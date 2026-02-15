@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: Full Forensic</title>
+    <title>Strata-Scan Pro: Exterior Forensic</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; padding: 10px; line-height: 1.4; }
@@ -13,7 +13,7 @@
         .btn-gps { background: #fd7e14; color: white; }
         .btn-log { background: #007bff; color: white; height: 80px; font-size: 1.4rem; }
         .alarm-box { background: #b00; padding: 25px; text-align: center; border-radius: 15px; font-size: 3.5rem; font-weight: 900; border: 4px solid #f00; margin-top: 10px; color: #fff; }
-        .log-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.7rem; color: #ccc; }
+        .log-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.65rem; color: #ccc; }
         .log-table th, .log-table td { border: 1px solid #444; padding: 6px; text-align: left; }
         .toggle-container { display: flex; align-items: center; justify-content: space-between; background: #222; padding: 15px; border-radius: 8px; margin: 10px 0; border: 1px solid #555; }
         .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
@@ -23,16 +23,17 @@
         input:checked + .slider { background-color: #f39c12; }
         input:checked + .slider:before { transform: translateX(26px); }
         .warning { background: #ff9800; color: #000; padding: 10px; border-radius: 5px; font-weight: bold; display: none; text-align: center; margin-top: 8px; font-size: 0.85rem; }
+        .baro-source { font-size: 0.7rem; color: #888; text-align: right; margin-top: -5px; }
     </style>
 </head>
 <body>
 
-    <h2 style="color:#0cf; text-align:center;">STRATA-SCAN PRO</h2>
+    <h2 style="color:#0cf; text-align:center;">STRATA-SCAN PRO <span style="font-size:0.6em; display:block; color:#fff;">EXTERIOR FORENSIC MODE</span></h2>
 
     <div class="card">
-        <label>1. Sensor & Site Sync</label>
+        <label>1. Exterior Environment Sync</label>
         <button class="btn btn-sync" onclick="connectProbes()">SYNC BLUETOOTH (Testo)</button>
-        <button class="btn btn-gps" onclick="syncGPS()">SYNC GPS WEATHER & SUN</button>
+        <button class="btn btn-gps" onclick="syncGPS()">SYNC GPS & SOLAR LOAD</button>
         <div style="display:flex; gap:10px;">
             <input type="number" id="tDry" placeholder="Temp °F">
             <input type="number" id="rh" placeholder="Humid %">
@@ -41,14 +42,15 @@
             <input type="number" id="windSpeed" placeholder="Wind m/s" oninput="checkWind()">
             <input type="number" id="pressure" placeholder="Press. hPa" oninput="checkPressure()">
         </div>
-        <div id="windWarning" class="warning">⚠️ HIGH WIND: DATA MASKED</div>
-        <div id="pressureWarning" class="warning">⚠️ PRESSURE DELTA: LEAK RISK</div>
+        <div class="baro-source" id="baroSource">Source: Manual/API</div>
+        <div id="windWarning" class="warning">⚠️ HIGH WIND: EXTERIOR DATA MASKED</div>
+        <div id="pressureWarning" class="warning">⚠️ PRESSURE DELTA: STACK EFFECT RISK</div>
     </div>
 
     <div class="card">
-        <label>2. Forensic Parameters</label>
+        <label>2. Facade Parameters</label>
         <div class="toggle-container">
-            <span style="font-weight:bold; color:#f39c12;">DIRECT SUNLIGHT?</span>
+            <span style="font-weight:bold; color:#f39c12;">DIRECT SUN ON FACADE?</span>
             <label class="switch"><input type="checkbox" id="solarToggle" onchange="updateAlarm()"><span class="slider"></span></label>
         </div>
         <select id="material" onchange="updateAlarm()">
@@ -61,28 +63,41 @@
             <option value="0.26">Aged/Degraded Sealant (0.26)</option>
         </select>
         <select id="scanMode" onchange="updateAlarm()">
-            <option value="1.0">FLASH SCAN (Active)</option>
-            <option value="1.5">FORENSIC (2h Delay)</option>
+            <option value="1.0">FLASH SCAN (Active Leak)</option>
+            <option value="1.5">FORENSIC (Residual Moisture)</option>
         </select>
-        <input type="number" id="baselineC8" placeholder="Reference Dry C8 Reading °F" oninput="updateAlarm()">
+        <input type="number" id="baselineC8" placeholder="Ref Dry Surface Temp °F" oninput="updateAlarm()">
     </div>
 
     <div class="alarm-box" id="result">--.-°F</div>
-    <button class="btn btn-log" onclick="logEvidence()">LOG EVIDENCE SNAPSHOT</button>
+    <button class="btn btn-log" onclick="logEvidence()">LOG FACADE SNAPSHOT</button>
 
     <div class="card">
-        <label>Evidence Vault</label>
+        <label>Evidence Vault (Exterior Audit)</label>
         <table class="log-table" id="logTable">
-            <thead><tr><th>Time</th><th>Sun</th><th>Tdry</th><th>Wind</th><th>Press</th><th>Alarm</th></tr></thead>
+            <thead><tr><th>Time</th><th>Sun</th><th>Mat.</th><th>Tdry</th><th>Wind</th><th>Press</th><th>Alarm</th></tr></thead>
             <tbody></tbody>
         </table>
-        <button class="btn" style="background:#6c757d; color:white; font-size:1rem;" onclick="exportLogs()">EXPORT CSV FOR DAVID/ERNIE</button>
+        <button class="btn" style="background:#6c757d; color:white; font-size:1rem;" onclick="exportLogs()">EXPORT EXTERIOR AUDIT CSV</button>
     </div>
 
     <script>
         const API_KEY = "D987987038bce28955e65f9f4ede5209";
         const TESTO_SERVICE = 0xfee9;
         const TESTO_CHAR = 0xfef5;
+
+        // Hardware Barometer Logic
+        if ('Sensor' in window) {
+            try {
+                const sensor = new Barometer({frequency: 1});
+                sensor.addEventListener('reading', () => {
+                    document.getElementById('pressure').value = sensor.pressure.toFixed(1);
+                    document.getElementById('baroSource').innerText = "Source: Hardware Sensor";
+                    checkPressure();
+                });
+                sensor.start();
+            } catch (e) { console.log("Internal Barometer not supported."); }
+        }
 
         async function connectProbes() {
             try {
@@ -122,10 +137,13 @@
                         document.getElementById('tDry').value = Math.round(data.main.temp);
                         document.getElementById('rh').value = data.main.humidity;
                     }
-                    document.getElementById('pressure').value = data.main.pressure;
+                    if(document.getElementById('baroSource').innerText !== "Source: Hardware Sensor") {
+                        document.getElementById('pressure').value = data.main.pressure;
+                        document.getElementById('baroSource').innerText = "Source: API Context";
+                    }
                     checkPressure();
                     updateAlarm();
-                } catch (e) { alert("API Offline"); }
+                } catch (e) { alert("API Context Offline"); }
             });
         }
 
@@ -152,20 +170,22 @@
         function logEvidence() {
             const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             const sun = document.getElementById('solarToggle').checked ? "SUN" : "SHADE";
-            const row = `<tr><td>${time}</td><td>${sun}</td><td>${document.getElementById('tDry').value}F</td><td>${document.getElementById('windSpeed').value}m/s</td><td>${document.getElementById('pressure').value}</td><td>${document.getElementById('result').innerText}</td></tr>`;
+            const mat = document.getElementById('material').options[document.getElementById('material').selectedIndex].text.split(' ')[0];
+            const row = `<tr><td>${time}</td><td>${sun}</td><td>${mat}</td><td>${document.getElementById('tDry').value}F</td><td>${document.getElementById('windSpeed').value}m/s</td><td>${document.getElementById('pressure').value}</td><td>${document.getElementById('result').innerText}</td></tr>`;
             document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
+            alert("SNAPSHOT LOGGED: Take FLIR Photo now of " + mat);
         }
 
         function exportLogs() {
-            let csv = "Time,Sun,Tdry,Wind,Press,Talarm\n";
+            let csv = "Time,Solar_Load,Material,Ambient_Temp,Wind_Speed,Pressure,Alarm_Threshold\n";
             document.querySelectorAll("#logTable tbody tr").forEach(tr => {
                 const c = tr.querySelectorAll("td");
-                csv += `${c[0].innerText},${c[1].innerText},${c[2].innerText},${c[3].innerText},${c[4].innerText},${c[5].innerText}\n`;
+                csv += `${c[0].innerText},${c[1].innerText},${c[2].innerText},${c[3].innerText},${c[4].innerText},${c[5].innerText},${c[6].innerText}\n`;
             });
             const blob = new Blob([csv], { type: 'text/csv' });
             const a = document.createElement('a');
             a.href = window.URL.createObjectURL(blob);
-            a.download = `Strata_Forensic_Report_${new Date().toISOString().slice(0,10)}.csv`;
+            a.download = `Exterior_Audit_${new Date().toISOString().slice(0,10)}.csv`;
             a.click();
         }
 
