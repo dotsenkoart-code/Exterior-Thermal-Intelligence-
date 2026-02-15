@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Strata-Scan Pro: Master Build</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; padding: 10px; line-height: 1.4; }
+        .card { background: #1a1a1a; padding: 18px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #333; }
+        input, select { width: 100%; padding: 16px; margin: 8px 0; background: #222; color: #0f0; border: 2px solid #555; border-radius: 8px; font-size: 1.1rem; box-sizing: border-box; }
+        label { font-size: 0.8rem; color: #0cf; font-weight: bold; text-transform: uppercase; display: block; }
+        
+        .btn { padding: 18px; border: none; border-radius: 10px; width: 100%; font-size: 1.2rem; font-weight: 800; cursor: pointer; margin-bottom: 10px; transition: opacity 0.2s; }
+        .btn-sync { background: #28a745; color: white; }
+        .btn-gps { background: #fd7e14; color: white; }
+        .btn-log { background: #007bff; color: white; height: 80px; font-size: 1.4rem; }
+        .btn-export { background: #6c757d; color: white; margin-top: 10px; font-size: 1rem; }
+        
+        .alarm-box { background: #b00; padding: 25px; text-align: center; border-radius: 15px; font-size: 3.5rem; font-weight: 900; border: 4px solid #f00; margin-top: 10px; color: #fff; }
+        .log-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.75rem; color: #ccc; }
+        .log-table th, .log-table td { border: 1px solid #444; padding: 8px; text-align: left; }
+        
+        .toggle-container { display: flex; align-items: center; justify-content: space-between; background: #222; padding: 15px; border-radius: 8px; margin: 10px 0; border: 1px solid #555; }
+        .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #444; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #f39c12; }
+        input:checked + .slider:before { transform: translateX(26px); }
+        
+        .warning { background: #ff9800; color: #000; padding: 10px; border-radius: 5px; font-weight: bold; display: none; text-align: center; margin-top: 8px; }
+    </style>
+</head>
+<body>
+
+    <h2 style="color:#0cf; text-align:center; margin-bottom:10px;">STRATA-SCAN PRO</h2>
+
+    <div class="card">
+        <label>1. Sensor & Site Sync</label>
+        <button class="btn btn-sync" onclick="connectProbes()">SYNC BLUETOOTH (Testo)</button>
+        <button class="btn btn-gps" onclick="syncGPS()">SYNC GPS WEATHER & SUN</button>
+        
+        <div style="display:flex; gap:10px;">
+            <input type="number" id="tDry" placeholder="Temp °F">
+            <input type="number" id="rh" placeholder="Humid %">
+        </div>
+        <div style="display:flex; gap:10px;">
+            <input type="number" id="windSpeed" placeholder="Wind m/s" oninput="checkWind()">
+            <input type="number" id="pressure" placeholder="Press. hPa" oninput="checkPressure()">
+        </div>
+        <div id="windWarning" class="warning">⚠️ HIGH WIND: DATA MASKED</div>
+        <div id="pressureWarning" class="warning">⚠️ PRESSURE DELTA: LEAK RISK</div>
+    </div>
+
+    <div class="card">
+        <label>2. Forensic Parameters</label>
+        
+        <div class="toggle-container">
+            <span style="font-weight:bold; color:#f39c12;">DIRECT SUNLIGHT?</span>
+            <label class="switch">
+                <input type="checkbox" id="solarToggle" onchange="updateAlarm()">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <select id="material" onchange="updateAlarm()">
+            <option value="0.18">Bricks / Masonry (0.18)</option>
+            <option value="0.20">Stucco / Concrete (0.20)</option>
+            <option value="0.25">Wood / Composite (0.25)</option>
+            <option value="0.15">Metal / Aluminum (0.15)</option>
+            <option value="0.22">EIFS / Synth Stucco (0.22)</option>
+            <option value="0.24">Fiber Cement / Hardie (0.24)</option>
+            <option value="0.26">Aged Sealant (0.26)</option>
+        </select>
+
+        <select id="scanMode" onchange="updateAlarm()">
+            <option value="1.0">FLASH SCAN (Active Wetting)</option>
+            <option value="1.5">FORENSIC (2h Residual)</option>
+        </select>
+        
+        <input type="number" id="baselineC8" placeholder="Reference Dry C8 Reading °F" oninput="updateAlarm()">
+    </div>
+
+    <div class="alarm-box" id="result">--.-°F</div>
+    <p style="text-align:center; color:#0cf; font-weight:bold; margin-top:5px;">SET C8 ISOTHERM BELOW THIS</p>
+    
+    <button class="btn btn-log" onclick="logEvidence()">LOG EVIDENCE SNAPSHOT</button>
+
+    <div class="card">
+        <label>Evidence Vault (Auto-Backup)</label>
+        <table class="log-table" id="logTable">
+            <thead>
+                <tr><th>Time</th><th>Sun</th><th>Temp</th><th>Alarm</th></tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <button class="btn btn-export" onclick="exportLogs()">EXPORT CSV LOGS</button>
+        <button class="btn" style="background:#b00; font-size:0.8rem; padding:10px;" onclick="clearLogs()">CLEAR VAULT</button>
+    </div>
+
+    <script>
+        const TESTO_SERVICE = 0xfee9;
+        const TESTO_CHAR = 0xfef5;
+
+        // Persistent Storage Loading
+        window.onload = () => {
+            const saved = localStorage.getItem('strata_logs');
+            if (saved) document.getElementById('logTable').querySelector('tbody').innerHTML = saved;
+        };
+
+        // Bluetooth Sync Logic
+        async function connectProbes() {
+            try {
+                const device = await navigator.bluetooth.requestDevice({ filters: [{ services: [TESTO_SERVICE] }], optionalServices: [TESTO_SERVICE] });
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(TESTO_SERVICE);
+                const char = await service.getCharacteristic(TESTO_CHAR);
+                char.startNotifications();
+                char.addEventListener('characteristicvaluechanged', (e) => {
+                    const val = (e.target.value.getUint16(2, true) / 100).toFixed(1);
+                    if (device.name.includes("605i")) document.getElementById('tDry').value = val;
+                    if (device.name.includes("405i")) document.getElementById('windSpeed').value = val;
+                    updateAlarm();
+                });
+            } catch (err) { console.log("BLE: " + err); }
+        }
+
+        // GPS & Solar Logic
+        async function syncGPS() {
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                const { latitude, longitude } = pos.coords;
+                const now = new Date();
+                
+                // Simplified Solar Elevation (0-90)
+                const solarElev = 90 - Math.abs(latitude - (23.5 * Math.sin(((now.getMonth()*30+now.getDate())/365)*2*Math.PI)));
+                document.getElementById('solarToggle').checked = (solarElev > 25 && now.getHours() > 8 && now.getHours() < 16);
+                
+                const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=imperial&appid=YOUR_API_KEY`;
+                try {
+                    const res = await fetch(weatherUrl);
+                    const data = await res.json();
+                    document.getElementById('tDry').value = Math.round(data.main.temp);
+                    document.getElementById('rh').value = data.main.humidity;
+                    document.getElementById('windSpeed').value = (data.wind.speed * 0.447).toFixed(1);
+                    document.getElementById('pressure').value = data.main.pressure;
+                    updateAlarm();
+                } catch (e) { alert("API Offline - Manual entry required."); }
+            });
+        }
+
+        function calculateTdp(T, RH) {
+            const a = 17.27, b = 237.7;
+            const gamma = (a * ((T-32)*5/9)) / (b + ((T-32)*5/9)) + Math.log(RH/100);
+            return ((b * gamma) / (a - gamma) * 9/5) + 32;
+        }
+
+        function checkWind() { document.getElementById('windWarning').style.display = document.getElementById('windSpeed').value > 3 ? 'block' : 'none'; }
+        function checkPressure() { document.getElementById('pressureWarning').style.display = (document.getElementById('pressure').value < 1005) ? 'block' : 'none'; }
+
+        function updateAlarm() {
+            const Tdry = parseFloat(document.getElementById('tDry').value);
+            const RH = parseFloat(document.getElementById('rh').value);
+            const refC8 = parseFloat(document.getElementById('baselineC8').value);
+            const ageFact = parseFloat(document.getElementById('material').value);
+            let sensMult = parseFloat(document.getElementById('scanMode').value);
+
+            // Solar Loading Bias Correction: Tighten sensitivity if in direct sun
+            if (document.getElementById('solarToggle').checked) sensMult *= 0.85;
+
+            if (Tdry && RH && refC8) {
+                const Tdp = calculateTdp(Tdry, RH);
+                const Talarm = refC8 - (Math.abs(refC8 - Tdp) * ageFact / sensMult);
+                document.getElementById('result').innerText = Talarm.toFixed(1) + "°F";
+            }
+        }
+
+        function logEvidence() {
+            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const sun = document.getElementById('solarToggle').checked ? "SUN" : "SHADE";
+            const Tdry = document.getElementById('tDry').value;
+            const alarm = document.getElementById('result').innerText;
+            const row = `<tr><td>${time}</td><td>${sun}</td><td>${Tdry}F</td><td>${alarm}</td></tr>`;
+            const tbody = document.getElementById('logTable').querySelector('tbody');
+            tbody.insertAdjacentHTML('afterbegin', row);
+            localStorage.setItem('strata_logs', tbody.innerHTML);
+        }
+
+        function exportLogs() {
+            let csv = "Time,Sun_Loading,Ambient_Temp,Alarm_Threshold\n";
+            document.querySelectorAll("#logTable tbody tr").forEach(tr => {
+                const c = tr.querySelectorAll("td");
+                csv += `${c[0].innerText},${c[1].innerText},${c[2].innerText},${c[3].innerText}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `StrataScan_Log_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+        }
+
+        function clearLogs() {
+            if(confirm("Clear Evidence Vault?")) {
+                document.getElementById('logTable').querySelector('tbody').innerHTML = "";
+                localStorage.removeItem('strata_logs');
+            }
+        }
+    </script>
+</body>
+</html>
