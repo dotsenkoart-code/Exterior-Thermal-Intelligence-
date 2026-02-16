@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: Universal Forensic</title>
+    <title>Strata-Scan Pro: Final Forensic</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; padding: 10px; line-height: 1.4; }
@@ -23,28 +23,26 @@
         input:checked + .slider { background-color: #f39c12; }
         input:checked + .slider:before { transform: translateX(26px); }
         .warning { background: #ff9800; color: #000; padding: 10px; border-radius: 5px; font-weight: bold; display: none; text-align: center; margin-top: 8px; font-size: 0.85rem; }
-        .baro-source { font-size: 0.7rem; color: #888; text-align: right; margin-top: -5px; }
+        .status-light { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #555; margin-right: 5px; }
     </style>
 </head>
 <body>
 
-    <h2 style="color:#0cf; text-align:center;">STRATA-SCAN PRO <span style="font-size:0.6em; display:block; color:#fff;">EXTERIOR UNIVERSAL MODE</span></h2>
+    <h2 style="color:#0cf; text-align:center;">STRATA-SCAN PRO <span style="font-size:0.5em; display:block; color:#fff;">EXTERIOR FORENSIC MASTER</span></h2>
 
     <div class="card">
         <label>1. Exterior Environment Sync</label>
-        <button class="btn btn-sync" onclick="connectProbes()">SYNC BLUETOOTH (REPAIRED)</button>
+        <button class="btn btn-sync" onclick="connectProbes()">FORCE SYNC TESTO</button>
         <button class="btn btn-gps" onclick="syncGPS()">SYNC GPS & SOLAR LOAD</button>
         <div style="display:flex; gap:10px;">
-            <input type="number" id="tDry" placeholder="Temp °F">
-            <input type="number" id="rh" placeholder="Humid %">
+            <div><label>TEMP °F</label><input type="number" id="tDry" placeholder="72.0"></div>
+            <div><label>HUMID %</label><input type="number" id="rh" placeholder="45"></div>
         </div>
         <div style="display:flex; gap:10px;">
-            <input type="number" id="windSpeed" placeholder="Wind m/s" oninput="checkWind()">
-            <input type="number" id="pressure" placeholder="Press. hPa" oninput="checkPressure()">
+            <div><label>WIND m/s</label><input type="number" id="windSpeed" placeholder="1.5" oninput="checkWind()"></div>
+            <div><label>PRESS hPa</label><input type="number" id="pressure" placeholder="1013"></div>
         </div>
-        <div class="baro-source" id="baroSource">Source: Manual/API</div>
         <div id="windWarning" class="warning">⚠️ HIGH WIND: EXTERIOR DATA MASKED</div>
-        <div id="pressureWarning" class="warning">⚠️ PRESSURE DELTA: STACK EFFECT RISK</div>
     </div>
 
     <div class="card">
@@ -54,7 +52,7 @@
             <label class="switch"><input type="checkbox" id="solarToggle" onchange="updateAlarm()"><span class="slider"></span></label>
         </div>
         <select id="material" onchange="updateAlarm()">
-            <option value="0.18" selected>Bricks / Masonry (0.18)</option>
+            <option value="0.18">Bricks / Masonry (0.18)</option>
             <option value="0.20">Stucco / Concrete (0.20)</option>
             <option value="0.25">Wood / Composite (0.25)</option>
             <option value="0.15">Metal / Aluminum (0.15)</option>
@@ -63,8 +61,8 @@
             <option value="0.26">Aged/Degraded Sealant (0.26)</option>
         </select>
         <select id="scanMode" onchange="updateAlarm()">
-            <option value="1.0">FLASH SCAN (Active Leak)</option>
-            <option value="1.5">FORENSIC (Residual Moisture)</option>
+            <option value="1.0">FLASH SCAN (Active)</option>
+            <option value="1.5">FORENSIC (2h Delay)</option>
         </select>
         <input type="number" id="baselineC8" placeholder="Ref Dry Surface Temp °F" oninput="updateAlarm()">
     </div>
@@ -78,60 +76,47 @@
             <thead><tr><th>Time</th><th>Sun</th><th>Mat.</th><th>Tdry</th><th>Wind</th><th>Press</th><th>Alarm</th></tr></thead>
             <tbody></tbody>
         </table>
-        <button class="btn" style="background:#6c757d; color:white; font-size:1rem;" onclick="exportLogs()">EXPORT EXTERIOR AUDIT CSV</button>
+        <button class="btn" style="background:#6c757d; color:white; font-size:1rem;" onclick="exportLogs()">EXPORT CSV</button>
     </div>
 
     <script>
         const API_KEY = "D987987038bce28955e65f9f4ede5209";
-
-        // Hardware Barometer Detection
-        if ('Sensor' in window) {
-            try {
-                const sensor = new Barometer({frequency: 1});
-                sensor.addEventListener('reading', () => {
-                    document.getElementById('pressure').value = sensor.pressure.toFixed(1);
-                    document.getElementById('baroSource').innerText = "Source: Hardware Sensor";
-                    checkPressure();
-                });
-                sensor.start();
-            } catch (e) { console.log("Internal Barometer not supported."); }
-        }
+        const TESTO_SERVICE = '0000fee9-0000-1000-8000-00805f9b34fb';
 
         async function connectProbes() {
             try {
-                // STEP 1: Broad search to avoid "No Services" error
                 const device = await navigator.bluetooth.requestDevice({ 
-                    acceptAllDevices: true, 
-                    optionalServices: ['0000fee9-0000-1000-8000-00805f9b34fb'] 
+                    acceptAllDevices: true,
+                    optionalServices: [TESTO_SERVICE] 
                 });
                 
                 const server = await device.gatt.connect();
-                
-                // STEP 2: Scour the device for the Testo data service
-                const services = await server.getPrimaryServices();
-                const service = services.find(s => s.uuid.includes('fee9'));
-                
-                if (!service) throw new Error("Testo service locked. CLOSE Testo App!");
-
+                // FORCE: Ask specifically for the Testo service by its full ID
+                const service = await server.getPrimaryService(TESTO_SERVICE);
                 const characteristics = await service.getCharacteristics();
-                const char = characteristics.find(c => c.uuid.includes('fef5'));
                 
-                await char.startNotifications();
-                char.addEventListener('characteristicvaluechanged', (e) => {
+                // Find the specific data pipe (fef5)
+                const dataChar = characteristics.find(c => c.uuid.includes('fef5'));
+
+                if (!dataChar) throw new Error("Data stream blocked. Restart Probe.");
+
+                await dataChar.startNotifications();
+                dataChar.addEventListener('characteristicvaluechanged', (e) => {
                     const val = (e.target.value.getUint16(2, true) / 100).toFixed(1);
-                    // Match by name or just populate based on active sensors
-                    if (device.name && device.name.includes("605i")) {
+                    if (device.name.includes("605i")) {
                         const tField = document.getElementById('tDry');
                         tField.value = val;
                         tField.style.borderColor = "#28a745";
-                    } else if (device.name && device.name.includes("405i")) {
+                    } else if (device.name.includes("405i")) {
                         document.getElementById('windSpeed').value = val;
                         checkWind();
                     }
                     updateAlarm();
                 });
-                alert("Connected to " + device.name);
-            } catch (err) { alert("Forensic Sync Error: " + err.message); }
+                alert("SUCCESS: Connected to " + device.name);
+            } catch (err) {
+                alert("LOCKOUT ERROR: " + err.message + "\n\nFIX: Go to Settings -> Apps -> Testo Smart -> FORCE STOP.");
+            }
         }
 
         async function syncGPS() {
@@ -149,13 +134,9 @@
                         document.getElementById('tDry').value = Math.round(data.main.temp);
                         document.getElementById('rh').value = data.main.humidity;
                     }
-                    if(document.getElementById('baroSource').innerText !== "Source: Hardware Sensor") {
-                        document.getElementById('pressure').value = data.main.pressure;
-                        document.getElementById('baroSource').innerText = "Source: API Context";
-                    }
-                    checkPressure();
+                    document.getElementById('pressure').value = data.main.pressure;
                     updateAlarm();
-                } catch (e) { alert("Weather API Sync Failed."); }
+                } catch (e) { alert("GPS Weather Offline"); }
             });
         }
 
@@ -166,13 +147,15 @@
         }
 
         function updateAlarm() {
-            const Tdry = parseFloat(document.getElementById('tDry').value);
-            const RH = parseFloat(document.getElementById('rh').value);
-            const refC8 = parseFloat(document.getElementById('baselineC8').value);
+            const Tdry = parseFloat(document.getElementById('tDry').value || 0);
+            const RH = parseFloat(document.getElementById('rh').value || 0);
+            const refC8 = parseFloat(document.getElementById('baselineC8').value || 0);
             const ageFact = parseFloat(document.getElementById('material').value);
             let sensMult = parseFloat(document.getElementById('scanMode').value);
+            
             if (document.getElementById('solarToggle').checked) sensMult *= 0.85;
-            if (Tdry && RH && refC8) {
+            
+            if (Tdry > 0 && RH > 0 && refC8 > 0) {
                 const Tdp = calculateTdp(Tdry, RH);
                 const Talarm = refC8 - (Math.abs(refC8 - Tdp) * ageFact / sensMult);
                 document.getElementById('result').innerText = Talarm.toFixed(1) + "°F";
@@ -185,11 +168,11 @@
             const mat = document.getElementById('material').options[document.getElementById('material').selectedIndex].text.split(' ')[0];
             const row = `<tr><td>${time}</td><td>${sun}</td><td>${mat}</td><td>${document.getElementById('tDry').value}F</td><td>${document.getElementById('windSpeed').value}m/s</td><td>${document.getElementById('pressure').value}</td><td>${document.getElementById('result').innerText}</td></tr>`;
             document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
-            alert("LOGGED: Capture FLIR C8 Photo of " + mat);
+            alert("LOGGED: Capture FLIR Photo of " + mat);
         }
 
         function exportLogs() {
-            let csv = "Time,Solar_Load,Material,Ambient_Temp,Wind_Speed,Pressure,Alarm_Threshold\n";
+            let csv = "Time,Solar,Material,Temp,Wind,Press,Alarm\n";
             document.querySelectorAll("#logTable tbody tr").forEach(tr => {
                 const c = tr.querySelectorAll("td");
                 csv += `${c[0].innerText},${c[1].innerText},${c[2].innerText},${c[3].innerText},${c[4].innerText},${c[5].innerText},${c[6].innerText}\n`;
@@ -197,12 +180,11 @@
             const blob = new Blob([csv], { type: 'text/csv' });
             const a = document.createElement('a');
             a.href = window.URL.createObjectURL(blob);
-            a.download = `Exterior_Audit_${new Date().toISOString().slice(0,10)}.csv`;
+            a.download = `Strata_Audit_${new Date().toISOString().slice(0,10)}.csv`;
             a.click();
         }
 
-        function checkWind() { document.getElementById('windWarning').style.display = document.getElementById('windSpeed').value > 3 ? 'block' : 'none'; }
-        function checkPressure() { document.getElementById('pressureWarning').style.display = (document.getElementById('pressure').value < 1005) ? 'block' : 'none'; }
+        function checkWind() { document.getElementById('windWarning').style.display = (document.getElementById('windSpeed').value > 3) ? 'block' : 'none'; }
     </script>
 </body>
 </html>
