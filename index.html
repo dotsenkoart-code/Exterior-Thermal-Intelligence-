@@ -1,185 +1,179 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: Heartbeat Master</title>
+    <title>Strata-Scan Pro: Drop-First Forensic</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; padding: 10px; line-height: 1.4; }
         .card { background: #1a1a1a; padding: 18px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #333; }
-        input, select { width: 100%; padding: 16px; margin: 8px 0; background: #222; color: #0f0; border: 2px solid #555; border-radius: 8px; font-size: 1.1rem; box-sizing: border-box; }
+        input, select { width: 100%; padding: 16px; margin: 8px 0; background: #222; color: #0f0; border: 2px solid #555; border-radius: 8px; font-size: 1.1rem; box-sizing: border-box; text-align: center; }
         label { font-size: 0.8rem; color: #0cf; font-weight: bold; text-transform: uppercase; display: block; }
         .btn { padding: 18px; border: none; border-radius: 10px; width: 100%; font-size: 1.2rem; font-weight: 800; cursor: pointer; margin-bottom: 10px; }
-        .btn-sync { background: #28a745; color: white; border: 2px solid #fff; }
+        .btn-gps { background: #fd7e14; color: white; border: 2px solid #fff; }
         .btn-log { background: #007bff; color: white; height: 80px; font-size: 1.4rem; }
+        .stepper-container { display: flex; align-items: center; gap: 5px; margin-bottom: 10px; }
+        .step-btn { background: #444; color: #fff; border: 1px solid #666; width: 60px; height: 60px; font-size: 1.8rem; font-weight: bold; border-radius: 10px; cursor: pointer; }
+        .orient-btn { flex: 1; background: #333; color: #fff; border: 1px solid #555; padding: 12px 5px; font-size: 0.9rem; font-weight: bold; border-radius: 8px; }
+        .orient-btn.active { background: #0cf; color: #000; border-color: #fff; }
         .alarm-box { background: #b00; padding: 25px; text-align: center; border-radius: 15px; font-size: 3.5rem; font-weight: 900; border: 4px solid #f00; margin-top: 10px; color: #fff; }
         .log-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.65rem; color: #ccc; }
         .log-table th, .log-table td { border: 1px solid #444; padding: 6px; text-align: left; }
-        .toggle-container { display: flex; align-items: center; justify-content: space-between; background: #222; padding: 15px; border-radius: 8px; margin: 10px 0; border: 1px solid #555; }
-        .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #444; transition: .4s; border-radius: 34px; }
-        .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: #f39c12; }
-        input:checked + .slider:before { transform: translateX(26px); }
     </style>
 </head>
 <body onload="syncGPS()">
 
-    <h2 style="color:#0cf; text-align:center;">STRATA-SCAN PRO <span style="font-size:0.5em; display:block; color:#fff;">HEARTBEAT HANDSHAKE MODE</span></h2>
+    <h2 style="color:#0cf; text-align:center; margin-bottom:0;">STRATA-SCAN PRO</h2>
+    <p style="text-align:center; font-size:0.7rem; color:#888; margin-top:5px;">DROP-FIRST / NO-TYPING MODE</p>
 
     <div class="card">
-        <label>1. Exterior Sensors (Testo Primary)</label>
-        <button class="btn btn-sync" id="mainSyncBtn" onclick="connectProbes()">SYNC PROBES (HEARTBEAT)</button>
-        <div style="display:flex; gap:10px;">
-            <div><label>Ambient °F</label><input type="number" id="tDry" placeholder="--"></div>
-            <div><label>Humid %</label><input type="number" id="rh" placeholder="--"></div>
+        <label>Building & Drop Dynamics</label>
+        <input type="text" id="projectID" placeholder="Building Address">
+        
+        <div style="display:flex; gap:10px; margin-top:10px;">
+            <div style="flex:1;"><label>Drop ID</label><input type="text" id="dropLetter" value="A" style="text-transform:uppercase;"></div>
+            <div style="flex:1;"><label>Floor #</label>
+                <div class="stepper-container">
+                    <button class="step-btn" style="height:45px; width:45px;" onclick="step('floorNum', -1)">-</button>
+                    <input type="number" id="floorNum" value="12">
+                    <button class="step-btn" style="height:45px; width:45px;" onclick="step('floorNum', 1)">+</button>
+                </div>
+            </div>
         </div>
+
+        <label style="margin-top:10px;">Window Position</label>
+        <div style="display:flex; gap:5px; margin-bottom:10px;">
+            <button id="btnL" class="orient-btn" onclick="setPosition('L')">LEFT</button>
+            <button id="btnC" class="orient-btn active" onclick="setPosition('C')">CENTER</button>
+            <button id="btnR" class="orient-btn" onclick="setPosition('R')">RIGHT</button>
+        </div>
+        
+        <label>ID Format (Drop-Floor-Pos): <span id="idPreview" style="color:#0f0;">A-12-C</span></label>
+    </div>
+
+    <div class="card">
+        <label>1. Field Data Sync</label>
+        <button class="btn btn-gps" onclick="syncGPS()">SYNC GPS WEATHER</button>
         <div style="display:flex; gap:10px;">
-            <div><label>Wind m/s</label><input type="number" id="windSpeed" placeholder="0.0"></div>
-            <div><label>Press hPa</label><input type="number" id="pressure" placeholder="Auto"></div>
+            <div style="flex:1;"><label>Temp °F</label><input type="number" id="tDry" value="70.0" step="0.1" oninput="updateAlarm()"></div>
+            <div style="flex:1;"><label>Humid %</label><input type="number" id="rh" value="50" step="1" oninput="updateAlarm()"></div>
         </div>
     </div>
 
     <div class="card">
-        <label>2. Facade Parameters</label>
-        <div class="toggle-container">
-            <span style="font-weight:bold; color:#f39c12;">DIRECT SUN ON FACADE?</span>
-            <label class="switch"><input type="checkbox" id="solarToggle" onchange="updateAlarm()"><span class="slider"></span></label>
-        </div>
-        <select id="material" onchange="updateAlarm()">
-            <option value="0.18">Bricks / Masonry (0.18)</option>
-            <option value="0.20" selected>Stucco / Concrete (0.20)</option>
-            <option value="0.25">Wood / Composite (0.25)</option>
-            <option value="0.15">Metal / Aluminum (0.15)</option>
-            <option value="0.22">EIFS / Synth Stucco (0.22)</option>
-            <option value="0.24">Fiber Cement (0.24)</option>
-            <option value="0.26">Aged Sealant (0.26)</option>
+        <label>2. Forensic Parameters</label>
+        <label>Status</label>
+        <select id="statusSelect" style="border-color:#0cf;">
+            <option value="Dry/Sound">DRY / SOUND</option>
+            <option value="Leak Suspected">LEAK SUSPECTED</option>
+            <option value="Sealant Failure">SEALANT FAILURE</option>
+            <option value="IGU Fogging">IGU FOGGING</option>
         </select>
-        <input type="number" id="baselineC8" placeholder="Reference Dry Surface Temp °F" oninput="updateAlarm()">
+        
+        <label>Forensic Notes</label>
+        <select id="notesSelect" style="border-color:#f39c12;">
+            <option value="None">-- NO SPECIFIC DEFECT --</option>
+            <option value="Gasket Gap">GASKET GAP / SHRINKAGE</option>
+            <option value="Cracked Sealant">CRACKED / AGED SEALANT</option>
+            <option value="Weep Hole Clogged">WEEP HOLE CLOGGED</option>
+            <option value="Metal Deform">METAL FRAME DEFORMATION</option>
+            <option value="Glass Crack">STRESS CRACK IN GLASS</option>
+            <option value="Air Whistle">AUDIBLE AIR LEAK</option>
+        </select>
+
+        <label>Ref Dry Surface (°F)</label>
+        <div class="stepper-container">
+            <button class="step-btn" onclick="step('baselineC8', -0.5)">-</button>
+            <input type="number" id="baselineC8" value="75.0" step="0.1" oninput="updateAlarm()">
+            <button class="step-btn" onclick="step('baselineC8', 0.5)">+</button>
+        </div>
     </div>
 
     <div class="alarm-box" id="result">--.-°F</div>
-    <button class="btn btn-log" onclick="logEvidence()">LOG FACADE SNAPSHOT</button>
+    <button class="btn btn-log" onclick="logEvidence()">LOG SNAPSHOT</button>
 
     <div class="card">
-        <label>Evidence Vault</label>
+        <label>Forensic Evidence Vault</label>
         <table class="log-table" id="logTable">
-            <thead><tr><th>Time</th><th>Sun</th><th>Mat.</th><th>Temp</th><th>Alarm</th></tr></thead>
+            <thead><tr><th>ID</th><th>Status</th><th>Notes</th><th>Alarm</th></tr></thead>
             <tbody></tbody>
         </table>
-        <button class="btn" style="background:#6c757d; color:white; font-size:1rem;" onclick="exportLogs()">EXPORT CSV</button>
+        <button class="btn" style="background:#444; color:white; font-size:0.8rem;" onclick="exportLogs()">EXPORT CSV REPORT</button>
     </div>
 
     <script>
         const API_KEY = "D987987038bce28955e65f9f4ede5209";
-        const TESTO_SERVICE = '0000fee9-0000-1000-8000-00805f9b34fb';
-        const TESTO_DATA_CHAR = '0000fef5-0000-1000-8000-00805f9b34fb';
-        let probesConnected = false;
+        let currentPos = "C";
 
-        async function connectProbes() {
-            try {
-                // Wide search for all Testo devices
-                const device = await navigator.bluetooth.requestDevice({ 
-                    acceptAllDevices: true,
-                    optionalServices: [TESTO_SERVICE] 
-                });
-                
-                const server = await device.gatt.connect();
-                console.log("GATT Connected. Waiting for Heartbeat...");
-                
-                // HEARTBEAT LOGIC: We loop the service request to force the hardware to reveal itself
-                let service = null;
-                for (let i = 0; i < 5; i++) {
-                    try {
-                        service = await server.getPrimaryService(TESTO_SERVICE);
-                        if (service) break;
-                    } catch (e) {
-                        console.log("Retry " + (i+1) + "...");
-                        await new Promise(r => setTimeout(r, 1000));
-                    }
-                }
+        function setPosition(p) {
+            currentPos = p;
+            ['L', 'C', 'R'].forEach(pos => {
+                document.getElementById('btn' + pos).className = (p === pos) ? 'orient-btn active' : 'orient-btn';
+            });
+            updatePreview();
+        }
 
-                if (!service) throw new Error("Hardware Timed Out. Restart Probe.");
+        function updatePreview() {
+            const drop = document.getElementById('dropLetter').value.toUpperCase();
+            const floor = document.getElementById('floorNum').value;
+            document.getElementById('idPreview').innerText = `${drop}-${floor}-${currentPos}`;
+        }
 
-                const char = await service.getCharacteristic(TESTO_DATA_CHAR);
-                await char.startNotifications();
-                
-                probesConnected = true;
-                document.getElementById('mainSyncBtn').innerText = "CONNECTED: " + device.name;
-                document.getElementById('mainSyncBtn').style.background = "#007bff";
+        document.getElementById('dropLetter').oninput = updatePreview;
+        document.getElementById('floorNum').oninput = updatePreview;
 
-                char.addEventListener('characteristicvaluechanged', (e) => {
-                    const val = (e.target.value.getUint16(2, true) / 100).toFixed(1);
-                    if (device.name.includes("605i")) {
-                        const t = document.getElementById('tDry');
-                        t.value = val; t.style.borderColor = "#28a745";
-                    } else if (device.name.includes("405i")) {
-                        document.getElementById('windSpeed').value = val;
-                    }
-                    updateAlarm();
-                });
-            } catch (err) {
-                alert("Heartbeat Failed: " + err.message);
-                probesConnected = false;
-            }
+        function step(id, val) {
+            const el = document.getElementById(id);
+            el.value = (parseFloat(el.value) + val).toFixed(1);
+            if(id === 'floorNum') el.value = Math.round(el.value);
+            updateAlarm();
+            updatePreview();
         }
 
         async function syncGPS() {
             navigator.geolocation.getCurrentPosition(async (pos) => {
-                const { latitude, longitude } = pos.coords;
-                const now = new Date();
-                const solarElev = 90 - Math.abs(latitude - (23.5 * Math.sin(((now.getMonth()*30+now.getDate())/365)*2*Math.PI)));
-                document.getElementById('solarToggle').checked = (solarElev > 25 && now.getHours() > 8 && now.getHours() < 16);
-                
-                const url = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=imperial&appid=${API_KEY}`;
+                const url = `https://api.openweathermap.org/data/2.5/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&units=imperial&appid=${API_KEY}`;
                 try {
                     const res = await fetch(url);
                     const data = await res.json();
-                    if(!probesConnected) {
-                        document.getElementById('tDry').value = Math.round(data.main.temp);
-                        document.getElementById('rh').value = data.main.humidity;
-                    }
-                    document.getElementById('pressure').value = data.main.pressure;
+                    document.getElementById('tDry').value = data.main.temp;
+                    document.getElementById('rh').value = data.main.humidity;
                     updateAlarm();
-                } catch (e) { console.log("GPS Data unavailable."); }
+                } catch (e) { console.log("GPS Sync failed."); }
             });
-        }
-
-        function calculateTdp(T, RH) {
-            const a = 17.27, b = 237.7;
-            const gamma = (a * ((T-32)*5/9)) / (b + ((T-32)*5/9)) + Math.log(RH/100);
-            return ((b * gamma) / (a - gamma) * 9/5) + 32;
         }
 
         function updateAlarm() {
             const Tdry = parseFloat(document.getElementById('tDry').value || 0);
             const RH = parseFloat(document.getElementById('rh').value || 0);
             const refC8 = parseFloat(document.getElementById('baselineC8').value || 0);
-            const ageFact = parseFloat(document.getElementById('material').value);
             if (Tdry > 0 && RH > 0 && refC8 > 0) {
-                const Tdp = calculateTdp(Tdry, RH);
-                const Talarm = refC8 - (Math.abs(refC8 - Tdp) * ageFact / (document.getElementById('solarToggle').checked ? 0.85 : 1.0));
+                const a = 17.27, b = 237.7;
+                const gamma = (a * ((Tdry-32)*5/9)) / (b + ((Tdry-32)*5/9)) + Math.log(RH/100);
+                const Tdp = ((b * gamma) / (a - gamma) * 9/5) + 32;
+                const Talarm = refC8 - (Math.abs(refC8 - Tdp) * 0.20); 
                 document.getElementById('result').innerText = Talarm.toFixed(1) + "°F";
             }
         }
 
         function logEvidence() {
-            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const row = `<tr><td>${time}</td><td>${document.getElementById('solarToggle').checked?'SUN':'SHADE'}</td><td>${document.getElementById('material').value}</td><td>${document.getElementById('tDry').value}F</td><td>${document.getElementById('result').innerText}</td></tr>`;
+            const id = document.getElementById('idPreview').innerText;
+            const status = document.getElementById('statusSelect').value;
+            const notes = document.getElementById('notesSelect').value;
+            const row = `<tr><td>${id}</td><td>${status}</td><td>${notes}</td><td>${document.getElementById('result').innerText}</td></tr>`;
             document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
-            alert("LOGGED: Capture FLIR C8 Photo now.");
         }
 
         function exportLogs() {
-            let csv = "Time,Sun,Material,Temp,Alarm\n";
+            const proj = document.getElementById('projectID').value || "Strata_Audit";
+            let csv = `Project,${proj}\nDate,${new Date().toLocaleDateString()}\n\nID,Status,Notes,Alarm_Threshold,Ambient_Temp\n`;
             document.querySelectorAll("#logTable tbody tr").forEach(tr => {
                 const c = tr.querySelectorAll("td");
-                csv += `${c[0].innerText},${c[1].innerText},${c[2].innerText},${c[3].innerText},${c[4].innerText}\n`;
+                csv += `${c[0].innerText},${c[1].innerText},${c[2].innerText},${c[3].innerText},${document.getElementById('tDry').value}\n`;
             });
             const blob = new Blob([csv], { type: 'text/csv' });
             const a = document.createElement('a');
             a.href = window.URL.createObjectURL(blob);
-            a.download = `Forensic_Audit_Report.csv`;
+            a.download = `${proj}_Report.csv`;
             a.click();
         }
     </script>
