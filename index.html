@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v23.0 Unabridged</title>
+    <title>Strata-Scan Pro: v25.0 Master</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; padding: 0; margin: 0; overflow: hidden; }
@@ -11,12 +11,12 @@
         
         /* NAVIGATION */
         .navbar { height: 70px; background: #111; display: flex; border-top: 2px solid #333; position: fixed; bottom: 0; width: 100%; z-index: 100; }
-        .nav-item { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold; color: #555; }
+        .nav-item { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold; color: #555; cursor: pointer; }
         .nav-item.active { color: #0cf; border-top: 3px solid #0cf; background: #1a1a1a; }
         
-        /* GLOVE-FRIENDLY UI */
+        /* GLOVE-FRIENDLY INPUTS */
         input, select { width: 100%; padding: 16px; margin: 5px 0; background: #222; color: #0f0; border: 2px solid #555; border-radius: 8px; font-size: 1.2rem; text-align: center; box-sizing: border-box;}
-        label { font-size: 0.7rem; color: #0cf; font-weight: bold; text-transform: uppercase; display: block; }
+        label { font-size: 0.7rem; color: #0cf; font-weight: bold; text-transform: uppercase; display: block; margin-top: 5px; }
         .stepper { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
         .step-btn { background: #444; color: #fff; border: 1px solid #666; width: 65px; height: 65px; font-size: 2rem; border-radius: 10px; font-weight: bold; }
         
@@ -24,21 +24,28 @@
         .pos-btn.active { background: #0cf; color: #000; border-color: #fff; }
 
         .btn { padding: 20px; border-radius: 12px; border: none; width: 100%; font-size: 1.3rem; font-weight: 800; cursor: pointer; }
+        .btn-sync { background: #fd7e14; color: #fff; margin-bottom: 10px; }
         .btn-log { background: #007bff; color: #fff; height: 90px; border: 4px solid #fff; }
+        .btn-flow { background: #333; color: #0cf; border: 2px solid #0cf; font-size: 1rem; }
+        .btn-descend { background: #28a745; color: #fff; margin-top: 15px; }
 
-        /* FORENSIC ALARM */
-        .alarm-box { background: #222; padding: 25px; text-align: center; border-radius: 15px; font-size: 3.8rem; font-weight: 900; border: 5px solid #444; margin: 10px 0; transition: 0.3s; }
-        .warn { background: #f39c12 !important; color: #000; border-color: #fff !important; }
+        /* FORENSIC ALARM & STATUS */
+        .alarm-box { background: #222; padding: 25px; text-align: center; border-radius: 15px; font-size: 3.5rem; font-weight: 900; border: 5px solid #444; margin: 10px 0; transition: 0.3s; }
         .crit { background: #f00 !important; color: #fff; border-color: #fff !important; animation: blink 0.6s infinite; }
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+        .flash-sync { animation: flashGreen 0.5s 3; }
+        @keyframes flashGreen { 0% { color: #0f0; border-color: #0f0; } 100% { color: #fff; border-color: #555; } }
 
+        /* CHECKLIST */
         .checklist { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
-        .check-item { background: #333; padding: 15px; border-radius: 10px; font-size: 0.75rem; text-align: center; border: 1px solid #555; font-weight: bold; }
+        .check-item { background: #333; padding: 15px; border-radius: 10px; font-size: 0.75rem; text-align: center; border: 1px solid #555; font-weight: bold; cursor: pointer; }
         .check-item.active { background: #0cf; color: #000; border-color: #fff; }
         .check-item.sound-box.active { background: #28a745; color: #fff; }
         
-        table { width: 100%; border-collapse: collapse; font-size: 0.55rem; color: #ccc; }
-        td, th { border: 1px solid #333; padding: 8px; text-align: left; }
+        /* DATA TABLE */
+        .table-wrap { overflow-x: auto; background: #111; border-radius: 8px; padding: 5px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.5rem; color: #ccc; min-width: 1200px; }
+        td, th { border: 1px solid #333; padding: 6px; text-align: left; }
     </style>
 </head>
 <body onload="initApp()">
@@ -60,14 +67,14 @@
 
                 <div style="display:flex; gap:10px; margin-top:10px;">
                     <div style="flex:1;"><label>Drop ID</label><input type="text" id="dropLetter" value="A" style="text-transform:uppercase;"></div>
-                    <div style="flex:1;"><label>FLIR Image #</label><input type="number" id="imgNum" value="1"></div>
+                    <div style="flex:1;"><label>Image #</label><input type="number" id="imgNum" value="1"></div>
                 </div>
 
                 <label style="margin-top:15px;">Window Position</label>
                 <div style="display:flex; gap:8px;">
-                    <button class="pos-btn" id="pL" onclick="setPos('L')">LEFT</button>
-                    <button class="pos-btn active" id="pC" onclick="setPos('C')">CENTER</button>
-                    <button class="pos-btn" id="pR" onclick="setPos('R')">RIGHT</button>
+                    <button class="pos-btn" id="pL" onclick="setPos('L')">L</button>
+                    <button class="pos-btn active" id="pC" onclick="setPos('C')">C</button>
+                    <button class="pos-btn" id="pR" onclick="setPos('R')">R</button>
                 </div>
             </div>
             <p id="idPreview" style="text-align:center; color:#0f0; font-weight:bold;">A-12-C</p>
@@ -76,29 +83,32 @@
         <div class="slide">
             <h2 style="color:#f39c12">2. CLIMATE BASELINE</h2>
             <div class="card">
-                <label>Ambient Temp (°F) [Testo]</label>
+                <label>Amb Temp (°F) [Testo]</label>
                 <div class="stepper">
                     <button class="step-btn" onclick="step('tDry', -0.1)">-</button>
-                    <input type="number" id="tDry" value="70.0" step="0.1">
+                    <input type="number" id="tDry" value="70.0" step="0.1" oninput="updateAlarm()">
                     <button class="step-btn" onclick="step('tDry', 0.1)">+</button>
                 </div>
 
                 <label>Humidity (%) [Testo]</label>
                 <div class="stepper">
                     <button class="step-btn" onclick="step('rh', -1)">-</button>
-                    <input type="number" id="rh" value="50">
+                    <input type="number" id="rh" value="50" oninput="updateAlarm()">
                     <button class="step-btn" onclick="step('rh', 1)">+</button>
                 </div>
-
-                <label>Wind Speed (m/s)</label>
+                
+                <label>Wind (m/s)</label>
                 <div class="stepper">
                     <button class="step-btn" onclick="step('wind', -0.1)">-</button>
                     <input type="number" id="wind" value="0.0">
                     <button class="step-btn" onclick="step('wind', 0.1)">+</button>
                 </div>
             </div>
-            <button class="btn" style="background:#fd7e14; color:#fff;" onclick="syncGPS()">SYNC BARO @ ALTITUDE</button>
-            <input type="hidden" id="pressure" value="1013.25">
+            <div class="card">
+                <label>Atmospheric Pressure (hPa)</label>
+                <input type="number" id="pressure" value="1013.2" readonly>
+                <button class="btn btn-sync" onclick="syncGPS()">SYNC BARO @ ALTITUDE</button>
+            </div>
         </div>
 
         <div class="slide">
@@ -106,16 +116,11 @@
             <div class="card">
                 <label>Material Library</label>
                 <select id="material" onchange="updateAlarm()">
-                    <option value="0.20">STUCCO / CONCRETE (0.20)</option>
-                    <option value="0.15">ALUMINUM / METAL (0.15)</option>
-                    <option value="0.26">AGED SEALANT (0.26)</option>
-                    <option value="0.18">BRICK / MASONRY (0.18)</option>
-                    <option value="0.12">GLASS / GLAZING (0.12)</option>
-                </select>
-                <label>Solar Environment</label>
-                <select id="solar" onchange="updateAlarm()">
-                    <option value="1.0">☁️ SHADE / OVERCAST</option>
-                    <option value="0.85">☀️ DIRECT SUN</option>
+                    <option value="0.20">Stucco / Concrete (0.20)</option>
+                    <option value="0.15">Aluminum / Metal (0.15)</option>
+                    <option value="0.26">Aged Sealant (0.26)</option>
+                    <option value="0.12">Glass / Glazing (0.12)</option>
+                    <option value="0.18">Masonry / Brick (0.18)</option>
                 </select>
 
                 <div class="checklist">
@@ -129,35 +134,34 @@
 
             <div style="display:flex; gap:10px;">
                 <div style="flex:1;"><label>Ref Dry</label>
-                    <div class="stepper"><button class="step-btn" onclick="step('baselineC8', -0.1)" style="width:45px; height:45px;">-</button><input type="number" id="baselineC8" value="75.0"><button class="step-btn" onclick="step('baselineC8', 0.1)" style="width:45px; height:45px;">+</button></div>
+                    <div class="stepper"><button class="step-btn" onclick="step('baselineC8', -0.1)" style="width:45px; height:45px;">-</button><input type="number" id="baselineC8" value="75.0"></div>
                 </div>
                 <div style="flex:1;"><label>Suspect</label>
-                    <div class="stepper"><button class="step-btn" onclick="step('suspectTemp', -0.1)" style="width:45px; height:45px;">-</button><input type="number" id="suspectTemp" value="75.0"><button class="step-btn" onclick="step('suspectTemp', 0.1)" style="width:45px; height:45px;">+</button></div>
+                    <div class="stepper"><button class="step-btn" onclick="step('suspectTemp', -0.1)" style="width:45px; height:45px;">-</button><input type="number" id="suspectTemp" value="75.0"></div>
                 </div>
             </div>
-
             <div class="alarm-box" id="result">--.-°F</div>
-            <button class="btn btn-log" onclick="logEvidence()">COMMIT DATA</button>
+            <button class="btn" style="background:#007bff; color:#fff;" onclick="logEvidence()">COMMIT SNAPSHOT</button>
         </div>
 
         <div class="slide">
-            <h2 style="color:#ccc">4. COMMAND FLOW</h2>
+            <h2 style="color:#ccc">4. COMMAND CENTER</h2>
             <div class="card">
-                <label>Jump to Next Window (Same Floor)</label>
+                <label>Flow Control</label>
                 <div style="display:flex; gap:8px; margin-top:5px;">
-                    <button class="pos-btn" style="color:#0cf" onclick="flowNext('L')">L</button>
-                    <button class="pos-btn" style="color:#0cf" onclick="flowNext('C')">C</button>
-                    <button class="pos-btn" style="color:#0cf" onclick="flowNext('R')">R</button>
+                    <button class="pos-btn btn-flow" onclick="flowNext('L')">L</button>
+                    <button class="pos-btn btn-flow" onclick="flowNext('C')">C</button>
+                    <button class="pos-btn btn-flow" onclick="flowNext('R')">R</button>
                 </div>
-                <button class="btn" style="background:#28a745; color:#fff; margin-top:20px;" onclick="flowNext('DOWN')">DESCEND & RESET TO CENTER</button>
+                <button class="btn btn-descend" onclick="flowNext('DOWN')">DESCEND FLOOR & RESET</button>
             </div>
-            <div class="card" style="font-size:0.6rem; height:180px; overflow-y:auto; padding:5px;">
+            <div class="table-wrap">
                 <table id="logTable">
-                    <thead><tr><th>ID</th><th>ΔT</th><th>Finding</th><th>Alarm</th><th>Amb</th><th>Press</th></tr></thead>
+                    <thead><tr><th>Time</th><th>Address</th><th>ID</th><th>ΔT</th><th>Finding</th><th>Alarm</th><th>Amb</th><th>Hum</th><th>Press</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
-            <div style="display:flex; gap:8px;">
+            <div style="display:flex; gap:8px; margin-top:10px;">
                 <button class="btn" style="background:#444; flex:1; font-size:0.8rem;" onclick="exportLogs()">EXPORT CSV</button>
                 <button class="btn" style="background:#b00; flex:1; font-size:0.8rem;" onclick="clearVault()">WIPE</button>
             </div>
@@ -187,21 +191,6 @@
             items.forEach((item, i) => item.classList.toggle('active', i === num));
         }
 
-        function step(id, val) {
-            const el = document.getElementById(id);
-            el.value = (parseFloat(el.value) + val).toFixed(id === 'floorNum' || id === 'rh' ? 0 : 1);
-            updateAlarm();
-            updatePreview();
-        }
-
-        function setPos(p) {
-            currentPos = p;
-            ['L', 'C', 'R'].forEach(pos => { const btn = document.getElementById('p' + pos); if(btn) btn.classList.toggle('active', p === pos); });
-            updatePreview();
-        }
-
-        function updatePreview() { document.getElementById('idPreview').innerText = `${document.getElementById('dropLetter').value}-${document.getElementById('floorNum').value}-${currentPos}`; }
-
         async function syncGPS() {
             navigator.geolocation.getCurrentPosition(async (pos) => {
                 const url = `https://api.openweathermap.org/data/2.5/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&units=imperial&appid=${API_KEY}`;
@@ -210,10 +199,13 @@
                 const P0 = data.main.pressure;
                 const h = pos.coords.altitude || 0;
                 const Tk = (data.main.temp - 32) * 5/9 + 273.15;
-                // Full Hypsometric Pressure Correction
-                document.getElementById('pressure').value = (P0 * Math.pow(1 - (0.0065 * h) / Tk, 5.257)).toFixed(1);
+                const press = (P0 * Math.pow(1 - (0.0065 * h) / Tk, 5.257)).toFixed(1);
+                
+                const pInput = document.getElementById('pressure');
+                pInput.value = press;
+                pInput.classList.add('flash-sync');
+                setTimeout(() => pInput.classList.remove('flash-sync'), 1500);
                 updateAlarm();
-                alert("STATION PRESSURE CALIBRATED: " + document.getElementById('pressure').value + " hPa");
             });
         }
 
@@ -223,43 +215,29 @@
             const ref = parseFloat(document.getElementById('baselineC8').value);
             const sus = parseFloat(document.getElementById('suspectTemp').value);
             const mat = parseFloat(document.getElementById('material').value);
-            const sol = parseFloat(document.getElementById('solar').value);
             const P = parseFloat(document.getElementById('pressure').value);
 
-            // 1. Vapor Pressure Enhancement Factor (f) for Moist Air
+            // FORMULA: Arden Buck + Enhancement Factor (f)
             const f = 1.0007 + (3.46e-6 * P);
-            // 2. Arden Buck High-Precision Coefficients
             const a = 17.27, b = 237.7;
             const gamma = (a * ((Td-32)*5/9)) / (b + ((Td-32)*5/9)) + Math.log((RH/100) * f);
             const Tdp = ((b * gamma) / (a - gamma) * 9/5) + 32;
+            const Talarm = ref - (Math.abs(ref - Tdp) * mat);
             
-            // 3. Material-Solar Threshold Integration
-            const Talarm = ref - (Math.abs(ref - Tdp) * mat / (sol === 0.85 ? 0.92 : 1.0));
             const box = document.getElementById('result');
             box.innerText = Talarm.toFixed(1) + "°F";
-            
-            const delta = (ref - sus).toFixed(1);
-            if (sus <= Talarm) {
-                box.className = "alarm-box crit";
-                if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 200]);
-            } else if (delta >= 2.0) {
-                box.className = "alarm-box warn";
-            } else {
-                box.className = "alarm-box";
-            }
+            box.className = (sus <= Talarm) ? "alarm-box crit" : "alarm-box";
         }
 
-        function toggleSound() { document.getElementById('soundBtn').classList.add('active'); document.querySelectorAll('.defect').forEach(el => el.classList.remove('active')); }
-        function toggleDefect(el) { el.classList.toggle('active'); if (document.querySelectorAll('.defect.active').length > 0) document.getElementById('soundBtn').classList.remove('active'); else document.getElementById('soundBtn').classList.add('active'); }
-
         function logEvidence() {
+            const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' });
+            const addr = document.getElementById('projectID').value || "NA";
+            const id = `${document.getElementById('dropLetter').value}-${document.getElementById('floorNum').value}-${currentPos}`;
             const findings = Array.from(document.querySelectorAll('.check-item.active')).map(i => i.innerText).join("|");
-            const id = document.getElementById('idPreview').innerText;
             const ref = parseFloat(document.getElementById('baselineC8').value);
             const sus = parseFloat(document.getElementById('suspectTemp').value);
-            const delta = (ref - sus).toFixed(1);
-            const photo = "FLIR" + document.getElementById('imgNum').value.toString().padStart(4, '0');
-            const row = `<tr><td>${id}</td><td>${delta}</td><td>${findings}</td><td>${document.getElementById('result').innerText}</td><td>${document.getElementById('tDry').value}</td><td>${document.getElementById('pressure').value}</td></tr>`;
+            
+            const row = `<tr><td>${time}</td><td>${addr}</td><td>${id}</td><td>${(ref-sus).toFixed(1)}</td><td>${findings}</td><td>${document.getElementById('result').innerText}</td><td>${document.getElementById('tDry').value}</td><td>${document.getElementById('rh').value}</td><td>${document.getElementById('pressure').value}</td></tr>`;
             document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
             localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
             goToSlide(3);
@@ -274,13 +252,18 @@
             updateAlarm();
         }
 
+        function step(id, val) { const el = document.getElementById(id); el.value = (parseFloat(el.value) + val).toFixed(id === 'floorNum' || id === 'rh' ? 0 : 1); updateAlarm(); updatePreview(); }
+        function setPos(p) { currentPos = p; ['L', 'C', 'R'].forEach(pos => { const btn = document.getElementById('p' + pos); if(btn) btn.classList.toggle('active', p === pos); }); updatePreview(); }
+        function updatePreview() { document.getElementById('idPreview').innerText = `${document.getElementById('dropLetter').value}-${document.getElementById('floorNum').value}-${currentPos}`; }
+        function toggleSound() { document.getElementById('soundBtn').classList.add('active'); document.querySelectorAll('.defect').forEach(el => el.classList.remove('active')); }
+        function toggleDefect(el) { el.classList.toggle('active'); if (document.querySelectorAll('.defect.active').length > 0) document.getElementById('soundBtn').classList.remove('active'); else document.getElementById('soundBtn').classList.add('active'); }
         function saveDraft() { localStorage.setItem('strataDraft', document.getElementById('projectID').value); }
-        function clearVault() { if (confirm("Wipe session data?")) { localStorage.removeItem('strataVault'); location.reload(); } }
+        function clearVault() { if (confirm("Wipe data?")) { localStorage.removeItem('strataVault'); location.reload(); } }
         function exportLogs() {
-            let csv = "ID,DeltaT,Findings,Alarm,Ambient,Pressure\n";
+            let csv = "Time,Address,ID,DeltaT,Findings,Alarm,Amb,Hum,Press\n";
             document.querySelectorAll("#logTable tbody tr").forEach(tr => { csv += Array.from(tr.querySelectorAll("td")).map(td => `"${td.innerText}"`).join(",") + "\n"; });
             const blob = new Blob([csv], { type: 'text/csv' });
-            const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = "Strata_Report.csv"; a.click();
+            const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = "Strata_v25_Report.csv"; a.click();
         }
     </script>
 </body>
