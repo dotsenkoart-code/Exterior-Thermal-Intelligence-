@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: Wide Net Forensic</title>
+    <title>Strata-Scan Pro: Universal Forensic</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; padding: 10px; line-height: 1.4; }
@@ -28,11 +28,11 @@
 </head>
 <body>
 
-    <h2 style="color:#0cf; text-align:center;">STRATA-SCAN PRO <span style="font-size:0.6em; display:block; color:#fff;">EXTERIOR FORENSIC (WIDE NET)</span></h2>
+    <h2 style="color:#0cf; text-align:center;">STRATA-SCAN PRO <span style="font-size:0.6em; display:block; color:#fff;">EXTERIOR UNIVERSAL MODE</span></h2>
 
     <div class="card">
         <label>1. Exterior Environment Sync</label>
-        <button class="btn btn-sync" onclick="connectProbes()">SYNC BLUETOOTH (ALL DEVICES)</button>
+        <button class="btn btn-sync" onclick="connectProbes()">SYNC BLUETOOTH (REPAIRED)</button>
         <button class="btn btn-gps" onclick="syncGPS()">SYNC GPS & SOLAR LOAD</button>
         <div style="display:flex; gap:10px;">
             <input type="number" id="tDry" placeholder="Temp °F">
@@ -83,10 +83,8 @@
 
     <script>
         const API_KEY = "D987987038bce28955e65f9f4ede5209";
-        const TESTO_SERVICE = 0xfee9;
-        const TESTO_CHAR = 0xfef5;
 
-        // Hardware Barometer Logic
+        // Hardware Barometer Detection
         if ('Sensor' in window) {
             try {
                 const sensor = new Barometer({frequency: 1});
@@ -101,29 +99,39 @@
 
         async function connectProbes() {
             try {
-                // WORKAROUND: acceptAllDevices set to true to bypass filtering issues
+                // STEP 1: Broad search to avoid "No Services" error
                 const device = await navigator.bluetooth.requestDevice({ 
                     acceptAllDevices: true, 
-                    optionalServices: [TESTO_SERVICE] 
+                    optionalServices: ['0000fee9-0000-1000-8000-00805f9b34fb'] 
                 });
+                
                 const server = await device.gatt.connect();
-                const service = await server.getPrimaryService(TESTO_SERVICE);
-                const char = await service.getCharacteristic(TESTO_CHAR);
-                char.startNotifications();
+                
+                // STEP 2: Scour the device for the Testo data service
+                const services = await server.getPrimaryServices();
+                const service = services.find(s => s.uuid.includes('fee9'));
+                
+                if (!service) throw new Error("Testo service locked. CLOSE Testo App!");
+
+                const characteristics = await service.getCharacteristics();
+                const char = characteristics.find(c => c.uuid.includes('fef5'));
+                
+                await char.startNotifications();
                 char.addEventListener('characteristicvaluechanged', (e) => {
                     const val = (e.target.value.getUint16(2, true) / 100).toFixed(1);
+                    // Match by name or just populate based on active sensors
                     if (device.name && device.name.includes("605i")) {
                         const tField = document.getElementById('tDry');
                         tField.value = val;
                         tField.style.borderColor = "#28a745";
-                    }
-                    if (device.name && device.name.includes("405i")) {
+                    } else if (device.name && device.name.includes("405i")) {
                         document.getElementById('windSpeed').value = val;
                         checkWind();
                     }
                     updateAlarm();
                 });
-            } catch (err) { alert("Wide Net Connection failed: " + err); }
+                alert("Connected to " + device.name);
+            } catch (err) { alert("Forensic Sync Error: " + err.message); }
         }
 
         async function syncGPS() {
@@ -147,7 +155,7 @@
                     }
                     checkPressure();
                     updateAlarm();
-                } catch (e) { alert("API Context Offline"); }
+                } catch (e) { alert("Weather API Sync Failed."); }
             });
         }
 
@@ -177,7 +185,7 @@
             const mat = document.getElementById('material').options[document.getElementById('material').selectedIndex].text.split(' ')[0];
             const row = `<tr><td>${time}</td><td>${sun}</td><td>${mat}</td><td>${document.getElementById('tDry').value}F</td><td>${document.getElementById('windSpeed').value}m/s</td><td>${document.getElementById('pressure').value}</td><td>${document.getElementById('result').innerText}</td></tr>`;
             document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
-            alert("SNAPSHOT LOGGED: Take FLIR Photo now of " + mat);
+            alert("LOGGED: Capture FLIR C8 Photo of " + mat);
         }
 
         function exportLogs() {
