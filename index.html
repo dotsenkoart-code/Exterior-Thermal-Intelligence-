@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: Final Forensic</title>
+    <title>Strata-Scan Pro: Sensor-Primary</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; padding: 10px; line-height: 1.4; }
@@ -9,8 +9,7 @@
         input, select { width: 100%; padding: 16px; margin: 8px 0; background: #222; color: #0f0; border: 2px solid #555; border-radius: 8px; font-size: 1.1rem; box-sizing: border-box; }
         label { font-size: 0.8rem; color: #0cf; font-weight: bold; text-transform: uppercase; display: block; }
         .btn { padding: 18px; border: none; border-radius: 10px; width: 100%; font-size: 1.2rem; font-weight: 800; cursor: pointer; margin-bottom: 10px; }
-        .btn-sync { background: #28a745; color: white; }
-        .btn-gps { background: #fd7e14; color: white; }
+        .btn-sync { background: #28a745; color: white; border: 2px solid #fff; }
         .btn-log { background: #007bff; color: white; height: 80px; font-size: 1.4rem; }
         .alarm-box { background: #b00; padding: 25px; text-align: center; border-radius: 15px; font-size: 3.5rem; font-weight: 900; border: 4px solid #f00; margin-top: 10px; color: #fff; }
         .log-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.65rem; color: #ccc; }
@@ -22,27 +21,25 @@
         .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
         input:checked + .slider { background-color: #f39c12; }
         input:checked + .slider:before { transform: translateX(26px); }
-        .warning { background: #ff9800; color: #000; padding: 10px; border-radius: 5px; font-weight: bold; display: none; text-align: center; margin-top: 8px; font-size: 0.85rem; }
-        .status-light { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #555; margin-right: 5px; }
+        .status-msg { font-size: 0.75rem; text-align: center; margin-bottom: 10px; color: #aaa; }
     </style>
 </head>
-<body>
+<body onload="syncGPS()">
 
-    <h2 style="color:#0cf; text-align:center;">STRATA-SCAN PRO <span style="font-size:0.5em; display:block; color:#fff;">EXTERIOR FORENSIC MASTER</span></h2>
+    <h2 style="color:#0cf; text-align:center;">STRATA-SCAN PRO <span style="font-size:0.5em; display:block; color:#fff;">SENSOR-PRIMARY MODE</span></h2>
 
     <div class="card">
-        <label>1. Exterior Environment Sync</label>
-        <button class="btn btn-sync" onclick="connectProbes()">FORCE SYNC TESTO</button>
-        <button class="btn btn-gps" onclick="syncGPS()">SYNC GPS & SOLAR LOAD</button>
+        <label>1. Field Data (Testo Primary / GPS Backup)</label>
+        <button class="btn btn-sync" id="mainSyncBtn" onclick="connectProbes()">CONNECT TESTO PROBES</button>
+        <div id="statusIndicator" class="status-msg">GPS Context Active. Connect sensors for high-accuracy.</div>
         <div style="display:flex; gap:10px;">
-            <div><label>TEMP °F</label><input type="number" id="tDry" placeholder="72.0"></div>
-            <div><label>HUMID %</label><input type="number" id="rh" placeholder="45"></div>
+            <div><label>Ambient °F</label><input type="number" id="tDry" placeholder="--"></div>
+            <div><label>Humid %</label><input type="number" id="rh" placeholder="--"></div>
         </div>
         <div style="display:flex; gap:10px;">
-            <div><label>WIND m/s</label><input type="number" id="windSpeed" placeholder="1.5" oninput="checkWind()"></div>
-            <div><label>PRESS hPa</label><input type="number" id="pressure" placeholder="1013"></div>
+            <div><label>Wind m/s</label><input type="number" id="windSpeed" placeholder="0.0"></div>
+            <div><label>Press hPa</label><input type="number" id="pressure" placeholder="Auto"></div>
         </div>
-        <div id="windWarning" class="warning">⚠️ HIGH WIND: EXTERIOR DATA MASKED</div>
     </div>
 
     <div class="card">
@@ -58,22 +55,18 @@
             <option value="0.15">Metal / Aluminum (0.15)</option>
             <option value="0.22">EIFS / Synth Stucco (0.22)</option>
             <option value="0.24">Fiber Cement / Hardie (0.24)</option>
-            <option value="0.26">Aged/Degraded Sealant (0.26)</option>
+            <option value="0.26">Aged Sealant (0.26)</option>
         </select>
-        <select id="scanMode" onchange="updateAlarm()">
-            <option value="1.0">FLASH SCAN (Active)</option>
-            <option value="1.5">FORENSIC (2h Delay)</option>
-        </select>
-        <input type="number" id="baselineC8" placeholder="Ref Dry Surface Temp °F" oninput="updateAlarm()">
+        <input type="number" id="baselineC8" placeholder="Reference Dry Reading °F" oninput="updateAlarm()">
     </div>
 
     <div class="alarm-box" id="result">--.-°F</div>
-    <button class="btn btn-log" onclick="logEvidence()">LOG FACADE SNAPSHOT</button>
+    <button class="btn btn-log" onclick="logEvidence()">LOG SNAPSHOT</button>
 
     <div class="card">
-        <label>Evidence Vault (Exterior Audit)</label>
+        <label>Evidence Vault</label>
         <table class="log-table" id="logTable">
-            <thead><tr><th>Time</th><th>Sun</th><th>Mat.</th><th>Tdry</th><th>Wind</th><th>Press</th><th>Alarm</th></tr></thead>
+            <thead><tr><th>Time</th><th>Source</th><th>Mat.</th><th>Temp</th><th>Alarm</th></tr></thead>
             <tbody></tbody>
         </table>
         <button class="btn" style="background:#6c757d; color:white; font-size:1rem;" onclick="exportLogs()">EXPORT CSV</button>
@@ -82,6 +75,7 @@
     <script>
         const API_KEY = "D987987038bce28955e65f9f4ede5209";
         const TESTO_SERVICE = '0000fee9-0000-1000-8000-00805f9b34fb';
+        let probesConnected = false;
 
         async function connectProbes() {
             try {
@@ -91,31 +85,32 @@
                 });
                 
                 const server = await device.gatt.connect();
-                // FORCE: Ask specifically for the Testo service by its full ID
+                await new Promise(r => setTimeout(r, 2000));
+                
                 const service = await server.getPrimaryService(TESTO_SERVICE);
                 const characteristics = await service.getCharacteristics();
-                
-                // Find the specific data pipe (fef5)
                 const dataChar = characteristics.find(c => c.uuid.includes('fef5'));
 
-                if (!dataChar) throw new Error("Data stream blocked. Restart Probe.");
-
                 await dataChar.startNotifications();
+                probesConnected = true;
+                document.getElementById('statusIndicator').innerText = "PRIMARY: Sensors connected (" + device.name + ")";
+                document.getElementById('statusIndicator').style.color = "#28a745";
+
                 dataChar.addEventListener('characteristicvaluechanged', (e) => {
                     const val = (e.target.value.getUint16(2, true) / 100).toFixed(1);
                     if (device.name.includes("605i")) {
-                        const tField = document.getElementById('tDry');
-                        tField.value = val;
-                        tField.style.borderColor = "#28a745";
+                        const t = document.getElementById('tDry');
+                        t.value = val; t.style.borderColor = "#28a745";
+                        t.readOnly = true; 
                     } else if (device.name.includes("405i")) {
-                        document.getElementById('windSpeed').value = val;
-                        checkWind();
+                        const w = document.getElementById('windSpeed');
+                        w.value = val; w.style.borderColor = "#28a745";
                     }
                     updateAlarm();
                 });
-                alert("SUCCESS: Connected to " + device.name);
             } catch (err) {
-                alert("LOCKOUT ERROR: " + err.message + "\n\nFIX: Go to Settings -> Apps -> Testo Smart -> FORCE STOP.");
+                alert("Bluetooth connection failed. Using GPS as backup.");
+                probesConnected = false;
             }
         }
 
@@ -126,17 +121,20 @@
                 const solarElev = 90 - Math.abs(latitude - (23.5 * Math.sin(((now.getMonth()*30+now.getDate())/365)*2*Math.PI)));
                 document.getElementById('solarToggle').checked = (solarElev > 25 && now.getHours() > 8 && now.getHours() < 16);
                 
-                const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=imperial&appid=${API_KEY}`;
+                const url = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=imperial&appid=${API_KEY}`;
                 try {
-                    const res = await fetch(weatherUrl);
+                    const res = await fetch(url);
                     const data = await res.json();
-                    if(!document.getElementById('tDry').style.borderColor.includes("rgb(40, 167, 69)")) {
+                    
+                    // Only use GPS values if probes are NOT connected
+                    if(!probesConnected) {
                         document.getElementById('tDry').value = Math.round(data.main.temp);
                         document.getElementById('rh').value = data.main.humidity;
+                        document.getElementById('statusIndicator').innerText = "BACKUP: Using GPS Weather Data.";
                     }
                     document.getElementById('pressure').value = data.main.pressure;
                     updateAlarm();
-                } catch (e) { alert("GPS Weather Offline"); }
+                } catch (e) { console.log("GPS Data unavailable."); }
             });
         }
 
@@ -151,40 +149,32 @@
             const RH = parseFloat(document.getElementById('rh').value || 0);
             const refC8 = parseFloat(document.getElementById('baselineC8').value || 0);
             const ageFact = parseFloat(document.getElementById('material').value);
-            let sensMult = parseFloat(document.getElementById('scanMode').value);
-            
-            if (document.getElementById('solarToggle').checked) sensMult *= 0.85;
-            
             if (Tdry > 0 && RH > 0 && refC8 > 0) {
                 const Tdp = calculateTdp(Tdry, RH);
-                const Talarm = refC8 - (Math.abs(refC8 - Tdp) * ageFact / sensMult);
+                const Talarm = refC8 - (Math.abs(refC8 - Tdp) * ageFact / (document.getElementById('solarToggle').checked ? 0.85 : 1.0));
                 document.getElementById('result').innerText = Talarm.toFixed(1) + "°F";
             }
         }
 
         function logEvidence() {
             const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const sun = document.getElementById('solarToggle').checked ? "SUN" : "SHADE";
-            const mat = document.getElementById('material').options[document.getElementById('material').selectedIndex].text.split(' ')[0];
-            const row = `<tr><td>${time}</td><td>${sun}</td><td>${mat}</td><td>${document.getElementById('tDry').value}F</td><td>${document.getElementById('windSpeed').value}m/s</td><td>${document.getElementById('pressure').value}</td><td>${document.getElementById('result').innerText}</td></tr>`;
+            const source = probesConnected ? "SENSOR" : "GPS";
+            const row = `<tr><td>${time}</td><td>${source}</td><td>${document.getElementById('material').value}</td><td>${document.getElementById('tDry').value}F</td><td>${document.getElementById('result').innerText}</td></tr>`;
             document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
-            alert("LOGGED: Capture FLIR Photo of " + mat);
         }
 
         function exportLogs() {
-            let csv = "Time,Solar,Material,Temp,Wind,Press,Alarm\n";
+            let csv = "Time,Source,Material,Temp,Alarm\n";
             document.querySelectorAll("#logTable tbody tr").forEach(tr => {
                 const c = tr.querySelectorAll("td");
-                csv += `${c[0].innerText},${c[1].innerText},${c[2].innerText},${c[3].innerText},${c[4].innerText},${c[5].innerText},${c[6].innerText}\n`;
+                csv += `${c[0].innerText},${c[1].innerText},${c[2].innerText},${c[3].innerText},${c[4].innerText}\n`;
             });
             const blob = new Blob([csv], { type: 'text/csv' });
             const a = document.createElement('a');
             a.href = window.URL.createObjectURL(blob);
-            a.download = `Strata_Audit_${new Date().toISOString().slice(0,10)}.csv`;
+            a.download = `Forensic_Audit_Report.csv`;
             a.click();
         }
-
-        function checkWind() { document.getElementById('windWarning').style.display = (document.getElementById('windSpeed').value > 3) ? 'block' : 'none'; }
     </script>
 </body>
 </html>
