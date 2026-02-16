@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v16.0 Engineer</title>
+    <title>Strata-Scan Pro: v16.5 Optimized</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; padding: 10px; line-height: 1.3; }
@@ -30,28 +30,32 @@
 </head>
 <body onload="initApp()">
 
-    <h2 style="color:#0cf; text-align:center; margin-bottom:0;">STRATA-SCAN PRO <span style="font-size:0.5em; color:#fff;">v16.0 ENGINEER</span></h2>
+    <h2 style="color:#0cf; text-align:center; margin-bottom:0;">STRATA-SCAN PRO <span style="font-size:0.5em; color:#fff;">v16.5 OPTIMIZED</span></h2>
 
     <div class="card">
-        <label>Building & Evidence Mapping</label>
+        <label>Building & Drop Mapping</label>
         <input type="text" id="projectID" placeholder="Building Address..." oninput="saveDraft()">
         <div style="display:flex; gap:8px;">
             <div style="flex:1;"><label>Drop</label><input type="text" id="dropLetter" value="A" oninput="updatePreview()"></div>
-            <div style="flex:1;"><label>Floor</label><input type="number" id="floorNum" value="12" oninput="updatePreview()"></div>
-            <div style="flex:1;"><label>FLIR Image #</label>
-                <div class="stepper-container"><button class="step-btn" style="height:45px; width:45px;" onclick="step('imgNum', -1)">-</button><input type="number" id="imgNum" value="1"><button class="step-btn" style="height:45px; width:45px;" onclick="step('imgNum', 1)">+</button></div>
+            <div style="flex:2;"><label>Floor # (Manual Step)</label>
+                <div class="stepper-container">
+                    <button class="step-btn" onclick="step('floorNum', -1)">-</button>
+                    <input type="number" id="floorNum" value="12" oninput="updatePreview()">
+                    <button class="step-btn" onclick="step('floorNum', 1)">+</button>
+                </div>
             </div>
+            <div style="flex:1;"><label>FLIR #</label><input type="number" id="imgNum" value="1" oninput="updatePreview()"></div>
         </div>
         <div style="display:flex; gap:5px; margin-top:5px;">
             <button id="btnL" class="orient-btn" onclick="setPosition('L')">LEFT</button>
             <button id="btnC" class="orient-btn active" onclick="setPosition('C')">CENTER</button>
             <button id="btnR" class="orient-btn" onclick="setPosition('R')">RIGHT</button>
         </div>
-        <label>Forensic ID: <span id="idPreview" style="color:#0f0;">A-12-C</span> | Photo: <span id="imgPreview" style="color:#f39c12;">FLIR0001</span></label>
+        <label>Forensic ID: <span id="idPreview" style="color:#0f0;">A-12-C</span> | Evidence ID: <span id="imgPreview" style="color:#f39c12;">FLIR0001</span></label>
     </div>
 
     <div class="card">
-        <label>1. Testo Climate Inputs (0.1° Precision)</label>
+        <label>1. Testo Climate Inputs</label>
         <div style="display:flex; gap:10px;">
             <div style="flex:1;"><label>Amb °F</label>
                 <div class="stepper-container"><button class="step-btn" onclick="step('tDry', -0.1)">-</button><input type="number" id="tDry" value="70.0" step="0.1" oninput="updateAlarm()"><button class="step-btn" onclick="step('tDry', 0.1)">+</button></div>
@@ -64,9 +68,9 @@
             <div style="flex:1;"><label>Wind m/s</label>
                 <div class="stepper-container"><button class="step-btn" onclick="step('wind', -0.1)">-</button><input type="number" id="wind" value="0.0" step="0.1"><button class="step-btn" onclick="step('wind', 0.1)">+</button></div>
             </div>
-            <div style="flex:1;"><label>Local Press (hPa)</label><input type="number" id="pressure" readonly></div>
+            <div style="flex:1;"><label>Press (hPa)</label><input type="number" id="pressure" readonly></div>
         </div>
-        <button class="btn btn-gps" onclick="syncGPS()">SYNC GPS ALTITUDE & BARO</button>
+        <button class="btn btn-gps" onclick="syncGPS()">SYNC GPS BARO @ ALTITUDE</button>
         <div class="toggle-container">
             <span id="solarLabel" style="font-weight:bold; color:#0cf;">☁️ SHADE / OVERCAST</span>
             <label class="switch"><input type="checkbox" id="solarOverride" onchange="updateAlarm()"><span class="slider"></span></label>
@@ -94,13 +98,13 @@
     </div>
 
     <div class="alarm-box" id="result">--.-°F</div>
-    <button class="btn btn-log" onclick="logEvidence()">LOG DUAL AUDIT LINE</button>
+    <button class="btn btn-log" onclick="logEvidence()">LOG DATA & ADVANCE PHOTO</button>
 
     <div class="card">
-        <label>Evidence Vault (Dual Audit + Baro Corrected)</label>
+        <label>Evidence Vault</label>
         <div class="log-table-wrapper">
             <table class="log-table" id="logTable">
-                <thead><tr><th>Photo</th><th>Address</th><th>Time</th><th>ID</th><th>Finding</th><th>Alarm</th><th>Dry</th><th>Suspect</th><th>Amb-T</th><th>Hum-T</th><th>Amb-G</th><th>Hum-G</th><th>Press</th><th>Sun</th></tr></thead>
+                <thead><tr><th>Photo</th><th>Address</th><th>Time</th><th>ID</th><th>Finding</th><th>Alarm</th><th>Dry</th><th>Suspect</th><th>Amb-T</th><th>Hum-T</th><th>GPS-T</th><th>GPS-H</th><th>Press</th><th>Sun</th></tr></thead>
                 <tbody></tbody>
             </table>
         </div>
@@ -126,7 +130,7 @@
 
         function step(id, val) {
             const el = document.getElementById(id);
-            el.value = (parseFloat(el.value) + val).toFixed(id === 'rh' || id === 'imgNum' ? 0 : 1);
+            el.value = (parseFloat(el.value) + val).toFixed(id === 'rh' || id === 'floorNum' || id === 'imgNum' ? 0 : 1);
             updateAlarm();
             updatePreview();
         }
@@ -167,7 +171,7 @@
                     lastGPS = { temp: data.main.temp, hum: data.main.humidity, press: correctedP };
                     document.getElementById('pressure').value = correctedP;
                     updateAlarm();
-                } catch (e) { console.log("GPS Sync Failed"); }
+                } catch (e) { console.log("GPS Failed"); }
             });
         }
 
@@ -203,7 +207,7 @@
             tbody.insertAdjacentHTML('afterbegin', row);
             localStorage.setItem('strataVault', tbody.innerHTML);
 
-            // AUTO-ADVANCE
+            // AUTO-ADVANCE PHOTO ONLY (User handles Floor manually)
             document.getElementById('suspectTemp').value = dry;
             document.getElementById('imgNum').value = parseInt(document.getElementById('imgNum').value) + 1;
             updatePreview();
@@ -218,7 +222,7 @@
                 csv += Array.from(tr.querySelectorAll("td")).map(td => `"${td.innerText}"`).join(",") + "\n";
             });
             const blob = new Blob([csv], { type: 'text/csv' });
-            const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = `${proj}_v16.csv`; a.click();
+            const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = `${proj}_v16.5.csv`; a.click();
         }
     </script>
 </body>
