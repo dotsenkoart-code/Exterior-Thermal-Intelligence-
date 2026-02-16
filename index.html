@@ -1,132 +1,124 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: Full Spec Forensic</title>
+    <title>Strata-Scan Pro: Forensic Audit v10</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; padding: 10px; line-height: 1.4; }
-        .card { background: #1a1a1a; padding: 18px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #333; }
-        input, select { width: 100%; padding: 16px; margin: 8px 0; background: #222; color: #0f0; border: 2px solid #555; border-radius: 8px; font-size: 1.1rem; box-sizing: border-box; text-align: center; }
+        body { font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; padding: 10px; line-height: 1.3; }
+        .card { background: #1a1a1a; padding: 15px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #333; }
+        input, select { width: 100%; padding: 14px; margin: 5px 0; background: #222; color: #0f0; border: 2px solid #555; border-radius: 8px; font-size: 1.1rem; box-sizing: border-box; text-align: center; }
         label { font-size: 0.7rem; color: #0cf; font-weight: bold; text-transform: uppercase; display: block; margin-top: 5px; }
         .btn { padding: 18px; border: none; border-radius: 10px; width: 100%; font-size: 1.2rem; font-weight: 800; cursor: pointer; margin-bottom: 10px; }
         .btn-gps { background: #fd7e14; color: white; border: 2px solid #fff; }
         .btn-log { background: #007bff; color: white; height: 80px; font-size: 1.4rem; }
-        .stepper-container { display: flex; align-items: center; gap: 5px; margin-bottom: 10px; }
-        .step-btn { background: #444; color: #fff; border: 1px solid #666; width: 55px; height: 55px; font-size: 1.8rem; font-weight: bold; border-radius: 10px; }
-        .orient-btn { flex: 1; background: #333; color: #fff; border: 1px solid #555; padding: 12px 5px; font-size: 0.9rem; font-weight: bold; border-radius: 8px; }
+        .stepper-container { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; }
+        .step-btn { background: #444; color: #fff; border: 1px solid #666; width: 50px; height: 50px; font-size: 1.8rem; font-weight: bold; border-radius: 8px; }
+        .orient-btn { flex: 1; background: #333; color: #fff; border: 1px solid #555; padding: 12px 5px; font-size: 0.8rem; font-weight: bold; border-radius: 8px; }
         .orient-btn.active { background: #0cf; color: #000; border-color: #fff; }
-        .toggle-container { display: flex; align-items: center; justify-content: space-between; background: #222; padding: 12px; border-radius: 8px; margin: 10px 0; border: 1px solid #f39c12; }
-        .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #444; transition: .4s; border-radius: 34px; }
-        .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: #f39c12; }
-        input:checked + .slider:before { transform: translateX(26px); }
-        .alarm-box { background: #b00; padding: 25px; text-align: center; border-radius: 15px; font-size: 3.5rem; font-weight: 900; border: 4px solid #f00; margin-top: 10px; color: #fff; }
-        .log-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.6rem; color: #ccc; }
-        .log-table th, .log-table td { border: 1px solid #444; padding: 5px; text-align: left; }
+        .alarm-box { background: #b00; padding: 20px; text-align: center; border-radius: 15px; font-size: 3.2rem; font-weight: 900; border: 4px solid #f00; margin-top: 10px; color: #fff; position: relative; }
+        .alarm-box::after { content: 'ALARM THRESHOLD'; position: absolute; bottom: 5px; left: 0; right: 0; font-size: 0.6rem; color: #fff; opacity: 0.7; }
+        .log-table-wrapper { overflow-x: auto; margin-top: 15px; }
+        .log-table { width: 100%; border-collapse: collapse; font-size: 0.55rem; color: #ccc; min-width: 600px; }
+        .log-table th, .log-table td { border: 1px solid #444; padding: 5px; text-align: left; background: #111; }
+        .sun-status { font-weight: 900; color: #f39c12; }
     </style>
 </head>
 <body onload="syncGPS()">
 
-    <h2 style="color:#0cf; text-align:center; margin-bottom:0;">STRATA-SCAN PRO</h2>
-    <p style="text-align:center; font-size:0.7rem; color:#888; margin-top:5px;">COMPLETE FORENSIC BUILD v9.0</p>
+    <h2 style="color:#0cf; text-align:center; margin-bottom:0;">STRATA-SCAN PRO <span style="font-size:0.5em; color:#fff;">v10.0</span></h2>
 
     <div class="card">
-        <label>Building & Drop Mapping</label>
+        <label>Project & ID</label>
         <input type="text" id="projectID" placeholder="Building Name">
-        <div style="display:flex; gap:10px; margin-top:10px;">
+        <div style="display:flex; gap:8px;">
             <div style="flex:1;"><label>Drop</label><input type="text" id="dropLetter" value="A" style="text-transform:uppercase;"></div>
             <div style="flex:1;"><label>Floor</label>
                 <div class="stepper-container">
-                    <button class="step-btn" style="height:40px; width:40px;" onclick="step('floorNum', -1)">-</button>
+                    <button class="step-btn" onclick="step('floorNum', -1)">-</button>
                     <input type="number" id="floorNum" value="12">
-                    <button class="step-btn" style="height:40px; width:40px;" onclick="step('floorNum', 1)">+</button>
+                    <button class="step-btn" onclick="step('floorNum', 1)">+</button>
                 </div>
             </div>
         </div>
-        <label>Window Position</label>
-        <div style="display:flex; gap:5px; margin-bottom:10px;">
+        <div style="display:flex; gap:5px; margin-top:5px;">
             <button id="btnL" class="orient-btn" onclick="setPosition('L')">LEFT</button>
             <button id="btnC" class="orient-btn active" onclick="setPosition('C')">CENTER</button>
             <button id="btnR" class="orient-btn" onclick="setPosition('R')">RIGHT</button>
         </div>
-        <label>Current ID: <span id="idPreview" style="color:#0f0;">A-12-C</span></label>
+        <label>Forensic ID: <span id="idPreview" style="color:#0f0;">A-12-C</span></label>
     </div>
 
     <div class="card">
-        <label>1. Testo Climate Sync (Manual Match)</label>
-        <button class="btn btn-gps" onclick="syncGPS()">RE-SYNC GPS BACKUP</button>
+        <label>1. Testo/Climate Sync</label>
+        <button class="btn btn-gps" onclick="syncGPS()">AUTO-SYNC GPS & SUN POSITION</button>
+        <div style="display:flex; gap:10px;">
+            <div style="flex:1;"><label>Temp (°F)</label>
+                <div class="stepper-container"><button class="step-btn" onclick="step('tDry', -0.1)">-</button><input type="number" id="tDry" value="70.0" step="0.1" oninput="updateAlarm()"><button class="step-btn" onclick="step('tDry', 0.1)">+</button></div>
+            </div>
+            <div style="flex:1;"><label>Humid (%)</label>
+                <div class="stepper-container"><button class="step-btn" onclick="step('rh', -1)">-</button><input type="number" id="rh" value="50" step="1" oninput="updateAlarm()"><button class="step-btn" onclick="step('rh', 1)">+</button></div>
+            </div>
+        </div>
+        <div style="display:flex; gap:10px;">
+            <div style="flex:1;"><label>Wind (m/s)</label>
+                <div class="stepper-container"><button class="step-btn" onclick="step('wind', -0.1)">-</button><input type="number" id="wind" value="0.0" step="0.1"><button class="step-btn" onclick="step('wind', 0.1)">+</button></div>
+            </div>
+            <div style="flex:1;"><label>Press (hPa)</label><input type="number" id="pressure" readonly></div>
+        </div>
+        <div id="solarDisplay" class="sun-status" style="text-align:center; padding-top:5px; font-size:0.7rem;">CALCULATING SUN...</div>
+    </div>
+
+    <div class="card">
+        <label>2. Material & Reference</label>
         <div style="display:flex; gap:10px;">
             <div style="flex:1;">
-                <label>Temp (°F)</label>
-                <div class="stepper-container">
-                    <button class="step-btn" onclick="step('tDry', -0.5)">-</button>
-                    <input type="number" id="tDry" value="70.0" step="0.1" oninput="updateAlarm()">
-                    <button class="step-btn" onclick="step('tDry', 0.5)">+</button>
-                </div>
+                <label>Material</label>
+                <select id="material" onchange="updateAlarm()">
+                    <option value="0.20" selected>Stucco (0.2)</option>
+                    <option value="0.15">Metal (0.15)</option>
+                    <option value="0.26">Sealant (0.26)</option>
+                    <option value="0.18">Brick (0.18)</option>
+                </select>
             </div>
             <div style="flex:1;">
-                <label>Humid (%)</label>
-                <div class="stepper-container">
-                    <button class="step-btn" onclick="step('rh', -1)">-</button>
-                    <input type="number" id="rh" value="50" step="1" oninput="updateAlarm()">
-                    <button class="step-btn" onclick="step('rh', 1)">+</button>
-                </div>
+                <label>Finding</label>
+                <select id="statusSelect">
+                    <option value="Sound">SOUND</option>
+                    <option value="Suspected">LEAK ?</option>
+                    <option value="Sealant">SEALANT FAIL</option>
+                </select>
             </div>
         </div>
-    </div>
-
-    <div class="card">
-        <label>2. Facade Physics</label>
-        <div class="toggle-container">
-            <span style="font-weight:bold; color:#f39c12;">DIRECT SOLAR LOAD?</span>
-            <label class="switch"><input type="checkbox" id="solarToggle" onchange="updateAlarm()"><span class="slider"></span></label>
-        </div>
-        <label>Material Type</label>
-        <select id="material" onchange="updateAlarm()">
-            <option value="0.20" selected>Stucco / Concrete (0.20)</option>
-            <option value="0.15">Aluminum / Metal (0.15)</option>
-            <option value="0.26">Aged Sealant (0.26)</option>
-            <option value="0.18">Masonry / Brick (0.18)</option>
-            <option value="0.22">EIFS / Synth (0.22)</option>
-        </select>
-        <label>Status & Finding</label>
-        <select id="statusSelect" style="border-color:#0cf;">
-            <option value="Dry/Sound">DRY / SOUND</option>
-            <option value="Leak Suspected">LEAK SUSPECTED</option>
-            <option value="Sealant Failure">SEALANT FAILURE</option>
-            <option value="IGU Fogging">IGU FOGGING</option>
-        </select>
         <label>Ref Dry Surface (°F)</label>
         <div class="stepper-container">
-            <button class="step-btn" onclick="step('baselineC8', -0.5)">-</button>
+            <button class="step-btn" onclick="step('baselineC8', -0.1)">-</button>
             <input type="number" id="baselineC8" value="75.0" step="0.1" oninput="updateAlarm()">
-            <button class="step-btn" onclick="step('baselineC8', 0.5)">+</button>
+            <button class="step-btn" onclick="step('baselineC8', 0.1)">+</button>
         </div>
     </div>
 
     <div class="alarm-box" id="result">--.-°F</div>
-    <button class="btn btn-log" onclick="logEvidence()">LOG FORENSIC SNAPSHOT</button>
+    <button class="btn btn-log" onclick="logEvidence()">LOG COMPLETE AUDIT LINE</button>
 
     <div class="card">
-        <label>Forensic Evidence Vault</label>
-        <table class="log-table" id="logTable">
-            <thead><tr><th>ID</th><th>Status</th><th>Alarm</th><th>Dry</th><th>Solar</th></tr></thead>
-            <tbody></tbody>
-        </table>
-        <button class="btn" style="background:#444; color:white; font-size:0.8rem;" onclick="exportLogs()">EXPORT CSV REPORT</button>
+        <label>Evidence Vault (Full Data View)</label>
+        <div class="log-table-wrapper">
+            <table class="log-table" id="logTable">
+                <thead><tr><th>ID</th><th>Status</th><th>Alarm</th><th>Dry</th><th>Humid</th><th>Amb</th><th>Wind</th><th>Press</th><th>Sun</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <button class="btn" style="background:#444; color:white; font-size:0.8rem; margin-top:10px;" onclick="exportLogs()">EXPORT CSV AUDIT</button>
     </div>
 
     <script>
         const API_KEY = "D987987038bce28955e65f9f4ede5209";
         let currentPos = "C";
+        let isSun = false;
 
         function setPosition(p) {
             currentPos = p;
-            ['L', 'C', 'R'].forEach(pos => {
-                document.getElementById('btn' + pos).className = (p === pos) ? 'orient-btn active' : 'orient-btn';
-            });
+            ['L', 'C', 'R'].forEach(pos => document.getElementById('btn' + pos).className = (p === pos) ? 'orient-btn active' : 'orient-btn');
             updatePreview();
         }
 
@@ -146,12 +138,21 @@
 
         async function syncGPS() {
             navigator.geolocation.getCurrentPosition(async (pos) => {
-                const url = `https://api.openweathermap.org/data/2.5/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&units=imperial&appid=${API_KEY}`;
+                const { latitude, longitude } = pos.coords;
+                const url = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=imperial&appid=${API_KEY}`;
                 try {
                     const res = await fetch(url);
                     const data = await res.json();
+                    document.getElementById('pressure').value = data.main.pressure;
                     document.getElementById('tDry').value = data.main.temp;
                     document.getElementById('rh').value = data.main.humidity;
+                    
+                    // Sun Calc: Simple Elevation Estimate
+                    const now = new Date();
+                    const solarElev = 90 - Math.abs(latitude - (23.5 * Math.sin(((now.getMonth()*30+now.getDate())/365)*2*Math.PI)));
+                    isSun = (solarElev > 20 && now.getHours() > 8 && now.getHours() < 16);
+                    document.getElementById('solarDisplay').innerText = isSun ? "☀️ DIRECT SOLAR LOAD ACTIVE" : "☁️ SHADE / OVERCAST MASKING";
+                    document.getElementById('solarDisplay').style.color = isSun ? "#f39c12" : "#0cf";
                     updateAlarm();
                 } catch (e) { console.log("GPS Offline"); }
             });
@@ -162,14 +163,13 @@
             const RH = parseFloat(document.getElementById('rh').value || 0);
             const refC8 = parseFloat(document.getElementById('baselineC8').value || 0);
             const matFact = parseFloat(document.getElementById('material').value);
-            const solar = document.getElementById('solarToggle').checked ? 0.85 : 1.0;
+            const solarAdj = isSun ? 0.85 : 1.0;
 
             if (Tdry > 0 && RH > 0 && refC8 > 0) {
                 const a = 17.27, b = 237.7;
                 const gamma = (a * ((Tdry-32)*5/9)) / (b + ((Tdry-32)*5/9)) + Math.log(RH/100);
                 const Tdp = ((b * gamma) / (a - gamma) * 9/5) + 32;
-                // Forensic Formula including Material and Solar adjustment
-                const Talarm = refC8 - (Math.abs(refC8 - Tdp) * matFact / solar);
+                const Talarm = refC8 - (Math.abs(refC8 - Tdp) * matFact / solarAdj);
                 document.getElementById('result').innerText = Talarm.toFixed(1) + "°F";
             }
         }
@@ -177,22 +177,29 @@
         function logEvidence() {
             const id = document.getElementById('idPreview').innerText;
             const status = document.getElementById('statusSelect').value;
-            const solar = document.getElementById('solarToggle').checked ? "SUN" : "SHADE";
-            const row = `<tr><td>${id}</td><td>${status}</td><td>${document.getElementById('result').innerText}</td><td>${document.getElementById('baselineC8').value}</td><td>${solar}</td></tr>`;
+            const alarm = document.getElementById('result').innerText;
+            const dry = document.getElementById('baselineC8').value;
+            const humid = document.getElementById('rh').value;
+            const amb = document.getElementById('tDry').value;
+            const wind = document.getElementById('wind').value;
+            const press = document.getElementById('pressure').value;
+            const sun = isSun ? "SUN" : "SHADE";
+
+            const row = `<tr><td>${id}</td><td>${status}</td><td>${alarm}</td><td>${dry}</td><td>${humid}</td><td>${amb}</td><td>${wind}</td><td>${press}</td><td>${sun}</td></tr>`;
             document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
         }
 
         function exportLogs() {
             const proj = document.getElementById('projectID').value || "Strata_Audit";
-            let csv = `Project,${proj}\nDate,${new Date().toLocaleDateString()}\n\nID,Status,Alarm,Ref_Dry,Solar_Load\n`;
+            let csv = "ID,Status,Alarm,Ref_Dry,Humidity,Ambient,Wind,Pressure,Sun\n";
             document.querySelectorAll("#logTable tbody tr").forEach(tr => {
                 const c = tr.querySelectorAll("td");
-                csv += `${c[0].innerText},${c[1].innerText},${c[2].innerText},${c[3].innerText},${c[4].innerText}\n`;
+                csv += `${c[0].innerText},${c[1].innerText},${c[2].innerText},${c[3].innerText},${c[4].innerText},${c[5].innerText},${c[6].innerText},${c[7].innerText},${c[8].innerText}\n`;
             });
             const blob = new Blob([csv], { type: 'text/csv' });
             const a = document.createElement('a');
             a.href = window.URL.createObjectURL(blob);
-            a.download = `${proj}_Forensic_Report.csv`;
+            a.download = `${proj}_Report.csv`;
             a.click();
         }
     </script>
