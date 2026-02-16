@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v16.5 Optimized</title>
+    <title>Strata-Scan Pro: v17.0 Master</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; padding: 10px; line-height: 1.3; }
@@ -15,29 +15,23 @@
         .step-btn { background: #444; color: #fff; border: 1px solid #666; width: 55px; height: 55px; font-size: 1.8rem; font-weight: bold; border-radius: 8px; }
         .orient-btn { flex: 1; background: #333; color: #fff; border: 1px solid #555; padding: 12px 5px; font-size: 0.8rem; font-weight: bold; border-radius: 8px; }
         .orient-btn.active { background: #0cf; color: #000; border-color: #fff; }
-        .toggle-container { display: flex; align-items: center; justify-content: space-between; background: #222; padding: 12px; border-radius: 8px; margin: 10px 0; border: 1px solid #f39c12; }
-        .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #444; transition: .4s; border-radius: 34px; }
-        .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: #f39c12; }
         .alarm-box { background: #b00; padding: 25px; text-align: center; border-radius: 15px; font-size: 3.5rem; font-weight: 900; border: 4px solid #f00; margin-top: 10px; color: #fff; }
         .log-table-wrapper { overflow-x: auto; margin-top: 15px; border: 1px solid #444; border-radius: 8px; }
-        .log-table { width: 100%; border-collapse: collapse; font-size: 0.6rem; color: #ccc; min-width: 1400px; }
+        .log-table { width: 100%; border-collapse: collapse; font-size: 0.6rem; color: #ccc; min-width: 1600px; }
         .log-table td, .log-table th { border: 1px solid #444; padding: 8px; text-align: left; background: #111; }
         .utility-btns { display: flex; gap: 10px; margin-top: 5px; }
     </style>
 </head>
 <body onload="initApp()">
 
-    <h2 style="color:#0cf; text-align:center; margin-bottom:0;">STRATA-SCAN PRO <span style="font-size:0.5em; color:#fff;">v16.5 OPTIMIZED</span></h2>
+    <h2 style="color:#0cf; text-align:center; margin-bottom:0;">STRATA-SCAN PRO <span style="font-size:0.5em; color:#fff;">v17.0 FORENSIC</span></h2>
 
     <div class="card">
         <label>Building & Drop Mapping</label>
         <input type="text" id="projectID" placeholder="Building Address..." oninput="saveDraft()">
         <div style="display:flex; gap:8px;">
             <div style="flex:1;"><label>Drop</label><input type="text" id="dropLetter" value="A" oninput="updatePreview()"></div>
-            <div style="flex:2;"><label>Floor # (Manual Step)</label>
+            <div style="flex:2;"><label>Floor #</label>
                 <div class="stepper-container">
                     <button class="step-btn" onclick="step('floorNum', -1)">-</button>
                     <input type="number" id="floorNum" value="12" oninput="updatePreview()">
@@ -51,34 +45,52 @@
             <button id="btnC" class="orient-btn active" onclick="setPosition('C')">CENTER</button>
             <button id="btnR" class="orient-btn" onclick="setPosition('R')">RIGHT</button>
         </div>
-        <label>Forensic ID: <span id="idPreview" style="color:#0f0;">A-12-C</span> | Evidence ID: <span id="imgPreview" style="color:#f39c12;">FLIR0001</span></label>
+        <label>ID Preview: <span id="idPreview" style="color:#0f0;">A-12-C</span> | Evidence ID: <span id="imgPreview" style="color:#f39c12;">FLIR0001</span></label>
     </div>
 
     <div class="card">
-        <label>1. Testo Climate Inputs</label>
+        <label>1. Field Climate Sync (Testo + GPS)</label>
         <div style="display:flex; gap:10px;">
-            <div style="flex:1;"><label>Amb °F</label>
+            <div style="flex:1;"><label>Amb Temp °F</label>
                 <div class="stepper-container"><button class="step-btn" onclick="step('tDry', -0.1)">-</button><input type="number" id="tDry" value="70.0" step="0.1" oninput="updateAlarm()"><button class="step-btn" onclick="step('tDry', 0.1)">+</button></div>
             </div>
-            <div style="flex:1;"><label>Hum %</label>
+            <div style="flex:1;"><label>Amb Hum %</label>
                 <div class="stepper-container"><button class="step-btn" onclick="step('rh', -1)">-</button><input type="number" id="rh" value="50" step="1" oninput="updateAlarm()"><button class="step-btn" onclick="step('rh', 1)">+</button></div>
             </div>
         </div>
-        <div style="display:flex; gap:10px;">
-            <div style="flex:1;"><label>Wind m/s</label>
-                <div class="stepper-container"><button class="step-btn" onclick="step('wind', -0.1)">-</button><input type="number" id="wind" value="0.0" step="0.1"><button class="step-btn" onclick="step('wind', 0.1)">+</button></div>
+        <button class="btn btn-gps" onclick="syncGPS()">SYNC BARO PRESSURE @ ALTITUDE</button>
+        <div style="display:flex; gap:10px; margin-top:10px;">
+            <div style="flex:1;"><label>Local Press (hPa)</label><input type="number" id="pressure" readonly></div>
+            <div style="flex:1;"><label>Solar Load</label>
+                <select id="solarSelect" onchange="updateAlarm()">
+                    <option value="1.0">☁️ SHADE / OVERCAST</option>
+                    <option value="0.85">☀️ DIRECT SUN</option>
+                </select>
             </div>
-            <div style="flex:1;"><label>Press (hPa)</label><input type="number" id="pressure" readonly></div>
-        </div>
-        <button class="btn btn-gps" onclick="syncGPS()">SYNC GPS BARO @ ALTITUDE</button>
-        <div class="toggle-container">
-            <span id="solarLabel" style="font-weight:bold; color:#0cf;">☁️ SHADE / OVERCAST</span>
-            <label class="switch"><input type="checkbox" id="solarOverride" onchange="updateAlarm()"><span class="slider"></span></label>
         </div>
     </div>
 
     <div class="card">
-        <label>2. Diagnostic Snapshot</label>
+        <label>2. Diagnostic Analysis</label>
+        <div style="display:flex; gap:10px;">
+            <div style="flex:1;"><label>Facade Material</label>
+                <select id="material" onchange="updateAlarm()">
+                    <option value="0.20">Stucco / Conc (0.20)</option>
+                    <option value="0.15">Aluminum / Metal (0.15)</option>
+                    <option value="0.26">Aged Sealant (0.26)</option>
+                    <option value="0.18">Masonry / Brick (0.18)</option>
+                </select>
+            </div>
+            <div style="flex:1;"><label>Visual Finding</label>
+                <select id="statusSelect">
+                    <option value="Sound">SOUND / DRY</option>
+                    <option value="Leak">LEAK SUSPECTED</option>
+                    <option value="SealFail">SEALANT FAIL</option>
+                    <option value="Gasket">GASKET GAP</option>
+                    <option value="IGU">IGU FAILURE</option>
+                </select>
+            </div>
+        </div>
         <div style="display:flex; gap:10px;">
             <div style="flex:1;"><label>Ref Dry (°F)</label>
                 <div class="stepper-container"><button class="step-btn" onclick="step('baselineC8', -0.1)">-</button><input type="number" id="baselineC8" value="75.0" step="0.1" oninput="updateAlarm()"><button class="step-btn" onclick="step('baselineC8', 0.1)">+</button></div>
@@ -87,30 +99,22 @@
                 <div class="stepper-container"><button class="step-btn" onclick="step('suspectTemp', -0.1)">-</button><input type="number" id="suspectTemp" value="75.0" step="0.1" oninput="updateAlarm()"><button class="step-btn" onclick="step('suspectTemp', 0.1)">+</button></div>
             </div>
         </div>
-        <label>Visual Finding</label>
-        <select id="statusSelect">
-            <option value="Dry/Sound">SOUND / DRY</option>
-            <option value="Leak Suspected">LEAK SUSPECTED</option>
-            <option value="Sealant Failure">SEALANT FAIL</option>
-            <option value="Gasket Failure">GASKET GAP</option>
-            <option value="IGU Fogging">IGU FAILURE</option>
-        </select>
     </div>
 
     <div class="alarm-box" id="result">--.-°F</div>
     <button class="btn btn-log" onclick="logEvidence()">LOG DATA & ADVANCE PHOTO</button>
 
     <div class="card">
-        <label>Evidence Vault</label>
+        <label>Evidence Vault (Dual-Audit Trail)</label>
         <div class="log-table-wrapper">
             <table class="log-table" id="logTable">
-                <thead><tr><th>Photo</th><th>Address</th><th>Time</th><th>ID</th><th>Finding</th><th>Alarm</th><th>Dry</th><th>Suspect</th><th>Amb-T</th><th>Hum-T</th><th>GPS-T</th><th>GPS-H</th><th>Press</th><th>Sun</th></tr></thead>
+                <thead><tr><th>Photo</th><th>ID</th><th>Finding</th><th>Material</th><th>Alarm</th><th>Ref Dry</th><th>Suspect</th><th>ΔT</th><th>Amb-T</th><th>Hum-T</th><th>GPS-T</th><th>GPS-H</th><th>Press</th><th>Sun</th></tr></thead>
                 <tbody></tbody>
             </table>
         </div>
         <div class="utility-btns">
-            <button class="btn" style="background:#444; flex:2;" onclick="exportLogs()">EXPORT CSV</button>
-            <button class="btn" style="background:#b00; flex:1;" onclick="clearVault()">WIPE</button>
+            <button class="btn" style="background:#444; flex:2;" onclick="exportLogs()">EXPORT CSV AUDIT</button>
+            <button class="btn" style="background:#b00; flex:1;" onclick="clearVault()">WIPE SESSION</button>
         </div>
     </div>
 
@@ -179,15 +183,15 @@
             const Tdry = parseFloat(document.getElementById('tDry').value || 0);
             const RH = parseFloat(document.getElementById('rh').value || 0);
             const refC8 = parseFloat(document.getElementById('baselineC8').value || 0);
-            const isSun = document.getElementById('solarOverride').checked;
-            document.getElementById('solarLabel').innerText = isSun ? "☀️ SOLAR LOAD ACTIVE" : "☁️ SHADE / OVERCAST";
-            document.getElementById('solarLabel').style.color = isSun ? "#f39c12" : "#0cf";
+            const matFact = parseFloat(document.getElementById('material').value);
+            const solarAdj = parseFloat(document.getElementById('solarSelect').value);
 
             if (Tdry > 0 && RH > 0 && refC8 > 0) {
+                // High Precision Arden Buck Equation
                 const a = 17.27, b = 237.7;
                 const gamma = (a * ((Tdry-32)*5/9)) / (b + ((Tdry-32)*5/9)) + Math.log(RH/100);
                 const Tdp = ((b * gamma) / (a - gamma) * 9/5) + 32;
-                const Talarm = refC8 - (Math.abs(refC8 - Tdp) * 0.20 / (isSun ? 0.85 : 1.0));
+                const Talarm = refC8 - (Math.abs(refC8 - Tdp) * matFact / solarAdj);
                 document.getElementById('result').innerText = Talarm.toFixed(1) + "°F";
                 const sus = parseFloat(document.getElementById('suspectTemp').value);
                 document.getElementById('result').style.background = (sus <= Talarm) ? "#b00" : "#222";
@@ -195,19 +199,19 @@
         }
 
         function logEvidence() {
-            const addr = document.getElementById('projectID').value || "No Address";
             const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             const photo = document.getElementById('imgPreview').innerText;
-            const dry = document.getElementById('baselineC8').value;
-            const sus = document.getElementById('suspectTemp').value;
-            const sun = document.getElementById('solarOverride').checked ? "SUN" : "SHADE";
+            const matText = document.getElementById('material').options[document.getElementById('material').selectedIndex].text;
+            const dry = parseFloat(document.getElementById('baselineC8').value);
+            const sus = parseFloat(document.getElementById('suspectTemp').value);
+            const delta = (dry - sus).toFixed(1);
 
-            const row = `<tr><td>${photo}</td><td>${addr}</td><td>${time}</td><td>${document.getElementById('idPreview').innerText}</td><td>${document.getElementById('statusSelect').value}</td><td>${document.getElementById('result').innerText}</td><td>${dry}</td><td>${sus}</td><td>${document.getElementById('tDry').value}</td><td>${document.getElementById('rh').value}</td><td>${lastGPS.temp}</td><td>${lastGPS.hum}</td><td>${document.getElementById('pressure').value}</td><td>${sun}</td></tr>`;
+            const row = `<tr><td>${photo}</td><td>${document.getElementById('idPreview').innerText}</td><td>${document.getElementById('statusSelect').value}</td><td>${matText}</td><td>${document.getElementById('result').innerText}</td><td>${dry}</td><td>${sus}</td><td>${delta}</td><td>${document.getElementById('tDry').value}</td><td>${document.getElementById('rh').value}</td><td>${lastGPS.temp}</td><td>${lastGPS.hum}</td><td>${document.getElementById('pressure').value}</td><td>${document.getElementById('solarSelect').value == "1.0" ? "SHADE" : "SUN"}</td></tr>`;
             const tbody = document.getElementById('logTable').querySelector('tbody');
             tbody.insertAdjacentHTML('afterbegin', row);
             localStorage.setItem('strataVault', tbody.innerHTML);
 
-            // AUTO-ADVANCE PHOTO ONLY (User handles Floor manually)
+            // AUTO-ADVANCE PHOTO & RESET SUSPECT
             document.getElementById('suspectTemp').value = dry;
             document.getElementById('imgNum').value = parseInt(document.getElementById('imgNum').value) + 1;
             updatePreview();
@@ -217,12 +221,12 @@
 
         function exportLogs() {
             const proj = document.getElementById('projectID').value || "Strata_Audit";
-            let csv = "Photo,Address,Time,ID,Finding,Alarm,Ref_Dry,Suspect,Amb_T,Hum_T,GPS_T,GPS_H,Press,Sun\n";
+            let csv = "Photo,ID,Finding,Material,Alarm,RefDry,Suspect,DeltaT,AmbT,HumT,GPST,GPSH,Press,Sun\n";
             document.querySelectorAll("#logTable tbody tr").forEach(tr => {
                 csv += Array.from(tr.querySelectorAll("td")).map(td => `"${td.innerText}"`).join(",") + "\n";
             });
             const blob = new Blob([csv], { type: 'text/csv' });
-            const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = `${proj}_v16.5.csv`; a.click();
+            const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = `${proj}_Audit.csv`; a.click();
         }
     </script>
 </body>
