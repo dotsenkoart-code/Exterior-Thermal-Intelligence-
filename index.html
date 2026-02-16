@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: Sensor-Primary</title>
+    <title>Strata-Scan Pro: Heartbeat Master</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; padding: 10px; line-height: 1.4; }
@@ -21,17 +21,15 @@
         .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
         input:checked + .slider { background-color: #f39c12; }
         input:checked + .slider:before { transform: translateX(26px); }
-        .status-msg { font-size: 0.75rem; text-align: center; margin-bottom: 10px; color: #aaa; }
     </style>
 </head>
 <body onload="syncGPS()">
 
-    <h2 style="color:#0cf; text-align:center;">STRATA-SCAN PRO <span style="font-size:0.5em; display:block; color:#fff;">SENSOR-PRIMARY MODE</span></h2>
+    <h2 style="color:#0cf; text-align:center;">STRATA-SCAN PRO <span style="font-size:0.5em; display:block; color:#fff;">HEARTBEAT HANDSHAKE MODE</span></h2>
 
     <div class="card">
-        <label>1. Field Data (Testo Primary / GPS Backup)</label>
-        <button class="btn btn-sync" id="mainSyncBtn" onclick="connectProbes()">CONNECT TESTO PROBES</button>
-        <div id="statusIndicator" class="status-msg">GPS Context Active. Connect sensors for high-accuracy.</div>
+        <label>1. Exterior Sensors (Testo Primary)</label>
+        <button class="btn btn-sync" id="mainSyncBtn" onclick="connectProbes()">SYNC PROBES (HEARTBEAT)</button>
         <div style="display:flex; gap:10px;">
             <div><label>Ambient °F</label><input type="number" id="tDry" placeholder="--"></div>
             <div><label>Humid %</label><input type="number" id="rh" placeholder="--"></div>
@@ -50,23 +48,23 @@
         </div>
         <select id="material" onchange="updateAlarm()">
             <option value="0.18">Bricks / Masonry (0.18)</option>
-            <option value="0.20">Stucco / Concrete (0.20)</option>
+            <option value="0.20" selected>Stucco / Concrete (0.20)</option>
             <option value="0.25">Wood / Composite (0.25)</option>
             <option value="0.15">Metal / Aluminum (0.15)</option>
             <option value="0.22">EIFS / Synth Stucco (0.22)</option>
-            <option value="0.24">Fiber Cement / Hardie (0.24)</option>
+            <option value="0.24">Fiber Cement (0.24)</option>
             <option value="0.26">Aged Sealant (0.26)</option>
         </select>
-        <input type="number" id="baselineC8" placeholder="Reference Dry Reading °F" oninput="updateAlarm()">
+        <input type="number" id="baselineC8" placeholder="Reference Dry Surface Temp °F" oninput="updateAlarm()">
     </div>
 
     <div class="alarm-box" id="result">--.-°F</div>
-    <button class="btn btn-log" onclick="logEvidence()">LOG SNAPSHOT</button>
+    <button class="btn btn-log" onclick="logEvidence()">LOG FACADE SNAPSHOT</button>
 
     <div class="card">
         <label>Evidence Vault</label>
         <table class="log-table" id="logTable">
-            <thead><tr><th>Time</th><th>Source</th><th>Mat.</th><th>Temp</th><th>Alarm</th></tr></thead>
+            <thead><tr><th>Time</th><th>Sun</th><th>Mat.</th><th>Temp</th><th>Alarm</th></tr></thead>
             <tbody></tbody>
         </table>
         <button class="btn" style="background:#6c757d; color:white; font-size:1rem;" onclick="exportLogs()">EXPORT CSV</button>
@@ -75,41 +73,53 @@
     <script>
         const API_KEY = "D987987038bce28955e65f9f4ede5209";
         const TESTO_SERVICE = '0000fee9-0000-1000-8000-00805f9b34fb';
+        const TESTO_DATA_CHAR = '0000fef5-0000-1000-8000-00805f9b34fb';
         let probesConnected = false;
 
         async function connectProbes() {
             try {
+                // Wide search for all Testo devices
                 const device = await navigator.bluetooth.requestDevice({ 
                     acceptAllDevices: true,
                     optionalServices: [TESTO_SERVICE] 
                 });
                 
                 const server = await device.gatt.connect();
-                await new Promise(r => setTimeout(r, 2000));
+                console.log("GATT Connected. Waiting for Heartbeat...");
                 
-                const service = await server.getPrimaryService(TESTO_SERVICE);
-                const characteristics = await service.getCharacteristics();
-                const dataChar = characteristics.find(c => c.uuid.includes('fef5'));
+                // HEARTBEAT LOGIC: We loop the service request to force the hardware to reveal itself
+                let service = null;
+                for (let i = 0; i < 5; i++) {
+                    try {
+                        service = await server.getPrimaryService(TESTO_SERVICE);
+                        if (service) break;
+                    } catch (e) {
+                        console.log("Retry " + (i+1) + "...");
+                        await new Promise(r => setTimeout(r, 1000));
+                    }
+                }
 
-                await dataChar.startNotifications();
+                if (!service) throw new Error("Hardware Timed Out. Restart Probe.");
+
+                const char = await service.getCharacteristic(TESTO_DATA_CHAR);
+                await char.startNotifications();
+                
                 probesConnected = true;
-                document.getElementById('statusIndicator').innerText = "PRIMARY: Sensors connected (" + device.name + ")";
-                document.getElementById('statusIndicator').style.color = "#28a745";
+                document.getElementById('mainSyncBtn').innerText = "CONNECTED: " + device.name;
+                document.getElementById('mainSyncBtn').style.background = "#007bff";
 
-                dataChar.addEventListener('characteristicvaluechanged', (e) => {
+                char.addEventListener('characteristicvaluechanged', (e) => {
                     const val = (e.target.value.getUint16(2, true) / 100).toFixed(1);
                     if (device.name.includes("605i")) {
                         const t = document.getElementById('tDry');
                         t.value = val; t.style.borderColor = "#28a745";
-                        t.readOnly = true; 
                     } else if (device.name.includes("405i")) {
-                        const w = document.getElementById('windSpeed');
-                        w.value = val; w.style.borderColor = "#28a745";
+                        document.getElementById('windSpeed').value = val;
                     }
                     updateAlarm();
                 });
             } catch (err) {
-                alert("Bluetooth connection failed. Using GPS as backup.");
+                alert("Heartbeat Failed: " + err.message);
                 probesConnected = false;
             }
         }
@@ -125,12 +135,9 @@
                 try {
                     const res = await fetch(url);
                     const data = await res.json();
-                    
-                    // Only use GPS values if probes are NOT connected
                     if(!probesConnected) {
                         document.getElementById('tDry').value = Math.round(data.main.temp);
                         document.getElementById('rh').value = data.main.humidity;
-                        document.getElementById('statusIndicator').innerText = "BACKUP: Using GPS Weather Data.";
                     }
                     document.getElementById('pressure').value = data.main.pressure;
                     updateAlarm();
@@ -158,13 +165,13 @@
 
         function logEvidence() {
             const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const source = probesConnected ? "SENSOR" : "GPS";
-            const row = `<tr><td>${time}</td><td>${source}</td><td>${document.getElementById('material').value}</td><td>${document.getElementById('tDry').value}F</td><td>${document.getElementById('result').innerText}</td></tr>`;
+            const row = `<tr><td>${time}</td><td>${document.getElementById('solarToggle').checked?'SUN':'SHADE'}</td><td>${document.getElementById('material').value}</td><td>${document.getElementById('tDry').value}F</td><td>${document.getElementById('result').innerText}</td></tr>`;
             document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
+            alert("LOGGED: Capture FLIR C8 Photo now.");
         }
 
         function exportLogs() {
-            let csv = "Time,Source,Material,Temp,Alarm\n";
+            let csv = "Time,Sun,Material,Temp,Alarm\n";
             document.querySelectorAll("#logTable tbody tr").forEach(tr => {
                 const c = tr.querySelectorAll("td");
                 csv += `${c[0].innerText},${c[1].innerText},${c[2].innerText},${c[3].innerText},${c[4].innerText}\n`;
