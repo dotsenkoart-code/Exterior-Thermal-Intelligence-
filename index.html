@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v30.0 Final</title>
+    <title>Strata-Scan Pro: v30.5 Final</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; padding: 0; margin: 0; overflow: hidden; touch-action: manipulation; }
@@ -9,12 +9,10 @@
         .slide { width: 100vw; height: 100%; padding: 15px; box-sizing: border-box; overflow-y: auto; padding-bottom: 120px; }
         .card { background: #1a1a1a; padding: 15px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #333; }
         
-        /* NAVIGATION */
         .navbar { height: 70px; background: #111; display: flex; border-top: 2px solid #333; position: fixed; bottom: 0; width: 100%; z-index: 1000; }
         .nav-item { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold; color: #555; }
         .nav-item.active { color: #0cf; border-top: 3px solid #0cf; background: #1a1a1a; }
         
-        /* TACTILE STEPPERS */
         .stepper { display: flex; align-items: center; justify-content: space-between; background: #222; border-radius: 12px; border: 2px solid #444; margin: 10px 0; overflow: hidden; }
         .step-btn { width: 85px; height: 85px; background: #333; border: none; color: #fff; font-size: 2.5rem; font-weight: bold; cursor: pointer; -webkit-tap-highlight-color: transparent; }
         .step-btn:active { background: #555; }
@@ -23,16 +21,16 @@
         input[type="text"], input[type="number"], select { width: 100%; padding: 14px; background: #222; color: #fff; border: 2px solid #555; border-radius: 8px; font-size: 1.2rem; text-align: center; box-sizing: border-box; margin: 5px 0; }
         label { font-size: 0.7rem; color: #0cf; font-weight: bold; text-transform: uppercase; display: block; margin-top: 5px; }
         
-        /* FORENSIC ALARMS */
         .alarm-box { background: #222; padding: 25px; text-align: center; border-radius: 15px; font-size: 3.5rem; font-weight: 900; border: 5px solid #444; margin: 10px 0; transition: 0.3s; }
         .crit { background: #f00 !important; color: #fff; border-color: #fff !important; animation: blink 0.6s infinite; }
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
         
-        /* VISUAL SYNC FLASH */
         .flash-sync { animation: flashGreen 0.4s 3; }
         @keyframes flashGreen { 0% { border-color: #0f0; background: #030; } 100% { border-color: #333; background: #1a1a1a; } }
 
         .btn { padding: 20px; border-radius: 12px; border: none; width: 100%; font-size: 1.3rem; font-weight: 800; cursor: pointer; }
+        .btn-rapid { background: #333; color: #0f0; border: 2px solid #0f0; margin: 10px 0; font-size: 1rem; padding: 15px; }
+        
         .check-item { background: #333; padding: 15px; border-radius: 10px; font-size: 0.75rem; text-align: center; border: 1px solid #555; font-weight: bold; margin-bottom: 5px; cursor: pointer; }
         .check-item.active { background: #0cf; color: #000; border-color: #fff; }
         .check-item.sound-box.active { background: #28a745; color: #fff; }
@@ -49,7 +47,7 @@
         <div class="slide">
             <h2 style="color:#0cf">1. DROP SETUP</h2>
             <div class="card" style="text-align:center;">
-                <label>Current ID Preview</label>
+                <label>Current Target ID</label>
                 <div id="fullIDDisplay" style="font-size: 4rem; font-weight: 900; color: #0f0; text-shadow: 0 0 15px #0f0; margin: 10px 0;">A-12-C</div>
             </div>
             <div class="card">
@@ -102,14 +100,17 @@
         <div class="slide">
             <h2 style="color:#0f0">3. DIAGNOSTIC</h2>
             <div class="card">
-                <label>Material & Solar Load</label>
+                <label>Material Library</label>
                 <select id="material" onchange="updateAlarm()">
                     <option value="0.20">Stucco / Concrete (0.20)</option>
                     <option value="0.15">Aluminum / Metal (0.15)</option>
                     <option value="0.26">Aged Sealant (0.26)</option>
                     <option value="0.12">Glass / Glazing (0.12)</option>
+                    <option value="0.18">Brick / Masonry (0.18)</option>
+                    <option value="0.21">Terracotta (0.21)</option>
                 </select>
-                <select id="solar" onchange="updateAlarm()" style="margin-top:10px;">
+                <label>Solar Environment</label>
+                <select id="solar" onchange="updateAlarm()">
                     <option value="1.0">☁️ SHADE / OVERCAST</option>
                     <option value="0.85">☀️ DIRECT SUN</option>
                 </select>
@@ -118,6 +119,7 @@
                 <label>Forensic Checklist</label>
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
                     <div class="check-item sound-box active" id="soundBtn" onclick="toggleSound()">SOUND / DRY</div>
+                    <div class="check-item defect" onclick="toggleDefect(this)">MOISTURE DETECTED</div>
                     <div class="check-item defect" onclick="toggleDefect(this)">LEAK SUSPECTED</div>
                     <div class="check-item defect" onclick="toggleDefect(this)">SEALANT FAIL</div>
                     <div class="check-item defect" onclick="toggleDefect(this)">GASKET GAP</div>
@@ -125,17 +127,22 @@
                 </div>
             </div>
             <div class="card">
-                <label>Ref Dry Surface (°F)</label>
-                <div class="stepper">
-                    <button class="step-btn" onclick="step('baselineC8', -0.1)">−</button>
-                    <div class="step-val" id="baselineC8Val">75.0</div>
-                    <button class="step-btn" onclick="step('baselineC8', 0.1)">+</button>
-                </div>
-                <label>Suspect Anomaly (°F)</label>
-                <div class="stepper">
-                    <button class="step-btn" onclick="step('suspectTemp', -0.1)">−</button>
-                    <div class="step-val" id="suspectTempVal">75.0</div>
-                    <button class="step-btn" onclick="step('suspectTemp', 0.1)">+</button>
+                <button class="btn btn-rapid" onclick="noAnomalies()">✓ NO ANOMALIES FOUND</button>
+                <div style="display:flex; gap:10px;">
+                    <div style="flex:1;"><label>Ref Dry Surface</label>
+                        <div class="stepper">
+                            <button class="step-btn" onclick="step('baselineC8', -0.1)" style="width:50px; height:60px;">−</button>
+                            <div class="step-val" id="baselineC8Val" style="font-size:1.4rem;">75.0</div>
+                            <button class="step-btn" onclick="step('baselineC8', 0.1)" style="width:50px; height:60px;">+</button>
+                        </div>
+                    </div>
+                    <div style="flex:1;"><label>Suspect Anomaly</label>
+                        <div class="stepper">
+                            <button class="step-btn" onclick="step('suspectTemp', -0.1)" style="width:50px; height:60px;">−</button>
+                            <div class="step-val" id="suspectTempVal" style="font-size:1.4rem;">75.0</div>
+                            <button class="step-btn" onclick="step('suspectTemp', 0.1)" style="width:50px; height:60px;">+</button>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="alarm-box" id="result">--.-°F</div>
@@ -146,7 +153,7 @@
         <div class="slide">
             <h2 style="color:#ccc">4. COMMAND CENTER</h2>
             <div class="card">
-                <label>Tactical Flow Control</label>
+                <label>Tactical Flow</label>
                 <div style="display:flex; gap:8px; margin-top:5px;">
                     <button class="btn" style="background:#333; color:#0cf; flex:1;" onclick="flowNext('L')">MOVE L</button>
                     <button class="btn" style="background:#333; color:#0cf; flex:1;" onclick="flowNext('C')">MOVE C</button>
@@ -178,6 +185,14 @@
             if (localStorage.getItem('strataDraft')) document.getElementById('projectID').value = localStorage.getItem('strataDraft');
             updateAlarm();
             updatePreview();
+        }
+
+        function noAnomalies() {
+            const ref = document.getElementById('baselineC8').value;
+            document.getElementById('suspectTemp').value = ref;
+            document.getElementById('suspectTempVal').innerText = parseFloat(ref).toFixed(1);
+            toggleSound();
+            updateAlarm();
         }
 
         function goToSlide(num) {
@@ -220,7 +235,6 @@
                 const h = pos.coords.altitude || 0;
                 const Tk = (data.main.temp - 32) * 5/9 + 273.15;
                 const press = (P0 * Math.pow(1 - (0.0065 * h) / Tk, 5.257)).toFixed(1);
-                
                 const pInput = document.getElementById('pressure');
                 const pCard = document.getElementById('pressCard');
                 pInput.value = press;
@@ -235,16 +249,13 @@
             const ref = parseFloat(document.getElementById('baselineC8').value), sus = parseFloat(document.getElementById('suspectTemp').value);
             const mat = parseFloat(document.getElementById('material').value), sol = parseFloat(document.getElementById('solar').value);
             const P = parseFloat(document.getElementById('pressure').value);
-
             const f = 1.0007 + (3.46e-6 * P), a = 17.27, b = 237.7;
             const gamma = (a * ((Td-32)*5/9)) / (b + ((Td-32)*5/9)) + Math.log((RH/100) * f);
             const Tdp = ((b * gamma) / (a - gamma) * 9/5) + 32;
             const Talarm = ref - (Math.abs(ref - Tdp) * mat / (sol === "0.85" ? 0.92 : 1.0));
-            
             const box = document.getElementById('result');
             box.innerText = Talarm.toFixed(1) + "°F";
             const delta = (ref - sus).toFixed(1);
-
             if (sus <= Talarm) { 
                 box.className = "alarm-box crit"; 
                 if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 200]); 
@@ -263,7 +274,6 @@
             const findings = Array.from(document.querySelectorAll('.check-item.active')).map(i => i.innerText).join("|");
             const id = document.getElementById('fullIDDisplay').innerText;
             const ref = parseFloat(document.getElementById('baselineC8').value), sus = parseFloat(document.getElementById('suspectTemp').value);
-            
             const row = `<tr><td>${time}</td><td>${id}</td><td>${(ref-sus).toFixed(1)}</td><td>${findings}</td><td>${document.getElementById('result').innerText}</td><td>${document.getElementById('tDry').value}</td><td>${document.getElementById('pressure').value}</td></tr>`;
             document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
             localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
@@ -274,9 +284,7 @@
             document.getElementById('imgNum').value = parseInt(document.getElementById('imgNum').value) + 1;
             if (cmd === 'DOWN') { step('floorNum', -1); setPos('C'); goToSlide(0); }
             else { setPos(cmd); goToSlide(2); }
-            document.getElementById('suspectTemp').value = document.getElementById('baselineC8').value;
-            document.getElementById('suspectTempVal').innerText = document.getElementById('baselineC8').value;
-            toggleSound(); updateAlarm();
+            noAnomalies();
         }
 
         function toggleSound() { document.getElementById('soundBtn').classList.add('active'); document.querySelectorAll('.defect').forEach(el => el.classList.remove('active')); }
@@ -287,7 +295,7 @@
             let csv = "Time,ID,DeltaT,Findings,Alarm,Amb,Press\n";
             document.querySelectorAll("#logTable tbody tr").forEach(tr => { csv += Array.from(tr.querySelectorAll("td")).map(td => `"${td.innerText}"`).join(",") + "\n"; });
             const blob = new Blob([csv], { type: 'text/csv' });
-            const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = "Strata_v30_Final.csv"; a.click();
+            const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = "Strata_v30.5_Final.csv"; a.click();
         }
     </script>
 </body>
