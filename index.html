@@ -3,6 +3,11 @@
 <head>
     <title>Strata-Scan Pro: v36.0 Fleet</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#000000">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; padding: 0; margin: 0; overflow: hidden; touch-action: manipulation; }
         .slide-container { display: flex; transition: transform 0.3s ease-in-out; width: 400vw; height: calc(100vh - 70px); }
@@ -469,6 +474,15 @@
             document.querySelectorAll("#logTable tbody tr").forEach(tr => { csv += Array.from(tr.querySelectorAll("td")).map(td => `"${td.innerText}"`).join(",") + "\n"; });
             const blob = new Blob([csv], { type: 'text/csv' });
             const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = "Strata_Fleet_Report.csv"; a.click();
+        }
+
+        // Register the Service Worker for Offline PWA Support
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Strata-Scan Offline Engine Active:', reg.scope))
+                    .catch(err => console.error('Offline Engine Failed:', err));
+            });
         }
     </script>
 </body>
