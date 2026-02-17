@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v31.0 Final</title>
+    <title>Strata-Scan Pro: v32.0 Master</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; padding: 0; margin: 0; overflow: hidden; touch-action: manipulation; }
@@ -13,30 +13,27 @@
         .nav-item { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold; color: #555; }
         .nav-item.active { color: #0cf; border-top: 3px solid #0cf; background: #1a1a1a; }
         
+        /* TACTICAL STEPPERS */
         .stepper { display: flex; align-items: center; justify-content: space-between; background: #222; border-radius: 12px; border: 2px solid #444; margin: 10px 0; overflow: hidden; }
-        .step-btn { width: 85px; height: 85px; background: #333; border: none; color: #fff; font-size: 2.5rem; font-weight: bold; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-        .step-btn:active { background: #555; }
+        .step-btn { width: 85px; height: 85px; background: #333; border: none; color: #fff; font-size: 2.5rem; font-weight: bold; cursor: pointer; }
         .step-val { flex: 1; text-align: center; font-size: 2.2rem; font-weight: 900; color: #0f0; text-shadow: 0 0 8px #0f0; }
         
         input[type="text"], input[type="number"], select { width: 100%; padding: 14px; background: #222; color: #fff; border: 2px solid #555; border-radius: 8px; font-size: 1.2rem; text-align: center; box-sizing: border-box; margin: 5px 0; }
         label { font-size: 0.7rem; color: #0cf; font-weight: bold; text-transform: uppercase; display: block; margin-top: 5px; }
         
-        .alarm-box { background: #222; padding: 25px; text-align: center; border-radius: 15px; font-size: 3.5rem; font-weight: 900; border: 5px solid #444; margin: 10px 0; transition: 0.3s; }
+        .alarm-box { background: #222; padding: 25px; text-align: center; border-radius: 15px; font-size: 3.5rem; font-weight: 900; border: 5px solid #444; margin: 10px 0; }
         .crit { background: #f00 !important; color: #fff; border-color: #fff !important; animation: blink 0.6s infinite; }
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
-        
         .flash-sync { animation: flashGreen 0.4s 3; }
         @keyframes flashGreen { 0% { border-color: #0f0; background: #030; } 100% { border-color: #333; background: #1a1a1a; } }
 
         .btn { padding: 20px; border-radius: 12px; border: none; width: 100%; font-size: 1.3rem; font-weight: 800; cursor: pointer; }
-        .btn-rapid { background: #333; color: #0f0; border: 2px solid #0f0; margin: 10px 0; font-size: 1rem; padding: 15px; }
-        
         .check-item { background: #333; padding: 15px; border-radius: 10px; font-size: 0.75rem; text-align: center; border: 1px solid #555; font-weight: bold; margin-bottom: 5px; cursor: pointer; }
         .check-item.active { background: #0cf; color: #000; border-color: #fff; }
         .check-item.sound-box.active { background: #28a745; color: #fff; }
 
         .vault-wrap { overflow-x: auto; background: #111; border-radius: 8px; padding: 5px; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.5rem; color: #ccc; min-width: 1600px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.5rem; color: #ccc; min-width: 1500px; }
         td, th { border: 1px solid #333; padding: 8px; text-align: left; }
     </style>
 </head>
@@ -45,13 +42,11 @@
     <div class="slide-container" id="mainSlider">
         
         <div class="slide">
-            <h2 style="color:#0cf">1. DROP SETUP</h2>
+            <h2 style="color:#0cf">1. DROP MAPPING</h2>
+            
             <div class="card">
-                <label>Project Address</label>
-                <input type="text" id="projectID" placeholder="Building Name..." oninput="saveDraft()">
-                
-                <label style="margin-top:15px; text-align:center;">Current Target ID</label>
-                <div id="fullIDDisplay" style="font-size: 3.5rem; font-weight: 900; color: #0f0; text-shadow: 0 0 15px #0f0; margin: 5px 0; text-align:center;">A-12-C</div>
+                <label>Project Address / Building Name</label>
+                <input type="text" id="projectID" placeholder="Enter Site Name..." oninput="saveDraft()">
             </div>
 
             <div class="card">
@@ -61,17 +56,32 @@
                     <div class="step-val" id="floorNumVal">12</div>
                     <button class="step-btn" onclick="step('floorNum', 1)">+</button>
                 </div>
-                <div style="display:flex; gap:10px;">
+
+                <div style="display:flex; gap:10px; margin-top:5px;">
                     <div style="flex:1;"><label>Drop ID</label><input type="text" id="dropLetter" value="A" style="text-transform:uppercase;" oninput="updatePreview()"></div>
-                    <div style="flex:1;"><label>Full Image #</label><div id="fullImgDisplay" style="font-size: 1.5rem; color:#f39c12; font-weight:900; background:#222; padding:10px; border-radius:8px; border:1px solid #555; text-align:center; margin-top:5px;">FLIR0001</div><input type="hidden" id="imgNum" value="1"></div>
-                </div>
-                <label style="margin-top:10px;">Window Position</label>
-                <div style="display:flex; gap:8px;">
-                    <button class="btn" id="pL" style="background:#333; flex:1;" onclick="setPos('L')">L</button>
-                    <button class="btn" id="pC" style="background:#0cf; color:#000; flex:1;" onclick="setPos('C')">C</button>
-                    <button class="btn" id="pR" style="background:#333; flex:1;" onclick="setPos('R')">R</button>
+                    <div style="flex:2;"><label>Window Position</label>
+                        <div style="display:flex; gap:5px;">
+                            <button class="btn" id="pL" style="background:#333; padding:12px; flex:1;" onclick="setPos('L')">L</button>
+                            <button class="btn" id="pC" style="background:#0cf; padding:12px; color:#000; flex:1;" onclick="setPos('C')">C</button>
+                            <button class="btn" id="pR" style="background:#333; padding:12px; flex:1;" onclick="setPos('R')">R</button>
+                        </div>
+                    </div>
                 </div>
             </div>
+
+            <div class="card">
+                <label>Image # (Editable)</label>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-weight:bold; color:#f39c12;">FLIR</span>
+                    <input type="number" id="imgNum" value="1" oninput="updatePreview()" style="flex:1; border-color:#f39c12; color:#f39c12;">
+                </div>
+            </div>
+
+            <div class="card" style="text-align:center;">
+                <label>Full Target ID</label>
+                <div id="fullIDDisplay" style="font-size: 3.5rem; font-weight: 900; color: #0f0; text-shadow: 0 0 15px #0f0; margin: 5px 0;">A-12-C</div>
+            </div>
+            
             <input type="hidden" id="floorNum" value="12">
         </div>
 
@@ -111,34 +121,34 @@
                     <option value="0.18">Brick / Masonry (0.18)</option>
                     <option value="0.21">Terracotta (0.21)</option>
                 </select>
-                <label>Solar Environment</label>
+                <label>Solar Load</label>
                 <select id="solar" onchange="updateAlarm()">
-                    <option value="1.0">☁️ SHADE / OVERCAST</option>
-                    <option value="0.85">☀️ DIRECT SUN</option>
+                    <option value="1.0">☁️ SHADE</option>
+                    <option value="0.85">☀️ SUN</option>
                 </select>
             </div>
             <div class="card">
                 <label>Forensic Checklist</label>
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
-                    <div class="check-item sound-box active" id="soundBtn" onclick="toggleSound()">SOUND / DRY</div>
-                    <div class="check-item defect" onclick="toggleDefect(this)">MOISTURE DETECTED</div>
-                    <div class="check-item defect" onclick="toggleDefect(this)">LEAK SUSPECTED</div>
-                    <div class="check-item defect" onclick="toggleDefect(this)">SEALANT FAIL</div>
-                    <div class="check-item defect" onclick="toggleDefect(this)">GASKET GAP</div>
-                    <div class="check-item defect" onclick="toggleDefect(this)">IGU FOGGING</div>
+                    <div class="check-item sound-box active" id="soundBtn" onclick="toggleSound()">SOUND</div>
+                    <div class="check-item defect" onclick="toggleDefect(this)">MOISTURE</div>
+                    <div class="check-item defect" onclick="toggleDefect(this)">LEAK</div>
+                    <div class="check-item defect" onclick="toggleDefect(this)">SEAL FAIL</div>
+                    <div class="check-item defect" onclick="toggleDefect(this)">GASKET</div>
+                    <div class="check-item defect" onclick="toggleDefect(this)">IGU FOG</div>
                 </div>
             </div>
             <div class="card">
-                <button class="btn btn-rapid" onclick="noAnomaliesOnly()">✓ NO ANOMALIES (SYNC TEMP ONLY)</button>
+                <button class="btn" style="background:#333; color:#0f0; border:2px solid #0f0; margin-bottom:10px;" onclick="rapidSync()">✓ SYNC DRY REF</button>
                 <div style="display:flex; gap:10px;">
-                    <div style="flex:1;"><label>Ref Dry Surface</label>
+                    <div style="flex:1;"><label>Ref Dry</label>
                         <div class="stepper">
                             <button class="step-btn" onclick="step('baselineC8', -0.1)" style="width:50px; height:60px;">−</button>
                             <div class="step-val" id="baselineC8Val" style="font-size:1.4rem;">75.0</div>
                             <button class="step-btn" onclick="step('baselineC8', 0.1)" style="width:50px; height:60px;">+</button>
                         </div>
                     </div>
-                    <div style="flex:1;"><label>Suspect Anomaly</label>
+                    <div style="flex:1;"><label>Suspect</label>
                         <div class="stepper">
                             <button class="step-btn" onclick="step('suspectTemp', -0.1)" style="width:50px; height:60px;">−</button>
                             <div class="step-val" id="suspectTempVal" style="font-size:1.4rem;">75.0</div>
@@ -155,7 +165,7 @@
         <div class="slide">
             <h2 style="color:#ccc">4. COMMAND CENTER</h2>
             <div class="card">
-                <label>Tactical Flow</label>
+                <label>Flow Control</label>
                 <div style="display:flex; gap:8px; margin-top:5px;">
                     <button class="btn" style="background:#333; color:#0cf; flex:1;" onclick="flowNext('L')">MOVE L</button>
                     <button class="btn" style="background:#333; color:#0cf; flex:1;" onclick="flowNext('C')">MOVE C</button>
@@ -165,7 +175,7 @@
             </div>
             <div class="vault-wrap">
                 <table id="logTable">
-                    <thead><tr><th>Time (sec)</th><th>Image #</th><th>ID</th><th>ΔT</th><th>Findings</th><th>Alarm</th><th>Amb</th><th>Press</th></tr></thead>
+                    <thead><tr><th>Time (sec)</th><th>ID</th><th>ΔT</th><th>Findings</th><th>Alarm</th><th>Amb</th><th>Press</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
@@ -187,13 +197,6 @@
             if (localStorage.getItem('strataDraft')) document.getElementById('projectID').value = localStorage.getItem('strataDraft');
             updateAlarm();
             updatePreview();
-        }
-
-        function noAnomaliesOnly() {
-            const ref = document.getElementById('baselineC8').value;
-            document.getElementById('suspectTemp').value = ref;
-            document.getElementById('suspectTempVal').innerText = parseFloat(ref).toFixed(1);
-            updateAlarm();
         }
 
         function goToSlide(num) {
@@ -225,11 +228,14 @@
         function updatePreview() {
             const floor = document.getElementById('floorNum').value;
             const drop = document.getElementById('dropLetter').value.toUpperCase();
-            const fullID = `${drop}-${floor}-${currentPos}`;
-            document.getElementById('fullIDDisplay').innerText = fullID;
-            
-            const imgVal = document.getElementById('imgNum').value;
-            document.getElementById('fullImgDisplay').innerText = "FLIR" + imgVal.toString().padStart(4, '0');
+            document.getElementById('fullIDDisplay').innerText = `${drop}-${floor}-${currentPos}`;
+        }
+
+        function rapidSync() {
+            const ref = document.getElementById('baselineC8').value;
+            document.getElementById('suspectTemp').value = ref;
+            document.getElementById('suspectTempVal').innerText = parseFloat(ref).toFixed(1);
+            updateAlarm();
         }
 
         async function syncGPS() {
@@ -237,10 +243,7 @@
                 const url = `https://api.openweathermap.org/data/2.5/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&units=imperial&appid=${API_KEY}`;
                 const res = await fetch(url);
                 const data = await res.json();
-                const P0 = data.main.pressure;
-                const h = pos.coords.altitude || 0;
-                const Tk = (data.main.temp - 32) * 5/9 + 273.15;
-                const press = (P0 * Math.pow(1 - (0.0065 * h) / Tk, 5.257)).toFixed(1);
+                const press = (data.main.pressure * Math.pow(1 - (0.0065 * (pos.coords.altitude || 0)) / ((data.main.temp - 32) * 5/9 + 273.15), 5.257)).toFixed(1);
                 const pInput = document.getElementById('pressure');
                 const pCard = document.getElementById('pressCard');
                 pInput.value = press;
@@ -255,10 +258,13 @@
             const ref = parseFloat(document.getElementById('baselineC8').value), sus = parseFloat(document.getElementById('suspectTemp').value);
             const mat = parseFloat(document.getElementById('material').value), sol = parseFloat(document.getElementById('solar').value);
             const P = parseFloat(document.getElementById('pressure').value);
+
+            // FORMULA: Arden Buck + Enhancement Factor (f)
             const f = 1.0007 + (3.46e-6 * P), a = 17.27, b = 237.7;
             const gamma = (a * ((Td-32)*5/9)) / (b + ((Td-32)*5/9)) + Math.log((RH/100) * f);
             const Tdp = ((b * gamma) / (a - gamma) * 9/5) + 32;
             const Talarm = ref - (Math.abs(ref - Tdp) * mat / (sol === "0.85" ? 0.92 : 1.0));
+            
             const box = document.getElementById('result');
             box.innerText = Talarm.toFixed(1) + "°F";
             const delta = (ref - sus).toFixed(1);
@@ -279,23 +285,20 @@
             const time = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0') + ":" + now.getSeconds().toString().padStart(2, '0');
             const findings = Array.from(document.querySelectorAll('.check-item.active')).map(i => i.innerText).join("|");
             const id = document.getElementById('fullIDDisplay').innerText;
-            const img = document.getElementById('fullImgDisplay').innerText;
             const ref = parseFloat(document.getElementById('baselineC8').value), sus = parseFloat(document.getElementById('suspectTemp').value);
-            const row = `<tr><td>${time}</td><td>${img}</td><td>${id}</td><td>${(ref-sus).toFixed(1)}</td><td>${findings}</td><td>${document.getElementById('result').innerText}</td><td>${document.getElementById('tDry').value}</td><td>${document.getElementById('pressure').value}</td></tr>`;
+            const row = `<tr><td>${time}</td><td>${id}</td><td>${(ref-sus).toFixed(1)}</td><td>${findings}</td><td>${document.getElementById('result').innerText}</td><td>${document.getElementById('tDry').value}</td><td>${document.getElementById('pressure').value}</td></tr>`;
             document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
             localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
             goToSlide(3);
         }
 
         function flowNext(cmd) {
-            let imgEl = document.getElementById('imgNum');
-            imgEl.value = parseInt(imgEl.value) + 1;
+            document.getElementById('imgNum').value = parseInt(document.getElementById('imgNum').value) + 1;
             if (cmd === 'DOWN') { step('floorNum', -1); setPos('C'); goToSlide(0); }
             else { setPos(cmd); goToSlide(2); }
-            const ref = document.getElementById('baselineC8').value;
-            document.getElementById('suspectTemp').value = ref;
-            document.getElementById('suspectTempVal').innerText = parseFloat(ref).toFixed(1);
-            toggleSound(); updateAlarm(); updatePreview();
+            rapidSync();
+            toggleSound();
+            updateAlarm();
         }
 
         function toggleSound() { document.getElementById('soundBtn').classList.add('active'); document.querySelectorAll('.defect').forEach(el => el.classList.remove('active')); }
@@ -303,10 +306,10 @@
         function saveDraft() { localStorage.setItem('strataDraft', document.getElementById('projectID').value); }
         function clearVault() { if (confirm("Wipe?")) { localStorage.removeItem('strataVault'); location.reload(); } }
         function exportLogs() {
-            let csv = "Time,Image,ID,DeltaT,Findings,Alarm,Amb,Press\n";
+            let csv = "Time,ID,DeltaT,Findings,Alarm,Amb,Press\n";
             document.querySelectorAll("#logTable tbody tr").forEach(tr => { csv += Array.from(tr.querySelectorAll("td")).map(td => `"${td.innerText}"`).join(",") + "\n"; });
             const blob = new Blob([csv], { type: 'text/csv' });
-            const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = "Strata_v31.csv"; a.click();
+            const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = "Strata_v32_Report.csv"; a.click();
         }
     </script>
 </body>
