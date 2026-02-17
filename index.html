@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v30.5 Final</title>
+    <title>Strata-Scan Pro: v31.0 Final</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; padding: 0; margin: 0; overflow: hidden; touch-action: manipulation; }
@@ -36,7 +36,7 @@
         .check-item.sound-box.active { background: #28a745; color: #fff; }
 
         .vault-wrap { overflow-x: auto; background: #111; border-radius: 8px; padding: 5px; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.5rem; color: #ccc; min-width: 1500px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.5rem; color: #ccc; min-width: 1600px; }
         td, th { border: 1px solid #333; padding: 8px; text-align: left; }
     </style>
 </head>
@@ -46,13 +46,15 @@
         
         <div class="slide">
             <h2 style="color:#0cf">1. DROP SETUP</h2>
-            <div class="card" style="text-align:center;">
-                <label>Current Target ID</label>
-                <div id="fullIDDisplay" style="font-size: 4rem; font-weight: 900; color: #0f0; text-shadow: 0 0 15px #0f0; margin: 10px 0;">A-12-C</div>
-            </div>
             <div class="card">
                 <label>Project Address</label>
                 <input type="text" id="projectID" placeholder="Building Name..." oninput="saveDraft()">
+                
+                <label style="margin-top:15px; text-align:center;">Current Target ID</label>
+                <div id="fullIDDisplay" style="font-size: 3.5rem; font-weight: 900; color: #0f0; text-shadow: 0 0 15px #0f0; margin: 5px 0; text-align:center;">A-12-C</div>
+            </div>
+
+            <div class="card">
                 <label>Floor #</label>
                 <div class="stepper">
                     <button class="step-btn" onclick="step('floorNum', -1)">−</button>
@@ -61,7 +63,7 @@
                 </div>
                 <div style="display:flex; gap:10px;">
                     <div style="flex:1;"><label>Drop ID</label><input type="text" id="dropLetter" value="A" style="text-transform:uppercase;" oninput="updatePreview()"></div>
-                    <div style="flex:1;"><label>Image #</label><input type="number" id="imgNum" value="1"></div>
+                    <div style="flex:1;"><label>Full Image #</label><div id="fullImgDisplay" style="font-size: 1.5rem; color:#f39c12; font-weight:900; background:#222; padding:10px; border-radius:8px; border:1px solid #555; text-align:center; margin-top:5px;">FLIR0001</div><input type="hidden" id="imgNum" value="1"></div>
                 </div>
                 <label style="margin-top:10px;">Window Position</label>
                 <div style="display:flex; gap:8px;">
@@ -127,7 +129,7 @@
                 </div>
             </div>
             <div class="card">
-                <button class="btn btn-rapid" onclick="noAnomalies()">✓ NO ANOMALIES FOUND</button>
+                <button class="btn btn-rapid" onclick="noAnomaliesOnly()">✓ NO ANOMALIES (SYNC TEMP ONLY)</button>
                 <div style="display:flex; gap:10px;">
                     <div style="flex:1;"><label>Ref Dry Surface</label>
                         <div class="stepper">
@@ -163,7 +165,7 @@
             </div>
             <div class="vault-wrap">
                 <table id="logTable">
-                    <thead><tr><th>Time (sec)</th><th>ID</th><th>ΔT</th><th>Findings</th><th>Alarm</th><th>Amb</th><th>Press</th></tr></thead>
+                    <thead><tr><th>Time (sec)</th><th>Image #</th><th>ID</th><th>ΔT</th><th>Findings</th><th>Alarm</th><th>Amb</th><th>Press</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
@@ -187,11 +189,10 @@
             updatePreview();
         }
 
-        function noAnomalies() {
+        function noAnomaliesOnly() {
             const ref = document.getElementById('baselineC8').value;
             document.getElementById('suspectTemp').value = ref;
             document.getElementById('suspectTempVal').innerText = parseFloat(ref).toFixed(1);
-            toggleSound();
             updateAlarm();
         }
 
@@ -206,7 +207,7 @@
             const display = document.getElementById(id + 'Val');
             let newVal = (parseFloat(el.value) + val).toFixed(id === 'rh' || id === 'floorNum' ? 0 : 1);
             el.value = newVal;
-            display.innerText = newVal;
+            if(display) display.innerText = newVal;
             updateAlarm();
             updatePreview();
         }
@@ -222,8 +223,13 @@
         }
 
         function updatePreview() {
-            const fullID = `${document.getElementById('dropLetter').value.toUpperCase()}-${document.getElementById('floorNum').value}-${currentPos}`;
+            const floor = document.getElementById('floorNum').value;
+            const drop = document.getElementById('dropLetter').value.toUpperCase();
+            const fullID = `${drop}-${floor}-${currentPos}`;
             document.getElementById('fullIDDisplay').innerText = fullID;
+            
+            const imgVal = document.getElementById('imgNum').value;
+            document.getElementById('fullImgDisplay').innerText = "FLIR" + imgVal.toString().padStart(4, '0');
         }
 
         async function syncGPS() {
@@ -273,18 +279,23 @@
             const time = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0') + ":" + now.getSeconds().toString().padStart(2, '0');
             const findings = Array.from(document.querySelectorAll('.check-item.active')).map(i => i.innerText).join("|");
             const id = document.getElementById('fullIDDisplay').innerText;
+            const img = document.getElementById('fullImgDisplay').innerText;
             const ref = parseFloat(document.getElementById('baselineC8').value), sus = parseFloat(document.getElementById('suspectTemp').value);
-            const row = `<tr><td>${time}</td><td>${id}</td><td>${(ref-sus).toFixed(1)}</td><td>${findings}</td><td>${document.getElementById('result').innerText}</td><td>${document.getElementById('tDry').value}</td><td>${document.getElementById('pressure').value}</td></tr>`;
+            const row = `<tr><td>${time}</td><td>${img}</td><td>${id}</td><td>${(ref-sus).toFixed(1)}</td><td>${findings}</td><td>${document.getElementById('result').innerText}</td><td>${document.getElementById('tDry').value}</td><td>${document.getElementById('pressure').value}</td></tr>`;
             document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
             localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
             goToSlide(3);
         }
 
         function flowNext(cmd) {
-            document.getElementById('imgNum').value = parseInt(document.getElementById('imgNum').value) + 1;
+            let imgEl = document.getElementById('imgNum');
+            imgEl.value = parseInt(imgEl.value) + 1;
             if (cmd === 'DOWN') { step('floorNum', -1); setPos('C'); goToSlide(0); }
             else { setPos(cmd); goToSlide(2); }
-            noAnomalies();
+            const ref = document.getElementById('baselineC8').value;
+            document.getElementById('suspectTemp').value = ref;
+            document.getElementById('suspectTempVal').innerText = parseFloat(ref).toFixed(1);
+            toggleSound(); updateAlarm(); updatePreview();
         }
 
         function toggleSound() { document.getElementById('soundBtn').classList.add('active'); document.querySelectorAll('.defect').forEach(el => el.classList.remove('active')); }
@@ -292,10 +303,10 @@
         function saveDraft() { localStorage.setItem('strataDraft', document.getElementById('projectID').value); }
         function clearVault() { if (confirm("Wipe?")) { localStorage.removeItem('strataVault'); location.reload(); } }
         function exportLogs() {
-            let csv = "Time,ID,DeltaT,Findings,Alarm,Amb,Press\n";
+            let csv = "Time,Image,ID,DeltaT,Findings,Alarm,Amb,Press\n";
             document.querySelectorAll("#logTable tbody tr").forEach(tr => { csv += Array.from(tr.querySelectorAll("td")).map(td => `"${td.innerText}"`).join(",") + "\n"; });
             const blob = new Blob([csv], { type: 'text/csv' });
-            const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = "Strata_v30.5_Final.csv"; a.click();
+            const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = "Strata_v31.csv"; a.click();
         }
     </script>
 </body>
