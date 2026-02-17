@@ -17,7 +17,7 @@
         .step-btn { width: 85px; height: 85px; background: #333; border: none; color: #fff; font-size: 2.5rem; font-weight: bold; cursor: pointer; }
         .step-val { flex: 1; text-align: center; font-size: 2.2rem; font-weight: 900; color: #0f0; text-shadow: 0 0 8px #0f0; }
         
-        input[type="text"], input[type="number"], select { width: 100%; padding: 14px; background: #222; color: #fff; border: 2px solid #555; border-radius: 8px; font-size: 1.2rem; text-align: center; box-sizing: border-box; margin: 5px 0; }
+        input[type="text"], input[type="password"], input[type="number"], select { width: 100%; padding: 14px; background: #222; color: #fff; border: 2px solid #555; border-radius: 8px; font-size: 1.2rem; text-align: center; box-sizing: border-box; margin: 5px 0; }
         label { font-size: 0.7rem; color: #0cf; font-weight: bold; text-transform: uppercase; display: block; margin-top: 5px; }
         
         .alarm-box { background: #222; padding: 25px; text-align: center; border-radius: 15px; font-size: 3.5rem; font-weight: 900; border: 5px solid #444; margin: 10px 0; transition: 0.3s; }
@@ -35,7 +35,7 @@
         .check-item.sound-box.active { background: #28a745; color: #fff; }
 
         .vault-wrap { overflow-x: auto; background: #111; border-radius: 8px; padding: 5px; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.5rem; color: #ccc; min-width: 1600px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.5rem; color: #ccc; min-width: 1700px; }
         td, th { border: 1px solid #333; padding: 8px; text-align: left; }
     </style>
 </head>
@@ -109,8 +109,8 @@
                 </div>
             </div>
             <div class="card" id="pressCard">
-                <label>Station Pressure (hPa)</label>
-                <input type="number" id="pressure" value="1013.2" readonly>
+                <label>Station Pressure (hPa) [Manual Override Allowed]</label>
+                <input type="number" id="pressure" value="1013.2" oninput="updateAlarm()">
                 <button class="btn" style="background:#fd7e14; color:#fff; margin-top:10px;" onclick="syncGPS()">SYNC BARO PRESSURE</button>
             </div>
             <input type="hidden" id="tDry" value="70.0">
@@ -145,6 +145,16 @@
                     <div class="check-item defect" onclick="toggleDefect(this)">IGU FOGGING</div>
                 </div>
             </div>
+            
+            <div class="card">
+                <label>Ground Truth (Moisture Meter)</label>
+                <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
+                    <input type="number" id="moisturePct" placeholder="0" style="flex:1; margin:0; padding:15px; font-size:1.5rem;">
+                    <span style="font-weight:bold; color:#0cf; font-size:1.5rem;">%</span>
+                    <div class="check-item" id="meterProvedBtn" onclick="this.classList.toggle('active')" style="flex:2; margin:0; padding:15px; background:#333; border: 2px solid #555; display:flex; align-items:center; justify-content:center; font-size:0.9rem;">PROVED WITH METER</div>
+                </div>
+            </div>
+
             <div class="card">
                 <button class="btn" style="background:#333; color:#0f0; border:2px solid #0f0; margin-bottom:15px; font-size: 1rem;" onclick="rapidSync()">✓ NO ANOMALIES (SYNC TEMP ONLY)</button>
                 <div style="display:flex; gap:10px;">
@@ -173,13 +183,18 @@
         <div class="slide">
             <h2 style="color:#ccc">4. COMMAND CENTER</h2>
             <div class="card">
+                <label>System Settings</label>
+                <input type="password" id="apiKeyInput" placeholder="Enter OpenWeather API Key..." style="font-size:0.8rem;">
+                <button class="btn" style="background:#555; color:#fff; margin-top:5px; padding:10px; font-size:0.9rem;" onclick="saveApiKey()">SAVE API KEY TO DEVICE</button>
+            </div>
+            <div class="card">
                 <label>Fleet Data Tracking</label>
                 <div style="display:flex; gap:8px; margin-top:5px;" id="flowNextRow"></div>
                 <button class="btn" style="background:#28a745; color:#fff; margin-top:20px;" onclick="flowNext('DOWN')">DESCEND & RESET TO LEFT</button>
             </div>
             <div class="vault-wrap">
                 <table id="logTable">
-                    <thead><tr><th>Tech</th><th>Time (sec)</th><th>Image #</th><th>ID</th><th>ΔT</th><th>Findings</th><th>Alarm</th><th>Amb</th><th>Hum</th><th>Press</th></tr></thead>
+                    <thead><tr><th>Tech</th><th>Time (sec)</th><th>Image #</th><th>ID</th><th>ΔT</th><th>Findings</th><th>Moisture %</th><th>Meter Proved</th><th>Alarm</th><th>Amb</th><th>Hum</th><th>Press</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
@@ -198,7 +213,6 @@
     </div>
 
     <script>
-        const API_KEY = "D987987038bce28955e65f9f4ede5209";
         let currentPos = "L";
 
         function initApp() {
@@ -208,8 +222,22 @@
                 document.getElementById('projectID').value = data.project || "";
                 document.getElementById('techName').value = data.tech || "";
             }
+            if (localStorage.getItem('strataApiKey')) {
+                document.getElementById('apiKeyInput').value = localStorage.getItem('strataApiKey');
+            }
             setPattern('3');
             updateAlarm();
+        }
+
+        function saveApiKey() {
+            const key = document.getElementById('apiKeyInput').value.trim();
+            if (key) {
+                localStorage.setItem('strataApiKey', key);
+                alert("API Key Saved Securely to Device!");
+            } else {
+                localStorage.removeItem('strataApiKey');
+                alert("API Key Cleared!");
+            }
         }
 
         function setPattern(val) {
@@ -222,7 +250,6 @@
 
             const configs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
             
-            // Force Default to Left (or Center if 1 Win)
             currentPos = configs[val][0];
 
             configs[val].forEach(p => {
@@ -279,17 +306,31 @@
         }
 
         async function syncGPS() {
+            const apiKey = localStorage.getItem('strataApiKey');
+            if (!apiKey) {
+                alert("Please save your OpenWeather API Key in the Command Center first.");
+                goToSlide(3);
+                return;
+            }
+
             navigator.geolocation.getCurrentPosition(async (pos) => {
-                const url = `https://api.openweathermap.org/data/2.5/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&units=imperial&appid=${API_KEY}`;
-                const res = await fetch(url);
-                const data = await res.json();
-                const P0 = data.main.pressure;
-                const Tk = (data.main.temp - 32) * 5/9 + 273.15;
-                const press = (P0 * Math.pow(1 - (0.0065 * (pos.coords.altitude || 0)) / Tk, 5.257)).toFixed(1);
-                document.getElementById('pressure').value = press;
-                document.getElementById('pressCard').classList.add('flash-sync');
-                setTimeout(() => document.getElementById('pressCard').classList.remove('flash-sync'), 1200);
-                updateAlarm();
+                try {
+                    const url = `https://api.openweathermap.org/data/2.5/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&units=imperial&appid=${apiKey}`;
+                    const res = await fetch(url);
+                    if (!res.ok) throw new Error("API Error");
+                    const data = await res.json();
+                    const P0 = data.main.pressure;
+                    const Tk = (data.main.temp - 32) * 5/9 + 273.15;
+                    const press = (P0 * Math.pow(1 - (0.0065 * (pos.coords.altitude || 0)) / Tk, 5.257)).toFixed(1);
+                    document.getElementById('pressure').value = press;
+                    document.getElementById('pressCard').classList.add('flash-sync');
+                    setTimeout(() => document.getElementById('pressCard').classList.remove('flash-sync'), 1200);
+                    updateAlarm();
+                } catch (err) {
+                    alert("Failed to fetch weather data. Please check your API key or enter pressure manually.");
+                }
+            }, (err) => {
+                alert("GPS Error. Please enter the station pressure manually.");
             });
         }
 
@@ -326,7 +367,10 @@
             const img = "FLIR" + document.getElementById('imgNum').value.toString().padStart(4, '0');
             const ref = parseFloat(document.getElementById('baselineC8').value), sus = parseFloat(document.getElementById('suspectTemp').value);
             
-            const row = `<tr><td>${tech}</td><td>${time}</td><td>${img}</td><td>${id}</td><td>${(ref-sus).toFixed(1)}</td><td>${findings}</td><td>${document.getElementById('result').innerText}</td><td>${document.getElementById('tDry').value}</td><td>${document.getElementById('rh').value}</td><td>${document.getElementById('pressure').value}</td></tr>`;
+            const mPct = document.getElementById('moisturePct').value || "--";
+            const proved = document.getElementById('meterProvedBtn').classList.contains('active') ? "YES" : "NO";
+            
+            const row = `<tr><td>${tech}</td><td>${time}</td><td>${img}</td><td>${id}</td><td>${(ref-sus).toFixed(1)}</td><td>${findings}</td><td>${mPct}</td><td>${proved}</td><td>${document.getElementById('result').innerText}</td><td>${document.getElementById('tDry').value}</td><td>${document.getElementById('rh').value}</td><td>${document.getElementById('pressure').value}</td></tr>`;
             document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
             localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
             goToSlide(3);
@@ -334,6 +378,10 @@
 
         function flowNext(cmd) {
             document.getElementById('imgNum').value = parseInt(document.getElementById('imgNum').value) + 1;
+            
+            document.getElementById('moisturePct').value = '';
+            document.getElementById('meterProvedBtn').classList.remove('active');
+            
             if (cmd === 'DOWN') { 
                 step('floorNum', -1); 
                 const pat = document.getElementById('dropPattern').value;
@@ -367,7 +415,7 @@
         function clearVault() { if (confirm("Wipe?")) { localStorage.removeItem('strataVault'); location.reload(); } }
         
         function exportLogs() {
-            let csv = "Technician,Time,Image,ID,DeltaT,Findings,Alarm,Amb,Hum,Press\n";
+            let csv = "Technician,Time,Image,ID,DeltaT,Findings,Moisture %,Meter Proved,Alarm,Amb,Hum,Press\n";
             document.querySelectorAll("#logTable tbody tr").forEach(tr => { csv += Array.from(tr.querySelectorAll("td")).map(td => `"${td.innerText}"`).join(",") + "\n"; });
             const blob = new Blob([csv], { type: 'text/csv' });
             const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = "Strata_Fleet_Report.csv"; a.click();
