@@ -146,13 +146,18 @@
                 </div>
             </div>
             
-            <div class="card">
+            <div class="card" id="groundTruthCard" style="display:none;">
                 <label>Ground Truth (Moisture Meter)</label>
                 <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
-                    <input type="number" id="moisturePct" placeholder="0" style="flex:1; margin:0; padding:15px; font-size:1.5rem;">
+                    <div class="stepper" style="flex:1; margin:0;">
+                        <button class="step-btn" style="width:50px; height:60px;" onclick="step('moisturePct', -1)">−</button>
+                        <div class="step-val" id="moisturePctVal" style="font-size:1.5rem;">0</div>
+                        <button class="step-btn" style="width:50px; height:60px;" onclick="step('moisturePct', 1)">+</button>
+                    </div>
                     <span style="font-weight:bold; color:#0cf; font-size:1.5rem;">%</span>
-                    <div class="check-item" id="meterProvedBtn" onclick="this.classList.toggle('active')" style="flex:2; margin:0; padding:15px; background:#333; border: 2px solid #555; display:flex; align-items:center; justify-content:center; font-size:0.9rem;">PROVED WITH METER</div>
+                    <div class="check-item" id="meterProvedBtn" onclick="this.classList.toggle('active')" style="flex:1.5; margin:0; padding:15px; background:#333; border: 2px solid #555; display:flex; align-items:center; justify-content:center; font-size:0.9rem;">PROVED WITH METER</div>
                 </div>
+                <input type="hidden" id="moisturePct" value="0">
             </div>
 
             <div class="card">
@@ -293,7 +298,8 @@
         function step(id, val) {
             const el = document.getElementById(id);
             const display = document.getElementById(id + 'Val');
-            let newVal = (parseFloat(el.value) + val).toFixed(id === 'rh' || id === 'floorNum' ? 0 : 1);
+            let newVal = (parseFloat(el.value) + val).toFixed(id === 'rh' || id === 'floorNum' || id === 'moisturePct' ? 0 : 1);
+            if(id === 'moisturePct' && newVal < 0) newVal = 0; // Prevent negative moisture
             el.value = newVal;
             if(display) display.innerText = newVal;
             updateAlarm(); updatePreview();
@@ -367,8 +373,9 @@
             const img = "FLIR" + document.getElementById('imgNum').value.toString().padStart(4, '0');
             const ref = parseFloat(document.getElementById('baselineC8').value), sus = parseFloat(document.getElementById('suspectTemp').value);
             
-            const mPct = document.getElementById('moisturePct').value || "--";
-            const proved = document.getElementById('meterProvedBtn').classList.contains('active') ? "YES" : "NO";
+            const isMoistureCardVisible = document.getElementById('groundTruthCard').style.display === 'block';
+            const mPct = isMoistureCardVisible ? document.getElementById('moisturePct').value : "--";
+            const proved = (isMoistureCardVisible && document.getElementById('meterProvedBtn').classList.contains('active')) ? "YES" : "NO";
             
             const row = `<tr><td>${tech}</td><td>${time}</td><td>${img}</td><td>${id}</td><td>${(ref-sus).toFixed(1)}</td><td>${findings}</td><td>${mPct}</td><td>${proved}</td><td>${document.getElementById('result').innerText}</td><td>${document.getElementById('tDry').value}</td><td>${document.getElementById('rh').value}</td><td>${document.getElementById('pressure').value}</td></tr>`;
             document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
@@ -378,9 +385,6 @@
 
         function flowNext(cmd) {
             document.getElementById('imgNum').value = parseInt(document.getElementById('imgNum').value) + 1;
-            
-            document.getElementById('moisturePct').value = '';
-            document.getElementById('meterProvedBtn').classList.remove('active');
             
             if (cmd === 'DOWN') { 
                 step('floorNum', -1); 
@@ -404,8 +408,34 @@
             items.forEach((item, i) => item.classList.toggle('active', i === num));
         }
 
-        function toggleSound() { document.getElementById('soundBtn').classList.add('active'); document.querySelectorAll('.defect').forEach(el => el.classList.remove('active')); }
-        function toggleDefect(el) { el.classList.toggle('active'); if (document.querySelectorAll('.defect.active').length > 0) document.getElementById('soundBtn').classList.remove('active'); else document.getElementById('soundBtn').classList.add('active'); }
+        function toggleSound() { 
+            document.getElementById('soundBtn').classList.add('active'); 
+            document.querySelectorAll('.defect').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById('groundTruthCard').style.display = 'none';
+            document.getElementById('moisturePct').value = '0';
+            document.getElementById('moisturePctVal').innerText = '0';
+            document.getElementById('meterProvedBtn').classList.remove('active');
+        }
+
+        function toggleDefect(el) { 
+            el.classList.toggle('active'); 
+            if (document.querySelectorAll('.defect.active').length > 0) {
+                document.getElementById('soundBtn').classList.remove('active'); 
+            } else {
+                document.getElementById('soundBtn').classList.add('active'); 
+            }
+            
+            const moistureBtn = Array.from(document.querySelectorAll('.defect')).find(b => b.innerText === 'MOISTURE DETECTED');
+            if (moistureBtn && moistureBtn.classList.contains('active')) {
+                document.getElementById('groundTruthCard').style.display = 'block';
+            } else {
+                document.getElementById('groundTruthCard').style.display = 'none';
+                document.getElementById('moisturePct').value = '0';
+                document.getElementById('moisturePctVal').innerText = '0';
+                document.getElementById('meterProvedBtn').classList.remove('active');
+            }
+        }
         
         function saveDraft() { 
             const draft = { project: document.getElementById('projectID').value, tech: document.getElementById('techName').value };
