@@ -233,8 +233,11 @@
                 posRow.appendChild(posBtn);
 
                 const flowBtn = document.createElement('button');
-                flowBtn.className = 'btn'; flowBtn.style.cssText = 'background:#333; color:#0cf; flex:1;';
-                flowBtn.innerText = 'MOVE ' + p; flowBtn.onclick = () => flowNext(p);
+                flowBtn.className = 'btn'; 
+                flowBtn.dataset.pos = p;
+                flowBtn.style.cssText = 'background:#333; color:#0cf; flex:1; font-size: 0.75rem;';
+                flowBtn.innerText = p === currentPos ? 'TAKE ADDITIONAL PICTURE' : 'MOVE ' + p;
+                flowBtn.onclick = () => flowNext(p);
                 flowRow.appendChild(flowBtn);
             });
             updatePreview();
@@ -248,6 +251,15 @@
                 btn.style.background = isMatch ? '#0cf' : '#333';
                 btn.style.color = isMatch ? '#000' : '#fff';
             });
+            
+            const flowBtns = document.querySelectorAll('#flowNextRow button');
+            flowBtns.forEach(btn => {
+                const btnPos = btn.dataset.pos;
+                if(btnPos) {
+                    btn.innerText = (btnPos === currentPos) ? 'TAKE ADDITIONAL PICTURE' : 'MOVE ' + btnPos;
+                }
+            });
+
             updatePreview();
         }
 
