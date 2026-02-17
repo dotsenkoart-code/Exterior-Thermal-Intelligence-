@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v35.0 Unabridged</title>
+    <title>Strata-Scan Pro: v36.0 Fleet</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; padding: 0; margin: 0; overflow: hidden; touch-action: manipulation; }
@@ -9,41 +9,33 @@
         .slide { width: 100vw; height: 100%; padding: 15px; box-sizing: border-box; overflow-y: auto; padding-bottom: 120px; }
         .card { background: #1a1a1a; padding: 15px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #333; }
         
-        /* NAVIGATION BAR */
         .navbar { height: 70px; background: #111; display: flex; border-top: 2px solid #333; position: fixed; bottom: 0; width: 100%; z-index: 1000; }
         .nav-item { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold; color: #555; cursor: pointer; }
         .nav-item.active { color: #0cf; border-top: 3px solid #0cf; background: #1a1a1a; }
         
-        /* TACTILE STEPPERS (ROPE-LOCKED) */
         .stepper { display: flex; align-items: center; justify-content: space-between; background: #222; border-radius: 12px; border: 2px solid #444; margin: 10px 0; overflow: hidden; }
         .step-btn { width: 85px; height: 85px; background: #333; border: none; color: #fff; font-size: 2.5rem; font-weight: bold; cursor: pointer; }
-        .step-btn:active { background: #555; }
         .step-val { flex: 1; text-align: center; font-size: 2.2rem; font-weight: 900; color: #0f0; text-shadow: 0 0 8px #0f0; }
         
-        /* INPUT STYLES */
         input[type="text"], input[type="number"], select { width: 100%; padding: 14px; background: #222; color: #fff; border: 2px solid #555; border-radius: 8px; font-size: 1.2rem; text-align: center; box-sizing: border-box; margin: 5px 0; }
         label { font-size: 0.7rem; color: #0cf; font-weight: bold; text-transform: uppercase; display: block; margin-top: 5px; }
         
-        /* FORENSIC ALARM SYSTEM */
         .alarm-box { background: #222; padding: 25px; text-align: center; border-radius: 15px; font-size: 3.5rem; font-weight: 900; border: 5px solid #444; margin: 10px 0; transition: 0.3s; }
         .crit { background: #f00 !important; color: #fff; border-color: #fff !important; animation: blink 0.6s infinite; }
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
         .flash-sync { animation: flashGreen 0.4s 3; }
         @keyframes flashGreen { 0% { border-color: #0f0; background: #030; } 100% { border-color: #333; background: #1a1a1a; } }
 
-        /* BUTTONS */
         .btn { padding: 20px; border-radius: 12px; border: none; width: 100%; font-size: 1.3rem; font-weight: 800; cursor: pointer; }
         .pattern-btn { flex: 1; padding: 15px 5px; background: #333; border: 2px solid #555; border-radius: 8px; color: #fff; font-size: 0.7rem; font-weight: bold; }
         .pattern-btn.active { background: #f39c12; color: #000; border-color: #fff; }
 
-        /* CHECKLIST */
         .check-item { background: #333; padding: 15px; border-radius: 10px; font-size: 0.75rem; text-align: center; border: 1px solid #555; font-weight: bold; margin-bottom: 5px; cursor: pointer; }
         .check-item.active { background: #0cf; color: #000; border-color: #fff; }
         .check-item.sound-box.active { background: #28a745; color: #fff; }
 
-        /* TABLE */
         .vault-wrap { overflow-x: auto; background: #111; border-radius: 8px; padding: 5px; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.5rem; color: #ccc; min-width: 1500px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.5rem; color: #ccc; min-width: 1600px; }
         td, th { border: 1px solid #333; padding: 8px; text-align: left; }
     </style>
 </head>
@@ -54,7 +46,9 @@
         <div class="slide">
             <h2 style="color:#0cf">1. DROP MAPPING</h2>
             <div class="card">
-                <label>Project Address / Building Name</label>
+                <label>Technician Name</label>
+                <input type="text" id="techName" placeholder="Enter Name..." oninput="saveDraft()">
+                <label style="margin-top:10px;">Project Address / Building Name</label>
                 <input type="text" id="projectID" placeholder="Enter Site Name..." oninput="saveDraft()">
             </div>
 
@@ -75,7 +69,7 @@
 
                 <div style="display:flex; gap:10px; margin-top:15px;">
                     <div style="flex:1;"><label>Drop ID</label><input type="text" id="dropLetter" value="A" style="text-transform:uppercase;" oninput="updatePreview()"></div>
-                    <div style="flex:2;"><label>Initial Position</label>
+                    <div style="flex:2;"><label>Position Selector</label>
                         <div style="display:flex; gap:8px;" id="posSelectorRow"></div>
                     </div>
                 </div>
@@ -90,7 +84,7 @@
             </div>
 
             <div class="card" style="text-align:center;">
-                <label>Full Target ID</label>
+                <label>Current Target ID</label>
                 <div id="fullIDDisplay" style="font-size: 3.5rem; font-weight: 900; color: #0f0; text-shadow: 0 0 15px #0f0; margin: 5px 0;">A-12-L</div>
             </div>
             
@@ -135,8 +129,7 @@
                     <option value="0.18">Brick / Masonry (0.18)</option>
                     <option value="0.21">Terracotta (0.21)</option>
                 </select>
-                <label>Solar Environment</label>
-                <select id="solar" onchange="updateAlarm()">
+                <select id="solar" onchange="updateAlarm()" style="margin-top:10px;">
                     <option value="1.0">☁️ SHADE / OVERCAST</option>
                     <option value="0.85">☀️ DIRECT SUN</option>
                 </select>
@@ -180,13 +173,13 @@
         <div class="slide">
             <h2 style="color:#ccc">4. COMMAND CENTER</h2>
             <div class="card">
-                <label>Tactical Flow Control</label>
+                <label>Fleet Data Tracking</label>
                 <div style="display:flex; gap:8px; margin-top:5px;" id="flowNextRow"></div>
                 <button class="btn" style="background:#28a745; color:#fff; margin-top:20px;" onclick="flowNext('DOWN')">DESCEND & RESET TO LEFT</button>
             </div>
             <div class="vault-wrap">
                 <table id="logTable">
-                    <thead><tr><th>Time (sec)</th><th>Image #</th><th>ID</th><th>ΔT</th><th>Findings</th><th>Alarm</th><th>Amb</th><th>Hum</th><th>Press</th></tr></thead>
+                    <thead><tr><th>Tech</th><th>Time (sec)</th><th>Image #</th><th>ID</th><th>ΔT</th><th>Findings</th><th>Alarm</th><th>Amb</th><th>Hum</th><th>Press</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
@@ -210,7 +203,11 @@
 
         function initApp() {
             if (localStorage.getItem('strataVault')) document.getElementById('logTable').querySelector('tbody').innerHTML = localStorage.getItem('strataVault');
-            if (localStorage.getItem('strataDraft')) document.getElementById('projectID').value = localStorage.getItem('strataDraft');
+            if (localStorage.getItem('strataDraft')) {
+                const data = JSON.parse(localStorage.getItem('strataDraft'));
+                document.getElementById('projectID').value = data.project || "";
+                document.getElementById('techName').value = data.tech || "";
+            }
             setPattern('3');
             updateAlarm();
         }
@@ -224,6 +221,10 @@
             flowRow.innerHTML = ''; posRow.innerHTML = '';
 
             const configs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
+            
+            // Force Default to Left (or Center if 1 Win)
+            currentPos = configs[val][0];
+
             configs[val].forEach(p => {
                 const posBtn = document.createElement('button');
                 posBtn.className = 'btn'; posBtn.id = 'p' + p;
@@ -236,17 +237,7 @@
                 flowBtn.innerText = 'MOVE ' + p; flowBtn.onclick = () => flowNext(p);
                 flowRow.appendChild(flowBtn);
             });
-            if (!configs[val].includes(currentPos)) setPos(configs[val][0]);
             updatePreview();
-        }
-
-        function step(id, val) {
-            const el = document.getElementById(id);
-            const display = document.getElementById(id + 'Val');
-            let newVal = (parseFloat(el.value) + val).toFixed(id === 'rh' || id === 'floorNum' ? 0 : 1);
-            el.value = newVal;
-            if(display) display.innerText = newVal;
-            updateAlarm(); updatePreview();
         }
 
         function setPos(p) {
@@ -260,17 +251,19 @@
             updatePreview();
         }
 
+        function step(id, val) {
+            const el = document.getElementById(id);
+            const display = document.getElementById(id + 'Val');
+            let newVal = (parseFloat(el.value) + val).toFixed(id === 'rh' || id === 'floorNum' ? 0 : 1);
+            el.value = newVal;
+            if(display) display.innerText = newVal;
+            updateAlarm(); updatePreview();
+        }
+
         function updatePreview() {
             const floor = document.getElementById('floorNum').value;
             const drop = document.getElementById('dropLetter').value.toUpperCase();
             document.getElementById('fullIDDisplay').innerText = `${drop}-${floor}-${currentPos}`;
-        }
-
-        function rapidSync() {
-            const ref = document.getElementById('baselineC8').value;
-            document.getElementById('suspectTemp').value = ref;
-            document.getElementById('suspectTempVal').innerText = parseFloat(ref).toFixed(1);
-            updateAlarm();
         }
 
         async function syncGPS() {
@@ -278,7 +271,9 @@
                 const url = `https://api.openweathermap.org/data/2.5/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&units=imperial&appid=${API_KEY}`;
                 const res = await fetch(url);
                 const data = await res.json();
-                const press = (data.main.pressure * Math.pow(1 - (0.0065 * (pos.coords.altitude || 0)) / ((data.main.temp - 32) * 5/9 + 273.15), 5.257)).toFixed(1);
+                const P0 = data.main.pressure;
+                const Tk = (data.main.temp - 32) * 5/9 + 273.15;
+                const press = (P0 * Math.pow(1 - (0.0065 * (pos.coords.altitude || 0)) / Tk, 5.257)).toFixed(1);
                 document.getElementById('pressure').value = press;
                 document.getElementById('pressCard').classList.add('flash-sync');
                 setTimeout(() => document.getElementById('pressCard').classList.remove('flash-sync'), 1200);
@@ -292,7 +287,6 @@
             const mat = parseFloat(document.getElementById('material').value), sol = parseFloat(document.getElementById('solar').value);
             const P = parseFloat(document.getElementById('pressure').value);
 
-            // FORMULA: Arden Buck + Enhancement Factor (f)
             const f = 1.0007 + (3.46e-6 * P), a = 17.27, b = 237.7;
             const gamma = (a * ((Td-32)*5/9)) / (b + ((Td-32)*5/9)) + Math.log((RH/100) * f);
             const Tdp = ((b * gamma) / (a - gamma) * 9/5) + 32;
@@ -301,16 +295,13 @@
             const box = document.getElementById('result');
             box.innerText = Talarm.toFixed(1) + "°F";
             const delta = (ref - sus).toFixed(1);
-
             if (sus <= Talarm) { 
                 box.className = "alarm-box crit"; 
                 if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 200]); 
             } else if (delta >= 2.0) { 
-                box.className = "alarm-box warn"; 
-                box.style.background = "#f39c12"; box.style.color = "#000";
+                box.className = "alarm-box warn"; box.style.background = "#f39c12"; box.style.color = "#000";
             } else { 
-                box.className = "alarm-box"; 
-                box.style.background = "#222"; box.style.color = "#fff";
+                box.className = "alarm-box"; box.style.background = "#222"; box.style.color = "#fff";
             }
         }
 
@@ -319,10 +310,11 @@
             const time = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0') + ":" + now.getSeconds().toString().padStart(2, '0');
             const findings = Array.from(document.querySelectorAll('.check-item.active')).map(i => i.innerText).join("|");
             const id = document.getElementById('fullIDDisplay').innerText;
+            const tech = document.getElementById('techName').value || "Unknown";
             const img = "FLIR" + document.getElementById('imgNum').value.toString().padStart(4, '0');
             const ref = parseFloat(document.getElementById('baselineC8').value), sus = parseFloat(document.getElementById('suspectTemp').value);
             
-            const row = `<tr><td>${time}</td><td>${img}</td><td>${id}</td><td>${(ref-sus).toFixed(1)}</td><td>${findings}</td><td>${document.getElementById('result').innerText}</td><td>${document.getElementById('tDry').value}</td><td>${document.getElementById('rh').value}</td><td>${document.getElementById('pressure').value}</td></tr>`;
+            const row = `<tr><td>${tech}</td><td>${time}</td><td>${img}</td><td>${id}</td><td>${(ref-sus).toFixed(1)}</td><td>${findings}</td><td>${document.getElementById('result').innerText}</td><td>${document.getElementById('tDry').value}</td><td>${document.getElementById('rh').value}</td><td>${document.getElementById('pressure').value}</td></tr>`;
             document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
             localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
             goToSlide(3);
@@ -339,6 +331,13 @@
             rapidSync(); toggleSound(); updateAlarm();
         }
 
+        function rapidSync() {
+            const ref = document.getElementById('baselineC8').value;
+            document.getElementById('suspectTemp').value = ref;
+            document.getElementById('suspectTempVal').innerText = parseFloat(ref).toFixed(1);
+            updateAlarm();
+        }
+
         function goToSlide(num) {
             document.getElementById('mainSlider').style.transform = `translateX(-${num * 100}vw)`;
             const items = document.querySelectorAll('.nav-item');
@@ -347,13 +346,19 @@
 
         function toggleSound() { document.getElementById('soundBtn').classList.add('active'); document.querySelectorAll('.defect').forEach(el => el.classList.remove('active')); }
         function toggleDefect(el) { el.classList.toggle('active'); if (document.querySelectorAll('.defect.active').length > 0) document.getElementById('soundBtn').classList.remove('active'); else document.getElementById('soundBtn').classList.add('active'); }
-        function saveDraft() { localStorage.setItem('strataDraft', document.getElementById('projectID').value); }
+        
+        function saveDraft() { 
+            const draft = { project: document.getElementById('projectID').value, tech: document.getElementById('techName').value };
+            localStorage.setItem('strataDraft', JSON.stringify(draft)); 
+        }
+        
         function clearVault() { if (confirm("Wipe?")) { localStorage.removeItem('strataVault'); location.reload(); } }
+        
         function exportLogs() {
-            let csv = "Time,Image,ID,DeltaT,Findings,Alarm,Amb,Hum,Press\n";
+            let csv = "Technician,Time,Image,ID,DeltaT,Findings,Alarm,Amb,Hum,Press\n";
             document.querySelectorAll("#logTable tbody tr").forEach(tr => { csv += Array.from(tr.querySelectorAll("td")).map(td => `"${td.innerText}"`).join(",") + "\n"; });
             const blob = new Blob([csv], { type: 'text/csv' });
-            const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = "Strata_v35_Unabridged.csv"; a.click();
+            const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = "Strata_Fleet_Report.csv"; a.click();
         }
     </script>
 </body>
