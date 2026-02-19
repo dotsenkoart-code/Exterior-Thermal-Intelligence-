@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v55.0 Floor Audit</title>
+    <title>Strata-Scan Pro: v56.0 Context UI</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
@@ -14,6 +14,11 @@
         
         .card { background: #121212; padding: 12px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #2a2a2a; }
         
+        /* --- BRAND NEW SITUATIONAL AWARENESS BANNERS --- */
+        .target-banner { background: #111; padding: 12px; border-radius: 8px; border: 2px solid #0cf; text-align: center; margin-bottom: 12px; box-shadow: 0 0 10px rgba(0, 204, 255, 0.15); }
+        .target-label { font-size: 0.7rem; color: #0cf; font-weight: 800; letter-spacing: 1px; margin-bottom: 4px; display: block; text-transform: uppercase; }
+        .target-id { font-size: 2.5rem; font-weight: 900; color: #fff; letter-spacing: 2px; }
+
         .navbar { height: 65px; background: #080808; display: flex; border-top: 1px solid #333; position: fixed; bottom: 0; width: 100%; z-index: 1000; }
         .nav-item { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; color: #666; cursor: pointer; letter-spacing: 1px; }
         .nav-item.active { color: #0cf; border-top: 2px solid #0cf; background: #111; }
@@ -182,15 +187,20 @@
                 </div>
             </div>
 
-            <div style="text-align:center; padding:10px; background:#111; border-radius:8px; border:1px solid #333; margin-top:5px;">
-                <label>TARGET ID</label>
-                <div id="fullIDDisplay" style="font-size: 2.5rem; font-weight: 900; color: #0cf; letter-spacing: 2px;">A-12-L</div>
+            <div class="target-banner" style="border-color:#333;">
+                <span class="target-label" style="color:#888;">TARGET ID (MAP)</span>
+                <div id="fullIDDisplay" class="target-id" style="color:#0cf;">A-12-L</div>
             </div>
             
             <input type="hidden" id="dropPattern" value="3">
         </div>
 
         <div class="slide">
+
+            <div class="target-banner">
+                <span class="target-label">CURRENT DIAGNOSIS TARGET</span>
+                <div id="diagnoseIDDisplay" class="target-id">A-12-L</div>
+            </div>
 
             <label style="margin-left:5px; margin-top:10px;">SCAN & FLAG FINDINGS</label>
             <div class="check-grid">
@@ -234,6 +244,11 @@
             <h2 style="color:#fff; margin:0 0 10px 0; font-size:1.2rem;">COMMAND CENTER</h2>
             
             <div class="card">
+                <div style="text-align:center; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid #333;">
+                    <span style="font-size:0.7rem; color:#888; font-weight:bold; display:block;">YOU ARE CURRENTLY AT:</span>
+                    <span id="cmdIDDisplay" style="font-size:1.6rem; font-weight:900; color:#fff;">A-12-L</span>
+                </div>
+
                 <label>NEXT MOVE</label>
                 <div id="flowNextRow" style="display:flex; gap:8px; margin-bottom:10px;"></div>
                 <button class="cmd-action-btn" style="background:#28a745; margin-top:5px;" onclick="requestFloorChange('descend_btn')">
@@ -334,22 +349,17 @@
         function checkFloorCompletion() {
             const pat = document.getElementById('dropPattern').value;
             const required = patternConfigs[pat];
-            // Find which required positions are missing from the logged set
             const missing = required.filter(p => !floorLoggedPositions.has(p));
             return missing;
         }
 
         function requestFloorChange(actionType) {
-            // First, make sure they aren't abandoning the window they are currently looking at
             verifySafeMove(() => {
-                // Second, check if they finished the whole floor pattern
                 const missing = checkFloorCompletion();
                 
                 if (missing.length === 0) {
-                    // Floor is complete! Execute the change immediately.
                     processFloorAction(actionType);
                 } else {
-                    // Floor is incomplete. Trigger the Warning Modal.
                     pendingFloorAction = actionType;
                     document.getElementById('missingFloorWindows').innerText = missing.join(", ");
                     document.getElementById('floorAuditModal').style.display = 'flex';
@@ -372,12 +382,10 @@
 
         function processFloorAction(actionType) {
             let val = (actionType === 'up') ? 1 : -1;
-            step('floorNum', val); // Changes the actual number
+            step('floorNum', val); 
             
-            // Clear the floor progress for the new floor
             floorLoggedPositions.clear();
             
-            // Automatically snap back to the starting position for the pattern
             const pat = document.getElementById('dropPattern').value;
             currentPos = patternConfigs[pat][0];
             isCurrentWindowLogged = false;
@@ -385,7 +393,6 @@
             updatePosUI();
             updatePreview();
             
-            // If they used the massive "DESCEND" button on Command Tab, jump to Map.
             if (actionType === 'descend_btn') {
                 goToSlide(0);
             }
@@ -435,7 +442,6 @@
             document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
             localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
             
-            // Register this position as logged for the floor audit
             floorLoggedPositions.add(currentPos);
             
             imgEl.value = parseInt(imgEl.value) + 1;
@@ -486,7 +492,6 @@
             localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
             
             isCurrentWindowLogged = true;
-            // Register this position as logged for the floor audit
             floorLoggedPositions.add(currentPos);
             
             imgEl.value = parseInt(imgEl.value) + 1;
@@ -570,7 +575,6 @@
             const flow = document.getElementById('flowNextRow');
             row.innerHTML = ''; flow.innerHTML = '';
             
-            // Complete reset when changing patterns
             isCurrentWindowLogged = false; 
             floorLoggedPositions.clear(); 
             currentPos = patternConfigs[val][0];
@@ -609,10 +613,15 @@
             });
         }
 
+        /* THIS FUNCTION UPDATES ALL 3 BANNERS AT ONCE */
         function updatePreview() {
             const f = document.getElementById('floorNum').value;
             const d = document.getElementById('dropLetter').value.toUpperCase();
-            document.getElementById('fullIDDisplay').innerText = `${d}-${f}-${currentPos}`;
+            const fullID = `${d}-${f}-${currentPos}`;
+            
+            document.getElementById('fullIDDisplay').innerText = fullID; // Map Tab
+            document.getElementById('diagnoseIDDisplay').innerText = fullID; // Diagnose Tab
+            document.getElementById('cmdIDDisplay').innerText = fullID; // Command Tab
         }
 
         function goToSlide(n) {
