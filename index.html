@@ -1,12 +1,10 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v41.0 Dashboard</title>
+    <title>Strata-Scan Pro: v43.0 Calibrated</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
-    <link rel="apple-touch-icon" href="icon-192.png">
 
     <style>
         /* --- CORE LAYOUT --- */
@@ -14,79 +12,56 @@
         .slide-container { display: flex; transition: transform 0.3s ease-in-out; width: 300vw; height: calc(100vh - 65px); }
         .slide { width: 100vw; height: 100%; padding: 10px; box-sizing: border-box; overflow-y: auto; padding-bottom: 80px; }
         
-        /* CARD STYLING - FLATTENED FOR PRO LOOK */
         .card { background: #121212; padding: 12px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #2a2a2a; }
-        .dashboard-panel { display: flex; gap: 8px; margin-bottom: 8px; }
         
-        /* --- NAVIGATION --- */
         .navbar { height: 65px; background: #080808; display: flex; border-top: 1px solid #333; position: fixed; bottom: 0; width: 100%; z-index: 1000; }
         .nav-item { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; color: #666; cursor: pointer; letter-spacing: 1px; }
         .nav-item.active { color: #0cf; border-top: 2px solid #0cf; background: #111; }
 
-        /* --- INPUTS --- */
         input[type="text"], input[type="number"] { width: 100%; padding: 10px; background: #222; color: #fff; border: 1px solid #444; border-radius: 6px; font-size: 1.1rem; text-align: center; box-sizing: border-box; }
         label { font-size: 0.65rem; color: #888; font-weight: 700; text-transform: uppercase; display: block; margin-bottom: 4px; letter-spacing: 0.5px; }
-        .active-label { color: #0cf; }
 
-        /* --- THE COCKPIT STEPPERS (COMPACT) --- */
-        .stepper-box { flex: 1; background: #1a1a1a; border-radius: 8px; border: 1px solid #333; padding: 5px; position: relative; overflow: hidden; }
-        .stepper-header { font-size: 0.7rem; color: #aaa; text-align: center; margin-bottom: 2px; font-weight: bold; }
-        .stepper-row { display: flex; align-items: center; justify-content: space-between; height: 60px; }
-        
-        .step-btn { width: 45px; height: 100%; background: #252525; border: none; color: #fff; font-size: 1.8rem; font-weight: 300; cursor: pointer; border-radius: 6px; z-index: 2; transition: background 0.1s; }
-        .step-btn:active { background: #444; }
-        
+        /* --- STEPPER --- */
+        .stepper-box { background: #1a1a1a; border-radius: 8px; border: 1px solid #333; padding: 5px; position: relative; overflow: hidden; margin-bottom: 10px; }
+        .stepper-row { display: flex; align-items: center; justify-content: space-between; height: 70px; }
+        .step-btn { width: 60px; height: 100%; background: #252525; border: none; color: #fff; font-size: 2rem; font-weight: 300; cursor: pointer; z-index: 2; border-radius: 6px; }
         .step-display { flex: 1; text-align: center; position: relative; height: 100%; display: flex; flex-direction: column; justify-content: center; }
-        .step-val { font-size: 2rem; font-weight: 700; color: #fff; z-index: 1; pointer-events: none; }
+        .step-val { font-size: 2.2rem; font-weight: 700; color: #fff; z-index: 1; pointer-events: none; }
         
         .touch-slider { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: ew-resize; z-index: 3; }
 
         /* --- HUD BUBBLE --- */
         .hud-bubble {
-            position: absolute; top: -60px; left: 50%; transform: translateX(-50%) scale(0);
+            position: absolute; top: -70px; left: 50%; transform: translateX(-50%) scale(0);
             background: #f39c12; color: #000; padding: 5px 15px; border-radius: 20px;
-            font-size: 1.8rem; font-weight: 800; z-index: 100; pointer-events: none;
+            font-size: 2rem; font-weight: 800; z-index: 100; pointer-events: none;
             transition: transform 0.1s; border: 3px solid #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.5);
         }
 
-        /* --- STATUS BAR ALARM --- */
-        .status-bar { 
-            width: 100%; padding: 12px; text-align: center; font-size: 1.2rem; font-weight: 800; 
-            border-radius: 6px; background: #222; border: 1px solid #333; color: #888; 
-            margin-bottom: 8px; transition: 0.3s; 
-            display: flex; justify-content: space-between; align-items: center;
+        /* --- LIMIT BANNER --- */
+        .limit-banner {
+            background: #222; border: 1px solid #444; border-radius: 6px; padding: 15px; 
+            text-align: center; margin-bottom: 15px; transition: 0.3s;
         }
-        .status-bar.safe { border-left: 5px solid #28a745; color: #fff; }
-        .status-bar.warn { background: #f39c12; color: #000; border: 1px solid #fff; }
-        .status-bar.crit { background: #d9534f; color: #fff; animation: pulse 1s infinite; border: 1px solid #fff; }
-        @keyframes pulse { 50% { opacity: 0.8; } }
+        .limit-val { font-size: 2.5rem; font-weight: 900; color: #f39c12; text-shadow: 0 0 10px rgba(243, 156, 18, 0.3); }
+        .limit-label { font-size: 0.7rem; color: #aaa; letter-spacing: 1px; text-transform: uppercase; }
 
         /* --- 3-COLUMN CHECKLIST --- */
         .check-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
         .check-item { 
             background: #222; padding: 15px 5px; border-radius: 6px; text-align: center; 
             font-size: 0.65rem; font-weight: 700; border: 1px solid #333; color: #888;
-            cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1.2;
-            height: 50px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1.2; height: 50px;
         }
-        .check-item.active { background: #0cf; color: #000; border-color: #fff; box-shadow: 0 0 10px rgba(0,204,255,0.3); }
-        .check-item.sound-box.active { background: #28a745; color: #fff; }
-        .check-item.defect.active { background: #d9534f; color: #fff; border-color: #fff; }
+        .check-item.active { background: #0cf; color: #000; border-color: #fff; }
 
         /* --- MOISTURE PANEL --- */
-        .moisture-panel {
-            background: #1a1a1a; border: 1px solid #d9534f; border-radius: 6px; padding: 10px;
-            margin-top: 8px; display: none; animation: slideDown 0.2s ease-out;
-        }
-        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .moisture-panel { background: #1a1a1a; border: 1px solid #d9534f; border-radius: 6px; padding: 10px; margin-top: 8px; display: none; }
 
         /* --- BUTTONS --- */
-        .action-btn { width: 100%; padding: 16px; border-radius: 8px; border: none; font-size: 1.1rem; font-weight: 800; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; }
-        .btn-blue { background: #007bff; background: linear-gradient(180deg, #007bff 0%, #0056b3 100%); }
-        .btn-green { background: #28a745; background: linear-gradient(180deg, #28a745 0%, #1e7e34 100%); }
-        .btn-dark { background: #333; border: 1px solid #555; }
-        
-        /* --- UTILS --- */
+        .action-btn { width: 100%; padding: 16px; border-radius: 8px; border: none; font-size: 1.1rem; font-weight: 800; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; margin-top: 15px; }
+        .btn-blue { background: linear-gradient(180deg, #007bff 0%, #0056b3 100%); }
+        .btn-green { background: linear-gradient(180deg, #28a745 0%, #1e7e34 100%); }
         .pattern-btn { flex: 1; padding: 10px; background: #222; border: 1px solid #444; color: #666; font-size: 0.7rem; font-weight: bold; }
         .pattern-btn.active { background: #0cf; color: #000; }
         
@@ -103,20 +78,20 @@
             <div class="card">
                 <div style="display:flex; gap:8px;">
                     <div style="flex:2;"><label>Technician</label><input type="text" id="techName" oninput="saveDraft()"></div>
-                    <div style="flex:1;"><label class="active-label">Cam ID</label><input type="text" id="camID" oninput="saveDraft()" style="border-color:#0cf;"></div>
+                    <div style="flex:1;"><label style="color:#0cf;">Cam ID</label><input type="text" id="camID" oninput="saveDraft()" style="border-color:#0cf;"></div>
                 </div>
                 <label style="margin-top:8px;">Project</label><input type="text" id="projectID" oninput="saveDraft()">
             </div>
 
             <div class="card">
                 <label>Floor Level</label>
-                <div class="stepper-box" style="margin-bottom:10px;">
+                <div class="stepper-box">
                     <div class="stepper-row">
-                        <button class="step-btn" onclick="step('floorNum', -1)">−</button>
+                        <button class="step-btn" onclick="stepFloor(-1)">−</button>
                         <div class="step-display">
-                            <div class="step-val" id="floorNumVal" style="color:#fff;">12</div>
+                            <div class="step-val" id="floorNumVal">12</div>
                         </div>
-                        <button class="step-btn" onclick="step('floorNum', 1)">+</button>
+                        <button class="step-btn" onclick="stepFloor(1)">+</button>
                     </div>
                     <input type="hidden" id="floorNum" value="12">
                 </div>
@@ -142,46 +117,29 @@
         </div>
 
         <div class="slide">
-            <div class="dashboard-panel">
-                <div class="stepper-box">
-                    <div class="stepper-header">REF (DRY)</div>
-                    <div class="stepper-row">
-                        <button class="step-btn" onclick="step('baselineC8', -0.1)">-</button>
-                        <div class="step-display">
-                            <div class="step-val" id="baselineC8Val">75.0</div>
-                            <div class="hud-bubble" id="hud-baselineC8">75.0</div>
-                            <input type="range" class="touch-slider" min="0" max="120" step="1" value="75.0" oninput="slideUpdate('baselineC8', this.value)" onchange="slideEnd('baselineC8')">
-                        </div>
-                        <button class="step-btn" onclick="step('baselineC8', 0.1)">+</button>
-                    </div>
-                    <input type="hidden" id="baselineC8" value="75.0">
-                </div>
-
-                <div class="stepper-box">
-                    <div class="stepper-header">SCAN TEMP</div>
-                    <div class="stepper-row">
-                        <button class="step-btn" onclick="step('suspectTemp', -0.1)">-</button>
-                        <div class="step-display">
-                            <div class="step-val" id="suspectTempVal" style="color:#f39c12;">75.0</div>
-                            <div class="hud-bubble" id="hud-suspectTemp">75.0</div>
-                            <input type="range" class="touch-slider" min="0" max="120" step="1" value="75.0" oninput="slideUpdate('suspectTemp', this.value)" onchange="slideEnd('suspectTemp')">
-                        </div>
-                        <button class="step-btn" onclick="step('suspectTemp', 0.1)">+</button>
-                    </div>
-                    <input type="hidden" id="suspectTemp" value="75.0">
-                </div>
-            </div>
-
-            <div class="status-bar" id="resultBar">
-                <span id="deltaDisplay" style="font-size:0.9rem; font-weight:400;">Δ 0.0</span>
-                <span id="statusText">NO ANOMALY</span>
-            </div>
             
-            <button class="action-btn btn-dark" style="padding:10px; font-size:0.8rem; margin-bottom:12px;" onclick="rapidSync()">SYNC TEMPERATURES (RESET)</button>
+            <label style="margin-left:5px;">STEP 1: SET DRY REFERENCE</label>
+            <div class="stepper-box" style="border-color:#0cf;">
+                <div class="stepper-row">
+                    <button class="step-btn" onclick="step('baselineC8', -0.1)">-</button>
+                    <div class="step-display">
+                        <div class="step-val" id="baselineC8Val">75.0</div>
+                        <div class="hud-bubble" id="hud-baselineC8">75.0</div>
+                        <input type="range" class="touch-slider" min="0" max="120" step="1" value="75.0" oninput="slideUpdate('baselineC8', this.value)" onchange="slideEnd('baselineC8')">
+                    </div>
+                    <button class="step-btn" onclick="step('baselineC8', 0.1)">+</button>
+                </div>
+                <input type="hidden" id="baselineC8" value="75.0">
+            </div>
 
-            <label style="margin-left:5px;">OBSERVATIONS</label>
+            <div class="limit-banner">
+                <div class="limit-label">ANYTHING COLDER THAN THIS IS A DEFECT</div>
+                <div class="limit-val" id="limitDisplay">72.0°F</div>
+            </div>
+
+            <label style="margin-left:5px;">STEP 2: SCAN & FLAG</label>
             <div class="check-grid">
-                <div class="check-item sound-box active" id="soundBtn" onclick="toggleSound()">SOUND / DRY</div>
+                <div class="check-item sound-box active" id="soundBtn" onclick="toggleSound()">✅ CLEAR</div>
                 <div class="check-item defect" id="moistureDetectBtn" onclick="toggleDefect(this)">MOISTURE</div>
                 <div class="check-item defect" onclick="toggleDefect(this)">LEAK SUSPECT</div>
                 <div class="check-item defect" onclick="toggleDefect(this)">SEALANT FAIL</div>
@@ -192,7 +150,7 @@
             <div class="moisture-panel" id="groundTruthCard">
                 <label style="color:#d9534f; margin-bottom:8px;">SURVEYMASTER CONFIRMATION</label>
                 <div style="display:flex; gap:8px;">
-                    <div class="stepper-box" style="flex:1;">
+                    <div class="stepper-box" style="flex:1; margin:0;">
                         <div class="stepper-row" style="height:50px;">
                             <button class="step-btn" style="width:30px;" onclick="step('moisturePct', -1)">-</button>
                             <div class="step-display">
@@ -204,11 +162,11 @@
                         </div>
                         <input type="hidden" id="moisturePct" value="85">
                     </div>
-                    <div class="check-item" id="meterProvedBtn" onclick="toggleMeter(this)" style="flex:1.5; border:1px solid #555;">PROVED</div>
+                    <div class="check-item" id="meterProvedBtn" onclick="toggleMeter(this)" style="flex:1.5; border:1px solid #555;">METER PROVED</div>
                 </div>
             </div>
 
-            <button class="action-btn btn-blue" style="margin-top:15px; box-shadow: 0 4px 15px rgba(0,123,255,0.4);" onclick="logEvidence()">LOG DATA & NEXT</button>
+            <button class="action-btn btn-blue" onclick="logEvidence()">LOG DATA & NEXT</button>
         </div>
 
         <div class="slide">
@@ -217,14 +175,14 @@
                 <div style="padding:10px; border-bottom:1px solid #333; display:flex; gap:5px;" id="flowNextRow"></div>
                 <div style="overflow-x:auto; max-height:60vh;">
                     <table id="logTable">
-                        <thead style="background:#222;"><tr><th>ID</th><th>ΔT</th><th>Finds</th><th>M%</th><th>Time</th></tr></thead>
+                        <thead style="background:#222;"><tr><th>ID</th><th>Ref</th><th>Finds</th><th>M%</th><th>Time</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
             </div>
             <div style="display:flex; gap:8px; margin-top:10px;">
-                <button class="action-btn btn-dark" onclick="exportLogs()">EXPORT CSV</button>
-                <button class="action-btn" style="background:#b00;" onclick="clearVault()">WIPE</button>
+                <button class="action-btn btn-dark" style="margin:0;" onclick="exportLogs()">EXPORT CSV</button>
+                <button class="action-btn" style="background:#b00; margin:0;" onclick="clearVault()">WIPE</button>
             </div>
         </div>
     </div>
@@ -247,7 +205,7 @@
                 document.getElementById('camID').value = data.cam || "";
             }
             setPattern('3');
-            updateAlarm();
+            updateLimit();
         }
 
         /* --- HUD & SLIDER LOGIC --- */
@@ -257,7 +215,7 @@
             const hud = document.getElementById('hud-' + id);
             if(hud) { hud.innerText = formatted; hud.style.transform = "translateX(-50%) scale(1)"; }
             document.getElementById(id).value = formatted;
-            updateAlarm();
+            if(id === 'baselineC8') updateLimit();
         }
         
         function slideEnd(id) {
@@ -272,46 +230,25 @@
             if(id === 'moisturePct') { if(newVal < 0) newVal = 0; if(newVal > 100) newVal = 100; }
             
             el.value = newVal;
-            document.getElementById(id + 'Val').innerText = newVal;
+            
+            const displayId = (id === 'floorNum') ? 'floorNumVal' : id + 'Val';
+            document.getElementById(displayId).innerText = newVal;
             
             // Sync slider
-            const slider = el.parentElement.querySelector('.touch-slider'); // Fix selector scope
-            if(!slider) {
-                 // Fallback if slider is in parent's parent (stepper-box structure)
-                 const box = el.closest('.stepper-box');
-                 if(box) { const s = box.querySelector('.touch-slider'); if(s) s.value = Math.round(newVal); }
-            } else {
-                 slider.value = Math.round(newVal);
-            }
+            const box = el.closest('.stepper-box');
+            if(box) { const s = box.querySelector('.touch-slider'); if(s) s.value = Math.round(newVal); }
 
-            if(id !== 'floorNum') updateAlarm(); 
+            if(id === 'baselineC8') updateLimit();
             if(id === 'floorNum') updatePreview();
         }
 
-        /* --- UI LOGIC --- */
-        function updateAlarm() {
+        function updateLimit() {
             const ref = parseFloat(document.getElementById('baselineC8').value);
-            const sus = parseFloat(document.getElementById('suspectTemp').value);
-            const delta = (ref - sus).toFixed(1);
-            const limit = (ref - 3.0).toFixed(1);
-            
-            const bar = document.getElementById('resultBar');
-            const txt = document.getElementById('statusText');
-            document.getElementById('deltaDisplay').innerText = `Δ ${delta}°F`;
-
-            if (sus <= (ref - 3.0)) {
-                bar.className = "status-bar crit";
-                txt.innerText = "⚠️ ANOMALY DETECTED";
-                if (window.navigator.vibrate) window.navigator.vibrate(200);
-            } else if (sus < ref) {
-                bar.className = "status-bar warn";
-                txt.innerText = "COOLING DETECTED";
-            } else {
-                bar.className = "status-bar safe";
-                txt.innerText = "NO THERMAL ANOMALY";
-            }
+            const lim = (ref - 3.0).toFixed(1);
+            document.getElementById('limitDisplay').innerText = lim + "°F";
         }
 
+        /* --- DEFECT LOGIC --- */
         function toggleSound() {
             document.getElementById('soundBtn').classList.add('active');
             document.querySelectorAll('.defect').forEach(el => el.classList.remove('active'));
@@ -325,7 +262,7 @@
             } else {
                 document.getElementById('soundBtn').classList.add('active');
             }
-            // Show moisture panel if specific button clicked
+            // Show moisture panel logic
             const mBtn = document.getElementById('moistureDetectBtn');
             document.getElementById('groundTruthCard').style.display = (mBtn.classList.contains('active')) ? 'block' : 'none';
         }
@@ -335,19 +272,16 @@
             if(el.classList.contains('active')) {
                 el.style.background = '#28a745'; el.style.color='#fff'; el.innerText = '✅ PROVED';
             } else {
-                el.style.background = '#222'; el.style.color='#888'; el.innerText = 'PROVED';
+                el.style.background = '#222'; el.style.color='#888'; el.innerText = 'METER PROVED';
             }
         }
-
-        function rapidSync() {
-            const ref = document.getElementById('baselineC8').value;
-            const susInput = document.getElementById('suspectTemp');
-            susInput.value = ref;
-            document.getElementById('suspectTempVal').innerText = ref;
-            // Sync slider
-            const slider = susInput.closest('.stepper-box').querySelector('.touch-slider');
-            if(slider) slider.value = Math.round(ref);
-            updateAlarm();
+        
+        function stepFloor(val) {
+            let el = document.getElementById('floorNum');
+            let n = parseInt(el.value) + val;
+            el.value = n;
+            document.getElementById('floorNumVal').innerText = n;
+            updatePreview();
         }
 
         /* --- MAP & LOGGING --- */
@@ -361,7 +295,6 @@
             currentPos = configs[val][0];
             
             configs[val].forEach(p => {
-                // Map buttons
                 const btn = document.createElement('button');
                 btn.className = 'pattern-btn'; 
                 if(p === currentPos) { btn.style.background='#0cf'; btn.style.color='#000'; }
@@ -369,7 +302,6 @@
                 btn.onclick = () => { currentPos=p; updatePosUI(); updatePreview(); };
                 row.appendChild(btn);
                 
-                // Flow buttons
                 const fBtn = document.createElement('button');
                 fBtn.className = 'pattern-btn';
                 fBtn.style.fontSize = '0.6rem';
@@ -397,7 +329,7 @@
             const now = new Date();
             const time = now.getHours().toString().padStart(2,'0') + ":" + now.getMinutes().toString().padStart(2,'0');
             const id = document.getElementById('fullIDDisplay').innerText;
-            const delta = (parseFloat(document.getElementById('baselineC8').value) - parseFloat(document.getElementById('suspectTemp').value)).toFixed(1);
+            const ref = document.getElementById('baselineC8').value;
             
             let finds = [];
             document.querySelectorAll('.check-item.active').forEach(el => finds.push(el.innerText));
@@ -409,13 +341,18 @@
                 if(document.getElementById('meterProvedBtn').classList.contains('active')) mPct += " (V)";
             }
 
-            const row = `<tr><td style="color:#0cf; font-weight:bold;">${id}</td><td>${delta}</td><td>${finds[0]}</td><td>${mPct}</td><td>${time}</td></tr>`;
+            const row = `<tr><td style="color:#0cf; font-weight:bold;">${id}</td><td>${ref}</td><td>${finds.join('|')}</td><td>${mPct}</td><td>${time}</td></tr>`;
             document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
             localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
             
-            // Advance Img Num
             const imgEl = document.getElementById('imgNum');
             imgEl.value = parseInt(imgEl.value) + 1;
+            
+            // Reset Diagnosis (Keep Baseline)
+            toggleSound(); 
+            document.getElementById('moisturePct').value = '';
+            document.getElementById('meterProvedBtn').classList.remove('active');
+            document.getElementById('meterProvedBtn').style.background = '#222';
             
             goToSlide(2);
         }
@@ -433,7 +370,7 @@
         function clearVault() { if(confirm("Wipe data?")) { localStorage.removeItem('strataVault'); location.reload(); } }
         
         function exportLogs() {
-            let csv = "ID,Delta,Findings,Moisture,Time\n";
+            let csv = "ID,RefTemp,Findings,Moisture,Time\n";
             document.querySelectorAll("#logTable tbody tr").forEach(tr => {
                 csv += Array.from(tr.querySelectorAll("td")).map(td => td.innerText).join(",") + "\n";
             });
