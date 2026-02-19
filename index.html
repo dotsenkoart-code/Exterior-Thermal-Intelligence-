@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v40.0 HUD Edition</title>
+    <title>Strata-Scan Pro: v41.0 Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
     <link rel="manifest" href="manifest.json">
@@ -9,70 +9,89 @@
     <link rel="apple-touch-icon" href="icon-192.png">
 
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; padding: 0; margin: 0; overflow: hidden; touch-action: manipulation; }
-        .slide-container { display: flex; transition: transform 0.3s ease-in-out; width: 300vw; height: calc(100vh - 70px); }
-        .slide { width: 100vw; height: 100%; padding: 15px; box-sizing: border-box; overflow-y: auto; padding-bottom: 120px; }
-        .card { background: #1a1a1a; padding: 15px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #333; }
+        /* --- CORE LAYOUT --- */
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background: #000; color: #fff; padding: 0; margin: 0; overflow: hidden; touch-action: manipulation; }
+        .slide-container { display: flex; transition: transform 0.3s ease-in-out; width: 300vw; height: calc(100vh - 65px); }
+        .slide { width: 100vw; height: 100%; padding: 10px; box-sizing: border-box; overflow-y: auto; padding-bottom: 80px; }
         
-        .navbar { height: 70px; background: #111; display: flex; border-top: 2px solid #333; position: fixed; bottom: 0; width: 100%; z-index: 1000; }
-        .nav-item { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold; color: #555; cursor: pointer; }
-        .nav-item.active { color: #0cf; border-top: 3px solid #0cf; background: #1a1a1a; }
+        /* CARD STYLING - FLATTENED FOR PRO LOOK */
+        .card { background: #121212; padding: 12px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #2a2a2a; }
+        .dashboard-panel { display: flex; gap: 8px; margin-bottom: 8px; }
         
-        /* --- NEW HUD STEPPER STYLES --- */
-        .stepper { display: flex; align-items: center; justify-content: space-between; background: #222; border-radius: 12px; border: 2px solid #444; margin: 10px 0; overflow: visible; position: relative; }
-        .step-btn { width: 70px; height: 85px; background: #333; border: none; color: #fff; font-size: 2.5rem; font-weight: bold; cursor: pointer; z-index: 2; border-radius: 10px; }
+        /* --- NAVIGATION --- */
+        .navbar { height: 65px; background: #080808; display: flex; border-top: 1px solid #333; position: fixed; bottom: 0; width: 100%; z-index: 1000; }
+        .nav-item { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; color: #666; cursor: pointer; letter-spacing: 1px; }
+        .nav-item.active { color: #0cf; border-top: 2px solid #0cf; background: #111; }
+
+        /* --- INPUTS --- */
+        input[type="text"], input[type="number"] { width: 100%; padding: 10px; background: #222; color: #fff; border: 1px solid #444; border-radius: 6px; font-size: 1.1rem; text-align: center; box-sizing: border-box; }
+        label { font-size: 0.65rem; color: #888; font-weight: 700; text-transform: uppercase; display: block; margin-bottom: 4px; letter-spacing: 0.5px; }
+        .active-label { color: #0cf; }
+
+        /* --- THE COCKPIT STEPPERS (COMPACT) --- */
+        .stepper-box { flex: 1; background: #1a1a1a; border-radius: 8px; border: 1px solid #333; padding: 5px; position: relative; overflow: hidden; }
+        .stepper-header { font-size: 0.7rem; color: #aaa; text-align: center; margin-bottom: 2px; font-weight: bold; }
+        .stepper-row { display: flex; align-items: center; justify-content: space-between; height: 60px; }
         
-        .step-display-area { flex: 1; position: relative; height: 85px; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #222; }
-        .step-val { font-size: 2.2rem; font-weight: 900; color: #0f0; text-shadow: 0 0 8px #0f0; z-index: 1; pointer-events: none; }
+        .step-btn { width: 45px; height: 100%; background: #252525; border: none; color: #fff; font-size: 1.8rem; font-weight: 300; cursor: pointer; border-radius: 6px; z-index: 2; transition: background 0.1s; }
+        .step-btn:active { background: #444; }
         
-        /* The invisible touch zone */
+        .step-display { flex: 1; text-align: center; position: relative; height: 100%; display: flex; flex-direction: column; justify-content: center; }
+        .step-val { font-size: 2rem; font-weight: 700; color: #fff; z-index: 1; pointer-events: none; }
+        
         .touch-slider { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: ew-resize; z-index: 3; }
-        .grip-mark { width: 40px; height: 4px; background: #444; border-radius: 2px; margin-bottom: 5px; }
 
-        /* THE POP-UP HUD */
+        /* --- HUD BUBBLE --- */
         .hud-bubble {
-            position: absolute;
-            top: -70px; /* Floats above the finger */
-            left: 50%;
-            transform: translateX(-50%) scale(0); /* Hidden by default */
-            background: #f39c12;
-            color: #000;
-            padding: 10px 20px;
-            border-radius: 50px;
-            font-size: 2.5rem;
-            font-weight: 900;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.8);
-            z-index: 100;
-            pointer-events: none;
-            transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            border: 4px solid #fff;
-            white-space: nowrap;
-        }
-        /* Show HUD when active */
-        .stepper:focus-within .hud-bubble, .touch-slider:active + .hud-bubble {
-            transform: translateX(-50%) scale(1);
+            position: absolute; top: -60px; left: 50%; transform: translateX(-50%) scale(0);
+            background: #f39c12; color: #000; padding: 5px 15px; border-radius: 20px;
+            font-size: 1.8rem; font-weight: 800; z-index: 100; pointer-events: none;
+            transition: transform 0.1s; border: 3px solid #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.5);
         }
 
-        input[type="text"], input[type="password"], input[type="number"], select { width: 100%; padding: 14px; background: #222; color: #fff; border: 2px solid #555; border-radius: 8px; font-size: 1.2rem; text-align: center; box-sizing: border-box; margin: 5px 0; }
-        label { font-size: 0.7rem; color: #0cf; font-weight: bold; text-transform: uppercase; display: block; margin-top: 5px; }
-        
-        .alarm-box { background: #222; padding: 25px; text-align: center; border-radius: 15px; font-size: 3.5rem; font-weight: 900; border: 5px solid #444; margin: 10px 0; transition: 0.3s; }
-        .crit { background: #f00 !important; color: #fff; border-color: #fff !important; animation: blink 0.6s infinite; }
-        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
-        .warn { background: #f39c12 !important; color: #000 !important; }
+        /* --- STATUS BAR ALARM --- */
+        .status-bar { 
+            width: 100%; padding: 12px; text-align: center; font-size: 1.2rem; font-weight: 800; 
+            border-radius: 6px; background: #222; border: 1px solid #333; color: #888; 
+            margin-bottom: 8px; transition: 0.3s; 
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .status-bar.safe { border-left: 5px solid #28a745; color: #fff; }
+        .status-bar.warn { background: #f39c12; color: #000; border: 1px solid #fff; }
+        .status-bar.crit { background: #d9534f; color: #fff; animation: pulse 1s infinite; border: 1px solid #fff; }
+        @keyframes pulse { 50% { opacity: 0.8; } }
 
-        .btn { padding: 20px; border-radius: 12px; border: none; width: 100%; font-size: 1.3rem; font-weight: 800; cursor: pointer; }
-        .pattern-btn { flex: 1; padding: 15px 5px; background: #333; border: 2px solid #555; border-radius: 8px; color: #fff; font-size: 0.7rem; font-weight: bold; }
-        .pattern-btn.active { background: #f39c12; color: #000; border-color: #fff; }
-
-        .check-item { background: #333; padding: 15px; border-radius: 10px; font-size: 0.75rem; text-align: center; border: 1px solid #555; font-weight: bold; margin-bottom: 5px; cursor: pointer; transition: 0.2s; }
-        .check-item.active { background: #0cf; color: #000; border-color: #fff; }
+        /* --- 3-COLUMN CHECKLIST --- */
+        .check-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+        .check-item { 
+            background: #222; padding: 15px 5px; border-radius: 6px; text-align: center; 
+            font-size: 0.65rem; font-weight: 700; border: 1px solid #333; color: #888;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1.2;
+            height: 50px;
+        }
+        .check-item.active { background: #0cf; color: #000; border-color: #fff; box-shadow: 0 0 10px rgba(0,204,255,0.3); }
         .check-item.sound-box.active { background: #28a745; color: #fff; }
-        #moistureDetectBtn.active { background: #d9534f !important; color: #fff !important; border-color: #fff !important; }
+        .check-item.defect.active { background: #d9534f; color: #fff; border-color: #fff; }
 
-        .vault-wrap { overflow-x: auto; background: #111; border-radius: 8px; padding: 5px; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.6rem; color: #ccc; min-width: 800px; }
-        td, th { border: 1px solid #333; padding: 8px; text-align: left; }
+        /* --- MOISTURE PANEL --- */
+        .moisture-panel {
+            background: #1a1a1a; border: 1px solid #d9534f; border-radius: 6px; padding: 10px;
+            margin-top: 8px; display: none; animation: slideDown 0.2s ease-out;
+        }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* --- BUTTONS --- */
+        .action-btn { width: 100%; padding: 16px; border-radius: 8px; border: none; font-size: 1.1rem; font-weight: 800; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; }
+        .btn-blue { background: #007bff; background: linear-gradient(180deg, #007bff 0%, #0056b3 100%); }
+        .btn-green { background: #28a745; background: linear-gradient(180deg, #28a745 0%, #1e7e34 100%); }
+        .btn-dark { background: #333; border: 1px solid #555; }
+        
+        /* --- UTILS --- */
+        .pattern-btn { flex: 1; padding: 10px; background: #222; border: 1px solid #444; color: #666; font-size: 0.7rem; font-weight: bold; }
+        .pattern-btn.active { background: #0cf; color: #000; }
+        
+        table { width: 100%; border-collapse: collapse; font-size: 0.6rem; color: #ccc; }
+        td, th { border: 1px solid #333; padding: 6px; text-align: left; }
     </style>
 </head>
 <body onload="initApp()">
@@ -80,146 +99,132 @@
     <div class="slide-container" id="mainSlider">
         
         <div class="slide">
-            <h2 style="color:#0cf">1. DROP MAPPING</h2>
+            <h2 style="color:#fff; margin:0 0 10px 0; font-size:1.2rem;">LOGISTICS</h2>
             <div class="card">
-                <label>Technician Name</label>
-                <input type="text" id="techName" placeholder="Enter Name..." oninput="saveDraft()">
-                
-                <label style="margin-top:10px; color:#f39c12;">Camera ID</label>
-                <input type="text" id="camID" placeholder="e.g. C1" oninput="saveDraft()" style="border-color:#f39c12;">
-
-                <label style="margin-top:10px;">Project Address / Building Name</label>
-                <input type="text" id="projectID" placeholder="Enter Site Name..." oninput="saveDraft()">
+                <div style="display:flex; gap:8px;">
+                    <div style="flex:2;"><label>Technician</label><input type="text" id="techName" oninput="saveDraft()"></div>
+                    <div style="flex:1;"><label class="active-label">Cam ID</label><input type="text" id="camID" oninput="saveDraft()" style="border-color:#0cf;"></div>
+                </div>
+                <label style="margin-top:8px;">Project</label><input type="text" id="projectID" oninput="saveDraft()">
             </div>
 
             <div class="card">
-                <label>Floor #</label>
-                <div class="stepper">
-                    <button class="step-btn" onclick="step('floorNum', -1)">−</button>
-                    <div class="step-display-area">
-                        <div class="step-val" id="floorNumVal">12</div>
+                <label>Floor Level</label>
+                <div class="stepper-box" style="margin-bottom:10px;">
+                    <div class="stepper-row">
+                        <button class="step-btn" onclick="step('floorNum', -1)">−</button>
+                        <div class="step-display">
+                            <div class="step-val" id="floorNumVal" style="color:#fff;">12</div>
+                        </div>
+                        <button class="step-btn" onclick="step('floorNum', 1)">+</button>
                     </div>
-                    <button class="step-btn" onclick="step('floorNum', 1)">+</button>
+                    <input type="hidden" id="floorNum" value="12">
                 </div>
                 
-                <label>Drop Pattern</label>
-                <div style="display:flex; gap:5px; margin: 5px 0;">
-                    <button class="pattern-btn active" id="pat3" onclick="setPattern('3')">3 WIN (L-C-R)</button>
-                    <button class="pattern-btn" id="pat2" onclick="setPattern('2')">2 WIN (L-R)</button>
-                    <button class="pattern-btn" id="pat1" onclick="setPattern('1')">1 WIN (C)</button>
+                <div style="display:flex; margin-bottom:10px;">
+                    <button class="pattern-btn active" id="pat3" onclick="setPattern('3')">3-WIN</button>
+                    <button class="pattern-btn" id="pat2" onclick="setPattern('2')">2-WIN</button>
+                    <button class="pattern-btn" id="pat1" onclick="setPattern('1')">1-WIN</button>
                 </div>
-
-                <div style="display:flex; gap:10px; margin-top:15px;">
-                    <div style="flex:1;"><label>Drop ID</label><input type="text" id="dropLetter" value="A" style="text-transform:uppercase;" oninput="updatePreview()"></div>
-                    <div style="flex:2;"><label>Position Selector</label>
-                        <div style="display:flex; gap:8px;" id="posSelectorRow"></div>
-                    </div>
+                
+                <div style="display:flex; gap:8px;">
+                    <div style="flex:1;"><label>Drop</label><input type="text" id="dropLetter" value="A" style="text-transform:uppercase;" oninput="updatePreview()"></div>
+                    <div style="flex:2;"><label>Position</label><div style="display:flex;" id="posSelectorRow"></div></div>
                 </div>
             </div>
 
-            <div class="card">
-                <label>Image # (Editable)</label>
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <span style="font-weight:bold; color:#f39c12;">FLIR</span>
-                    <input type="number" id="imgNum" value="1" oninput="updatePreview()" style="flex:1; border-color:#f39c12; color:#f39c12;">
-                </div>
+            <div style="text-align:center; padding:10px; background:#111; border-radius:8px; border:1px solid #333; margin-top:5px;">
+                <label>TARGET ID</label>
+                <div id="fullIDDisplay" style="font-size: 2.5rem; font-weight: 900; color: #0cf; letter-spacing: 2px;">A-12-L</div>
             </div>
-
-            <div class="card" style="text-align:center;">
-                <label>Current Target ID</label>
-                <div id="fullIDDisplay" style="font-size: 3.5rem; font-weight: 900; color: #0f0; text-shadow: 0 0 15px #0f0; margin: 5px 0;">A-12-L</div>
-            </div>
-            
-            <input type="hidden" id="floorNum" value="12">
             <input type="hidden" id="dropPattern" value="3">
+            <input type="hidden" id="imgNum" value="1">
         </div>
 
         <div class="slide">
-            <h2 style="color:#0f0">2. DIAGNOSTIC</h2>
-            
-            <div class="card">
-                <label>Forensic Checklist</label>
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
-                    <div class="check-item sound-box active" id="soundBtn" onclick="toggleSound()">SOUND / DRY</div>
-                    <div class="check-item defect" id="moistureDetectBtn" onclick="toggleDefect(this)">MOISTURE DETECTED</div>
-                    <div class="check-item defect" onclick="toggleDefect(this)">LEAK SUSPECTED</div>
-                    <div class="check-item defect" onclick="toggleDefect(this)">SEALANT FAIL</div>
-                    <div class="check-item defect" onclick="toggleDefect(this)">GASKET GAP</div>
-                    <div class="check-item defect" onclick="toggleDefect(this)">IGU FOGGING</div>
-                </div>
-            </div>
-            
-            <div class="card" id="groundTruthCard" style="display:none;">
-                <label>Ground Truth (Moisture Meter)</label>
-                <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
-                    <div class="stepper" style="flex:1; margin:0;">
-                        <button class="step-btn" onclick="step('moisturePct', -1)">−</button>
-                        <div class="step-display-area">
-                            <div class="grip-mark"></div>
-                            <div class="step-val" id="moisturePctVal">85</div>
-                            <input type="range" class="touch-slider" min="0" max="100" step="1" value="85" oninput="slideUpdate('moisturePct', this.value)" onchange="slideEnd('moisturePct')">
-                            <div class="hud-bubble" id="hud-moisturePct">85%</div>
+            <div class="dashboard-panel">
+                <div class="stepper-box">
+                    <div class="stepper-header">REF (DRY)</div>
+                    <div class="stepper-row">
+                        <button class="step-btn" onclick="step('baselineC8', -0.1)">-</button>
+                        <div class="step-display">
+                            <div class="step-val" id="baselineC8Val">75.0</div>
+                            <div class="hud-bubble" id="hud-baselineC8">75.0</div>
+                            <input type="range" class="touch-slider" min="0" max="120" step="1" value="75.0" oninput="slideUpdate('baselineC8', this.value)" onchange="slideEnd('baselineC8')">
                         </div>
-                        <button class="step-btn" onclick="step('moisturePct', 1)">+</button>
+                        <button class="step-btn" onclick="step('baselineC8', 0.1)">+</button>
                     </div>
-                    <span style="font-weight:bold; color:#0cf; font-size:1.5rem;">%</span>
-                    <div class="check-item" id="meterProvedBtn" onclick="toggleMeter(this)" style="flex:1.5; margin:0; padding:15px; background:#333; border: 2px solid #555; display:flex; align-items:center; justify-content:center; font-size:0.9rem;">PROVED WITH METER</div>
+                    <input type="hidden" id="baselineC8" value="75.0">
                 </div>
-                <input type="hidden" id="moisturePct" value="85">
+
+                <div class="stepper-box">
+                    <div class="stepper-header">SCAN TEMP</div>
+                    <div class="stepper-row">
+                        <button class="step-btn" onclick="step('suspectTemp', -0.1)">-</button>
+                        <div class="step-display">
+                            <div class="step-val" id="suspectTempVal" style="color:#f39c12;">75.0</div>
+                            <div class="hud-bubble" id="hud-suspectTemp">75.0</div>
+                            <input type="range" class="touch-slider" min="0" max="120" step="1" value="75.0" oninput="slideUpdate('suspectTemp', this.value)" onchange="slideEnd('suspectTemp')">
+                        </div>
+                        <button class="step-btn" onclick="step('suspectTemp', 0.1)">+</button>
+                    </div>
+                    <input type="hidden" id="suspectTemp" value="75.0">
+                </div>
             </div>
 
-            <div class="card">
-                <button class="btn" style="background:#333; color:#0f0; border:2px solid #0f0; margin-bottom:15px; font-size: 1rem;" onclick="rapidSync()">✓ NO ANOMALIES (SYNC TEMP ONLY)</button>
-                <div style="display:flex; gap:10px;">
-                    <div style="flex:1;"><label>Ref Dry (Baseline)</label>
-                        <div class="stepper">
-                            <button class="step-btn" onclick="step('baselineC8', -0.1)">−</button>
-                            <div class="step-display-area">
-                                <div class="grip-mark"></div>
-                                <div class="step-val" id="baselineC8Val">75.0</div>
-                                <input type="range" class="touch-slider" min="0" max="120" step="1" value="75.0" oninput="slideUpdate('baselineC8', this.value)" onchange="slideEnd('baselineC8')">
-                                <div class="hud-bubble" id="hud-baselineC8">75.0</div>
-                            </div>
-                            <button class="step-btn" onclick="step('baselineC8', 0.1)">+</button>
-                        </div>
-                    </div>
-                    <div style="flex:1;"><label>Suspect (Scan)</label>
-                        <div class="stepper">
-                            <button class="step-btn" onclick="step('suspectTemp', -0.1)">−</button>
-                            <div class="step-display-area">
-                                <div class="grip-mark"></div>
-                                <div class="step-val" id="suspectTempVal">75.0</div>
-                                <input type="range" class="touch-slider" min="0" max="120" step="1" value="75.0" oninput="slideUpdate('suspectTemp', this.value)" onchange="slideEnd('suspectTemp')">
-                                <div class="hud-bubble" id="hud-suspectTemp">75.0</div>
-                            </div>
-                            <button class="step-btn" onclick="step('suspectTemp', 0.1)">+</button>
-                        </div>
-                    </div>
-                </div>
+            <div class="status-bar" id="resultBar">
+                <span id="deltaDisplay" style="font-size:0.9rem; font-weight:400;">Δ 0.0</span>
+                <span id="statusText">NO ANOMALY</span>
             </div>
             
-            <div class="alarm-box" id="result">--.-°F</div>
-            <button class="btn" style="background:#007bff; color:#fff;" onclick="logEvidence()">COMMIT DATA SNAPSHOT</button>
-            <input type="hidden" id="baselineC8" value="75.0">
-            <input type="hidden" id="suspectTemp" value="75.0">
+            <button class="action-btn btn-dark" style="padding:10px; font-size:0.8rem; margin-bottom:12px;" onclick="rapidSync()">SYNC TEMPERATURES (RESET)</button>
+
+            <label style="margin-left:5px;">OBSERVATIONS</label>
+            <div class="check-grid">
+                <div class="check-item sound-box active" id="soundBtn" onclick="toggleSound()">SOUND / DRY</div>
+                <div class="check-item defect" id="moistureDetectBtn" onclick="toggleDefect(this)">MOISTURE</div>
+                <div class="check-item defect" onclick="toggleDefect(this)">LEAK SUSPECT</div>
+                <div class="check-item defect" onclick="toggleDefect(this)">SEALANT FAIL</div>
+                <div class="check-item defect" onclick="toggleDefect(this)">GASKET GAP</div>
+                <div class="check-item defect" onclick="toggleDefect(this)">IGU FOG</div>
+            </div>
+
+            <div class="moisture-panel" id="groundTruthCard">
+                <label style="color:#d9534f; margin-bottom:8px;">SURVEYMASTER CONFIRMATION</label>
+                <div style="display:flex; gap:8px;">
+                    <div class="stepper-box" style="flex:1;">
+                        <div class="stepper-row" style="height:50px;">
+                            <button class="step-btn" style="width:30px;" onclick="step('moisturePct', -1)">-</button>
+                            <div class="step-display">
+                                <div class="step-val" id="moisturePctVal" style="font-size:1.5rem;">85</div>
+                                <div class="hud-bubble" id="hud-moisturePct">85</div>
+                                <input type="range" class="touch-slider" min="0" max="100" step="1" value="85" oninput="slideUpdate('moisturePct', this.value)" onchange="slideEnd('moisturePct')">
+                            </div>
+                            <button class="step-btn" style="width:30px;" onclick="step('moisturePct', 1)">+</button>
+                        </div>
+                        <input type="hidden" id="moisturePct" value="85">
+                    </div>
+                    <div class="check-item" id="meterProvedBtn" onclick="toggleMeter(this)" style="flex:1.5; border:1px solid #555;">PROVED</div>
+                </div>
+            </div>
+
+            <button class="action-btn btn-blue" style="margin-top:15px; box-shadow: 0 4px 15px rgba(0,123,255,0.4);" onclick="logEvidence()">LOG DATA & NEXT</button>
         </div>
 
         <div class="slide">
-            <h2 style="color:#ccc">3. COMMAND CENTER</h2>
-            <div class="card">
-                <label>Fleet Data Tracking</label>
-                <div style="display:flex; gap:8px; margin-top:5px;" id="flowNextRow"></div>
-                <button class="btn" style="background:#28a745; color:#fff; margin-top:20px;" onclick="flowNext('DOWN')">DESCEND & RESET TO LEFT</button>
+            <h2 style="color:#fff; margin:0 0 10px 0; font-size:1.2rem;">DATA VAULT</h2>
+            <div class="card" style="padding:0;">
+                <div style="padding:10px; border-bottom:1px solid #333; display:flex; gap:5px;" id="flowNextRow"></div>
+                <div style="overflow-x:auto; max-height:60vh;">
+                    <table id="logTable">
+                        <thead style="background:#222;"><tr><th>ID</th><th>ΔT</th><th>Finds</th><th>M%</th><th>Time</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
             </div>
-            <div class="vault-wrap">
-                <table id="logTable">
-                    <thead><tr><th>Project</th><th>Cam</th><th>Tech</th><th>Time</th><th>Img</th><th>ID</th><th>ΔT</th><th>Finds</th><th>M%</th><th>Proved</th></tr></thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-            <div style="display:flex; gap:8px; margin-top:15px;">
-                <button class="btn" style="background:#444; flex:2; font-size:0.8rem;" onclick="exportLogs()">EXPORT CSV</button>
-                <button class="btn" style="background:#b00; flex:1; font-size:0.8rem;" onclick="clearVault()">WIPE</button>
+            <div style="display:flex; gap:8px; margin-top:10px;">
+                <button class="action-btn btn-dark" onclick="exportLogs()">EXPORT CSV</button>
+                <button class="action-btn" style="background:#b00;" onclick="clearVault()">WIPE</button>
             </div>
         </div>
     </div>
@@ -227,7 +232,7 @@
     <div class="navbar">
         <div class="nav-item active" onclick="goToSlide(0)">MAP</div>
         <div class="nav-item" onclick="goToSlide(1)">DIAGNOSE</div>
-        <div class="nav-item" onclick="goToSlide(2)">COMMAND</div>
+        <div class="nav-item" onclick="goToSlide(2)">VAULT</div>
     </div>
 
     <script>
@@ -245,246 +250,195 @@
             updateAlarm();
         }
 
-        // --- HUD SLIDER LOGIC ---
+        /* --- HUD & SLIDER LOGIC --- */
         function slideUpdate(id, val) {
-            // Logic: Slider is integer (Coarse), Buttons are decimal (Fine)
-            let formatted = parseFloat(val).toFixed(1);
-            
-            // 1. Update the main display
+            let formatted = (id === 'moisturePct') ? parseInt(val) : parseFloat(val).toFixed(1);
             document.getElementById(id + 'Val').innerText = formatted;
-            
-            // 2. Update the HUD Bubble
             const hud = document.getElementById('hud-' + id);
-            if(hud) {
-                hud.innerText = formatted;
-                hud.style.transform = "translateX(-50%) scale(1)"; // Force show
-            }
-            
-            // 3. Update hidden input
-            const hidden = document.getElementById(id);
-            if(hidden) hidden.value = formatted;
-            
+            if(hud) { hud.innerText = formatted; hud.style.transform = "translateX(-50%) scale(1)"; }
+            document.getElementById(id).value = formatted;
             updateAlarm();
         }
         
-        // Hide HUD when let go
         function slideEnd(id) {
             const hud = document.getElementById('hud-' + id);
-            if(hud) {
-                hud.style.transform = "translateX(-50%) scale(0)";
-            }
+            if(hud) hud.style.transform = "translateX(-50%) scale(0)";
         }
 
-        // --- STEPPER LOGIC ---
         function step(id, val) {
             const el = document.getElementById(id);
-            const display = document.getElementById(id + 'Val');
-            
             let current = parseFloat(el.value);
-            let newVal = (current + val).toFixed(id === 'floorNum' || id === 'moisturePct' ? 0 : 1);
-            
-            if(id === 'moisturePct') {
-                if(newVal < 0) newVal = 0; 
-                if(newVal > 100) newVal = 100;
-            }
+            let newVal = (current + val).toFixed(id === 'moisturePct' || id === 'floorNum' ? 0 : 1);
+            if(id === 'moisturePct') { if(newVal < 0) newVal = 0; if(newVal > 100) newVal = 100; }
             
             el.value = newVal;
-            if(display) display.innerText = newVal;
+            document.getElementById(id + 'Val').innerText = newVal;
             
-            // Sync slider position so it doesn't jump next time you touch it
-            const slider = el.parentElement.querySelector('.touch-slider');
-            if (slider) slider.value = Math.round(newVal); // Slider is int-based
+            // Sync slider
+            const slider = el.parentElement.querySelector('.touch-slider'); // Fix selector scope
+            if(!slider) {
+                 // Fallback if slider is in parent's parent (stepper-box structure)
+                 const box = el.closest('.stepper-box');
+                 if(box) { const s = box.querySelector('.touch-slider'); if(s) s.value = Math.round(newVal); }
+            } else {
+                 slider.value = Math.round(newVal);
+            }
 
-            updateAlarm(); updatePreview();
+            if(id !== 'floorNum') updateAlarm(); 
+            if(id === 'floorNum') updatePreview();
         }
 
-        function setPattern(val) {
-            document.getElementById('dropPattern').value = val;
-            document.querySelectorAll('.pattern-btn').forEach(b => b.classList.toggle('active', b.id === 'pat' + val));
-            
-            const flowRow = document.getElementById('flowNextRow');
-            const posRow = document.getElementById('posSelectorRow');
-            flowRow.innerHTML = ''; posRow.innerHTML = '';
-
-            const configs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
-            currentPos = configs[val][0];
-
-            configs[val].forEach(p => {
-                const posBtn = document.createElement('button');
-                posBtn.className = 'btn'; posBtn.id = 'p' + p;
-                posBtn.style.cssText = `background:${p === currentPos ? '#0cf' : '#333'}; padding:12px; flex:1; color:${p === currentPos ? '#000' : '#fff'};`;
-                posBtn.innerText = p; posBtn.onclick = () => setPos(p);
-                posRow.appendChild(posBtn);
-
-                const flowBtn = document.createElement('button');
-                flowBtn.className = 'btn'; 
-                flowBtn.dataset.pos = p;
-                flowBtn.style.cssText = 'background:#333; color:#0cf; flex:1; font-size: 0.75rem;';
-                flowBtn.innerText = p === currentPos ? 'RE-TAKE' : 'MOVE ' + p;
-                flowBtn.onclick = () => flowNext(p);
-                flowRow.appendChild(flowBtn);
-            });
-            updatePreview();
-        }
-
-        function setPos(p) {
-            currentPos = p;
-            const btns = document.querySelectorAll('#posSelectorRow button');
-            btns.forEach(btn => {
-                const isMatch = btn.innerText === p;
-                btn.style.background = isMatch ? '#0cf' : '#333';
-                btn.style.color = isMatch ? '#000' : '#fff';
-            });
-            
-            const flowBtns = document.querySelectorAll('#flowNextRow button');
-            flowBtns.forEach(btn => {
-                const btnPos = btn.dataset.pos;
-                if(btnPos) {
-                    btn.innerText = (btnPos === currentPos) ? 'RE-TAKE' : 'MOVE ' + btnPos;
-                }
-            });
-            updatePreview();
-        }
-
-        function updatePreview() {
-            const floor = document.getElementById('floorNum').value;
-            const drop = document.getElementById('dropLetter').value.toUpperCase();
-            document.getElementById('fullIDDisplay').innerText = `${drop}-${floor}-${currentPos}`;
-        }
-
+        /* --- UI LOGIC --- */
         function updateAlarm() {
             const ref = parseFloat(document.getElementById('baselineC8').value);
             const sus = parseFloat(document.getElementById('suspectTemp').value);
+            const delta = (ref - sus).toFixed(1);
+            const limit = (ref - 3.0).toFixed(1);
             
-            const Talarm = ref - 3.0; 
-            
-            const box = document.getElementById('result');
-            box.innerText = "Lim: " + Talarm.toFixed(1) + "°F";
-            
-            if (sus <= Talarm) { 
-                box.className = "alarm-box crit"; 
-                if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 200]); 
-            } else if (sus < ref) { 
-                box.className = "alarm-box warn"; 
-            } else { 
-                box.className = "alarm-box"; 
+            const bar = document.getElementById('resultBar');
+            const txt = document.getElementById('statusText');
+            document.getElementById('deltaDisplay').innerText = `Δ ${delta}°F`;
+
+            if (sus <= (ref - 3.0)) {
+                bar.className = "status-bar crit";
+                txt.innerText = "⚠️ ANOMALY DETECTED";
+                if (window.navigator.vibrate) window.navigator.vibrate(200);
+            } else if (sus < ref) {
+                bar.className = "status-bar warn";
+                txt.innerText = "COOLING DETECTED";
+            } else {
+                bar.className = "status-bar safe";
+                txt.innerText = "NO THERMAL ANOMALY";
             }
+        }
+
+        function toggleSound() {
+            document.getElementById('soundBtn').classList.add('active');
+            document.querySelectorAll('.defect').forEach(el => el.classList.remove('active'));
+            document.getElementById('groundTruthCard').style.display = 'none';
+        }
+
+        function toggleDefect(el) {
+            el.classList.toggle('active');
+            if (document.querySelectorAll('.defect.active').length > 0) {
+                document.getElementById('soundBtn').classList.remove('active');
+            } else {
+                document.getElementById('soundBtn').classList.add('active');
+            }
+            // Show moisture panel if specific button clicked
+            const mBtn = document.getElementById('moistureDetectBtn');
+            document.getElementById('groundTruthCard').style.display = (mBtn.classList.contains('active')) ? 'block' : 'none';
         }
 
         function toggleMeter(el) {
             el.classList.toggle('active');
             if(el.classList.contains('active')) {
-                el.style.background = '#28a745';
-                el.innerHTML = '✅ METER PROVED';
+                el.style.background = '#28a745'; el.style.color='#fff'; el.innerText = '✅ PROVED';
             } else {
-                el.style.background = '#333';
-                el.innerHTML = 'PROVED WITH METER';
+                el.style.background = '#222'; el.style.color='#888'; el.innerText = 'PROVED';
             }
-        }
-
-        function resetMeterUI() {
-            document.getElementById('groundTruthCard').style.display = 'none';
-            document.getElementById('moisturePct').value = '85';
-            document.getElementById('moisturePctVal').innerText = '85';
-            const meterBtn = document.getElementById('meterProvedBtn');
-            meterBtn.classList.remove('active');
-            meterBtn.style.background = '#333';
-            meterBtn.innerHTML = 'PROVED WITH METER';
-        }
-
-        function logEvidence() {
-            const now = new Date();
-            const time = now.getHours().toString().padStart(2, '0') + ":" + 
-                         now.getMinutes().toString().padStart(2, '0') + ":" + 
-                         now.getSeconds().toString().padStart(2, '0');
-                         
-            const findings = Array.from(document.querySelectorAll('.check-item.active')).map(i => i.innerText.replace('✅ ', '')).join("|");
-            const id = document.getElementById('fullIDDisplay').innerText;
-            const tech = document.getElementById('techName').value || "Unknown";
-            const cam = document.getElementById('camID').value || "--";
-            const proj = document.getElementById('projectID').value || "--";
-            
-            const img = "FLIR" + document.getElementById('imgNum').value.toString().padStart(4, '0');
-            const ref = parseFloat(document.getElementById('baselineC8').value), sus = parseFloat(document.getElementById('suspectTemp').value);
-            
-            const isMoistureCardVisible = document.getElementById('groundTruthCard').style.display === 'block';
-            const mPct = isMoistureCardVisible ? document.getElementById('moisturePct').value : "--";
-            const proved = (isMoistureCardVisible && document.getElementById('meterProvedBtn').classList.contains('active')) ? "YES" : "NO";
-            
-            const row = `<tr><td>${proj}</td><td>${cam}</td><td>${tech}</td><td>${time}</td><td>${img}</td><td>${id}</td><td>${(ref-sus).toFixed(1)}</td><td>${findings}</td><td>${mPct}</td><td>${proved}</td></tr>`;
-            document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
-            localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
-            goToSlide(2); 
-        }
-
-        function flowNext(cmd) {
-            document.getElementById('imgNum').value = parseInt(document.getElementById('imgNum').value) + 1;
-            
-            if (cmd === 'DOWN') { 
-                step('floorNum', -1); 
-                const pat = document.getElementById('dropPattern').value;
-                setPos(pat === '1' ? 'C' : 'L'); 
-                goToSlide(0); 
-            } else { 
-                setPos(cmd); 
-                goToSlide(1); 
-            }
-            rapidSync(); toggleSound(); updateAlarm();
         }
 
         function rapidSync() {
             const ref = document.getElementById('baselineC8').value;
-            document.getElementById('suspectTemp').value = ref;
-            document.getElementById('suspectTempVal').innerText = parseFloat(ref).toFixed(1);
-            const slider = document.querySelector('#suspectTemp').parentElement.querySelector('.touch-slider');
+            const susInput = document.getElementById('suspectTemp');
+            susInput.value = ref;
+            document.getElementById('suspectTempVal').innerText = ref;
+            // Sync slider
+            const slider = susInput.closest('.stepper-box').querySelector('.touch-slider');
             if(slider) slider.value = Math.round(ref);
             updateAlarm();
         }
 
-        function goToSlide(num) {
-            document.getElementById('mainSlider').style.transform = `translateX(-${num * 100}vw)`;
-            const items = document.querySelectorAll('.nav-item');
-            items.forEach((item, i) => item.classList.toggle('active', i === num));
-        }
-
-        function toggleSound() { 
-            document.getElementById('soundBtn').classList.add('active'); 
-            document.querySelectorAll('.defect').forEach(el => el.classList.remove('active'));
-            resetMeterUI();
-        }
-
-        function toggleDefect(el) { 
-            el.classList.toggle('active'); 
-            if (document.querySelectorAll('.defect.active').length > 0) {
-                document.getElementById('soundBtn').classList.remove('active'); 
-            } else {
-                document.getElementById('soundBtn').classList.add('active'); 
-            }
+        /* --- MAP & LOGGING --- */
+        function setPattern(val) {
+            document.querySelectorAll('.pattern-btn').forEach(b => b.classList.toggle('active', b.id === 'pat' + val));
+            const configs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
+            const row = document.getElementById('posSelectorRow');
+            const flow = document.getElementById('flowNextRow');
+            row.innerHTML = ''; flow.innerHTML = '';
             
-            const moistureBtn = document.getElementById('moistureDetectBtn');
-            if (moistureBtn && moistureBtn.classList.contains('active')) {
-                document.getElementById('groundTruthCard').style.display = 'block';
-            } else {
-                resetMeterUI();
+            currentPos = configs[val][0];
+            
+            configs[val].forEach(p => {
+                // Map buttons
+                const btn = document.createElement('button');
+                btn.className = 'pattern-btn'; 
+                if(p === currentPos) { btn.style.background='#0cf'; btn.style.color='#000'; }
+                btn.innerText = p;
+                btn.onclick = () => { currentPos=p; updatePosUI(); updatePreview(); };
+                row.appendChild(btn);
+                
+                // Flow buttons
+                const fBtn = document.createElement('button');
+                fBtn.className = 'pattern-btn';
+                fBtn.style.fontSize = '0.6rem';
+                fBtn.innerText = "MOVE " + p;
+                fBtn.onclick = () => { currentPos=p; updatePosUI(); updatePreview(); goToSlide(1); };
+                flow.appendChild(fBtn);
+            });
+            updatePreview();
+        }
+        
+        function updatePosUI() {
+            Array.from(document.getElementById('posSelectorRow').children).forEach(b => {
+                b.style.background = (b.innerText === currentPos) ? '#0cf' : '#222';
+                b.style.color = (b.innerText === currentPos) ? '#000' : '#666';
+            });
+        }
+
+        function updatePreview() {
+            const f = document.getElementById('floorNum').value;
+            const d = document.getElementById('dropLetter').value.toUpperCase();
+            document.getElementById('fullIDDisplay').innerText = `${d}-${f}-${currentPos}`;
+        }
+
+        function logEvidence() {
+            const now = new Date();
+            const time = now.getHours().toString().padStart(2,'0') + ":" + now.getMinutes().toString().padStart(2,'0');
+            const id = document.getElementById('fullIDDisplay').innerText;
+            const delta = (parseFloat(document.getElementById('baselineC8').value) - parseFloat(document.getElementById('suspectTemp').value)).toFixed(1);
+            
+            let finds = [];
+            document.querySelectorAll('.check-item.active').forEach(el => finds.push(el.innerText));
+            if(finds.length===0) finds.push("DRY");
+            
+            let mPct = "--";
+            if(document.getElementById('groundTruthCard').style.display === 'block') {
+                mPct = document.getElementById('moisturePct').value + "%";
+                if(document.getElementById('meterProvedBtn').classList.contains('active')) mPct += " (V)";
             }
+
+            const row = `<tr><td style="color:#0cf; font-weight:bold;">${id}</td><td>${delta}</td><td>${finds[0]}</td><td>${mPct}</td><td>${time}</td></tr>`;
+            document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
+            localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
+            
+            // Advance Img Num
+            const imgEl = document.getElementById('imgNum');
+            imgEl.value = parseInt(imgEl.value) + 1;
+            
+            goToSlide(2);
+        }
+
+        function goToSlide(n) {
+            document.getElementById('mainSlider').style.transform = `translateX(-${n * 100}vw)`;
+            document.querySelectorAll('.nav-item').forEach((el, i) => el.classList.toggle('active', i === n));
+        }
+
+        function saveDraft() {
+            const d = { tech: document.getElementById('techName').value, cam: document.getElementById('camID').value, project: document.getElementById('projectID').value };
+            localStorage.setItem('strataDraft', JSON.stringify(d));
         }
         
-        function saveDraft() { 
-            const draft = { 
-                project: document.getElementById('projectID').value, 
-                tech: document.getElementById('techName').value,
-                cam: document.getElementById('camID').value
-            };
-            localStorage.setItem('strataDraft', JSON.stringify(draft)); 
-        }
-        
-        function clearVault() { if (confirm("Wipe?")) { localStorage.removeItem('strataVault'); location.reload(); } }
+        function clearVault() { if(confirm("Wipe data?")) { localStorage.removeItem('strataVault'); location.reload(); } }
         
         function exportLogs() {
-            let csv = "Project,Camera,Technician,Time,Image,ID,DeltaT,Findings,Moisture %,Meter Proved\n";
-            document.querySelectorAll("#logTable tbody tr").forEach(tr => { csv += Array.from(tr.querySelectorAll("td")).map(td => `"${td.innerText}"`).join(",") + "\n"; });
+            let csv = "ID,Delta,Findings,Moisture,Time\n";
+            document.querySelectorAll("#logTable tbody tr").forEach(tr => {
+                csv += Array.from(tr.querySelectorAll("td")).map(td => td.innerText).join(",") + "\n";
+            });
             const blob = new Blob([csv], { type: 'text/csv' });
-            const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = "Strata_Fleet_Report.csv"; a.click();
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = "Strata_Scan_Log.csv"; a.click();
         }
     </script>
 </body>
