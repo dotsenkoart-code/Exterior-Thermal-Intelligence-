@@ -1,40 +1,37 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v58.0 Pinned Context</title>
+    <title>Strata-Scan Pro: Gold Master</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Strata-Scan">
+    <meta name="mobile-web-app-capable" content="yes">
 
     <style>
         /* --- CORE LAYOUT --- */
-        body { font-family: 'Segoe UI', Roboto, sans-serif; background: #000; color: #fff; padding: 0; margin: 0; overflow: hidden; touch-action: manipulation; }
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background: #000; color: #fff; padding: 0; margin: 0; overflow: hidden; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
         .slide-container { display: flex; transition: transform 0.3s ease-in-out; width: 300vw; height: calc(100vh - 65px); }
-        .slide { width: 100vw; height: 100%; padding: 10px; box-sizing: border-box; overflow-y: auto; padding-bottom: 80px; }
+        .slide { width: 100vw; height: 100%; box-sizing: border-box; overflow-y: auto; padding-bottom: 80px; }
+        #slide-map { padding: 10px; }
+        #slide-diagnose { padding: 100px 10px 80px 10px; } 
+        #slide-command { padding: 100px 10px 80px 10px; }  
         
         .card { background: #121212; padding: 12px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #2a2a2a; }
         
-        /* --- PINNED STICKY HEADERS --- */
-        .sticky-banner {
-            position: sticky;
-            top: -10px; /* Counteracts the slide padding perfectly */
-            margin: -10px -10px 15px -10px; /* Stretches edge-to-edge */
-            background: #111;
-            padding: 15px 10px 10px 10px;
-            border-bottom: 2px solid #0cf;
-            text-align: center;
-            z-index: 100;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.8);
-        }
-        .sticky-label { font-size: 0.7rem; color: #888; font-weight: 800; letter-spacing: 1px; margin-bottom: 2px; display: block; text-transform: uppercase; }
-        .sticky-id { font-size: 2.8rem; font-weight: 900; color: #0cf; letter-spacing: 2px; margin: 0; line-height: 1; }
+        /* --- FIXED HEADERS --- */
+        .fixed-header { position: fixed; top: 0; left: 0; width: 100%; background: #111; padding: 15px 0 10px 0; text-align: center; z-index: 500; border-bottom: 2px solid #0cf; box-shadow: 0 10px 20px rgba(0,0,0,0.8); display: none; }
+        .fixed-label { font-size: 0.7rem; color: #888; font-weight: 800; letter-spacing: 1px; margin-bottom: 2px; display: block; text-transform: uppercase; }
+        .fixed-id { font-size: 2.8rem; font-weight: 900; color: #0cf; letter-spacing: 2px; margin: 0; line-height: 1; }
+        #header-command { border-bottom-color: #28a745; }
+        #header-command .fixed-id { color: #fff; }
 
-        /* Standard static banner for Map tab */
         .target-banner { background: #111; padding: 12px; border-radius: 8px; border: 2px solid #333; text-align: center; margin-bottom: 12px; }
-        .target-label { font-size: 0.7rem; color: #888; font-weight: 800; letter-spacing: 1px; margin-bottom: 4px; display: block; text-transform: uppercase; }
-        .target-id { font-size: 2.5rem; font-weight: 900; color: #0cf; letter-spacing: 2px; }
 
-        .navbar { height: 65px; background: #080808; display: flex; border-top: 1px solid #333; position: fixed; bottom: 0; width: 100%; z-index: 1000; }
+        .navbar { height: 65px; background: #080808; display: flex; border-top: 1px solid #333; position: fixed; bottom: 0; width: 100%; z-index: 1000; padding-bottom: env(safe-area-inset-bottom); }
         .nav-item { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; color: #666; cursor: pointer; letter-spacing: 1px; }
         .nav-item.active { color: #0cf; border-top: 2px solid #0cf; background: #111; }
 
@@ -47,25 +44,14 @@
         .step-btn { width: 60px; height: 100%; background: #252525; border: none; color: #fff; font-size: 2rem; font-weight: 300; cursor: pointer; z-index: 2; border-radius: 6px; }
         .step-display { flex: 1; text-align: center; position: relative; height: 100%; display: flex; flex-direction: column; justify-content: center; }
         .step-val { font-size: 2.2rem; font-weight: 700; color: #fff; z-index: 1; pointer-events: none; }
-        
         .touch-slider { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: ew-resize; z-index: 3; }
 
         /* --- MASSIVE HUD BUBBLE --- */
-        .hud-bubble {
-            position: absolute; top: -100px; left: 50%; transform: translateX(-50%) scale(0);
-            background: #f39c12; color: #000; padding: 10px 25px; border-radius: 30px;
-            font-size: 3rem; font-weight: 900; z-index: 9999; pointer-events: none;
-            transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
-            border: 4px solid #fff; box-shadow: 0 10px 25px rgba(0,0,0,0.9);
-        }
+        .hud-bubble { position: absolute; top: -100px; left: 50%; transform: translateX(-50%) scale(0); background: #f39c12; color: #000; padding: 10px 25px; border-radius: 30px; font-size: 3rem; font-weight: 900; z-index: 9999; pointer-events: none; transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275); border: 4px solid #fff; box-shadow: 0 10px 25px rgba(0,0,0,0.9); }
 
         /* --- CHECKLIST & BUTTONS --- */
         .check-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
-        .check-item { 
-            background: #222; padding: 15px 5px; border-radius: 6px; text-align: center; 
-            font-size: 0.65rem; font-weight: 700; border: 1px solid #333; color: #888;
-            cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1.2; height: 50px;
-        }
+        .check-item { background: #222; padding: 15px 5px; border-radius: 6px; text-align: center; font-size: 0.65rem; font-weight: 700; border: 1px solid #333; color: #888; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1.2; height: 50px; }
         .check-item.active { background: #0cf; color: #000; border-color: #fff; }
         .check-item.sound-box.active { background: #28a745; color: #fff; border-color: #fff; }
         
@@ -80,7 +66,6 @@
         .pattern-btn { flex: 1; padding: 15px; background: #222; border: 1px solid #444; color: #666; font-size: 0.8rem; font-weight: bold; cursor: pointer; }
         .pattern-btn.active { background: #0cf; color: #000; }
         
-        /* --- COMMAND TAB BIG BUTTONS --- */
         .cmd-flow-btn { flex: 1; padding: 25px 10px; background: #333; border: 1px solid #555; color: #fff; font-size: 1.1rem; font-weight: 900; cursor: pointer; border-radius: 8px; transition: 0.2s; }
         .cmd-action-btn { width: 100%; padding: 25px; border-radius: 8px; border: none; font-size: 1.2rem; font-weight: 900; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; margin-top: 15px; }
 
@@ -98,13 +83,21 @@
 </head>
 <body onload="initApp()">
 
+    <div id="header-diagnose" class="fixed-header">
+        <span class="fixed-label">CURRENT DIAGNOSIS TARGET</span>
+        <div id="diagnoseIDDisplay" class="fixed-id">A-12-L</div>
+    </div>
+    <div id="header-command" class="fixed-header">
+        <span class="fixed-label">YOU ARE CURRENTLY AT:</span>
+        <div id="cmdIDDisplay" class="fixed-id">A-12-L</div>
+    </div>
+
     <div id="safetyModal" class="modal-overlay">
         <div class="modal-box">
             <h2 style="color:#f39c12; margin-top:0; font-size: 2rem;">⚠️ DATA MISSING!</h2>
             <p style="color:#ccc; font-size:1.1rem; margin-bottom:25px; line-height:1.4;">
                 You have not logged any findings for window <br><strong id="modalTargetID" style="color:#0cf; font-size: 1.5rem; display:inline-block; margin-top:5px;">A-12-L</strong>
             </p>
-            
             <button class="modal-btn btn-blue" onclick="modalGoToDiagnose()">🔙 WAIT, TAKE ME TO DIAGNOSE</button>
             <button class="modal-btn btn-green" onclick="modalQuickLogAndMove()">✅ WINDOW IS CLEAR: LOG & MOVE</button>
             <button class="modal-btn btn-dark" onclick="modalForceSkip()">⚠️ FORCE SKIP (LEAVE BLANK)</button>
@@ -119,7 +112,6 @@
                 <strong id="missingFloorWindows" style="color:#0cf; font-size: 2rem; display:inline-block; margin-top:10px;">C, R</strong><br><br>
                 Are you sure you want to leave this floor?
             </p>
-            
             <button class="modal-btn btn-blue" onclick="modalCancelFloorChange()">🔙 CANCEL (STAY ON FLOOR)</button>
             <button class="modal-btn btn-dark" onclick="modalForceFloorChange()">⚠️ FORCE DESCEND (SKIP WINDOWS)</button>
         </div>
@@ -151,7 +143,7 @@
 
     <div class="slide-container" id="mainSlider">
         
-        <div class="slide">
+        <div class="slide" id="slide-map">
             <h2 style="color:#fff; margin:0 0 10px 0; font-size:1.2rem;">LOGISTICS</h2>
             
             <div class="card">
@@ -168,7 +160,7 @@
                     </div>
                     <div style="flex:1;">
                         <label style="color:#f39c12;">FLIR Image #</label>
-                        <input type="number" id="imgNum" value="1" style="border-color:#f39c12; color:#f39c12; font-weight:bold;">
+                        <input type="number" id="imgNum" value="1" style="border-color:#f39c12; color:#f39c12; font-weight:bold;" oninput="saveLocationState()">
                     </div>
                 </div>
             </div>
@@ -197,26 +189,20 @@
                 </div>
                 
                 <div style="display:flex; gap:8px;">
-                    <div style="flex:1;"><label>Drop ID</label><input type="text" id="dropLetter" value="A" style="text-transform:uppercase;" oninput="updatePreview()"></div>
+                    <div style="flex:1;"><label>Drop ID</label><input type="text" id="dropLetter" value="A" style="text-transform:uppercase;" oninput="updatePreview(); saveLocationState();"></div>
                     <div style="flex:2;"><label>Position</label><div style="display:flex;" id="posSelectorRow"></div></div>
                 </div>
             </div>
 
-            <div class="target-banner">
-                <span class="target-label">TARGET ID (MAP)</span>
-                <div id="fullIDDisplay" class="target-id">A-12-L</div>
+            <div class="target-banner" style="border-color:#333;">
+                <span class="target-label" style="color:#888;">TARGET ID (MAP)</span>
+                <div id="fullIDDisplay" class="target-id" style="color:#0cf;">A-12-L</div>
             </div>
             
             <input type="hidden" id="dropPattern" value="3">
         </div>
 
-        <div class="slide">
-
-            <div class="sticky-banner">
-                <span class="sticky-label">CURRENT DIAGNOSIS TARGET</span>
-                <div id="diagnoseIDDisplay" class="sticky-id">A-12-L</div>
-            </div>
-
+        <div class="slide" id="slide-diagnose">
             <label style="margin-left:5px; margin-top:10px;">SCAN & FLAG FINDINGS</label>
             <div class="check-grid">
                 <div class="check-item sound-box active" id="soundBtn" onclick="toggleSound()">CLEAR</div>
@@ -255,15 +241,7 @@
             <button class="action-btn btn-blue" onclick="logEvidence()">LOG DATA & VERIFY</button>
         </div>
 
-        <div class="slide">
-            
-            <div class="sticky-banner" style="border-bottom-color:#28a745;">
-                <span class="sticky-label">YOU ARE CURRENTLY AT:</span>
-                <div id="cmdIDDisplay" class="sticky-id" style="color:#fff;">A-12-L</div>
-            </div>
-
-            <h2 style="color:#fff; margin:0 0 10px 0; font-size:1.2rem;">COMMAND CENTER</h2>
-            
+        <div class="slide" id="slide-command">
             <div class="card">
                 <label>NEXT MOVE</label>
                 <div id="flowNextRow" style="display:flex; gap:8px; margin-bottom:10px;"></div>
@@ -317,14 +295,50 @@
         const patternConfigs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
 
         function initApp() {
+            // Load Vault
             if (localStorage.getItem('strataVault')) document.getElementById('logTable').querySelector('tbody').innerHTML = localStorage.getItem('strataVault');
+            
+            // Load Technician Draft Data
             if (localStorage.getItem('strataDraft')) {
                 const data = JSON.parse(localStorage.getItem('strataDraft'));
                 document.getElementById('projectID').value = data.project || "";
                 document.getElementById('techName').value = data.tech || "";
                 document.getElementById('camID').value = data.cam || "";
             }
-            setPattern('3');
+
+            // LOAD ANTI-REFRESH STATE (Location Data)
+            const savedState = JSON.parse(localStorage.getItem('strataState'));
+            if (savedState) {
+                document.getElementById('floorNum').value = savedState.floor;
+                document.getElementById('floorNumVal').innerText = savedState.floor;
+                document.getElementById('dropLetter').value = savedState.drop;
+                if(savedState.img) document.getElementById('imgNum').value = savedState.img;
+                
+                // Initialize pattern but force it to remember the exact position
+                setPattern(savedState.pattern, savedState.pos);
+            } else {
+                setPattern('3'); // Default start
+            }
+
+            updateFixedHeaders(0); 
+        }
+
+        // --- ANTI-REFRESH SAVE FUNCTION ---
+        function saveLocationState() {
+            const s = {
+                floor: document.getElementById('floorNum').value,
+                drop: document.getElementById('dropLetter').value,
+                pattern: document.getElementById('dropPattern').value,
+                pos: currentPos,
+                img: document.getElementById('imgNum').value
+            };
+            localStorage.setItem('strataState', JSON.stringify(s));
+        }
+
+        /* --- FIXED HEADER LOGIC --- */
+        function updateFixedHeaders(slideIndex) {
+            document.getElementById('header-diagnose').style.display = (slideIndex === 1) ? 'block' : 'none';
+            document.getElementById('header-command').style.display = (slideIndex === 2) ? 'block' : 'none';
         }
 
         /* --- INTERCEPTOR 1: WINDOW CHECK --- */
@@ -419,6 +433,7 @@
             
             updatePosUI();
             updatePreview();
+            saveLocationState(); // Anti-refresh save
             
             if (actionType === 'descend_btn') {
                 goToSlide(0);
@@ -446,9 +461,16 @@
         }
 
         /* --- LOGGING PROCESSES --- */
-        function performQuickLog() {
+        function getFormattedTime() {
             const now = new Date();
-            const time = now.getHours().toString().padStart(2,'0') + ":" + now.getMinutes().toString().padStart(2,'0');
+            // ADDED SECONDS TO THE EXPORT STRING
+            return now.getHours().toString().padStart(2,'0') + ":" + 
+                   now.getMinutes().toString().padStart(2,'0') + ":" + 
+                   now.getSeconds().toString().padStart(2,'0');
+        }
+
+        function performQuickLog() {
+            const time = getFormattedTime();
             
             const proj = document.getElementById('projectID').value || "No Project";
             const cam = document.getElementById('camID').value || "--";
@@ -474,6 +496,8 @@
             localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
             
             imgEl.value = parseInt(imgEl.value) + 1;
+            saveLocationState(); // Save updated camera number
+            
             toggleSound(); 
             document.getElementById('moisturePct').value = '';
             document.getElementById('meterProvedBtn').classList.remove('active');
@@ -483,8 +507,7 @@
         }
 
         function logEvidence() {
-            const now = new Date();
-            const time = now.getHours().toString().padStart(2,'0') + ":" + now.getMinutes().toString().padStart(2,'0');
+            const time = getFormattedTime();
             
             const proj = document.getElementById('projectID').value || "No Project";
             const cam = document.getElementById('camID').value || "--";
@@ -523,6 +546,7 @@
             isCurrentWindowLogged = true;
             
             imgEl.value = parseInt(imgEl.value) + 1;
+            saveLocationState(); // Save updated camera number
             
             toggleSound(); 
             document.getElementById('moisturePct').value = '';
@@ -556,7 +580,7 @@
             
             const box = el.closest('.stepper-box');
             if(box) { const s = box.querySelector('.touch-slider'); if(s) s.value = Math.round(newVal); }
-            if(id === 'floorNum') updatePreview();
+            if(id === 'floorNum') { updatePreview(); saveLocationState(); }
         }
 
         /* --- DEFECT LOGIC --- */
@@ -594,12 +618,13 @@
                 currentPos = p; 
                 updatePosUI(); 
                 updatePreview();
+                saveLocationState(); // Anti-refresh save
                 if (targetSlide !== null) goToSlide(targetSlide);
             });
         }
 
         /* --- MAP & NAVIGATION --- */
-        function setPattern(val) {
+        function setPattern(val, forcePos = null) {
             document.getElementById('dropPattern').value = val;
             document.querySelectorAll('.pattern-btn').forEach(b => b.classList.toggle('active', b.id === 'pat' + val));
             const row = document.getElementById('posSelectorRow');
@@ -607,7 +632,9 @@
             row.innerHTML = ''; flow.innerHTML = '';
             
             isCurrentWindowLogged = false; 
-            currentPos = patternConfigs[val][0];
+            
+            // Allow override if loading from memory, otherwise default to first in pattern
+            currentPos = forcePos ? forcePos : patternConfigs[val][0];
             
             patternConfigs[val].forEach(p => {
                 const btn = document.createElement('button');
@@ -625,6 +652,7 @@
             });
             updatePosUI();
             updatePreview();
+            saveLocationState(); // Anti-refresh save
         }
         
         function updatePosUI() {
@@ -657,6 +685,8 @@
         function goToSlide(n) {
             document.getElementById('mainSlider').style.transform = `translateX(-${n * 100}vw)`;
             document.querySelectorAll('.nav-item').forEach((el, i) => el.classList.toggle('active', i === n));
+            
+            updateFixedHeaders(n);
         }
 
         function saveDraft() {
