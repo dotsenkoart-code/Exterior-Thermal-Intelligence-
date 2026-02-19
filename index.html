@@ -1,489 +1,202 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v36.0 Fleet</title>
+    <title>Strata-Scan: Rapid Fleet</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#000000">
-    <link rel="apple-touch-icon" href="icon-192.png">
-
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; padding: 0; margin: 0; overflow: hidden; touch-action: manipulation; }
-        .slide-container { display: flex; transition: transform 0.3s ease-in-out; width: 400vw; height: calc(100vh - 70px); }
-        .slide { width: 100vw; height: 100%; padding: 15px; box-sizing: border-box; overflow-y: auto; padding-bottom: 120px; }
+        /* SAME STYLES AS BEFORE, JUST SIMPLIFIED */
+        body { font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; margin: 0; overflow: hidden; }
+        .slide-container { display: flex; transition: transform 0.3s ease-in-out; width: 300vw; height: 100vh; }
+        .slide { width: 100vw; height: 100%; padding: 15px; box-sizing: border-box; }
         .card { background: #1a1a1a; padding: 15px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #333; }
+        .btn { padding: 20px; border-radius: 12px; border: none; width: 100%; font-size: 1.2rem; font-weight: 800; cursor: pointer; color: white; }
+        .big-input { width: 100%; padding: 15px; background: #333; color: #fff; border: 2px solid #555; border-radius: 8px; font-size: 1.5rem; text-align: center; box-sizing: border-box; }
         
-        .navbar { height: 70px; background: #111; display: flex; border-top: 2px solid #333; position: fixed; bottom: 0; width: 100%; z-index: 1000; }
-        .nav-item { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold; color: #555; cursor: pointer; }
-        .nav-item.active { color: #0cf; border-top: 3px solid #0cf; background: #1a1a1a; }
-        
-        .stepper { display: flex; align-items: center; justify-content: space-between; background: #222; border-radius: 12px; border: 2px solid #444; margin: 10px 0; overflow: hidden; }
-        .step-btn { width: 85px; height: 85px; background: #333; border: none; color: #fff; font-size: 2.5rem; font-weight: bold; cursor: pointer; }
-        .step-val { flex: 1; text-align: center; font-size: 2.2rem; font-weight: 900; color: #0f0; text-shadow: 0 0 8px #0f0; }
-        
-        input[type="text"], input[type="password"], input[type="number"], select { width: 100%; padding: 14px; background: #222; color: #fff; border: 2px solid #555; border-radius: 8px; font-size: 1.2rem; text-align: center; box-sizing: border-box; margin: 5px 0; }
-        label { font-size: 0.7rem; color: #0cf; font-weight: bold; text-transform: uppercase; display: block; margin-top: 5px; }
-        
-        .alarm-box { background: #222; padding: 25px; text-align: center; border-radius: 15px; font-size: 3.5rem; font-weight: 900; border: 5px solid #444; margin: 10px 0; transition: 0.3s; }
-        .crit { background: #f00 !important; color: #fff; border-color: #fff !important; animation: blink 0.6s infinite; }
-        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
-        .flash-sync { animation: flashGreen 0.4s 3; }
-        @keyframes flashGreen { 0% { border-color: #0f0; background: #030; } 100% { border-color: #333; background: #1a1a1a; } }
+        /* The "Traffic Light" Logic */
+        .status-box { padding: 20px; text-align: center; border-radius: 10px; font-weight: bold; font-size: 1.2rem; margin-top: 10px; border: 4px solid #444; background: #222; }
+        .safe { border-color: #28a745; color: #28a745; }
+        .warn { border-color: #f39c12; color: #f39c12; animation: blink 1s infinite; }
+        .danger { border-color: #d9534f; color: #d9534f; background: #300; animation: blink 0.5s infinite; }
+        @keyframes blink { 50% { opacity: 0.7; } }
 
-        .btn { padding: 20px; border-radius: 12px; border: none; width: 100%; font-size: 1.3rem; font-weight: 800; cursor: pointer; }
-        .pattern-btn { flex: 1; padding: 15px 5px; background: #333; border: 2px solid #555; border-radius: 8px; color: #fff; font-size: 0.7rem; font-weight: bold; }
-        .pattern-btn.active { background: #f39c12; color: #000; border-color: #fff; }
-
-        .check-item { background: #333; padding: 15px; border-radius: 10px; font-size: 0.75rem; text-align: center; border: 1px solid #555; font-weight: bold; margin-bottom: 5px; cursor: pointer; transition: 0.2s; }
-        .check-item.active { background: #0cf; color: #000; border-color: #fff; }
-        .check-item.sound-box.active { background: #28a745; color: #fff; }
-        #moistureDetectBtn.active { background: #d9534f !important; color: #fff !important; border-color: #fff !important; }
-
-        .vault-wrap { overflow-x: auto; background: #111; border-radius: 8px; padding: 5px; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.5rem; color: #ccc; min-width: 1700px; }
-        td, th { border: 1px solid #333; padding: 8px; text-align: left; }
+        /* Navigation */
+        .navbar { position: fixed; bottom: 0; width: 100%; height: 70px; background: #111; display: flex; border-top: 2px solid #333; }
+        .nav-item { flex: 1; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #555; }
+        .nav-item.active { color: #0cf; border-top: 3px solid #0cf; background: #222; }
     </style>
 </head>
-<body onload="initApp()">
+<body onload="init()">
 
-    <div class="slide-container" id="mainSlider">
-        
-        <div class="slide">
-            <h2 style="color:#0cf">1. DROP MAPPING</h2>
-            <div class="card">
-                <label>Technician Name</label>
-                <input type="text" id="techName" placeholder="Enter Name..." oninput="saveDraft()">
-                <label style="margin-top:10px;">Project Address / Building Name</label>
-                <input type="text" id="projectID" placeholder="Enter Site Name..." oninput="saveDraft()">
+<div class="slide-container" id="mainSlider">
+    
+    <div class="slide">
+        <h2 style="color:#0cf; margin-top:0;">1. LOCATION</h2>
+        <div class="card">
+            <label>Current Drop</label>
+            <input type="text" id="dropID" class="big-input" value="A" style="text-transform:uppercase;">
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <button class="btn" onclick="setPos('L')" style="background:#333;">L</button>
+                <button class="btn" onclick="setPos('C')" style="background:#0cf; color:#000;">C</button>
+                <button class="btn" onclick="setPos('R')" style="background:#333;">R</button>
             </div>
-
-            <div class="card">
-                <label>Floor #</label>
-                <div class="stepper">
-                    <button class="step-btn" onclick="step('floorNum', -1)">−</button>
-                    <div class="step-val" id="floorNumVal">12</div>
-                    <button class="step-btn" onclick="step('floorNum', 1)">+</button>
-                </div>
-                
-                <label>Drop Pattern</label>
-                <div style="display:flex; gap:5px; margin: 5px 0;">
-                    <button class="pattern-btn active" id="pat3" onclick="setPattern('3')">3 WIN (L-C-R)</button>
-                    <button class="pattern-btn" id="pat2" onclick="setPattern('2')">2 WIN (L-R)</button>
-                    <button class="pattern-btn" id="pat1" onclick="setPattern('1')">1 WIN (C)</button>
-                </div>
-
-                <div style="display:flex; gap:10px; margin-top:15px;">
-                    <div style="flex:1;"><label>Drop ID</label><input type="text" id="dropLetter" value="A" style="text-transform:uppercase;" oninput="updatePreview()"></div>
-                    <div style="flex:2;"><label>Position Selector</label>
-                        <div style="display:flex; gap:8px;" id="posSelectorRow"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <label>Image # (Editable)</label>
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <span style="font-weight:bold; color:#f39c12;">FLIR</span>
-                    <input type="number" id="imgNum" value="1" oninput="updatePreview()" style="flex:1; border-color:#f39c12; color:#f39c12;">
-                </div>
-            </div>
-
-            <div class="card" style="text-align:center;">
-                <label>Current Target ID</label>
-                <div id="fullIDDisplay" style="font-size: 3.5rem; font-weight: 900; color: #0f0; text-shadow: 0 0 15px #0f0; margin: 5px 0;">A-12-L</div>
-            </div>
-            
-            <input type="hidden" id="floorNum" value="12">
-            <input type="hidden" id="dropPattern" value="3">
+            <div style="text-align:center; font-size:3rem; font-weight:900; color:#fff; margin-top:10px;" id="fullID">A-12-C</div>
         </div>
-
-        <div class="slide">
-            <h2 style="color:#f39c12">2. CLIMATE BASELINE</h2>
-            <div class="card">
-                <label>Amb Temp (°F) [Testo]</label>
-                <div class="stepper">
-                    <button class="step-btn" onclick="step('tDry', -0.1)">−</button>
-                    <div class="step-val" id="tDryVal">70.0</div>
-                    <button class="step-btn" onclick="step('tDry', 0.1)">+</button>
-                </div>
-                <label>Ambient Humidity (%) [Testo]</label>
-                <div class="stepper">
-                    <button class="step-btn" onclick="step('rh', -1)">−</button>
-                    <div class="step-val" id="rhVal">50</div>
-                    <button class="step-btn" onclick="step('rh', 1)">+</button>
-                </div>
-            </div>
-            <div class="card" id="pressCard">
-                <label>Station Pressure (hPa) [Manual Override Allowed]</label>
-                <input type="number" id="pressure" value="1013.2" oninput="updateAlarm()">
-                <button class="btn" style="background:#fd7e14; color:#fff; margin-top:10px;" onclick="syncGPS()">SYNC BARO PRESSURE</button>
-            </div>
-            <input type="hidden" id="tDry" value="70.0">
-            <input type="hidden" id="rh" value="50">
+        <div class="card">
+             <label>Floor #</label>
+             <div style="display:flex; gap:10px;">
+                 <button class="btn" style="background:#444;" onclick="modFloor(-1)">-</button>
+                 <span id="floorVal" style="font-size:2.5rem; font-weight:bold; padding:0 20px;">12</span>
+                 <button class="btn" style="background:#444;" onclick="modFloor(1)">+</button>
+             </div>
         </div>
-
-        <div class="slide">
-            <h2 style="color:#0f0">3. DIAGNOSTIC</h2>
-            <div class="card">
-                <label>Material Library</label>
-                <select id="material" onchange="updateAlarm()">
-                    <option value="0.20">Stucco / Concrete (0.20)</option>
-                    <option value="0.15">Aluminum / Metal (0.15)</option>
-                    <option value="0.26">Aged Sealant (0.26)</option>
-                    <option value="0.12">Glass / Glazing (0.12)</option>
-                    <option value="0.18">Brick / Masonry (0.18)</option>
-                    <option value="0.21">Terracotta (0.21)</option>
-                </select>
-                <select id="solar" onchange="updateAlarm()" style="margin-top:10px;">
-                    <option value="1.0">☁️ SHADE / OVERCAST</option>
-                    <option value="0.85">☀️ DIRECT SUN</option>
-                </select>
-            </div>
-            <div class="card">
-                <label>Forensic Checklist</label>
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
-                    <div class="check-item sound-box active" id="soundBtn" onclick="toggleSound()">SOUND / DRY</div>
-                    <div class="check-item defect" id="moistureDetectBtn" onclick="toggleDefect(this)">MOISTURE DETECTED</div>
-                    <div class="check-item defect" onclick="toggleDefect(this)">LEAK SUSPECTED</div>
-                    <div class="check-item defect" onclick="toggleDefect(this)">SEALANT FAIL</div>
-                    <div class="check-item defect" onclick="toggleDefect(this)">GASKET GAP</div>
-                    <div class="check-item defect" onclick="toggleDefect(this)">IGU FOGGING</div>
-                </div>
-            </div>
-            
-            <div class="card" id="groundTruthCard" style="display:none;">
-                <label>Ground Truth (Moisture Meter)</label>
-                <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
-                    <div class="stepper" style="flex:1; margin:0;">
-                        <button class="step-btn" style="width:50px; height:60px;" onclick="step('moisturePct', -1)">−</button>
-                        <div class="step-val" id="moisturePctVal" style="font-size:1.5rem;">85</div>
-                        <button class="step-btn" style="width:50px; height:60px;" onclick="step('moisturePct', 1)">+</button>
-                    </div>
-                    <span style="font-weight:bold; color:#0cf; font-size:1.5rem;">%</span>
-                    <div class="check-item" id="meterProvedBtn" onclick="toggleMeter(this)" style="flex:1.5; margin:0; padding:15px; background:#333; border: 2px solid #555; display:flex; align-items:center; justify-content:center; font-size:0.9rem;">PROVED WITH METER</div>
-                </div>
-                <input type="hidden" id="moisturePct" value="85">
-            </div>
-
-            <div class="card">
-                <button class="btn" style="background:#333; color:#0f0; border:2px solid #0f0; margin-bottom:15px; font-size: 1rem;" onclick="rapidSync()">✓ NO ANOMALIES (SYNC TEMP ONLY)</button>
-                <div style="display:flex; gap:10px;">
-                    <div style="flex:1;"><label>Ref Dry</label>
-                        <div class="stepper">
-                            <button class="step-btn" onclick="step('baselineC8', -0.1)" style="width:50px; height:60px;">−</button>
-                            <div class="step-val" id="baselineC8Val" style="font-size:1.4rem;">75.0</div>
-                            <button class="step-btn" onclick="step('baselineC8', 0.1)" style="width:50px; height:60px;">+</button>
-                        </div>
-                    </div>
-                    <div style="flex:1;"><label>Suspect</label>
-                        <div class="stepper">
-                            <button class="step-btn" onclick="step('suspectTemp', -0.1)" style="width:50px; height:60px;">−</button>
-                            <div class="step-val" id="suspectTempVal" style="font-size:1.4rem;">75.0</div>
-                            <button class="step-btn" onclick="step('suspectTemp', 0.1)" style="width:50px; height:60px;">+</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="alarm-box" id="result">--.-°F</div>
-            <button class="btn" style="background:#007bff; color:#fff;" onclick="logEvidence()">COMMIT DATA SNAPSHOT</button>
-            <input type="hidden" id="baselineC8" value="75.0">
-            <input type="hidden" id="suspectTemp" value="75.0">
-        </div>
-
-        <div class="slide">
-            <h2 style="color:#ccc">4. COMMAND CENTER</h2>
-            <div class="card">
-                <label>Fleet Data Tracking</label>
-                <div style="display:flex; gap:8px; margin-top:5px;" id="flowNextRow"></div>
-                <button class="btn" style="background:#28a745; color:#fff; margin-top:20px;" onclick="flowNext('DOWN')">DESCEND & RESET TO LEFT</button>
-            </div>
-            <div class="vault-wrap">
-                <table id="logTable">
-                    <thead><tr><th>Tech</th><th>Time (sec)</th><th>Image #</th><th>ID</th><th>ΔT</th><th>Findings</th><th>Moisture %</th><th>Meter Proved</th><th>Alarm</th><th>Amb</th><th>Hum</th><th>Press</th></tr></thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-            <div style="display:flex; gap:8px; margin-top:15px;">
-                <button class="btn" style="background:#444; flex:2; font-size:0.8rem;" onclick="exportLogs()">EXPORT CSV</button>
-                <button class="btn" style="background:#b00; flex:1; font-size:0.8rem;" onclick="clearVault()">WIPE</button>
-            </div>
-            
-            <div class="card" style="margin-top:40px; border-color:#222; background:#111;">
-                <label style="color:#555;">System Settings</label>
-                <input type="password" id="apiKeyInput" placeholder="Enter OpenWeather API Key..." style="font-size:0.8rem; background:#000; border-color:#333;">
-                <button class="btn" style="background:#222; color:#888; margin-top:5px; padding:10px; font-size:0.9rem;" onclick="saveApiKey()">SAVE API KEY TO DEVICE</button>
-            </div>
-        </div>
+        <button class="btn" style="background:#28a745; margin-top:20px;" onclick="goToSlide(1)">START SCAN >></button>
     </div>
 
-    <div class="navbar">
-        <div class="nav-item active" onclick="goToSlide(0)">MAP</div>
-        <div class="nav-item" onclick="goToSlide(1)">CLIMATE</div>
-        <div class="nav-item" onclick="goToSlide(2)">DIAGNOSE</div>
-        <div class="nav-item" onclick="goToSlide(3)">COMMAND</div>
+    <div class="slide">
+        <h2 style="color:#f39c12; margin-top:0;">2. SCAN & VERIFY</h2>
+        
+        <div class="card" style="border-color:#f39c12;">
+            <label style="color:#f39c12;">STEP 1: REFERENCE TEMP (DRY AREA)</label>
+            <div style="display:flex; gap:10px; margin-top:5px;">
+                <input type="number" id="refTemp" class="big-input" placeholder="75.0" oninput="calcAlarm()">
+                <div style="padding:10px; background:#333; border-radius:8px; width:120px; text-align:center;">
+                    <div style="font-size:0.6rem; color:#aaa;">ALARM TRIGGER</div>
+                    <div id="alarmVal" style="font-size:1.8rem; font-weight:bold; color:#f39c12;">--°</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <label style="color:#fff;">STEP 2: FINDINGS</label>
+            <input type="number" id="foundTemp" class="big-input" placeholder="Enter Coldest Temp..." oninput="calcAlarm()">
+            
+            <div id="statusBox" class="status-box safe">WAITING FOR INPUT</div>
+
+            <div id="confirmationTools" style="display:none; margin-top:15px; border-top:1px solid #555; padding-top:15px;">
+                <label style="color:#d9534f;">⚠️ ANOMALY DETECTED</label>
+                <button class="btn" id="meterBtn" style="background:#333; border:2px solid #555; margin-top:5px;" onclick="toggleMeter()">
+                    CONFIRM WITH SURVEYMASTER
+                </button>
+            </div>
+        </div>
+
+        <button class="btn" style="background:#007bff; margin-top:10px;" onclick="logData()">LOG & NEXT WINDOW</button>
     </div>
 
-    <script>
-        let currentPos = "L";
+    <div class="slide">
+        <h2 style="color:#ccc; margin-top:0;">3. HISTORY</h2>
+        <div id="logList" style="height:60vh; overflow-y:auto; background:#111; padding:10px; border-radius:10px;">
+            </div>
+        <button class="btn" style="background:#444; margin-top:10px;" onclick="exportCSV()">EXPORT CSV</button>
+    </div>
+</div>
 
-        function initApp() {
-            if (localStorage.getItem('strataVault')) document.getElementById('logTable').querySelector('tbody').innerHTML = localStorage.getItem('strataVault');
-            if (localStorage.getItem('strataDraft')) {
-                const data = JSON.parse(localStorage.getItem('strataDraft'));
-                document.getElementById('projectID').value = data.project || "";
-                document.getElementById('techName').value = data.tech || "";
-            }
-            if (localStorage.getItem('strataApiKey')) {
-                document.getElementById('apiKeyInput').value = localStorage.getItem('strataApiKey');
-            }
-            setPattern('3');
-            updateAlarm();
-        }
+<div class="navbar">
+    <div class="nav-item active" onclick="goToSlide(0)">LOCATE</div>
+    <div class="nav-item" onclick="goToSlide(1)">SCAN</div>
+    <div class="nav-item" onclick="goToSlide(2)">LOGS</div>
+</div>
 
-        function saveApiKey() {
-            const key = document.getElementById('apiKeyInput').value.trim();
-            if (key) {
-                localStorage.setItem('strataApiKey', key);
-                alert("API Key Saved Securely to Device!");
-            } else {
-                localStorage.removeItem('strataApiKey');
-                alert("API Key Cleared!");
-            }
-        }
+<script>
+    let floor = 12;
+    let pos = 'C';
+    let logs = [];
 
-        function setPattern(val) {
-            document.getElementById('dropPattern').value = val;
-            document.querySelectorAll('.pattern-btn').forEach(b => b.classList.toggle('active', b.id === 'pat' + val));
-            
-            const flowRow = document.getElementById('flowNextRow');
-            const posRow = document.getElementById('posSelectorRow');
-            flowRow.innerHTML = ''; posRow.innerHTML = '';
+    function init() { calcAlarm(); }
 
-            const configs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
-            
-            currentPos = configs[val][0];
+    function setPos(p) { 
+        pos = p; 
+        document.getElementById('fullID').innerText = document.getElementById('dropID').value + '-' + floor + '-' + p;
+    }
 
-            configs[val].forEach(p => {
-                const posBtn = document.createElement('button');
-                posBtn.className = 'btn'; posBtn.id = 'p' + p;
-                posBtn.style.cssText = `background:${p === currentPos ? '#0cf' : '#333'}; padding:12px; flex:1; color:${p === currentPos ? '#000' : '#fff'};`;
-                posBtn.innerText = p; posBtn.onclick = () => setPos(p);
-                posRow.appendChild(posBtn);
+    function modFloor(n) {
+        floor += n;
+        document.getElementById('floorVal').innerText = floor;
+        setPos(pos);
+    }
 
-                const flowBtn = document.createElement('button');
-                flowBtn.className = 'btn'; 
-                flowBtn.dataset.pos = p;
-                flowBtn.style.cssText = 'background:#333; color:#0cf; flex:1; font-size: 0.75rem;';
-                flowBtn.innerText = p === currentPos ? 'TAKE ADDITIONAL PICTURE' : 'MOVE ' + p;
-                flowBtn.onclick = () => flowNext(p);
-                flowRow.appendChild(flowBtn);
-            });
-            updatePreview();
-        }
-
-        function setPos(p) {
-            currentPos = p;
-            const btns = document.querySelectorAll('#posSelectorRow button');
-            btns.forEach(btn => {
-                const isMatch = btn.innerText === p;
-                btn.style.background = isMatch ? '#0cf' : '#333';
-                btn.style.color = isMatch ? '#000' : '#fff';
-            });
-            
-            const flowBtns = document.querySelectorAll('#flowNextRow button');
-            flowBtns.forEach(btn => {
-                const btnPos = btn.dataset.pos;
-                if(btnPos) {
-                    btn.innerText = (btnPos === currentPos) ? 'TAKE ADDITIONAL PICTURE' : 'MOVE ' + btnPos;
-                }
-            });
-
-            updatePreview();
-        }
-
-        function step(id, val) {
-            const el = document.getElementById(id);
-            const display = document.getElementById(id + 'Val');
-            let newVal = (parseFloat(el.value) + val).toFixed(id === 'rh' || id === 'floorNum' || id === 'moisturePct' ? 0 : 1);
-            if(id === 'moisturePct' && newVal < 0) newVal = 0; 
-            if(id === 'moisturePct' && newVal > 100) newVal = 100;
-            el.value = newVal;
-            if(display) display.innerText = newVal;
-            updateAlarm(); updatePreview();
-        }
-
-        function updatePreview() {
-            const floor = document.getElementById('floorNum').value;
-            const drop = document.getElementById('dropLetter').value.toUpperCase();
-            document.getElementById('fullIDDisplay').innerText = `${drop}-${floor}-${currentPos}`;
-        }
-
-        async function syncGPS() {
-            const apiKey = localStorage.getItem('strataApiKey');
-            if (!apiKey) {
-                alert("Please save your OpenWeather API Key in the Command Center first.");
-                goToSlide(3);
-                return;
-            }
-
-            navigator.geolocation.getCurrentPosition(async (pos) => {
-                try {
-                    const url = `https://api.openweathermap.org/data/2.5/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&units=imperial&appid=${apiKey}`;
-                    const res = await fetch(url);
-                    if (!res.ok) throw new Error("API Error");
-                    const data = await res.json();
-                    const P0 = data.main.pressure;
-                    const Tk = (data.main.temp - 32) * 5/9 + 273.15;
-                    const press = (P0 * Math.pow(1 - (0.0065 * (pos.coords.altitude || 0)) / Tk, 5.257)).toFixed(1);
-                    document.getElementById('pressure').value = press;
-                    document.getElementById('pressCard').classList.add('flash-sync');
-                    setTimeout(() => document.getElementById('pressCard').classList.remove('flash-sync'), 1200);
-                    updateAlarm();
-                } catch (err) {
-                    alert("Failed to fetch weather data. Please check your API key or enter pressure manually.");
-                }
-            }, (err) => {
-                alert("GPS Error. Please enter the station pressure manually.");
-            });
-        }
-
-        function updateAlarm() {
-            const Td = parseFloat(document.getElementById('tDry').value), RH = parseFloat(document.getElementById('rh').value);
-            const ref = parseFloat(document.getElementById('baselineC8').value), sus = parseFloat(document.getElementById('suspectTemp').value);
-            const mat = parseFloat(document.getElementById('material').value), sol = parseFloat(document.getElementById('solar').value);
-            const P = parseFloat(document.getElementById('pressure').value);
-
-            const f = 1.0007 + (3.46e-6 * P), a = 17.27, b = 237.7;
-            const gamma = (a * ((Td-32)*5/9)) / (b + ((Td-32)*5/9)) + Math.log((RH/100) * f);
-            const Tdp = ((b * gamma) / (a - gamma) * 9/5) + 32;
-            const Talarm = ref - (Math.abs(ref - Tdp) * mat / (sol === "0.85" ? 0.92 : 1.0));
-            
-            const box = document.getElementById('result');
-            box.innerText = Talarm.toFixed(1) + "°F";
-            const delta = (ref - sus).toFixed(1);
-            if (sus <= Talarm) { 
-                box.className = "alarm-box crit"; 
-                if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 200]); 
-            } else if (delta >= 2.0) { 
-                box.className = "alarm-box warn"; box.style.background = "#f39c12"; box.style.color = "#000";
-            } else { 
-                box.className = "alarm-box"; box.style.background = "#222"; box.style.color = "#fff";
-            }
-        }
-
-        function toggleMeter(el) {
-            el.classList.toggle('active');
-            if(el.classList.contains('active')) {
-                el.style.background = '#28a745';
-                el.style.color = '#fff';
-                el.innerHTML = '✅ METER PROVED';
-            } else {
-                el.style.background = '#333';
-                el.style.color = '#fff';
-                el.innerHTML = 'PROVED WITH METER';
-            }
-        }
-
-        function resetMeterUI() {
-            document.getElementById('groundTruthCard').style.display = 'none';
-            document.getElementById('moisturePct').value = '85';
-            document.getElementById('moisturePctVal').innerText = '85';
-            const meterBtn = document.getElementById('meterProvedBtn');
-            meterBtn.classList.remove('active');
-            meterBtn.style.background = '#333';
-            meterBtn.style.color = '#fff';
-            meterBtn.innerHTML = 'PROVED WITH METER';
-        }
-
-        function logEvidence() {
-            const now = new Date();
-            const time = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0') + ":" + now.getSeconds().toString().padStart(2, '0');
-            const findings = Array.from(document.querySelectorAll('.check-item.active')).map(i => i.innerText.replace('✅ ', '')).join("|");
-            const id = document.getElementById('fullIDDisplay').innerText;
-            const tech = document.getElementById('techName').value || "Unknown";
-            const img = "FLIR" + document.getElementById('imgNum').value.toString().padStart(4, '0');
-            const ref = parseFloat(document.getElementById('baselineC8').value), sus = parseFloat(document.getElementById('suspectTemp').value);
-            
-            const isMoistureCardVisible = document.getElementById('groundTruthCard').style.display === 'block';
-            const mPct = isMoistureCardVisible ? document.getElementById('moisturePct').value : "--";
-            const proved = (isMoistureCardVisible && document.getElementById('meterProvedBtn').classList.contains('active')) ? "YES" : "NO";
-            
-            const row = `<tr><td>${tech}</td><td>${time}</td><td>${img}</td><td>${id}</td><td>${(ref-sus).toFixed(1)}</td><td>${findings}</td><td>${mPct}</td><td>${proved}</td><td>${document.getElementById('result').innerText}</td><td>${document.getElementById('tDry').value}</td><td>${document.getElementById('rh').value}</td><td>${document.getElementById('pressure').value}</td></tr>`;
-            document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
-            localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
-            goToSlide(3);
-        }
-
-        function flowNext(cmd) {
-            document.getElementById('imgNum').value = parseInt(document.getElementById('imgNum').value) + 1;
-            
-            if (cmd === 'DOWN') { 
-                step('floorNum', -1); 
-                const pat = document.getElementById('dropPattern').value;
-                setPos(pat === '1' ? 'C' : 'L'); 
-                goToSlide(0); 
-            } else { setPos(cmd); goToSlide(2); }
-            rapidSync(); toggleSound(); updateAlarm();
-        }
-
-        function rapidSync() {
-            const ref = document.getElementById('baselineC8').value;
-            document.getElementById('suspectTemp').value = ref;
-            document.getElementById('suspectTempVal').innerText = parseFloat(ref).toFixed(1);
-            updateAlarm();
-        }
-
-        function goToSlide(num) {
-            document.getElementById('mainSlider').style.transform = `translateX(-${num * 100}vw)`;
-            const items = document.querySelectorAll('.nav-item');
-            items.forEach((item, i) => item.classList.toggle('active', i === num));
-        }
-
-        function toggleSound() { 
-            document.getElementById('soundBtn').classList.add('active'); 
-            document.querySelectorAll('.defect').forEach(el => el.classList.remove('active'));
-            resetMeterUI();
-        }
-
-        function toggleDefect(el) { 
-            el.classList.toggle('active'); 
-            if (document.querySelectorAll('.defect.active').length > 0) {
-                document.getElementById('soundBtn').classList.remove('active'); 
-            } else {
-                document.getElementById('soundBtn').classList.add('active'); 
-            }
-            
-            const moistureBtn = document.getElementById('moistureDetectBtn');
-            if (moistureBtn && moistureBtn.classList.contains('active')) {
-                document.getElementById('groundTruthCard').style.display = 'block';
-            } else {
-                resetMeterUI();
-            }
-        }
+    function calcAlarm() {
+        const ref = parseFloat(document.getElementById('refTemp').value);
+        const found = parseFloat(document.getElementById('foundTemp').value);
+        const box = document.getElementById('statusBox');
+        const tools = document.getElementById('confirmationTools');
         
-        function saveDraft() { 
-            const draft = { project: document.getElementById('projectID').value, tech: document.getElementById('techName').value };
-            localStorage.setItem('strataDraft', JSON.stringify(draft)); 
-        }
-        
-        function clearVault() { if (confirm("Wipe?")) { localStorage.removeItem('strataVault'); location.reload(); } }
-        
-        function exportLogs() {
-            let csv = "Technician,Time,Image,ID,DeltaT,Findings,Moisture %,Meter Proved,Alarm,Amb,Hum,Press\n";
-            document.querySelectorAll("#logTable tbody tr").forEach(tr => { csv += Array.from(tr.querySelectorAll("td")).map(td => `"${td.innerText}"`).join(",") + "\n"; });
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = "Strata_Fleet_Report.csv"; a.click();
+        if (!ref) { 
+            document.getElementById('alarmVal').innerText = "--"; 
+            return; 
         }
 
-        // Register the Service Worker for Offline PWA Support
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('Strata-Scan Offline Engine Active:', reg.scope))
-                    .catch(err => console.error('Offline Engine Failed:', err));
-            });
+        // THE MAGIC NUMBER: 3 DEGREES
+        const limit = ref - 3.0;
+        document.getElementById('alarmVal').innerText = limit.toFixed(1) + "°";
+
+        if (!found) {
+            box.innerText = "ENTER SCAN TEMP";
+            box.className = "status-box safe";
+            tools.style.display = "none";
+            return;
         }
-    </script>
+
+        const delta = (ref - found).toFixed(1);
+
+        if (found < limit) {
+            // COLDER THAN ALARM = POTENTIAL LEAK
+            box.innerText = `⚠️ ANOMALY (Δ -${delta}°F)`;
+            box.className = "status-box danger";
+            tools.style.display = "block";
+            if (navigator.vibrate) navigator.vibrate(200);
+        } else if (found < ref) {
+            // COLDER, BUT NOT CRITICAL
+            box.innerText = `COOLING (Δ -${delta}°F)`;
+            box.className = "status-box warn";
+            tools.style.display = "none";
+        } else {
+            // WARMER OR EQUAL
+            box.innerText = "NO THERMAL ANOMALY";
+            box.className = "status-box safe";
+            tools.style.display = "none";
+        }
+    }
+
+    function toggleMeter() {
+        const btn = document.getElementById('meterBtn');
+        if (btn.innerText.includes("CONFIRM")) {
+            btn.style.background = "#d9534f";
+            btn.innerText = "MOISTURE CONFIRMED ✅";
+        } else {
+            btn.style.background = "#333";
+            btn.innerText = "CONFIRM WITH SURVEYMASTER";
+        }
+    }
+
+    function logData() {
+        const id = document.getElementById('fullID').innerText;
+        const ref = document.getElementById('refTemp').value;
+        const found = document.getElementById('foundTemp').value;
+        const meter = document.getElementById('meterBtn').innerText.includes("✅") ? "WET" : "DRY";
+        
+        const logEntry = `<div style="border-bottom:1px solid #333; padding:10px; font-size:0.8rem;">
+            <strong style="color:#0cf">${id}</strong> | Ref: ${ref}° | Found: ${found}°<br>
+            Result: <span style="color:${meter==='WET'?'#d9534f':'#ccc'}">${meter}</span>
+        </div>`;
+        
+        document.getElementById('logList').insertAdjacentHTML('afterbegin', logEntry);
+        
+        // Reset for next window
+        document.getElementById('foundTemp').value = "";
+        document.getElementById('meterBtn').innerText = "CONFIRM WITH SURVEYMASTER";
+        document.getElementById('meterBtn').style.background = "#333";
+        document.getElementById('confirmationTools').style.display = "none";
+        goToSlide(0); // Go back to Map to change window/position
+    }
+
+    function goToSlide(n) {
+        document.getElementById('mainSlider').style.transform = `translateX(-${n * 100}vw)`;
+    }
+    
+    function exportCSV() {
+        alert("Exporting CSV...");
+    }
+</script>
 </body>
 </html>
