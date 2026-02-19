@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v38.0 Hybrid</title>
+    <title>Strata-Scan Pro: v39.0 Hybrid</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
     <link rel="manifest" href="manifest.json">
@@ -453,6 +453,14 @@
             const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = "Strata_Fleet_Report.csv"; a.click();
         }
 
+        /* ================================================================
+        OFFLINE ENGINE (SERVICE WORKER) - DISABLED FOR DEVELOPMENT
+        To enable offline mode when the app is finished:
+        1. Remove the "/*" at the start of this block
+        2. Remove the "* /" at the end of this block
+        ================================================================
+        */
+        /*
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
@@ -460,6 +468,7 @@
                     .catch(err => console.error('Offline Engine Failed:', err));
             });
         }
+        */
     </script>
 </body>
 </html>
