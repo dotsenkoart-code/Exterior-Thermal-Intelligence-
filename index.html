@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v43.0 Calibrated</title>
+    <title>Strata-Scan Pro: v44.0 Command</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
@@ -46,7 +46,7 @@
         .limit-val { font-size: 2.5rem; font-weight: 900; color: #f39c12; text-shadow: 0 0 10px rgba(243, 156, 18, 0.3); }
         .limit-label { font-size: 0.7rem; color: #aaa; letter-spacing: 1px; text-transform: uppercase; }
 
-        /* --- 3-COLUMN CHECKLIST --- */
+        /* --- CHECKLIST & BUTTONS --- */
         .check-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
         .check-item { 
             background: #222; padding: 15px 5px; border-radius: 6px; text-align: center; 
@@ -54,19 +54,17 @@
             cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1.2; height: 50px;
         }
         .check-item.active { background: #0cf; color: #000; border-color: #fff; }
-
-        /* --- MOISTURE PANEL --- */
+        
         .moisture-panel { background: #1a1a1a; border: 1px solid #d9534f; border-radius: 6px; padding: 10px; margin-top: 8px; display: none; }
 
-        /* --- BUTTONS --- */
         .action-btn { width: 100%; padding: 16px; border-radius: 8px; border: none; font-size: 1.1rem; font-weight: 800; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; margin-top: 15px; }
         .btn-blue { background: linear-gradient(180deg, #007bff 0%, #0056b3 100%); }
-        .btn-green { background: linear-gradient(180deg, #28a745 0%, #1e7e34 100%); }
-        .pattern-btn { flex: 1; padding: 10px; background: #222; border: 1px solid #444; color: #666; font-size: 0.7rem; font-weight: bold; }
+        
+        .pattern-btn { flex: 1; padding: 15px; background: #222; border: 1px solid #444; color: #666; font-size: 0.8rem; font-weight: bold; cursor: pointer; }
         .pattern-btn.active { background: #0cf; color: #000; }
         
         table { width: 100%; border-collapse: collapse; font-size: 0.6rem; color: #ccc; }
-        td, th { border: 1px solid #333; padding: 6px; text-align: left; }
+        td, th { border: 1px solid #333; padding: 8px; text-align: left; }
     </style>
 </head>
 <body onload="initApp()">
@@ -133,7 +131,7 @@
             </div>
 
             <div class="limit-banner">
-                <div class="limit-label">ANYTHING COLDER THAN THIS IS A DEFECT</div>
+                <div class="limit-label">ANOMALY THRESHOLD</div>
                 <div class="limit-val" id="limitDisplay">72.0°F</div>
             </div>
 
@@ -166,22 +164,32 @@
                 </div>
             </div>
 
-            <button class="action-btn btn-blue" onclick="logEvidence()">LOG DATA & NEXT</button>
+            <button class="action-btn btn-blue" onclick="logEvidence()">LOG DATA & VERIFY</button>
         </div>
 
         <div class="slide">
-            <h2 style="color:#fff; margin:0 0 10px 0; font-size:1.2rem;">DATA VAULT</h2>
+            <h2 style="color:#fff; margin:0 0 10px 0; font-size:1.2rem;">COMMAND CENTER</h2>
+            
+            <div class="card">
+                <label>NEXT MOVE</label>
+                <div id="flowNextRow" style="display:flex; gap:8px; margin-bottom:10px;"></div>
+                <button class="action-btn" style="background:#28a745; margin-top:5px; padding:15px;" onclick="descendFloor()">
+                    ▼ DESCEND FLOOR & RESET
+                </button>
+            </div>
+
             <div class="card" style="padding:0;">
-                <div style="padding:10px; border-bottom:1px solid #333; display:flex; gap:5px;" id="flowNextRow"></div>
-                <div style="overflow-x:auto; max-height:60vh;">
+                <label style="padding:10px; display:block;">DATA VAULT</label>
+                <div style="overflow-x:auto; max-height:45vh; border-top:1px solid #333;">
                     <table id="logTable">
                         <thead style="background:#222;"><tr><th>ID</th><th>Ref</th><th>Finds</th><th>M%</th><th>Time</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
             </div>
+
             <div style="display:flex; gap:8px; margin-top:10px;">
-                <button class="action-btn btn-dark" style="margin:0;" onclick="exportLogs()">EXPORT CSV</button>
+                <button class="action-btn" style="background:#333; margin:0;" onclick="exportLogs()">EXPORT CSV</button>
                 <button class="action-btn" style="background:#b00; margin:0;" onclick="clearVault()">WIPE</button>
             </div>
         </div>
@@ -190,7 +198,7 @@
     <div class="navbar">
         <div class="nav-item active" onclick="goToSlide(0)">MAP</div>
         <div class="nav-item" onclick="goToSlide(1)">DIAGNOSE</div>
-        <div class="nav-item" onclick="goToSlide(2)">VAULT</div>
+        <div class="nav-item" onclick="goToSlide(2)">COMMAND</div>
     </div>
 
     <script>
@@ -284,8 +292,20 @@
             updatePreview();
         }
 
-        /* --- MAP & LOGGING --- */
+        function descendFloor() {
+            stepFloor(-1);
+            // Reset to first position of current pattern
+            const pat = document.getElementById('dropPattern').value;
+            const configs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
+            currentPos = configs[pat][0];
+            updatePosUI();
+            updatePreview();
+            goToSlide(0); // Go to Map
+        }
+
+        /* --- MAP & NAVIGATION --- */
         function setPattern(val) {
+            document.getElementById('dropPattern').value = val;
             document.querySelectorAll('.pattern-btn').forEach(b => b.classList.toggle('active', b.id === 'pat' + val));
             const configs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
             const row = document.getElementById('posSelectorRow');
@@ -295,6 +315,7 @@
             currentPos = configs[val][0];
             
             configs[val].forEach(p => {
+                // Map buttons
                 const btn = document.createElement('button');
                 btn.className = 'pattern-btn'; 
                 if(p === currentPos) { btn.style.background='#0cf'; btn.style.color='#000'; }
@@ -302,9 +323,12 @@
                 btn.onclick = () => { currentPos=p; updatePosUI(); updatePreview(); };
                 row.appendChild(btn);
                 
+                // Flow buttons (Command Center)
                 const fBtn = document.createElement('button');
                 fBtn.className = 'pattern-btn';
-                fBtn.style.fontSize = '0.6rem';
+                fBtn.style.fontSize = '0.9rem';
+                fBtn.style.background = '#333';
+                fBtn.style.color = '#fff';
                 fBtn.innerText = "MOVE " + p;
                 fBtn.onclick = () => { currentPos=p; updatePosUI(); updatePreview(); goToSlide(1); };
                 flow.appendChild(fBtn);
@@ -316,6 +340,11 @@
             Array.from(document.getElementById('posSelectorRow').children).forEach(b => {
                 b.style.background = (b.innerText === currentPos) ? '#0cf' : '#222';
                 b.style.color = (b.innerText === currentPos) ? '#000' : '#666';
+            });
+            // Also update Flow buttons highlighting
+            Array.from(document.getElementById('flowNextRow').children).forEach(b => {
+                 b.style.background = (b.innerText === "MOVE " + currentPos) ? '#0cf' : '#333';
+                 b.style.color = (b.innerText === "MOVE " + currentPos) ? '#000' : '#fff';
             });
         }
 
@@ -354,7 +383,7 @@
             document.getElementById('meterProvedBtn').classList.remove('active');
             document.getElementById('meterProvedBtn').style.background = '#222';
             
-            goToSlide(2);
+            goToSlide(2); // Go to Command Center
         }
 
         function goToSlide(n) {
