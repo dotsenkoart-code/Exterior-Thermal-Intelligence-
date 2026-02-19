@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v56.1 Logic Patch</title>
+    <title>Strata-Scan Pro: v57.0 Vault-Based Audit</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
@@ -298,8 +298,6 @@
         let pendingMoveCallback = null;
         let pendingFloorAction = null;
         
-        // Tracks which positions have been logged on the CURRENT floor
-        let floorLoggedPositions = new Set();
         const patternConfigs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
 
         function initApp() {
@@ -316,8 +314,7 @@
         /* --- INTERCEPTOR 1: WINDOW CHECK --- */
         function verifySafeMove(callback) {
             if (isCurrentWindowLogged) {
-                // BUG FIX: Do NOT reset isCurrentWindowLogged here.
-                // We only reset it if the move actually successfully executes.
+                // DO NOT erase state here. State is erased only when move is successful.
                 callback();
             } else {
                 pendingMoveCallback = callback;
@@ -334,28 +331,49 @@
         function modalQuickLogAndMove() {
             document.getElementById('safetyModal').style.display = 'none';
             performQuickLog(); 
-            // BUG FIX: Let the pending move callback handle the state reset
+            // The callback will now execute, which will handle resetting state
             if(pendingMoveCallback) pendingMoveCallback();
             pendingMoveCallback = null;
         }
 
         function modalForceSkip() {
             document.getElementById('safetyModal').style.display = 'none';
-            // BUG FIX: Let the pending move callback handle the state reset
+            // The callback will now execute, which will handle resetting state
             if(pendingMoveCallback) pendingMoveCallback();
             pendingMoveCallback = null;
         }
 
-        /* --- INTERCEPTOR 2: FLOOR AUDIT --- */
+        /* --- INTERCEPTOR 2: THE VAULT AUDIT --- */
         function checkFloorCompletion() {
             const pat = document.getElementById('dropPattern').value;
-            const required = patternConfigs[pat];
-            const missing = required.filter(p => !floorLoggedPositions.has(p));
+            const required = patternConfigs[pat]; // e.g. ['L', 'C', 'R']
+            
+            const currentFloor = document.getElementById('floorNum').value;
+            const currentDrop = document.getElementById('dropLetter').value.toUpperCase();
+            
+            // Build a set of what we actually have in the Vault for this floor/drop
+            let foundPositions = new Set();
+            document.querySelectorAll("#logTable tbody tr").forEach(tr => {
+                const tds = tr.querySelectorAll("td");
+                if (tds.length >= 4) {
+                    const loggedID = tds[3].textContent; // Column 4 is ID (e.g. A-12-L)
+                    required.forEach(p => {
+                        if (loggedID === `${currentDrop}-${currentFloor}-${p}`) {
+                            foundPositions.add(p);
+                        }
+                    });
+                }
+            });
+
+            // Return whatever is missing
+            const missing = required.filter(p => !foundPositions.has(p));
             return missing;
         }
 
         function requestFloorChange(actionType) {
+            // Check window layer first
             verifySafeMove(() => {
+                // Check floor layer second (Querying the Vault)
                 const missing = checkFloorCompletion();
                 
                 if (missing.length === 0) {
@@ -371,6 +389,7 @@
         function modalCancelFloorChange() {
             document.getElementById('floorAuditModal').style.display = 'none';
             pendingFloorAction = null;
+            // Note: isCurrentWindowLogged stays exactly as it was. No data loss!
         }
 
         function modalForceFloorChange() {
@@ -385,12 +404,10 @@
             let val = (actionType === 'up') ? 1 : -1;
             step('floorNum', val); 
             
-            floorLoggedPositions.clear();
-            
             const pat = document.getElementById('dropPattern').value;
             currentPos = patternConfigs[pat][0];
             
-            // BUG FIX: The floor successfully changed, so we are on a new, unlogged window
+            // WE MOVED! Now it is safe to reset the window flag
             isCurrentWindowLogged = false;
             
             updatePosUI();
@@ -408,7 +425,7 @@
         function confirmWipe() { localStorage.removeItem('strataVault'); location.reload(); }
 
         /* --- SMART MODAL (PHOTO SYNC) --- */
-        let destinationSlideAfterPhoto = 2; // Default route after taking a picture
+        let destinationSlideAfterPhoto = 2;
 
         function triggerPhotoModal(imgString, targetSlide = 2) {
             destinationSlideAfterPhoto = targetSlide;
@@ -417,7 +434,6 @@
         }
         function closePhotoModal() {
             document.getElementById('photoModal').style.display = 'none';
-            // BUG FIX: Only jump to a new slide if a target was explicitly passed
             if (destinationSlideAfterPhoto !== null) {
                 goToSlide(destinationSlideAfterPhoto); 
             }
@@ -451,15 +467,13 @@
             document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
             localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
             
-            floorLoggedPositions.add(currentPos);
-            
             imgEl.value = parseInt(imgEl.value) + 1;
             toggleSound(); 
             document.getElementById('moisturePct').value = '';
             document.getElementById('meterProvedBtn').classList.remove('active');
             document.getElementById('meterProvedBtn').style.background = '#222';
             
-            // BUG FIX: Pass null so the modal doesn't intercept the background movement navigation
+            // Don't auto-navigate since this is called from a modal trying to do another action
             triggerPhotoModal(imgStr, null);
         }
 
@@ -502,7 +516,6 @@
             localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
             
             isCurrentWindowLogged = true;
-            floorLoggedPositions.add(currentPos);
             
             imgEl.value = parseInt(imgEl.value) + 1;
             
@@ -511,7 +524,6 @@
             document.getElementById('meterProvedBtn').classList.remove('active');
             document.getElementById('meterProvedBtn').style.background = '#222';
             
-            // Send them back to the Command Slide (slide 2) after they close the photo reminder
             triggerPhotoModal(imgStr, 2);
         }
 
@@ -571,8 +583,8 @@
 
         function attemptMovePosition(p, targetSlide = null) {
             verifySafeMove(() => {
-                // BUG FIX: Only wipe the safety flag if they are actually changing the target window
                 if (currentPos !== p) {
+                    // WE MOVED! Safe to wipe the flag.
                     isCurrentWindowLogged = false; 
                 }
                 currentPos = p; 
@@ -591,7 +603,6 @@
             row.innerHTML = ''; flow.innerHTML = '';
             
             isCurrentWindowLogged = false; 
-            floorLoggedPositions.clear(); 
             currentPos = patternConfigs[val][0];
             
             patternConfigs[val].forEach(p => {
