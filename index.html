@@ -1,7 +1,8 @@
+
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v50.0 4x3 Grid</title>
+    <title>Strata-Scan Pro: v51.0 Safety Net</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
@@ -30,7 +31,7 @@
         
         .touch-slider { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: ew-resize; z-index: 3; }
 
-        /* --- MASSIVE HUD BUBBLE (For Moisture Pct) --- */
+        /* --- MASSIVE HUD BUBBLE --- */
         .hud-bubble {
             position: absolute; top: -100px; left: 50%; transform: translateX(-50%) scale(0);
             background: #f39c12; color: #000; padding: 10px 25px; border-radius: 30px;
@@ -97,11 +98,11 @@
                 <label>Floor Level</label>
                 <div class="stepper-box">
                     <div class="stepper-row">
-                        <button class="step-btn" onclick="stepFloor(-1)">−</button>
+                        <button class="step-btn" onclick="attemptFloorChange(-1)">−</button>
                         <div class="step-display">
                             <div class="step-val" id="floorNumVal">12</div>
                         </div>
-                        <button class="step-btn" onclick="stepFloor(1)">+</button>
+                        <button class="step-btn" onclick="attemptFloorChange(1)">+</button>
                     </div>
                     <input type="hidden" id="floorNum" value="12">
                 </div>
@@ -176,7 +177,7 @@
             <div class="card">
                 <label>NEXT MOVE</label>
                 <div id="flowNextRow" style="display:flex; gap:8px; margin-bottom:10px;"></div>
-                <button class="cmd-action-btn" style="background:#28a745; margin-top:5px;" onclick="descendFloor()">
+                <button class="cmd-action-btn" style="background:#28a745; margin-top:5px;" onclick="attemptDescend()">
                     ▼ DESCEND FLOOR & RESET
                 </button>
             </div>
@@ -218,6 +219,9 @@
 
     <script>
         let currentPos = "L";
+        
+        // --- THE SAFETY NET FLAG ---
+        let isCurrentWindowLogged = false;
 
         function initApp() {
             if (localStorage.getItem('strataVault')) document.getElementById('logTable').querySelector('tbody').innerHTML = localStorage.getItem('strataVault');
@@ -230,17 +234,31 @@
             setPattern('3');
         }
 
-        /* --- HUD & SLIDER LOGIC --- */
+        /* --- THE SAFETY INTERCEPTOR --- */
+        function verifySafeMove(callback) {
+            // If data IS logged, let them move freely.
+            if (isCurrentWindowLogged) {
+                isCurrentWindowLogged = false; // Reset for the new window
+                callback();
+                return;
+            }
+
+            // If data is NOT logged, pop the warning.
+            const currentID = document.getElementById('fullIDDisplay').innerText;
+            const proceed = confirm(`⚠️ DATA MISSING!\n\nYou have not logged any findings for window [${currentID}].\n\nAre you sure you want to move without saving?`);
+            
+            if (proceed) {
+                isCurrentWindowLogged = false; // Reset for the new window
+                callback();
+            }
+        }
+
+        /* --- SLIDER LOGIC --- */
         function slideUpdate(id, val) {
             let formatted = parseInt(val);
             document.getElementById(id + 'Val').innerText = formatted;
-            
             const hud = document.getElementById('hud-' + id);
-            if(hud) { 
-                hud.innerText = formatted; 
-                hud.style.transform = "translateX(-50%) scale(1)"; 
-            }
-            
+            if(hud) { hud.innerText = formatted; hud.style.transform = "translateX(-50%) scale(1)"; }
             document.getElementById(id).value = formatted;
         }
         
@@ -256,13 +274,11 @@
             if(id === 'moisturePct') { if(newVal < 0) newVal = 0; if(newVal > 100) newVal = 100; }
             
             el.value = newVal;
-            
             const displayId = (id === 'floorNum') ? 'floorNumVal' : id + 'Val';
             document.getElementById(displayId).innerText = newVal;
             
             const box = el.closest('.stepper-box');
             if(box) { const s = box.querySelector('.touch-slider'); if(s) s.value = Math.round(newVal); }
-
             if(id === 'floorNum') updatePreview();
         }
 
@@ -293,22 +309,32 @@
             }
         }
         
-        function stepFloor(val) {
-            let el = document.getElementById('floorNum');
-            let n = parseInt(el.value) + val;
-            el.value = n;
-            document.getElementById('floorNumVal').innerText = n;
-            updatePreview();
+        /* --- MOVEMENT CONTROLS WRAPPED IN SAFETY NET --- */
+        function attemptFloorChange(val) {
+            verifySafeMove(() => {
+                step('floorNum', val);
+            });
         }
 
-        function descendFloor() {
-            stepFloor(-1);
-            const pat = document.getElementById('dropPattern').value;
-            const configs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
-            currentPos = configs[pat][0];
-            updatePosUI();
-            updatePreview();
-            goToSlide(0);
+        function attemptDescend() {
+            verifySafeMove(() => {
+                step('floorNum', -1);
+                const pat = document.getElementById('dropPattern').value;
+                const configs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
+                currentPos = configs[pat][0];
+                updatePosUI();
+                updatePreview();
+                goToSlide(0);
+            });
+        }
+
+        function attemptMovePosition(p, targetSlide = null) {
+            verifySafeMove(() => {
+                currentPos = p; 
+                updatePosUI(); 
+                updatePreview();
+                if (targetSlide !== null) goToSlide(targetSlide);
+            });
         }
 
         /* --- MAP & NAVIGATION --- */
@@ -320,20 +346,26 @@
             const flow = document.getElementById('flowNextRow');
             row.innerHTML = ''; flow.innerHTML = '';
             
+            // Force reset when changing patterns entirely
+            isCurrentWindowLogged = false; 
             currentPos = configs[val][0];
             
             configs[val].forEach(p => {
+                // Map buttons
                 const btn = document.createElement('button');
                 btn.className = 'pattern-btn'; 
                 btn.innerText = p;
-                btn.onclick = () => { currentPos=p; updatePosUI(); updatePreview(); };
+                // Hooked into the safety net
+                btn.onclick = () => { attemptMovePosition(p); };
                 row.appendChild(btn);
                 
+                // Command Center Flow buttons
                 const fBtn = document.createElement('button');
                 fBtn.className = 'cmd-flow-btn';
                 fBtn.dataset.pos = p;
                 fBtn.innerText = "MOVE " + p;
-                fBtn.onclick = () => { currentPos=p; updatePosUI(); updatePreview(); goToSlide(1); };
+                // Hooked into the safety net, sends them to Diagnosis slide
+                fBtn.onclick = () => { attemptMovePosition(p, 1); };
                 flow.appendChild(fBtn);
             });
             updatePosUI();
@@ -399,6 +431,9 @@
             
             document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
             localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
+            
+            // --- FLIP THE SAFETY FLAG ---
+            isCurrentWindowLogged = true;
             
             imgEl.value = parseInt(imgEl.value) + 1;
             
