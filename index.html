@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v46.0</title>
+    <title>Strata-Scan Pro: v47.0 Layout Fix</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
@@ -68,7 +68,6 @@
         /* --- VAULT TABLE STYLES --- */
         table { width: 100%; border-collapse: collapse; font-size: 0.7rem; color: #ccc; }
         td, th { border: 1px solid #333; padding: 8px; text-align: left; }
-        /* This hides columns from the screen but keeps them in the HTML for Exporting */
         .export-only { display: none; }
     </style>
 </head>
@@ -78,13 +77,23 @@
         
         <div class="slide">
             <h2 style="color:#fff; margin:0 0 10px 0; font-size:1.2rem;">LOGISTICS</h2>
+            
             <div class="card">
                 <label>Project Name / Building</label>
                 <input type="text" id="projectID" oninput="saveDraft()" style="margin-bottom:12px;">
                 
+                <label>Technician</label>
+                <input type="text" id="techName" oninput="saveDraft()" style="margin-bottom:12px;">
+                
                 <div style="display:flex; gap:8px;">
-                    <div style="flex:2;"><label>Technician</label><input type="text" id="techName" oninput="saveDraft()"></div>
-                    <div style="flex:1;"><label style="color:#0cf;">Cam ID</label><input type="text" id="camID" oninput="saveDraft()" style="border-color:#0cf;"></div>
+                    <div style="flex:1;">
+                        <label style="color:#0cf;">Cam ID</label>
+                        <input type="text" id="camID" oninput="saveDraft()" style="border-color:#0cf;" placeholder="e.g. C1">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="color:#f39c12;">FLIR Image #</label>
+                        <input type="number" id="imgNum" value="1" style="border-color:#f39c12; color:#f39c12; font-weight:bold;">
+                    </div>
                 </div>
             </div>
 
@@ -122,15 +131,16 @@
                 <div id="fullIDDisplay" style="font-size: 2.5rem; font-weight: 900; color: #0cf; letter-spacing: 2px;">A-12-L</div>
             </div>
             
-            <div class="card" style="margin-top:10px;">
-                <label style="color:#f39c12;">NEXT FLIR IMAGE #</label>
-                <input type="number" id="imgNum" value="1" style="border-color:#f39c12; color:#f39c12; font-size:1.5rem; font-weight:bold;">
-            </div>
             <input type="hidden" id="dropPattern" value="3">
         </div>
 
         <div class="slide">
             
+            <div class="limit-banner">
+                <div class="limit-label">ANOMALY THRESHOLD</div>
+                <div class="limit-val" id="limitDisplay">72.0°F</div>
+            </div>
+
             <label style="margin-left:5px;">STEP 1: SET DRY REFERENCE</label>
             <div class="stepper-box" style="border-color:#0cf;">
                 <div class="stepper-row">
@@ -145,12 +155,7 @@
                 <input type="hidden" id="baselineC8" value="75.0">
             </div>
 
-            <div class="limit-banner">
-                <div class="limit-label">ANOMALY THRESHOLD</div>
-                <div class="limit-val" id="limitDisplay">72.0°F</div>
-            </div>
-
-            <label style="margin-left:5px;">STEP 2: SCAN & FLAG</label>
+            <label style="margin-left:5px; margin-top:10px;">STEP 2: SCAN & FLAG</label>
             <div class="check-grid">
                 <div class="check-item sound-box active" id="soundBtn" onclick="toggleSound()">CLEAR</div>
                 <div class="check-item defect" id="moistureDetectBtn" onclick="toggleDefect(this)">MOISTURE</div>
@@ -249,7 +254,6 @@
             let formatted = (id === 'moisturePct') ? parseInt(val) : parseFloat(val).toFixed(1);
             document.getElementById(id + 'Val').innerText = formatted;
             
-            // Pop the HUD bubble
             const hud = document.getElementById('hud-' + id);
             if(hud) { 
                 hud.innerText = formatted; 
@@ -398,13 +402,12 @@
             const id = document.getElementById('fullIDDisplay').innerText;
             const ref = document.getElementById('baselineC8').value;
             
-            // Image number formatting
             const imgEl = document.getElementById('imgNum');
             const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
             
             let finds = [];
             document.querySelectorAll('.check-item.active').forEach(el => finds.push(el.innerText));
-            if(finds.length===0) finds.push("CLEAR"); // Changed from DRY to CLEAR based on request
+            if(finds.length===0) finds.push("CLEAR"); 
             
             let mPct = "--";
             let proved = "NO";
@@ -413,7 +416,6 @@
                 if(document.getElementById('meterProvedBtn').classList.contains('active')) proved = "YES";
             }
 
-            // CREATING THE ROW (Notice the .export-only classes for columns we want to hide on screen)
             const row = `<tr>
                 <td class="export-only">${proj}</td>
                 <td class="export-only">${cam}</td>
@@ -430,10 +432,8 @@
             document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
             localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
             
-            // Advance Image Number
             imgEl.value = parseInt(imgEl.value) + 1;
             
-            // Reset UI State
             toggleSound(); 
             document.getElementById('moisturePct').value = '';
             document.getElementById('meterProvedBtn').classList.remove('active');
@@ -455,16 +455,13 @@
         function clearVault() { if(confirm("Wipe all logged data?")) { localStorage.removeItem('strataVault'); location.reload(); } }
         
         function exportLogs() {
-            // Header for CSV File
             let csv = "Project,Camera,Technician,Drop ID,FLIR Image,Reference Temp,Findings,Moisture %,Meter Proved,Time\n";
             
-            // Loop through rows and grab text content (which grabs text even if CSS display is none)
             document.querySelectorAll("#logTable tbody tr").forEach(tr => {
                 const cols = Array.from(tr.querySelectorAll("td"));
                 csv += cols.map(td => `"${td.textContent}"`).join(",") + "\n";
             });
             
-            // Trigger Download
             const blob = new Blob([csv], { type: 'text/csv' });
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob); 
             a.download = "Strata_Data_Export.csv"; 
