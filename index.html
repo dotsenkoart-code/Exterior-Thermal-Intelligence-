@@ -1,8 +1,7 @@
-
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v51.0 Safety Net</title>
+    <title>Strata-Scan Pro: v52.0 Smart Modal</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
@@ -54,6 +53,8 @@
 
         .action-btn { width: 100%; padding: 16px; border-radius: 8px; border: none; font-size: 1.1rem; font-weight: 800; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; margin-top: 15px; }
         .btn-blue { background: linear-gradient(180deg, #007bff 0%, #0056b3 100%); }
+        .btn-green { background: linear-gradient(180deg, #28a745 0%, #1e7e34 100%); }
+        .btn-dark { background: #333; border: 1px solid #555; color: #aaa; }
         
         .pattern-btn { flex: 1; padding: 15px; background: #222; border: 1px solid #444; color: #666; font-size: 0.8rem; font-weight: bold; cursor: pointer; }
         .pattern-btn.active { background: #0cf; color: #000; }
@@ -66,9 +67,28 @@
         table { width: 100%; border-collapse: collapse; font-size: 0.7rem; color: #ccc; }
         td, th { border: 1px solid #333; padding: 8px; text-align: left; }
         .export-only { display: none; }
+
+        /* --- CUSTOM SAFETY MODAL --- */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 9999; display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .modal-box { background: #111; border: 2px solid #444; border-radius: 12px; padding: 25px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 15px 35px rgba(0,0,0,0.9); }
+        .modal-btn { width: 100%; padding: 22px 10px; border-radius: 8px; border: none; font-size: 1rem; font-weight: 900; cursor: pointer; color: white; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .modal-btn:last-child { margin-bottom: 0; }
     </style>
 </head>
 <body onload="initApp()">
+
+    <div id="safetyModal" class="modal-overlay">
+        <div class="modal-box">
+            <h2 style="color:#d9534f; margin-top:0; font-size: 2rem;">⚠️ DATA MISSING!</h2>
+            <p style="color:#ccc; font-size:1.1rem; margin-bottom:25px; line-height:1.4;">
+                You have not logged any findings for window <br><strong id="modalTargetID" style="color:#0cf; font-size: 1.5rem; display:inline-block; margin-top:5px;">A-12-L</strong>
+            </p>
+            
+            <button class="modal-btn btn-blue" onclick="modalGoToDiagnose()">🔙 WAIT, TAKE ME TO DIAGNOSE</button>
+            <button class="modal-btn btn-green" onclick="modalQuickLogAndMove()">✅ WINDOW IS CLEAR: LOG & MOVE</button>
+            <button class="modal-btn btn-dark" onclick="modalForceSkip()">⚠️ FORCE SKIP (LEAVE BLANK)</button>
+        </div>
+    </div>
 
     <div class="slide-container" id="mainSlider">
         
@@ -220,8 +240,9 @@
     <script>
         let currentPos = "L";
         
-        // --- THE SAFETY NET FLAG ---
+        // --- THE SAFETY NET STATE ---
         let isCurrentWindowLogged = false;
+        let pendingMoveCallback = null;
 
         function initApp() {
             if (localStorage.getItem('strataVault')) document.getElementById('logTable').querySelector('tbody').innerHTML = localStorage.getItem('strataVault');
@@ -234,23 +255,83 @@
             setPattern('3');
         }
 
-        /* --- THE SAFETY INTERCEPTOR --- */
+        /* --- THE SMART MODAL INTERCEPTOR --- */
         function verifySafeMove(callback) {
             // If data IS logged, let them move freely.
             if (isCurrentWindowLogged) {
-                isCurrentWindowLogged = false; // Reset for the new window
+                isCurrentWindowLogged = false; // Reset for the new window location
                 callback();
-                return;
+            } else {
+                // Intercept and show the custom modal
+                pendingMoveCallback = callback;
+                document.getElementById('modalTargetID').innerText = document.getElementById('fullIDDisplay').innerText;
+                document.getElementById('safetyModal').style.display = 'flex';
             }
+        }
 
-            // If data is NOT logged, pop the warning.
-            const currentID = document.getElementById('fullIDDisplay').innerText;
-            const proceed = confirm(`⚠️ DATA MISSING!\n\nYou have not logged any findings for window [${currentID}].\n\nAre you sure you want to move without saving?`);
+        // Modal Option 1: Cancel & Go back to Diagnose tab
+        function modalGoToDiagnose() {
+            document.getElementById('safetyModal').style.display = 'none';
+            goToSlide(1); 
+        }
+
+        // Modal Option 2: The "Manager's Trick" Quick Log
+        function modalQuickLogAndMove() {
+            document.getElementById('safetyModal').style.display = 'none';
+            performQuickLog(); // Silently logs it
             
-            if (proceed) {
-                isCurrentWindowLogged = false; // Reset for the new window
-                callback();
-            }
+            // Execute the move they were originally trying to make
+            isCurrentWindowLogged = false; 
+            if(pendingMoveCallback) pendingMoveCallback();
+            pendingMoveCallback = null;
+        }
+
+        // Modal Option 3: Force skip and leave gap in data
+        function modalForceSkip() {
+            document.getElementById('safetyModal').style.display = 'none';
+            
+            // Execute the move they were originally trying to make
+            isCurrentWindowLogged = false; 
+            if(pendingMoveCallback) pendingMoveCallback();
+            pendingMoveCallback = null;
+        }
+
+        /* --- THE SILENT QUICK LOG PROCESS --- */
+        function performQuickLog() {
+            const now = new Date();
+            const time = now.getHours().toString().padStart(2,'0') + ":" + now.getMinutes().toString().padStart(2,'0');
+            
+            const proj = document.getElementById('projectID').value || "No Project";
+            const cam = document.getElementById('camID').value || "--";
+            const tech = document.getElementById('techName').value || "Tech";
+            const id = document.getElementById('fullIDDisplay').innerText;
+            
+            const imgEl = document.getElementById('imgNum');
+            const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
+            
+            // Hardcoded Quick-Log entry
+            const row = `<tr>
+                <td class="export-only">${proj}</td>
+                <td class="export-only">${cam}</td>
+                <td class="export-only">${tech}</td>
+                <td style="color:#0cf; font-weight:bold;">${id}</td>
+                <td>${imgStr}</td>
+                <td style="color:#f39c12;">CLEAR (QUICK-LOG)</td>
+                <td class="export-only">--</td>
+                <td class="export-only">NO</td>
+                <td>${time}</td>
+            </tr>`;
+            
+            document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
+            localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
+            
+            imgEl.value = parseInt(imgEl.value) + 1;
+            
+            // Reset UI cleanly
+            toggleSound(); 
+            document.getElementById('moisturePct').value = '';
+            document.getElementById('meterProvedBtn').classList.remove('active');
+            document.getElementById('meterProvedBtn').style.background = '#222';
         }
 
         /* --- SLIDER LOGIC --- */
@@ -346,25 +427,22 @@
             const flow = document.getElementById('flowNextRow');
             row.innerHTML = ''; flow.innerHTML = '';
             
-            // Force reset when changing patterns entirely
+            // Changing drop pattern entirely should reset the flag
             isCurrentWindowLogged = false; 
             currentPos = configs[val][0];
             
             configs[val].forEach(p => {
-                // Map buttons
                 const btn = document.createElement('button');
                 btn.className = 'pattern-btn'; 
                 btn.innerText = p;
-                // Hooked into the safety net
                 btn.onclick = () => { attemptMovePosition(p); };
                 row.appendChild(btn);
                 
-                // Command Center Flow buttons
                 const fBtn = document.createElement('button');
                 fBtn.className = 'cmd-flow-btn';
                 fBtn.dataset.pos = p;
                 fBtn.innerText = "MOVE " + p;
-                // Hooked into the safety net, sends them to Diagnosis slide
+                // Command center buttons send tech to the Diagnose tab after moving
                 fBtn.onclick = () => { attemptMovePosition(p, 1); };
                 flow.appendChild(fBtn);
             });
