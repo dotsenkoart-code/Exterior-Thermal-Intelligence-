@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v54.1 Vault Polish</title>
+    <title>Strata-Scan Pro: v55.0 Floor Audit</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
@@ -91,6 +91,20 @@
         </div>
     </div>
 
+    <div id="floorAuditModal" class="modal-overlay">
+        <div class="modal-box" style="border-color:#f39c12;">
+            <h2 style="color:#f39c12; margin-top:0; font-size: 2rem;">⚠️ INCOMPLETE FLOOR</h2>
+            <p style="color:#ccc; font-size:1.1rem; margin-bottom:25px; line-height:1.4;">
+                You selected a drop pattern, but you missed the following position(s):<br>
+                <strong id="missingFloorWindows" style="color:#0cf; font-size: 2rem; display:inline-block; margin-top:10px;">C, R</strong><br><br>
+                Are you sure you want to leave this floor?
+            </p>
+            
+            <button class="modal-btn btn-blue" onclick="modalCancelFloorChange()">🔙 CANCEL (STAY ON FLOOR)</button>
+            <button class="modal-btn btn-dark" onclick="modalForceFloorChange()">⚠️ FORCE DESCEND (SKIP WINDOWS)</button>
+        </div>
+    </div>
+
     <div id="photoModal" class="modal-overlay">
         <div class="modal-box" style="border-color:#0cf;">
             <h2 style="color:#0cf; margin-top:0; font-size: 2rem;">📸 SNAP PHOTO</h2>
@@ -100,7 +114,6 @@
             <div id="modalPhotoNum" style="background:#222; border:2px solid #555; border-radius:8px; padding:15px; font-size:3.5rem; font-weight:900; color:#f39c12; margin-bottom:25px; letter-spacing: 2px;">
                 0045
             </div>
-            
             <button class="modal-btn btn-green" onclick="closePhotoModal()" style="font-size: 1.2rem; padding: 25px 10px;">✅ GOT IT - PROCEED</button>
         </div>
     </div>
@@ -111,7 +124,6 @@
             <p style="color:#ccc; font-size:1.1rem; margin-bottom:25px; line-height:1.4;">
                 This will permanently delete all logged findings in the Data Vault.<br><br><strong>Have you exported the CSV?</strong>
             </p>
-            
             <button class="modal-btn btn-dark" onclick="closeWipeModal()">🔙 CANCEL (KEEP DATA)</button>
             <button class="modal-btn btn-red" onclick="confirmWipe()">🚨 YES, WIPE ALL DATA</button>
         </div>
@@ -145,11 +157,11 @@
                 <label>Floor Level</label>
                 <div class="stepper-box">
                     <div class="stepper-row">
-                        <button class="step-btn" onclick="attemptFloorChange(-1)">−</button>
+                        <button class="step-btn" onclick="requestFloorChange('down')">−</button>
                         <div class="step-display">
                             <div class="step-val" id="floorNumVal">12</div>
                         </div>
-                        <button class="step-btn" onclick="attemptFloorChange(1)">+</button>
+                        <button class="step-btn" onclick="requestFloorChange('up')">+</button>
                     </div>
                     <input type="hidden" id="floorNum" value="12">
                 </div>
@@ -224,7 +236,7 @@
             <div class="card">
                 <label>NEXT MOVE</label>
                 <div id="flowNextRow" style="display:flex; gap:8px; margin-bottom:10px;"></div>
-                <button class="cmd-action-btn" style="background:#28a745; margin-top:5px;" onclick="attemptDescend()">
+                <button class="cmd-action-btn" style="background:#28a745; margin-top:5px;" onclick="requestFloorChange('descend_btn')">
                     ▼ DESCEND FLOOR & RESET
                 </button>
             </div>
@@ -265,11 +277,15 @@
     </div>
 
     <script>
+        // --- GLOBAL STATE ---
         let currentPos = "L";
-        
-        // --- THE SAFETY NET STATE ---
         let isCurrentWindowLogged = false;
         let pendingMoveCallback = null;
+        let pendingFloorAction = null;
+        
+        // Tracks which positions have been logged on the CURRENT floor
+        let floorLoggedPositions = new Set();
+        const patternConfigs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
 
         function initApp() {
             if (localStorage.getItem('strataVault')) document.getElementById('logTable').querySelector('tbody').innerHTML = localStorage.getItem('strataVault');
@@ -282,7 +298,7 @@
             setPattern('3');
         }
 
-        /* --- SMART MODAL INTERCEPTOR (SAFETY NET) --- */
+        /* --- INTERCEPTOR 1: WINDOW CHECK --- */
         function verifySafeMove(callback) {
             if (isCurrentWindowLogged) {
                 isCurrentWindowLogged = false; // Reset for new window
@@ -301,7 +317,7 @@
 
         function modalQuickLogAndMove() {
             document.getElementById('safetyModal').style.display = 'none';
-            performQuickLog(); 
+            performQuickLog(); // This handles adding to floorLoggedPositions
             isCurrentWindowLogged = false; 
             if(pendingMoveCallback) pendingMoveCallback();
             pendingMoveCallback = null;
@@ -314,17 +330,72 @@
             pendingMoveCallback = null;
         }
 
+        /* --- INTERCEPTOR 2: FLOOR AUDIT --- */
+        function checkFloorCompletion() {
+            const pat = document.getElementById('dropPattern').value;
+            const required = patternConfigs[pat];
+            // Find which required positions are missing from the logged set
+            const missing = required.filter(p => !floorLoggedPositions.has(p));
+            return missing;
+        }
+
+        function requestFloorChange(actionType) {
+            // First, make sure they aren't abandoning the window they are currently looking at
+            verifySafeMove(() => {
+                // Second, check if they finished the whole floor pattern
+                const missing = checkFloorCompletion();
+                
+                if (missing.length === 0) {
+                    // Floor is complete! Execute the change immediately.
+                    processFloorAction(actionType);
+                } else {
+                    // Floor is incomplete. Trigger the Warning Modal.
+                    pendingFloorAction = actionType;
+                    document.getElementById('missingFloorWindows').innerText = missing.join(", ");
+                    document.getElementById('floorAuditModal').style.display = 'flex';
+                }
+            });
+        }
+
+        function modalCancelFloorChange() {
+            document.getElementById('floorAuditModal').style.display = 'none';
+            pendingFloorAction = null;
+        }
+
+        function modalForceFloorChange() {
+            document.getElementById('floorAuditModal').style.display = 'none';
+            if (pendingFloorAction) {
+                processFloorAction(pendingFloorAction);
+            }
+            pendingFloorAction = null;
+        }
+
+        function processFloorAction(actionType) {
+            let val = (actionType === 'up') ? 1 : -1;
+            step('floorNum', val); // Changes the actual number
+            
+            // Clear the floor progress for the new floor
+            floorLoggedPositions.clear();
+            
+            // Automatically snap back to the starting position for the pattern
+            const pat = document.getElementById('dropPattern').value;
+            currentPos = patternConfigs[pat][0];
+            isCurrentWindowLogged = false;
+            
+            updatePosUI();
+            updatePreview();
+            
+            // If they used the massive "DESCEND" button on Command Tab, jump to Map.
+            if (actionType === 'descend_btn') {
+                goToSlide(0);
+            }
+        }
+
+
         /* --- SMART MODAL (WIPE VAULT) --- */
-        function openWipeModal() {
-            document.getElementById('wipeModal').style.display = 'flex';
-        }
-        function closeWipeModal() {
-            document.getElementById('wipeModal').style.display = 'none';
-        }
-        function confirmWipe() {
-            localStorage.removeItem('strataVault'); 
-            location.reload();
-        }
+        function openWipeModal() { document.getElementById('wipeModal').style.display = 'flex'; }
+        function closeWipeModal() { document.getElementById('wipeModal').style.display = 'none'; }
+        function confirmWipe() { localStorage.removeItem('strataVault'); location.reload(); }
 
         /* --- SMART MODAL (PHOTO SYNC) --- */
         function triggerPhotoModal(imgString) {
@@ -333,11 +404,10 @@
         }
         function closePhotoModal() {
             document.getElementById('photoModal').style.display = 'none';
-            goToSlide(2); // Proceed to Command Center
+            goToSlide(2); 
         }
 
-
-        /* --- THE SILENT QUICK LOG PROCESS --- */
+        /* --- LOGGING PROCESSES --- */
         function performQuickLog() {
             const now = new Date();
             const time = now.getHours().toString().padStart(2,'0') + ":" + now.getMinutes().toString().padStart(2,'0');
@@ -350,7 +420,6 @@
             const imgEl = document.getElementById('imgNum');
             const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
             
-            // Note: Added white-space:nowrap to the ID column
             const row = `<tr>
                 <td class="export-only">${proj}</td>
                 <td class="export-only">${cam}</td>
@@ -365,6 +434,60 @@
             
             document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
             localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
+            
+            // Register this position as logged for the floor audit
+            floorLoggedPositions.add(currentPos);
+            
+            imgEl.value = parseInt(imgEl.value) + 1;
+            toggleSound(); 
+            document.getElementById('moisturePct').value = '';
+            document.getElementById('meterProvedBtn').classList.remove('active');
+            document.getElementById('meterProvedBtn').style.background = '#222';
+            
+            triggerPhotoModal(imgStr);
+        }
+
+        function logEvidence() {
+            const now = new Date();
+            const time = now.getHours().toString().padStart(2,'0') + ":" + now.getMinutes().toString().padStart(2,'0');
+            
+            const proj = document.getElementById('projectID').value || "No Project";
+            const cam = document.getElementById('camID').value || "--";
+            const tech = document.getElementById('techName').value || "Tech";
+            const id = document.getElementById('fullIDDisplay').innerText;
+            
+            const imgEl = document.getElementById('imgNum');
+            const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
+            
+            let finds = [];
+            document.querySelectorAll('.check-item.active').forEach(el => finds.push(el.innerText));
+            if(finds.length===0) finds.push("CLEAR"); 
+            
+            let mPct = "--";
+            let proved = "NO";
+            if(document.getElementById('groundTruthCard').style.display === 'block') {
+                mPct = document.getElementById('moisturePct').value + "%";
+                if(document.getElementById('meterProvedBtn').classList.contains('active')) proved = "YES";
+            }
+
+            const row = `<tr>
+                <td class="export-only">${proj}</td>
+                <td class="export-only">${cam}</td>
+                <td class="export-only">${tech}</td>
+                <td style="color:#0cf; font-weight:bold; white-space:nowrap;">${id}</td>
+                <td>${imgStr}</td>
+                <td>${finds.join(' | ')}</td>
+                <td class="export-only">${mPct}</td>
+                <td class="export-only">${proved}</td>
+                <td>${time}</td>
+            </tr>`;
+            
+            document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
+            localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
+            
+            isCurrentWindowLogged = true;
+            // Register this position as logged for the floor audit
+            floorLoggedPositions.add(currentPos);
             
             imgEl.value = parseInt(imgEl.value) + 1;
             
@@ -384,12 +507,10 @@
             if(hud) { hud.innerText = formatted; hud.style.transform = "translateX(-50%) scale(1)"; }
             document.getElementById(id).value = formatted;
         }
-        
         function slideEnd(id) {
             const hud = document.getElementById('hud-' + id);
             if(hud) hud.style.transform = "translateX(-50%) scale(0)";
         }
-
         function step(id, val) {
             const el = document.getElementById(id);
             let current = parseFloat(el.value);
@@ -431,25 +552,6 @@
                 el.style.background = '#222'; el.style.color='#888'; el.innerText = 'METER PROVED';
             }
         }
-        
-        /* --- MOVEMENT CONTROLS --- */
-        function attemptFloorChange(val) {
-            verifySafeMove(() => {
-                step('floorNum', val);
-            });
-        }
-
-        function attemptDescend() {
-            verifySafeMove(() => {
-                step('floorNum', -1);
-                const pat = document.getElementById('dropPattern').value;
-                const configs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
-                currentPos = configs[pat][0];
-                updatePosUI();
-                updatePreview();
-                goToSlide(0);
-            });
-        }
 
         function attemptMovePosition(p, targetSlide = null) {
             verifySafeMove(() => {
@@ -464,15 +566,16 @@
         function setPattern(val) {
             document.getElementById('dropPattern').value = val;
             document.querySelectorAll('.pattern-btn').forEach(b => b.classList.toggle('active', b.id === 'pat' + val));
-            const configs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
             const row = document.getElementById('posSelectorRow');
             const flow = document.getElementById('flowNextRow');
             row.innerHTML = ''; flow.innerHTML = '';
             
+            // Complete reset when changing patterns
             isCurrentWindowLogged = false; 
-            currentPos = configs[val][0];
+            floorLoggedPositions.clear(); 
+            currentPos = patternConfigs[val][0];
             
-            configs[val].forEach(p => {
+            patternConfigs[val].forEach(p => {
                 const btn = document.createElement('button');
                 btn.className = 'pattern-btn'; 
                 btn.innerText = p;
@@ -510,58 +613,6 @@
             const f = document.getElementById('floorNum').value;
             const d = document.getElementById('dropLetter').value.toUpperCase();
             document.getElementById('fullIDDisplay').innerText = `${d}-${f}-${currentPos}`;
-        }
-
-        /* --- STANDARD LOGGING --- */
-        function logEvidence() {
-            const now = new Date();
-            const time = now.getHours().toString().padStart(2,'0') + ":" + now.getMinutes().toString().padStart(2,'0');
-            
-            const proj = document.getElementById('projectID').value || "No Project";
-            const cam = document.getElementById('camID').value || "--";
-            const tech = document.getElementById('techName').value || "Tech";
-            const id = document.getElementById('fullIDDisplay').innerText;
-            
-            const imgEl = document.getElementById('imgNum');
-            const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
-            
-            let finds = [];
-            document.querySelectorAll('.check-item.active').forEach(el => finds.push(el.innerText));
-            if(finds.length===0) finds.push("CLEAR"); 
-            
-            let mPct = "--";
-            let proved = "NO";
-            if(document.getElementById('groundTruthCard').style.display === 'block') {
-                mPct = document.getElementById('moisturePct').value + "%";
-                if(document.getElementById('meterProvedBtn').classList.contains('active')) proved = "YES";
-            }
-
-            // Note: Added white-space:nowrap to the ID column
-            const row = `<tr>
-                <td class="export-only">${proj}</td>
-                <td class="export-only">${cam}</td>
-                <td class="export-only">${tech}</td>
-                <td style="color:#0cf; font-weight:bold; white-space:nowrap;">${id}</td>
-                <td>${imgStr}</td>
-                <td>${finds.join(' | ')}</td>
-                <td class="export-only">${mPct}</td>
-                <td class="export-only">${proved}</td>
-                <td>${time}</td>
-            </tr>`;
-            
-            document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
-            localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
-            
-            isCurrentWindowLogged = true;
-            
-            imgEl.value = parseInt(imgEl.value) + 1;
-            
-            toggleSound(); 
-            document.getElementById('moisturePct').value = '';
-            document.getElementById('meterProvedBtn').classList.remove('active');
-            document.getElementById('meterProvedBtn').style.background = '#222';
-            
-            triggerPhotoModal(imgStr);
         }
 
         function goToSlide(n) {
