@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v53.0 Smart Modals</title>
+    <title>Strata-Scan Pro: v54.0 Photo Sync</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
@@ -88,6 +88,20 @@
             <button class="modal-btn btn-blue" onclick="modalGoToDiagnose()">🔙 WAIT, TAKE ME TO DIAGNOSE</button>
             <button class="modal-btn btn-green" onclick="modalQuickLogAndMove()">✅ WINDOW IS CLEAR: LOG & MOVE</button>
             <button class="modal-btn btn-dark" onclick="modalForceSkip()">⚠️ FORCE SKIP (LEAVE BLANK)</button>
+        </div>
+    </div>
+
+    <div id="photoModal" class="modal-overlay">
+        <div class="modal-box" style="border-color:#0cf;">
+            <h2 style="color:#0cf; margin-top:0; font-size: 2rem;">📸 SNAP PHOTO</h2>
+            <p style="color:#ccc; font-size:1.1rem; margin-bottom:15px; line-height:1.4;">
+                Data saved! Now verify your FLIR camera counter matches:
+            </p>
+            <div id="modalPhotoNum" style="background:#222; border:2px solid #555; border-radius:8px; padding:15px; font-size:3.5rem; font-weight:900; color:#f39c12; margin-bottom:25px; letter-spacing: 2px;">
+                0045
+            </div>
+            
+            <button class="modal-btn btn-green" onclick="closePhotoModal()" style="font-size: 1.2rem; padding: 25px 10px;">✅ GOT IT - PROCEED</button>
         </div>
     </div>
 
@@ -300,7 +314,7 @@
             pendingMoveCallback = null;
         }
 
-        /* --- SMART MODAL INTERCEPTOR (WIPE VAULT) --- */
+        /* --- SMART MODAL (WIPE VAULT) --- */
         function openWipeModal() {
             document.getElementById('wipeModal').style.display = 'flex';
         }
@@ -311,6 +325,17 @@
             localStorage.removeItem('strataVault'); 
             location.reload();
         }
+
+        /* --- SMART MODAL (PHOTO SYNC) --- */
+        function triggerPhotoModal(imgString) {
+            document.getElementById('modalPhotoNum').innerText = imgString;
+            document.getElementById('photoModal').style.display = 'flex';
+        }
+        function closePhotoModal() {
+            document.getElementById('photoModal').style.display = 'none';
+            goToSlide(2); // Proceed to Command Center
+        }
+
 
         /* --- THE SILENT QUICK LOG PROCESS --- */
         function performQuickLog() {
@@ -346,6 +371,9 @@
             document.getElementById('moisturePct').value = '';
             document.getElementById('meterProvedBtn').classList.remove('active');
             document.getElementById('meterProvedBtn').style.background = '#222';
+            
+            // Trigger the photo reminder for the Quick Log too
+            triggerPhotoModal(imgStr);
         }
 
         /* --- SLIDER LOGIC --- */
@@ -484,6 +512,7 @@
             document.getElementById('fullIDDisplay').innerText = `${d}-${f}-${currentPos}`;
         }
 
+        /* --- STANDARD LOGGING --- */
         function logEvidence() {
             const now = new Date();
             const time = now.getHours().toString().padStart(2,'0') + ":" + now.getMinutes().toString().padStart(2,'0');
@@ -531,7 +560,8 @@
             document.getElementById('meterProvedBtn').classList.remove('active');
             document.getElementById('meterProvedBtn').style.background = '#222';
             
-            goToSlide(2);
+            // Trigger the photo reminder modal INSTEAD of going straight to slide 2
+            triggerPhotoModal(imgStr);
         }
 
         function goToSlide(n) {
