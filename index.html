@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v45.0 Retake</title>
+    <title>Strata-Scan Pro: v46.0</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
@@ -22,7 +22,7 @@
         label { font-size: 0.65rem; color: #888; font-weight: 700; text-transform: uppercase; display: block; margin-bottom: 4px; letter-spacing: 0.5px; }
 
         /* --- STEPPER --- */
-        .stepper-box { background: #1a1a1a; border-radius: 8px; border: 1px solid #333; padding: 5px; position: relative; overflow: hidden; margin-bottom: 10px; }
+        .stepper-box { background: #1a1a1a; border-radius: 8px; border: 1px solid #333; padding: 5px; position: relative; overflow: visible; margin-bottom: 10px; }
         .stepper-row { display: flex; align-items: center; justify-content: space-between; height: 70px; }
         .step-btn { width: 60px; height: 100%; background: #252525; border: none; color: #fff; font-size: 2rem; font-weight: 300; cursor: pointer; z-index: 2; border-radius: 6px; }
         .step-display { flex: 1; text-align: center; position: relative; height: 100%; display: flex; flex-direction: column; justify-content: center; }
@@ -30,12 +30,13 @@
         
         .touch-slider { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: ew-resize; z-index: 3; }
 
-        /* --- HUD BUBBLE --- */
+        /* --- MASSIVE HUD BUBBLE --- */
         .hud-bubble {
-            position: absolute; top: -70px; left: 50%; transform: translateX(-50%) scale(0);
-            background: #f39c12; color: #000; padding: 5px 15px; border-radius: 20px;
-            font-size: 2rem; font-weight: 800; z-index: 100; pointer-events: none;
-            transition: transform 0.1s; border: 3px solid #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            position: absolute; top: -100px; left: 50%; transform: translateX(-50%) scale(0);
+            background: #f39c12; color: #000; padding: 10px 25px; border-radius: 30px;
+            font-size: 3rem; font-weight: 900; z-index: 9999; pointer-events: none;
+            transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            border: 4px solid #fff; box-shadow: 0 10px 25px rgba(0,0,0,0.9);
         }
 
         /* --- LIMIT BANNER --- */
@@ -54,6 +55,7 @@
             cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1.2; height: 50px;
         }
         .check-item.active { background: #0cf; color: #000; border-color: #fff; }
+        .check-item.sound-box.active { background: #28a745; color: #fff; border-color: #fff; }
         
         .moisture-panel { background: #1a1a1a; border: 1px solid #d9534f; border-radius: 6px; padding: 10px; margin-top: 8px; display: none; }
 
@@ -63,8 +65,11 @@
         .pattern-btn { flex: 1; padding: 15px; background: #222; border: 1px solid #444; color: #666; font-size: 0.8rem; font-weight: bold; cursor: pointer; }
         .pattern-btn.active { background: #0cf; color: #000; }
         
-        table { width: 100%; border-collapse: collapse; font-size: 0.6rem; color: #ccc; }
+        /* --- VAULT TABLE STYLES --- */
+        table { width: 100%; border-collapse: collapse; font-size: 0.7rem; color: #ccc; }
         td, th { border: 1px solid #333; padding: 8px; text-align: left; }
+        /* This hides columns from the screen but keeps them in the HTML for Exporting */
+        .export-only { display: none; }
     </style>
 </head>
 <body onload="initApp()">
@@ -74,11 +79,13 @@
         <div class="slide">
             <h2 style="color:#fff; margin:0 0 10px 0; font-size:1.2rem;">LOGISTICS</h2>
             <div class="card">
+                <label>Project Name / Building</label>
+                <input type="text" id="projectID" oninput="saveDraft()" style="margin-bottom:12px;">
+                
                 <div style="display:flex; gap:8px;">
                     <div style="flex:2;"><label>Technician</label><input type="text" id="techName" oninput="saveDraft()"></div>
                     <div style="flex:1;"><label style="color:#0cf;">Cam ID</label><input type="text" id="camID" oninput="saveDraft()" style="border-color:#0cf;"></div>
                 </div>
-                <label style="margin-top:8px;">Project</label><input type="text" id="projectID" oninput="saveDraft()">
             </div>
 
             <div class="card">
@@ -94,14 +101,18 @@
                     <input type="hidden" id="floorNum" value="12">
                 </div>
                 
-                <div style="display:flex; margin-bottom:10px;">
+                <label>Drop Pattern</label>
+                <div style="display:flex; margin-bottom:4px;">
                     <button class="pattern-btn active" id="pat3" onclick="setPattern('3')">3-WIN</button>
                     <button class="pattern-btn" id="pat2" onclick="setPattern('2')">2-WIN</button>
                     <button class="pattern-btn" id="pat1" onclick="setPattern('1')">1-WIN</button>
                 </div>
+                <div style="font-size:0.6rem; color:#888; text-align:center; margin-bottom:12px; font-weight:bold;">
+                    3-WIN (L-C-R) &nbsp;•&nbsp; 2-WIN (L-R) &nbsp;•&nbsp; 1-WIN (C)
+                </div>
                 
                 <div style="display:flex; gap:8px;">
-                    <div style="flex:1;"><label>Drop</label><input type="text" id="dropLetter" value="A" style="text-transform:uppercase;" oninput="updatePreview()"></div>
+                    <div style="flex:1;"><label>Drop ID</label><input type="text" id="dropLetter" value="A" style="text-transform:uppercase;" oninput="updatePreview()"></div>
                     <div style="flex:2;"><label>Position</label><div style="display:flex;" id="posSelectorRow"></div></div>
                 </div>
             </div>
@@ -110,8 +121,12 @@
                 <label>TARGET ID</label>
                 <div id="fullIDDisplay" style="font-size: 2.5rem; font-weight: 900; color: #0cf; letter-spacing: 2px;">A-12-L</div>
             </div>
+            
+            <div class="card" style="margin-top:10px;">
+                <label style="color:#f39c12;">NEXT FLIR IMAGE #</label>
+                <input type="number" id="imgNum" value="1" style="border-color:#f39c12; color:#f39c12; font-size:1.5rem; font-weight:bold;">
+            </div>
             <input type="hidden" id="dropPattern" value="3">
-            <input type="hidden" id="imgNum" value="1">
         </div>
 
         <div class="slide">
@@ -123,7 +138,7 @@
                     <div class="step-display">
                         <div class="step-val" id="baselineC8Val">75.0</div>
                         <div class="hud-bubble" id="hud-baselineC8">75.0</div>
-                        <input type="range" class="touch-slider" min="0" max="120" step="1" value="75.0" oninput="slideUpdate('baselineC8', this.value)" onchange="slideEnd('baselineC8')">
+                        <input type="range" class="touch-slider" min="40" max="110" step="1" value="75.0" oninput="slideUpdate('baselineC8', this.value)" onchange="slideEnd('baselineC8')" ontouchend="slideEnd('baselineC8')">
                     </div>
                     <button class="step-btn" onclick="step('baselineC8', 0.1)">+</button>
                 </div>
@@ -137,7 +152,7 @@
 
             <label style="margin-left:5px;">STEP 2: SCAN & FLAG</label>
             <div class="check-grid">
-                <div class="check-item sound-box active" id="soundBtn" onclick="toggleSound()">✅ CLEAR</div>
+                <div class="check-item sound-box active" id="soundBtn" onclick="toggleSound()">CLEAR</div>
                 <div class="check-item defect" id="moistureDetectBtn" onclick="toggleDefect(this)">MOISTURE</div>
                 <div class="check-item defect" onclick="toggleDefect(this)">LEAK SUSPECT</div>
                 <div class="check-item defect" onclick="toggleDefect(this)">SEALANT FAIL</div>
@@ -154,7 +169,7 @@
                             <div class="step-display">
                                 <div class="step-val" id="moisturePctVal" style="font-size:1.5rem;">85</div>
                                 <div class="hud-bubble" id="hud-moisturePct">85</div>
-                                <input type="range" class="touch-slider" min="0" max="100" step="1" value="85" oninput="slideUpdate('moisturePct', this.value)" onchange="slideEnd('moisturePct')">
+                                <input type="range" class="touch-slider" min="0" max="100" step="1" value="85" oninput="slideUpdate('moisturePct', this.value)" onchange="slideEnd('moisturePct')" ontouchend="slideEnd('moisturePct')">
                             </div>
                             <button class="step-btn" style="width:30px;" onclick="step('moisturePct', 1)">+</button>
                         </div>
@@ -182,7 +197,20 @@
                 <label style="padding:10px; display:block;">DATA VAULT</label>
                 <div style="overflow-x:auto; max-height:45vh; border-top:1px solid #333;">
                     <table id="logTable">
-                        <thead style="background:#222;"><tr><th>ID</th><th>Ref</th><th>Finds</th><th>M%</th><th>Time</th></tr></thead>
+                        <thead style="background:#222;">
+                            <tr>
+                                <th class="export-only">Project</th>
+                                <th class="export-only">Cam</th>
+                                <th class="export-only">Tech</th>
+                                <th>ID</th>
+                                <th>Img</th>
+                                <th class="export-only">Ref</th>
+                                <th>Finds</th>
+                                <th class="export-only">M%</th>
+                                <th class="export-only">Proved</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -220,8 +248,14 @@
         function slideUpdate(id, val) {
             let formatted = (id === 'moisturePct') ? parseInt(val) : parseFloat(val).toFixed(1);
             document.getElementById(id + 'Val').innerText = formatted;
+            
+            // Pop the HUD bubble
             const hud = document.getElementById('hud-' + id);
-            if(hud) { hud.innerText = formatted; hud.style.transform = "translateX(-50%) scale(1)"; }
+            if(hud) { 
+                hud.innerText = formatted; 
+                hud.style.transform = "translateX(-50%) scale(1)"; 
+            }
+            
             document.getElementById(id).value = formatted;
             if(id === 'baselineC8') updateLimit();
         }
@@ -276,7 +310,7 @@
         function toggleMeter(el) {
             el.classList.toggle('active');
             if(el.classList.contains('active')) {
-                el.style.background = '#28a745'; el.style.color='#fff'; el.innerText = '✅ PROVED';
+                el.style.background = '#28a745'; el.style.color='#fff'; el.innerText = 'PROVED';
             } else {
                 el.style.background = '#222'; el.style.color='#888'; el.innerText = 'METER PROVED';
             }
@@ -312,17 +346,15 @@
             currentPos = configs[val][0];
             
             configs[val].forEach(p => {
-                // Map buttons
                 const btn = document.createElement('button');
                 btn.className = 'pattern-btn'; 
                 btn.innerText = p;
                 btn.onclick = () => { currentPos=p; updatePosUI(); updatePreview(); };
                 row.appendChild(btn);
                 
-                // Flow buttons (Command Center)
                 const fBtn = document.createElement('button');
                 fBtn.className = 'pattern-btn';
-                fBtn.dataset.pos = p; // STORE POSITION FOR RETAKE LOGIC
+                fBtn.dataset.pos = p;
                 fBtn.style.fontSize = '0.9rem';
                 fBtn.style.background = '#333';
                 fBtn.style.color = '#fff';
@@ -330,19 +362,17 @@
                 fBtn.onclick = () => { currentPos=p; updatePosUI(); updatePreview(); goToSlide(1); };
                 flow.appendChild(fBtn);
             });
-            updatePosUI(); // Initial Update
+            updatePosUI();
             updatePreview();
         }
         
         function updatePosUI() {
-            // Update Map Buttons
             Array.from(document.getElementById('posSelectorRow').children).forEach(b => {
                 const isMatch = b.innerText === currentPos;
                 b.style.background = isMatch ? '#0cf' : '#222';
                 b.style.color = isMatch ? '#000' : '#666';
             });
 
-            // Update Command Center Buttons (RETAKE LOGIC)
             Array.from(document.getElementById('flowNextRow').children).forEach(b => {
                  const p = b.dataset.pos;
                  const isMatch = p === currentPos;
@@ -361,26 +391,49 @@
         function logEvidence() {
             const now = new Date();
             const time = now.getHours().toString().padStart(2,'0') + ":" + now.getMinutes().toString().padStart(2,'0');
+            
+            const proj = document.getElementById('projectID').value || "No Project";
+            const cam = document.getElementById('camID').value || "--";
+            const tech = document.getElementById('techName').value || "Tech";
             const id = document.getElementById('fullIDDisplay').innerText;
             const ref = document.getElementById('baselineC8').value;
             
+            // Image number formatting
+            const imgEl = document.getElementById('imgNum');
+            const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
+            
             let finds = [];
             document.querySelectorAll('.check-item.active').forEach(el => finds.push(el.innerText));
-            if(finds.length===0) finds.push("DRY");
+            if(finds.length===0) finds.push("CLEAR"); // Changed from DRY to CLEAR based on request
             
             let mPct = "--";
+            let proved = "NO";
             if(document.getElementById('groundTruthCard').style.display === 'block') {
                 mPct = document.getElementById('moisturePct').value + "%";
-                if(document.getElementById('meterProvedBtn').classList.contains('active')) mPct += " (V)";
+                if(document.getElementById('meterProvedBtn').classList.contains('active')) proved = "YES";
             }
 
-            const row = `<tr><td style="color:#0cf; font-weight:bold;">${id}</td><td>${ref}</td><td>${finds.join('|')}</td><td>${mPct}</td><td>${time}</td></tr>`;
+            // CREATING THE ROW (Notice the .export-only classes for columns we want to hide on screen)
+            const row = `<tr>
+                <td class="export-only">${proj}</td>
+                <td class="export-only">${cam}</td>
+                <td class="export-only">${tech}</td>
+                <td style="color:#0cf; font-weight:bold;">${id}</td>
+                <td>${imgStr}</td>
+                <td class="export-only">${ref}</td>
+                <td>${finds.join(' | ')}</td>
+                <td class="export-only">${mPct}</td>
+                <td class="export-only">${proved}</td>
+                <td>${time}</td>
+            </tr>`;
+            
             document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
             localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
             
-            const imgEl = document.getElementById('imgNum');
+            // Advance Image Number
             imgEl.value = parseInt(imgEl.value) + 1;
             
+            // Reset UI State
             toggleSound(); 
             document.getElementById('moisturePct').value = '';
             document.getElementById('meterProvedBtn').classList.remove('active');
@@ -399,15 +452,23 @@
             localStorage.setItem('strataDraft', JSON.stringify(d));
         }
         
-        function clearVault() { if(confirm("Wipe data?")) { localStorage.removeItem('strataVault'); location.reload(); } }
+        function clearVault() { if(confirm("Wipe all logged data?")) { localStorage.removeItem('strataVault'); location.reload(); } }
         
         function exportLogs() {
-            let csv = "ID,RefTemp,Findings,Moisture,Time\n";
+            // Header for CSV File
+            let csv = "Project,Camera,Technician,Drop ID,FLIR Image,Reference Temp,Findings,Moisture %,Meter Proved,Time\n";
+            
+            // Loop through rows and grab text content (which grabs text even if CSS display is none)
             document.querySelectorAll("#logTable tbody tr").forEach(tr => {
-                csv += Array.from(tr.querySelectorAll("td")).map(td => td.innerText).join(",") + "\n";
+                const cols = Array.from(tr.querySelectorAll("td"));
+                csv += cols.map(td => `"${td.textContent}"`).join(",") + "\n";
             });
+            
+            // Trigger Download
             const blob = new Blob([csv], { type: 'text/csv' });
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = "Strata_Scan_Log.csv"; a.click();
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); 
+            a.download = "Strata_Data_Export.csv"; 
+            a.click();
         }
     </script>
 </body>
