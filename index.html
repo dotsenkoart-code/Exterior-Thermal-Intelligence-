@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v44.0 Command</title>
+    <title>Strata-Scan Pro: v45.0 Retake</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
@@ -242,7 +242,6 @@
             const displayId = (id === 'floorNum') ? 'floorNumVal' : id + 'Val';
             document.getElementById(displayId).innerText = newVal;
             
-            // Sync slider
             const box = el.closest('.stepper-box');
             if(box) { const s = box.querySelector('.touch-slider'); if(s) s.value = Math.round(newVal); }
 
@@ -270,7 +269,6 @@
             } else {
                 document.getElementById('soundBtn').classList.add('active');
             }
-            // Show moisture panel logic
             const mBtn = document.getElementById('moistureDetectBtn');
             document.getElementById('groundTruthCard').style.display = (mBtn.classList.contains('active')) ? 'block' : 'none';
         }
@@ -294,13 +292,12 @@
 
         function descendFloor() {
             stepFloor(-1);
-            // Reset to first position of current pattern
             const pat = document.getElementById('dropPattern').value;
             const configs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
             currentPos = configs[pat][0];
             updatePosUI();
             updatePreview();
-            goToSlide(0); // Go to Map
+            goToSlide(0);
         }
 
         /* --- MAP & NAVIGATION --- */
@@ -318,7 +315,6 @@
                 // Map buttons
                 const btn = document.createElement('button');
                 btn.className = 'pattern-btn'; 
-                if(p === currentPos) { btn.style.background='#0cf'; btn.style.color='#000'; }
                 btn.innerText = p;
                 btn.onclick = () => { currentPos=p; updatePosUI(); updatePreview(); };
                 row.appendChild(btn);
@@ -326,6 +322,7 @@
                 // Flow buttons (Command Center)
                 const fBtn = document.createElement('button');
                 fBtn.className = 'pattern-btn';
+                fBtn.dataset.pos = p; // STORE POSITION FOR RETAKE LOGIC
                 fBtn.style.fontSize = '0.9rem';
                 fBtn.style.background = '#333';
                 fBtn.style.color = '#fff';
@@ -333,18 +330,25 @@
                 fBtn.onclick = () => { currentPos=p; updatePosUI(); updatePreview(); goToSlide(1); };
                 flow.appendChild(fBtn);
             });
+            updatePosUI(); // Initial Update
             updatePreview();
         }
         
         function updatePosUI() {
+            // Update Map Buttons
             Array.from(document.getElementById('posSelectorRow').children).forEach(b => {
-                b.style.background = (b.innerText === currentPos) ? '#0cf' : '#222';
-                b.style.color = (b.innerText === currentPos) ? '#000' : '#666';
+                const isMatch = b.innerText === currentPos;
+                b.style.background = isMatch ? '#0cf' : '#222';
+                b.style.color = isMatch ? '#000' : '#666';
             });
-            // Also update Flow buttons highlighting
+
+            // Update Command Center Buttons (RETAKE LOGIC)
             Array.from(document.getElementById('flowNextRow').children).forEach(b => {
-                 b.style.background = (b.innerText === "MOVE " + currentPos) ? '#0cf' : '#333';
-                 b.style.color = (b.innerText === "MOVE " + currentPos) ? '#000' : '#fff';
+                 const p = b.dataset.pos;
+                 const isMatch = p === currentPos;
+                 b.style.background = isMatch ? '#0cf' : '#333';
+                 b.style.color = isMatch ? '#000' : '#fff';
+                 b.innerText = isMatch ? "RE-TAKE" : "MOVE " + p;
             });
         }
 
@@ -377,13 +381,12 @@
             const imgEl = document.getElementById('imgNum');
             imgEl.value = parseInt(imgEl.value) + 1;
             
-            // Reset Diagnosis (Keep Baseline)
             toggleSound(); 
             document.getElementById('moisturePct').value = '';
             document.getElementById('meterProvedBtn').classList.remove('active');
             document.getElementById('meterProvedBtn').style.background = '#222';
             
-            goToSlide(2); // Go to Command Center
+            goToSlide(2);
         }
 
         function goToSlide(n) {
