@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v37.0 Hybrid</title>
+    <title>Strata-Scan Pro: v38.0 Hybrid</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
     <link rel="manifest" href="manifest.json">
@@ -10,7 +10,6 @@
 
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; padding: 0; margin: 0; overflow: hidden; touch-action: manipulation; }
-        /* CHANGED: Width is now 300vw for 3 slides */
         .slide-container { display: flex; transition: transform 0.3s ease-in-out; width: 300vw; height: calc(100vh - 70px); }
         .slide { width: 100vw; height: 100%; padding: 15px; box-sizing: border-box; overflow-y: auto; padding-bottom: 120px; }
         .card { background: #1a1a1a; padding: 15px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #333; }
@@ -19,10 +18,17 @@
         .nav-item { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold; color: #555; cursor: pointer; }
         .nav-item.active { color: #0cf; border-top: 3px solid #0cf; background: #1a1a1a; }
         
-        .stepper { display: flex; align-items: center; justify-content: space-between; background: #222; border-radius: 12px; border: 2px solid #444; margin: 10px 0; overflow: hidden; }
-        .step-btn { width: 85px; height: 85px; background: #333; border: none; color: #fff; font-size: 2.5rem; font-weight: bold; cursor: pointer; }
-        .step-val { flex: 1; text-align: center; font-size: 2.2rem; font-weight: 900; color: #0f0; text-shadow: 0 0 8px #0f0; }
+        /* UPDATED STEPPER WITH SLIDER */
+        .stepper { display: flex; align-items: center; justify-content: space-between; background: #222; border-radius: 12px; border: 2px solid #444; margin: 10px 0; overflow: hidden; position: relative; }
+        .step-btn { width: 70px; height: 85px; background: #333; border: none; color: #fff; font-size: 2.5rem; font-weight: bold; cursor: pointer; z-index: 2; }
         
+        .step-display-area { flex: 1; position: relative; height: 85px; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #222; }
+        .step-val { font-size: 2.2rem; font-weight: 900; color: #0f0; text-shadow: 0 0 8px #0f0; z-index: 1; pointer-events: none; }
+        
+        /* The invisible slider on top of the number */
+        .touch-slider { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: ew-resize; z-index: 3; }
+        .grip-mark { width: 40px; height: 4px; background: #444; border-radius: 2px; margin-bottom: 5px; }
+
         input[type="text"], input[type="password"], input[type="number"], select { width: 100%; padding: 14px; background: #222; color: #fff; border: 2px solid #555; border-radius: 8px; font-size: 1.2rem; text-align: center; box-sizing: border-box; margin: 5px 0; }
         label { font-size: 0.7rem; color: #0cf; font-weight: bold; text-transform: uppercase; display: block; margin-top: 5px; }
         
@@ -41,8 +47,7 @@
         #moistureDetectBtn.active { background: #d9534f !important; color: #fff !important; border-color: #fff !important; }
 
         .vault-wrap { overflow-x: auto; background: #111; border-radius: 8px; padding: 5px; }
-        /* Simpler table styles */
-        table { width: 100%; border-collapse: collapse; font-size: 0.6rem; color: #ccc; min-width: 600px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.6rem; color: #ccc; min-width: 800px; }
         td, th { border: 1px solid #333; padding: 8px; text-align: left; }
     </style>
 </head>
@@ -67,7 +72,9 @@
                 <label>Floor #</label>
                 <div class="stepper">
                     <button class="step-btn" onclick="step('floorNum', -1)">−</button>
-                    <div class="step-val" id="floorNumVal">12</div>
+                    <div class="step-display-area">
+                        <div class="step-val" id="floorNumVal">12</div>
+                    </div>
                     <button class="step-btn" onclick="step('floorNum', 1)">+</button>
                 </div>
                 
@@ -122,9 +129,13 @@
                 <label>Ground Truth (Moisture Meter)</label>
                 <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
                     <div class="stepper" style="flex:1; margin:0;">
-                        <button class="step-btn" style="width:50px; height:60px;" onclick="step('moisturePct', -1)">−</button>
-                        <div class="step-val" id="moisturePctVal" style="font-size:1.5rem;">85</div>
-                        <button class="step-btn" style="width:50px; height:60px;" onclick="step('moisturePct', 1)">+</button>
+                        <button class="step-btn" onclick="step('moisturePct', -1)">−</button>
+                        <div class="step-display-area">
+                            <div class="grip-mark"></div>
+                            <div class="step-val" id="moisturePctVal">85</div>
+                            <input type="range" class="touch-slider" min="0" max="100" value="85" oninput="slideUpdate('moisturePct', this.value)">
+                        </div>
+                        <button class="step-btn" onclick="step('moisturePct', 1)">+</button>
                     </div>
                     <span style="font-weight:bold; color:#0cf; font-size:1.5rem;">%</span>
                     <div class="check-item" id="meterProvedBtn" onclick="toggleMeter(this)" style="flex:1.5; margin:0; padding:15px; background:#333; border: 2px solid #555; display:flex; align-items:center; justify-content:center; font-size:0.9rem;">PROVED WITH METER</div>
@@ -137,16 +148,24 @@
                 <div style="display:flex; gap:10px;">
                     <div style="flex:1;"><label>Ref Dry (Baseline)</label>
                         <div class="stepper">
-                            <button class="step-btn" onclick="step('baselineC8', -0.1)" style="width:50px; height:60px;">−</button>
-                            <div class="step-val" id="baselineC8Val" style="font-size:1.4rem;">75.0</div>
-                            <button class="step-btn" onclick="step('baselineC8', 0.1)" style="width:50px; height:60px;">+</button>
+                            <button class="step-btn" onclick="step('baselineC8', -0.1)">−</button>
+                            <div class="step-display-area">
+                                <div class="grip-mark"></div>
+                                <div class="step-val" id="baselineC8Val">75.0</div>
+                                <input type="range" class="touch-slider" min="0" max="120" step="0.5" value="75.0" oninput="slideUpdate('baselineC8', this.value)">
+                            </div>
+                            <button class="step-btn" onclick="step('baselineC8', 0.1)">+</button>
                         </div>
                     </div>
                     <div style="flex:1;"><label>Suspect (Scan)</label>
                         <div class="stepper">
-                            <button class="step-btn" onclick="step('suspectTemp', -0.1)" style="width:50px; height:60px;">−</button>
-                            <div class="step-val" id="suspectTempVal" style="font-size:1.4rem;">75.0</div>
-                            <button class="step-btn" onclick="step('suspectTemp', 0.1)" style="width:50px; height:60px;">+</button>
+                            <button class="step-btn" onclick="step('suspectTemp', -0.1)">−</button>
+                            <div class="step-display-area">
+                                <div class="grip-mark"></div>
+                                <div class="step-val" id="suspectTempVal">75.0</div>
+                                <input type="range" class="touch-slider" min="0" max="120" step="0.5" value="75.0" oninput="slideUpdate('suspectTemp', this.value)">
+                            </div>
+                            <button class="step-btn" onclick="step('suspectTemp', 0.1)">+</button>
                         </div>
                     </div>
                 </div>
@@ -167,7 +186,7 @@
             </div>
             <div class="vault-wrap">
                 <table id="logTable">
-                    <thead><tr><th>Cam</th><th>Tech</th><th>Time</th><th>Img</th><th>ID</th><th>ΔT</th><th>Finds</th><th>M%</th><th>Proved</th></tr></thead>
+                    <thead><tr><th>Project</th><th>Cam</th><th>Tech</th><th>Time</th><th>Img</th><th>ID</th><th>ΔT</th><th>Finds</th><th>M%</th><th>Proved</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
@@ -175,7 +194,7 @@
                 <button class="btn" style="background:#444; flex:2; font-size:0.8rem;" onclick="exportLogs()">EXPORT CSV</button>
                 <button class="btn" style="background:#b00; flex:1; font-size:0.8rem;" onclick="clearVault()">WIPE</button>
             </div>
-            </div>
+        </div>
     </div>
 
     <div class="navbar">
@@ -193,10 +212,52 @@
                 const data = JSON.parse(localStorage.getItem('strataDraft'));
                 document.getElementById('projectID').value = data.project || "";
                 document.getElementById('techName').value = data.tech || "";
-                document.getElementById('camID').value = data.cam || ""; // Load Cam ID
+                document.getElementById('camID').value = data.cam || "";
             }
             setPattern('3');
             updateAlarm();
+        }
+
+        // --- SLIDER LOGIC ---
+        function slideUpdate(id, val) {
+            // Update the display text
+            const display = document.getElementById(id + 'Val');
+            const hiddenInput = document.getElementById(id);
+            
+            // Format decimals if needed
+            let formatted = val;
+            if (id === 'baselineC8' || id === 'suspectTemp') {
+                formatted = parseFloat(val).toFixed(1);
+            }
+            
+            if (display) display.innerText = formatted;
+            if (hiddenInput) hiddenInput.value = formatted;
+            
+            updateAlarm();
+        }
+
+        // --- STANDARD STEPPER LOGIC ---
+        function step(id, val) {
+            const el = document.getElementById(id);
+            const display = document.getElementById(id + 'Val');
+            
+            let current = parseFloat(el.value);
+            let newVal = (current + val).toFixed(id === 'floorNum' || id === 'moisturePct' ? 0 : 1);
+            
+            // Bounds check
+            if(id === 'moisturePct') {
+                if(newVal < 0) newVal = 0; 
+                if(newVal > 100) newVal = 100;
+            }
+            
+            el.value = newVal;
+            if(display) display.innerText = newVal;
+            
+            // Update the invisible slider position to match
+            const slider = el.parentElement.querySelector('.touch-slider');
+            if (slider) slider.value = newVal;
+
+            updateAlarm(); updatePreview();
         }
 
         function setPattern(val) {
@@ -208,7 +269,6 @@
             flowRow.innerHTML = ''; posRow.innerHTML = '';
 
             const configs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
-            
             currentPos = configs[val][0];
 
             configs[val].forEach(p => {
@@ -245,19 +305,7 @@
                     btn.innerText = (btnPos === currentPos) ? 'RE-TAKE' : 'MOVE ' + btnPos;
                 }
             });
-
             updatePreview();
-        }
-
-        function step(id, val) {
-            const el = document.getElementById(id);
-            const display = document.getElementById(id + 'Val');
-            let newVal = (parseFloat(el.value) + val).toFixed(id === 'floorNum' || id === 'moisturePct' ? 0 : 1);
-            if(id === 'moisturePct' && newVal < 0) newVal = 0; 
-            if(id === 'moisturePct' && newVal > 100) newVal = 100;
-            el.value = newVal;
-            if(display) display.innerText = newVal;
-            updateAlarm(); updatePreview();
         }
 
         function updatePreview() {
@@ -267,24 +315,21 @@
         }
 
         function updateAlarm() {
-            // SIMPLIFIED LOGIC: Ref - 3 degrees
             const ref = parseFloat(document.getElementById('baselineC8').value);
             const sus = parseFloat(document.getElementById('suspectTemp').value);
             
-            const Talarm = ref - 3.0; // The 3 degree rule
+            const Talarm = ref - 3.0; 
             
             const box = document.getElementById('result');
             box.innerText = "Lim: " + Talarm.toFixed(1) + "°F";
             
-            const delta = (ref - sus).toFixed(1);
-
             if (sus <= Talarm) { 
-                box.className = "alarm-box crit"; // RED
+                box.className = "alarm-box crit"; 
                 if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 200]); 
             } else if (sus < ref) { 
-                box.className = "alarm-box warn"; // ORANGE
+                box.className = "alarm-box warn"; 
             } else { 
-                box.className = "alarm-box"; // BLACK/SAFE
+                box.className = "alarm-box"; 
             }
         }
 
@@ -311,11 +356,18 @@
 
         function logEvidence() {
             const now = new Date();
-            const time = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+            // NEW: Added Seconds to timestamp
+            const time = now.getHours().toString().padStart(2, '0') + ":" + 
+                         now.getMinutes().toString().padStart(2, '0') + ":" + 
+                         now.getSeconds().toString().padStart(2, '0');
+                         
             const findings = Array.from(document.querySelectorAll('.check-item.active')).map(i => i.innerText.replace('✅ ', '')).join("|");
             const id = document.getElementById('fullIDDisplay').innerText;
             const tech = document.getElementById('techName').value || "Unknown";
             const cam = document.getElementById('camID').value || "--";
+            // NEW: Added Project to Log
+            const proj = document.getElementById('projectID').value || "--";
+            
             const img = "FLIR" + document.getElementById('imgNum').value.toString().padStart(4, '0');
             const ref = parseFloat(document.getElementById('baselineC8').value), sus = parseFloat(document.getElementById('suspectTemp').value);
             
@@ -323,10 +375,10 @@
             const mPct = isMoistureCardVisible ? document.getElementById('moisturePct').value : "--";
             const proved = (isMoistureCardVisible && document.getElementById('meterProvedBtn').classList.contains('active')) ? "YES" : "NO";
             
-            const row = `<tr><td>${cam}</td><td>${tech}</td><td>${time}</td><td>${img}</td><td>${id}</td><td>${(ref-sus).toFixed(1)}</td><td>${findings}</td><td>${mPct}</td><td>${proved}</td></tr>`;
+            const row = `<tr><td>${proj}</td><td>${cam}</td><td>${tech}</td><td>${time}</td><td>${img}</td><td>${id}</td><td>${(ref-sus).toFixed(1)}</td><td>${findings}</td><td>${mPct}</td><td>${proved}</td></tr>`;
             document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
             localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
-            goToSlide(2); // Go to Command Center
+            goToSlide(2); 
         }
 
         function flowNext(cmd) {
@@ -339,7 +391,7 @@
                 goToSlide(0); 
             } else { 
                 setPos(cmd); 
-                goToSlide(1); // Go to Diagnose
+                goToSlide(1); 
             }
             rapidSync(); toggleSound(); updateAlarm();
         }
@@ -348,6 +400,9 @@
             const ref = document.getElementById('baselineC8').value;
             document.getElementById('suspectTemp').value = ref;
             document.getElementById('suspectTempVal').innerText = parseFloat(ref).toFixed(1);
+            // Update slider position too
+            const slider = document.querySelector('#suspectTemp').parentElement.querySelector('.touch-slider');
+            if(slider) slider.value = ref;
             updateAlarm();
         }
 
@@ -391,13 +446,13 @@
         function clearVault() { if (confirm("Wipe?")) { localStorage.removeItem('strataVault'); location.reload(); } }
         
         function exportLogs() {
-            let csv = "Camera,Technician,Time,Image,ID,DeltaT,Findings,Moisture %,Meter Proved\n";
+            // NEW: Added Project Column to CSV
+            let csv = "Project,Camera,Technician,Time,Image,ID,DeltaT,Findings,Moisture %,Meter Proved\n";
             document.querySelectorAll("#logTable tbody tr").forEach(tr => { csv += Array.from(tr.querySelectorAll("td")).map(td => `"${td.innerText}"`).join(",") + "\n"; });
             const blob = new Blob([csv], { type: 'text/csv' });
             const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = "Strata_Fleet_Report.csv"; a.click();
         }
 
-        // Offline PWA Support
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
