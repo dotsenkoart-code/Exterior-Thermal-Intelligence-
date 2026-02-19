@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v56.1 Pinned Headers</title>
+    <title>Strata-Scan Pro: v56.1 Logic Patch</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
@@ -14,20 +14,10 @@
         
         .card { background: #121212; padding: 12px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #2a2a2a; }
         
-        /* --- PINNED STICKY HEADERS --- */
-        .sticky-banner {
-            position: sticky;
-            top: -10px; /* Counteracts the slide padding */
-            margin: -10px -10px 15px -10px;
-            background: #111;
-            padding: 15px 10px 10px 10px;
-            border-bottom: 2px solid #0cf;
-            text-align: center;
-            z-index: 100;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.8);
-        }
-        .sticky-label { font-size: 0.7rem; color: #888; font-weight: 800; letter-spacing: 1px; margin-bottom: 2px; display: block; text-transform: uppercase; }
-        .sticky-id { font-size: 2.8rem; font-weight: 900; color: #0cf; letter-spacing: 2px; margin: 0; line-height: 1; }
+        /* --- BRAND NEW SITUATIONAL AWARENESS BANNERS --- */
+        .target-banner { background: #111; padding: 12px; border-radius: 8px; border: 2px solid #0cf; text-align: center; margin-bottom: 12px; box-shadow: 0 0 10px rgba(0, 204, 255, 0.15); }
+        .target-label { font-size: 0.7rem; color: #0cf; font-weight: 800; letter-spacing: 1px; margin-bottom: 4px; display: block; text-transform: uppercase; }
+        .target-id { font-size: 2.5rem; font-weight: 900; color: #fff; letter-spacing: 2px; }
 
         .navbar { height: 65px; background: #080808; display: flex; border-top: 1px solid #333; position: fixed; bottom: 0; width: 100%; z-index: 1000; }
         .nav-item { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; color: #666; cursor: pointer; letter-spacing: 1px; }
@@ -197,9 +187,9 @@
                 </div>
             </div>
 
-            <div style="text-align:center; padding:10px; background:#111; border-radius:8px; border:1px solid #333; margin-top:5px;">
-                <span style="font-size: 0.7rem; color: #888; font-weight: 800; letter-spacing: 1px; display: block; text-transform: uppercase;">TARGET ID (MAP)</span>
-                <div id="fullIDDisplay" style="font-size: 2.5rem; font-weight: 900; color: #0cf; letter-spacing: 2px;">A-12-L</div>
+            <div class="target-banner" style="border-color:#333;">
+                <span class="target-label" style="color:#888;">TARGET ID (MAP)</span>
+                <div id="fullIDDisplay" class="target-id" style="color:#0cf;">A-12-L</div>
             </div>
             
             <input type="hidden" id="dropPattern" value="3">
@@ -207,9 +197,9 @@
 
         <div class="slide">
 
-            <div class="sticky-banner">
-                <span class="sticky-label">CURRENT DIAGNOSIS TARGET</span>
-                <div id="diagnoseIDDisplay" class="sticky-id">A-12-L</div>
+            <div class="target-banner">
+                <span class="target-label">CURRENT DIAGNOSIS TARGET</span>
+                <div id="diagnoseIDDisplay" class="target-id">A-12-L</div>
             </div>
 
             <label style="margin-left:5px; margin-top:10px;">SCAN & FLAG FINDINGS</label>
@@ -251,13 +241,14 @@
         </div>
 
         <div class="slide">
-            
-            <div class="sticky-banner" style="border-bottom-color:#28a745;">
-                <span class="sticky-label">YOU ARE CURRENTLY AT:</span>
-                <div id="cmdIDDisplay" class="sticky-id" style="color:#fff;">A-12-L</div>
-            </div>
+            <h2 style="color:#fff; margin:0 0 10px 0; font-size:1.2rem;">COMMAND CENTER</h2>
             
             <div class="card">
+                <div style="text-align:center; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid #333;">
+                    <span style="font-size:0.7rem; color:#888; font-weight:bold; display:block;">YOU ARE CURRENTLY AT:</span>
+                    <span id="cmdIDDisplay" style="font-size:1.6rem; font-weight:900; color:#fff;">A-12-L</span>
+                </div>
+
                 <label>NEXT MOVE</label>
                 <div id="flowNextRow" style="display:flex; gap:8px; margin-bottom:10px;"></div>
                 <button class="cmd-action-btn" style="background:#28a745; margin-top:5px;" onclick="requestFloorChange('descend_btn')">
@@ -267,7 +258,7 @@
 
             <div class="card" style="padding:0;">
                 <label style="padding:10px; display:block;">DATA VAULT</label>
-                <div style="overflow-x:auto; max-height:40vh; border-top:1px solid #333;">
+                <div style="overflow-x:auto; max-height:45vh; border-top:1px solid #333;">
                     <table id="logTable">
                         <thead style="background:#222;">
                             <tr>
@@ -325,7 +316,8 @@
         /* --- INTERCEPTOR 1: WINDOW CHECK --- */
         function verifySafeMove(callback) {
             if (isCurrentWindowLogged) {
-                isCurrentWindowLogged = false; // Reset for new window
+                // BUG FIX: Do NOT reset isCurrentWindowLogged here.
+                // We only reset it if the move actually successfully executes.
                 callback();
             } else {
                 pendingMoveCallback = callback;
@@ -341,15 +333,15 @@
 
         function modalQuickLogAndMove() {
             document.getElementById('safetyModal').style.display = 'none';
-            performQuickLog(); // This handles adding to floorLoggedPositions
-            isCurrentWindowLogged = false; 
+            performQuickLog(); 
+            // BUG FIX: Let the pending move callback handle the state reset
             if(pendingMoveCallback) pendingMoveCallback();
             pendingMoveCallback = null;
         }
 
         function modalForceSkip() {
             document.getElementById('safetyModal').style.display = 'none';
-            isCurrentWindowLogged = false; 
+            // BUG FIX: Let the pending move callback handle the state reset
             if(pendingMoveCallback) pendingMoveCallback();
             pendingMoveCallback = null;
         }
@@ -397,6 +389,8 @@
             
             const pat = document.getElementById('dropPattern').value;
             currentPos = patternConfigs[pat][0];
+            
+            // BUG FIX: The floor successfully changed, so we are on a new, unlogged window
             isCurrentWindowLogged = false;
             
             updatePosUI();
@@ -407,19 +401,26 @@
             }
         }
 
+
         /* --- SMART MODAL (WIPE VAULT) --- */
         function openWipeModal() { document.getElementById('wipeModal').style.display = 'flex'; }
         function closeWipeModal() { document.getElementById('wipeModal').style.display = 'none'; }
         function confirmWipe() { localStorage.removeItem('strataVault'); location.reload(); }
 
         /* --- SMART MODAL (PHOTO SYNC) --- */
-        function triggerPhotoModal(imgString) {
+        let destinationSlideAfterPhoto = 2; // Default route after taking a picture
+
+        function triggerPhotoModal(imgString, targetSlide = 2) {
+            destinationSlideAfterPhoto = targetSlide;
             document.getElementById('modalPhotoNum').innerText = imgString;
             document.getElementById('photoModal').style.display = 'flex';
         }
         function closePhotoModal() {
             document.getElementById('photoModal').style.display = 'none';
-            goToSlide(2); 
+            // BUG FIX: Only jump to a new slide if a target was explicitly passed
+            if (destinationSlideAfterPhoto !== null) {
+                goToSlide(destinationSlideAfterPhoto); 
+            }
         }
 
         /* --- LOGGING PROCESSES --- */
@@ -458,7 +459,8 @@
             document.getElementById('meterProvedBtn').classList.remove('active');
             document.getElementById('meterProvedBtn').style.background = '#222';
             
-            triggerPhotoModal(imgStr);
+            // BUG FIX: Pass null so the modal doesn't intercept the background movement navigation
+            triggerPhotoModal(imgStr, null);
         }
 
         function logEvidence() {
@@ -509,7 +511,8 @@
             document.getElementById('meterProvedBtn').classList.remove('active');
             document.getElementById('meterProvedBtn').style.background = '#222';
             
-            triggerPhotoModal(imgStr);
+            // Send them back to the Command Slide (slide 2) after they close the photo reminder
+            triggerPhotoModal(imgStr, 2);
         }
 
         /* --- SLIDER LOGIC --- */
@@ -568,6 +571,10 @@
 
         function attemptMovePosition(p, targetSlide = null) {
             verifySafeMove(() => {
+                // BUG FIX: Only wipe the safety flag if they are actually changing the target window
+                if (currentPos !== p) {
+                    isCurrentWindowLogged = false; 
+                }
                 currentPos = p; 
                 updatePosUI(); 
                 updatePreview();
