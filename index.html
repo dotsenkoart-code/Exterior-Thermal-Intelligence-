@@ -111,7 +111,7 @@
             <div class="preflight-data" id="pf-drop" style="color:#0cf;">DROP A</div>
             
             <p style="color:#888; margin:0; font-weight:bold;">STARTING WITH IMAGE:</p>
-            <div class="preflight-data" id="pf-img" style="color:#f39c12;">0045</div>
+            <div class="preflight-data" id="pf-img" style="color:#f39c12;">FLIR0045</div>
             
             <button class="modal-btn btn-green" onclick="lockInDrop()">🚀 YES, LOCK IT IN</button>
             <button class="modal-btn btn-dark" onclick="closePreFlight()">🔙 CANCEL</button>
@@ -151,7 +151,7 @@
             </p>
             
             <div style="display:flex; align-items:center; justify-content:center; gap: 10px; margin-bottom: 25px;">
-                <span style="font-size:1.5rem; font-weight:900; color:#666;">IMG</span>
+                <span style="font-size:1.5rem; font-weight:900; color:#666;">FLIR</span>
                 <input type="text" inputmode="numeric" pattern="[0-9]*" id="modalPhotoInput" style="width: 140px; font-size: 2.8rem; font-weight: 900; color: #f39c12; border: 2px solid #f39c12; background: #222; text-align: center; border-radius: 8px;">
             </div>
 
@@ -381,7 +381,8 @@
             document.getElementById('pf-tech').innerText = t;
             document.getElementById('pf-cam').innerText = c;
             document.getElementById('pf-drop').innerText = "DROP " + d.toUpperCase();
-            document.getElementById('pf-img').innerText = i.toString().padStart(4, '0');
+            // ADDED FLIR PREFIX HERE
+            document.getElementById('pf-img').innerText = "FLIR" + i.toString().padStart(4, '0');
 
             document.getElementById('preFlightModal').style.display = 'flex';
         }
@@ -604,7 +605,8 @@
             const id = document.getElementById('fullIDDisplay').innerText;
             
             const imgEl = document.getElementById('imgNum');
-            const imgStr = imgEl.value.toString().padStart(4, '0');
+            // ADDED FLIR PREFIX HERE
+            const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
             
             const row = `<tr>
                 <td class="export-only">${proj}</td>
@@ -632,7 +634,8 @@
             const id = document.getElementById('fullIDDisplay').innerText;
             
             const imgEl = document.getElementById('imgNum');
-            const imgStr = imgEl.value.toString().padStart(4, '0');
+            // ADDED FLIR PREFIX HERE
+            const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
             
             let finds = [];
             document.querySelectorAll('.check-item.active').forEach(el => finds.push(el.innerText));
