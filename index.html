@@ -341,13 +341,34 @@
             document.getElementById('header-command').style.display = (slideIndex === 2) ? 'block' : 'none';
         }
 
-        /* --- INTERCEPTOR 1: WINDOW CHECK --- */
+        /* --- INTERCEPTOR 1: WINDOW CHECK WITH VAULT SCAN --- */
         function verifySafeMove(callback) {
+            // 1. Check temporary session memory
             if (isCurrentWindowLogged) {
                 callback();
+                return;
+            } 
+            
+            // 2. NEW FIX: Check permanent Vault memory (in case of refresh or returning to previous drop)
+            const currentTarget = document.getElementById('fullIDDisplay').innerText;
+            let alreadyInVault = false;
+            
+            document.querySelectorAll("#logTable tbody tr").forEach(tr => {
+                const tds = tr.querySelectorAll("td");
+                if (tds.length >= 4) {
+                    if (tds[3].textContent === currentTarget) {
+                        alreadyInVault = true;
+                    }
+                }
+            });
+
+            if (alreadyInVault) {
+                // We found it in the Vault! Silent override, allow them to move.
+                callback();
             } else {
+                // It is truly missing from both short-term and long-term memory. Trigger warning.
                 pendingMoveCallback = callback;
-                document.getElementById('modalTargetID').innerText = document.getElementById('fullIDDisplay').innerText;
+                document.getElementById('modalTargetID').innerText = currentTarget;
                 document.getElementById('safetyModal').style.display = 'flex';
             }
         }
@@ -443,7 +464,7 @@
         /* --- SMART MODAL (WIPE VAULT) --- */
         function openWipeModal() { document.getElementById('wipeModal').style.display = 'flex'; }
         function closeWipeModal() { document.getElementById('wipeModal').style.display = 'none'; }
-        function confirmWipe() { localStorage.removeItem('strataVault'); location.reload(); }
+        function confirmWipe() { localStorage.removeItem('strataVault'); localStorage.removeItem('strataState'); location.reload(); }
 
         /* --- SMART MODAL (PHOTO SYNC) --- */
         let destinationSlideAfterPhoto = 2;
@@ -540,173 +561,4 @@
                 <td>${time}</td>
             </tr>`;
             
-            document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
-            localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
-            
-            isCurrentWindowLogged = true;
-            
-            imgEl.value = parseInt(imgEl.value) + 1;
-            saveLocationState(); // Save updated camera number
-            
-            toggleSound(); 
-            document.getElementById('moisturePct').value = '';
-            document.getElementById('meterProvedBtn').classList.remove('active');
-            document.getElementById('meterProvedBtn').style.background = '#222';
-            
-            triggerPhotoModal(imgStr, 2);
-        }
-
-        /* --- SLIDER LOGIC --- */
-        function slideUpdate(id, val) {
-            let formatted = parseInt(val);
-            document.getElementById(id + 'Val').innerText = formatted;
-            const hud = document.getElementById('hud-' + id);
-            if(hud) { hud.innerText = formatted; hud.style.transform = "translateX(-50%) scale(1)"; }
-            document.getElementById(id).value = formatted;
-        }
-        function slideEnd(id) {
-            const hud = document.getElementById('hud-' + id);
-            if(hud) hud.style.transform = "translateX(-50%) scale(0)";
-        }
-        function step(id, val) {
-            const el = document.getElementById(id);
-            let current = parseFloat(el.value);
-            let newVal = (current + val).toFixed(id === 'moisturePct' || id === 'floorNum' ? 0 : 1);
-            if(id === 'moisturePct') { if(newVal < 0) newVal = 0; if(newVal > 100) newVal = 100; }
-            
-            el.value = newVal;
-            const displayId = (id === 'floorNum') ? 'floorNumVal' : id + 'Val';
-            document.getElementById(displayId).innerText = newVal;
-            
-            const box = el.closest('.stepper-box');
-            if(box) { const s = box.querySelector('.touch-slider'); if(s) s.value = Math.round(newVal); }
-            if(id === 'floorNum') { updatePreview(); saveLocationState(); }
-        }
-
-        /* --- DEFECT LOGIC --- */
-        function toggleSound() {
-            document.getElementById('soundBtn').classList.add('active');
-            document.querySelectorAll('.defect').forEach(el => el.classList.remove('active'));
-            document.getElementById('groundTruthCard').style.display = 'none';
-        }
-
-        function toggleDefect(el) {
-            el.classList.toggle('active');
-            if (document.querySelectorAll('.defect.active').length > 0) {
-                document.getElementById('soundBtn').classList.remove('active');
-            } else {
-                document.getElementById('soundBtn').classList.add('active');
-            }
-            const mBtn = document.getElementById('moistureDetectBtn');
-            document.getElementById('groundTruthCard').style.display = (mBtn.classList.contains('active')) ? 'block' : 'none';
-        }
-
-        function toggleMeter(el) {
-            el.classList.toggle('active');
-            if(el.classList.contains('active')) {
-                el.style.background = '#28a745'; el.style.color='#fff'; el.innerText = 'PROVED';
-            } else {
-                el.style.background = '#222'; el.style.color='#888'; el.innerText = 'METER PROVED';
-            }
-        }
-
-        function attemptMovePosition(p, targetSlide = null) {
-            verifySafeMove(() => {
-                if (currentPos !== p) {
-                    isCurrentWindowLogged = false; 
-                }
-                currentPos = p; 
-                updatePosUI(); 
-                updatePreview();
-                saveLocationState(); // Anti-refresh save
-                if (targetSlide !== null) goToSlide(targetSlide);
-            });
-        }
-
-        /* --- MAP & NAVIGATION --- */
-        function setPattern(val, forcePos = null) {
-            document.getElementById('dropPattern').value = val;
-            document.querySelectorAll('.pattern-btn').forEach(b => b.classList.toggle('active', b.id === 'pat' + val));
-            const row = document.getElementById('posSelectorRow');
-            const flow = document.getElementById('flowNextRow');
-            row.innerHTML = ''; flow.innerHTML = '';
-            
-            isCurrentWindowLogged = false; 
-            
-            // Allow override if loading from memory, otherwise default to first in pattern
-            currentPos = forcePos ? forcePos : patternConfigs[val][0];
-            
-            patternConfigs[val].forEach(p => {
-                const btn = document.createElement('button');
-                btn.className = 'pattern-btn'; 
-                btn.innerText = p;
-                btn.onclick = () => { attemptMovePosition(p); };
-                row.appendChild(btn);
-                
-                const fBtn = document.createElement('button');
-                fBtn.className = 'cmd-flow-btn';
-                fBtn.dataset.pos = p;
-                fBtn.innerText = "MOVE " + p;
-                fBtn.onclick = () => { attemptMovePosition(p, 1); };
-                flow.appendChild(fBtn);
-            });
-            updatePosUI();
-            updatePreview();
-            saveLocationState(); // Anti-refresh save
-        }
-        
-        function updatePosUI() {
-            Array.from(document.getElementById('posSelectorRow').children).forEach(b => {
-                const isMatch = b.innerText === currentPos;
-                b.style.background = isMatch ? '#0cf' : '#222';
-                b.style.color = isMatch ? '#000' : '#666';
-            });
-
-            Array.from(document.getElementById('flowNextRow').children).forEach(b => {
-                 const p = b.dataset.pos;
-                 const isMatch = p === currentPos;
-                 b.style.background = isMatch ? '#0cf' : '#333';
-                 b.style.color = isMatch ? '#000' : '#fff';
-                 b.innerText = isMatch ? "RE-TAKE" : "MOVE " + p;
-            });
-        }
-
-        /* THIS FUNCTION UPDATES ALL 3 BANNERS AT ONCE */
-        function updatePreview() {
-            const f = document.getElementById('floorNum').value;
-            const d = document.getElementById('dropLetter').value.toUpperCase();
-            const fullID = `${d}-${f}-${currentPos}`;
-            
-            document.getElementById('fullIDDisplay').innerText = fullID; 
-            document.getElementById('diagnoseIDDisplay').innerText = fullID; 
-            document.getElementById('cmdIDDisplay').innerText = fullID; 
-        }
-
-        function goToSlide(n) {
-            document.getElementById('mainSlider').style.transform = `translateX(-${n * 100}vw)`;
-            document.querySelectorAll('.nav-item').forEach((el, i) => el.classList.toggle('active', i === n));
-            
-            updateFixedHeaders(n);
-        }
-
-        function saveDraft() {
-            const d = { tech: document.getElementById('techName').value, cam: document.getElementById('camID').value, project: document.getElementById('projectID').value };
-            localStorage.setItem('strataDraft', JSON.stringify(d));
-        }
-        
-        function exportLogs() {
-            let csv = "Project,Camera,Technician,Drop ID,FLIR Image,Findings,Moisture %,Meter Proved,Time\n";
-            
-            document.querySelectorAll("#logTable tbody tr").forEach(tr => {
-                const cols = Array.from(tr.querySelectorAll("td"));
-                csv += cols.map(td => `"${td.textContent}"`).join(",") + "\n";
-            });
-            
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); 
-            a.download = "Strata_Data_Export.csv"; 
-            a.click();
-        }
-    </script>
-</body>
-</html>
+            document
