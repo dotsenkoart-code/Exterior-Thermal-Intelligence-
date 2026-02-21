@@ -22,6 +22,9 @@
         
         .card { background: #121212; padding: 12px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #2a2a2a; }
         
+        /* --- HIGHLIGHT CARD FOR CRITICAL DATA --- */
+        .critical-card { background: #0a1118; padding: 15px; border-radius: 8px; margin-bottom: 12px; border: 2px solid #0cf; box-shadow: 0 0 15px rgba(0, 204, 255, 0.1); }
+        
         /* --- FIXED HEADERS --- */
         .fixed-header { position: fixed; top: 0; left: 0; width: 100%; background: #111; padding: 15px 0 10px 0; text-align: center; z-index: 500; border-bottom: 2px solid #0cf; box-shadow: 0 10px 20px rgba(0,0,0,0.8); display: none; }
         .fixed-label { font-size: 0.7rem; color: #888; font-weight: 800; letter-spacing: 1px; margin-bottom: 2px; display: block; text-transform: uppercase; }
@@ -35,7 +38,8 @@
         .nav-item { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; color: #666; cursor: pointer; letter-spacing: 1px; }
         .nav-item.active { color: #0cf; border-top: 2px solid #0cf; background: #111; }
 
-        input[type="text"], input[type="number"] { width: 100%; padding: 10px; background: #222; color: #fff; border: 1px solid #444; border-radius: 6px; font-size: 1.1rem; text-align: center; box-sizing: border-box; }
+        input[type="text"], input[type="number"] { width: 100%; padding: 12px; background: #222; color: #fff; border: 1px solid #444; border-radius: 6px; font-size: 1.1rem; text-align: center; box-sizing: border-box; }
+        input:disabled { background: #1a1a1a; color: #555; border-color: #333; }
         label { font-size: 0.65rem; color: #888; font-weight: 700; text-transform: uppercase; display: block; margin-bottom: 4px; letter-spacing: 0.5px; }
 
         /* --- STEPPER --- */
@@ -46,7 +50,6 @@
         .step-val { font-size: 2.2rem; font-weight: 700; color: #fff; z-index: 1; pointer-events: none; }
         .touch-slider { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: ew-resize; z-index: 3; }
 
-        /* --- MASSIVE HUD BUBBLE --- */
         .hud-bubble { position: absolute; top: -100px; left: 50%; transform: translateX(-50%) scale(0); background: #f39c12; color: #000; padding: 10px 25px; border-radius: 30px; font-size: 3rem; font-weight: 900; z-index: 9999; pointer-events: none; transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275); border: 4px solid #fff; box-shadow: 0 10px 25px rgba(0,0,0,0.9); }
 
         /* --- CHECKLIST & BUTTONS --- */
@@ -57,7 +60,7 @@
         
         .moisture-panel { background: #1a1a1a; border: 1px solid #d9534f; border-radius: 6px; padding: 10px; margin-top: 8px; display: none; }
 
-        .action-btn { width: 100%; padding: 16px; border-radius: 8px; border: none; font-size: 1.1rem; font-weight: 800; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; margin-top: 15px; }
+        .action-btn { width: 100%; padding: 18px; border-radius: 8px; border: none; font-size: 1.2rem; font-weight: 900; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; margin-top: 15px; }
         .btn-blue { background: linear-gradient(180deg, #007bff 0%, #0056b3 100%); }
         .btn-green { background: linear-gradient(180deg, #28a745 0%, #1e7e34 100%); }
         .btn-dark { background: #333; border: 1px solid #555; color: #aaa; }
@@ -79,24 +82,46 @@
         .modal-box { background: #111; border: 2px solid #444; border-radius: 12px; padding: 25px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 15px 35px rgba(0,0,0,0.9); }
         .modal-btn { width: 100%; padding: 22px 10px; border-radius: 8px; border: none; font-size: 1rem; font-weight: 900; cursor: pointer; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
         .modal-btn:last-child { margin-bottom: 0; }
+        
+        .preflight-data { font-size: 2.2rem; font-weight: 900; color: #fff; margin: 5px 0 15px 0; }
     </style>
 </head>
 <body onload="initApp()">
 
     <div id="header-diagnose" class="fixed-header">
         <span class="fixed-label">CURRENT DIAGNOSIS TARGET</span>
-        <div id="diagnoseIDDisplay" class="fixed-id">A-12-L</div>
+        <div id="diagnoseIDDisplay" class="fixed-id">12AL</div>
     </div>
     <div id="header-command" class="fixed-header">
         <span class="fixed-label">YOU ARE CURRENTLY AT:</span>
-        <div id="cmdIDDisplay" class="fixed-id">A-12-L</div>
+        <div id="cmdIDDisplay" class="fixed-id">12AL</div>
+    </div>
+
+    <div id="preFlightModal" class="modal-overlay">
+        <div class="modal-box" style="border-color:#0cf;">
+            <h2 style="color:#0cf; margin-top:0; font-size: 2rem;">⚠️ PRE-FLIGHT CHECK</h2>
+            <div style="color:#aaa; font-size:0.9rem; margin-bottom:20px; border-bottom: 1px solid #333; padding-bottom: 15px;">
+                Proj: <strong id="pf-proj" style="color:#fff;">--</strong> | 
+                Tech: <strong id="pf-tech" style="color:#fff;">--</strong> | 
+                Cam: <strong id="pf-cam" style="color:#fff;">--</strong>
+            </div>
+            
+            <p style="color:#888; margin:0; font-weight:bold;">YOU ARE ABOUT TO START:</p>
+            <div class="preflight-data" id="pf-drop" style="color:#0cf;">DROP A</div>
+            
+            <p style="color:#888; margin:0; font-weight:bold;">STARTING WITH IMAGE:</p>
+            <div class="preflight-data" id="pf-img" style="color:#f39c12;">FLIR0045</div>
+            
+            <button class="modal-btn btn-green" onclick="lockInDrop()">🚀 YES, LOCK IT IN</button>
+            <button class="modal-btn btn-dark" onclick="closePreFlight()">🔙 CANCEL</button>
+        </div>
     </div>
 
     <div id="safetyModal" class="modal-overlay">
         <div class="modal-box">
             <h2 style="color:#f39c12; margin-top:0; font-size: 2rem;">⚠️ DATA MISSING!</h2>
             <p style="color:#ccc; font-size:1.1rem; margin-bottom:25px; line-height:1.4;">
-                You have not logged any findings for window <br><strong id="modalTargetID" style="color:#0cf; font-size: 1.5rem; display:inline-block; margin-top:5px;">A-12-L</strong>
+                You have not logged any findings for window <br><strong id="modalTargetID" style="color:#0cf; font-size: 1.5rem; display:inline-block; margin-top:5px;">12AL</strong>
             </p>
             <button class="modal-btn btn-blue" onclick="modalGoToDiagnose()">🔙 WAIT, TAKE ME TO DIAGNOSE</button>
             <button class="modal-btn btn-green" onclick="modalQuickLogAndMove()">✅ WINDOW IS CLEAR: LOG & MOVE</button>
@@ -121,7 +146,7 @@
         <div class="modal-box" style="border-color:#0cf;">
             <h2 style="color:#0cf; margin-top:0; font-size: 2rem;">📸 SNAP PHOTO</h2>
             <p style="color:#ccc; font-size:1.1rem; margin-bottom:15px; line-height:1.4;">
-                Data saved! Now verify your FLIR camera counter matches:
+                Data saved! Verify FLIR camera counter matches:
             </p>
             <div id="modalPhotoNum" style="background:#222; border:2px solid #555; border-radius:8px; padding:15px; font-size:3.5rem; font-weight:900; color:#f39c12; margin-bottom:25px; letter-spacing: 2px;">
                 0045
@@ -144,29 +169,35 @@
     <div class="slide-container" id="mainSlider">
         
         <div class="slide" id="slide-map">
-            <h2 style="color:#fff; margin:0 0 10px 0; font-size:1.2rem;">LOGISTICS</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h2 style="color:#fff; margin:0; font-size:1.2rem;">LOGISTICS SETUP</h2>
+                <button id="btn-unlock" class="btn-dark" style="display:none; padding: 8px 15px; border-radius: 6px; font-size: 0.8rem; font-weight: bold;" onclick="unlockSetup()">✏️ EDIT SETUP</button>
+            </div>
             
             <div class="card">
                 <label>Project Name / Building</label>
-                <input type="text" id="projectID" oninput="saveDraft()" style="margin-bottom:12px;">
+                <input type="text" id="projectID" class="setup-input" style="margin-bottom:12px;" placeholder="e.g. Torrance HOA">
                 
-                <label>Technician</label>
-                <input type="text" id="techName" oninput="saveDraft()" style="margin-bottom:12px;">
+                <label>Technician Name</label>
+                <input type="text" id="techName" class="setup-input" style="margin-bottom:12px;" placeholder="e.g. Art">
                 
-                <div style="display:flex; gap:8px;">
-                    <div style="flex:1;">
-                        <label style="color:#0cf;">Cam ID</label>
-                        <input type="text" id="camID" oninput="saveDraft()" style="border-color:#0cf;" placeholder="e.g. C1">
-                    </div>
-                    <div style="flex:1;">
-                        <label style="color:#f39c12;">FLIR Image #</label>
-                        <input type="number" id="imgNum" value="1" style="border-color:#f39c12; color:#f39c12; font-weight:bold;" oninput="saveLocationState()">
-                    </div>
-                </div>
+                <label>Cam ID</label>
+                <input type="text" id="camID" class="setup-input" placeholder="e.g. C1">
             </div>
 
-            <div class="card">
-                <label>Floor Level</label>
+            <div class="critical-card">
+                <div style="display:flex; gap:10px; margin-bottom: 15px;">
+                    <div style="flex:1;">
+                        <label style="color:#0cf; font-size:0.8rem;">Drop ID</label>
+                        <input type="text" id="dropLetter" class="setup-input" style="font-size: 1.5rem; font-weight: bold; border-color: #0cf;" placeholder="e.g. A" oninput="handleDropChange()">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="color:#f39c12; font-size:0.8rem;">Start Image #</label>
+                        <input type="number" id="imgNum" class="setup-input" style="font-size: 1.5rem; font-weight: bold; border-color: #f39c12; color: #f39c12;" placeholder="e.g. 1">
+                    </div>
+                </div>
+
+                <label style="color:#888;">Starting Floor Level</label>
                 <div class="stepper-box">
                     <div class="stepper-row">
                         <button class="step-btn" onclick="requestFloorChange('down')">−</button>
@@ -178,32 +209,38 @@
                     <input type="hidden" id="floorNum" value="12">
                 </div>
                 
-                <label>Drop Pattern</label>
+                <label style="color:#888;">Drop Pattern</label>
                 <div style="display:flex; margin-bottom:4px;">
                     <button class="pattern-btn active" id="pat3" onclick="setPattern('3')">3-WIN</button>
                     <button class="pattern-btn" id="pat2" onclick="setPattern('2')">2-WIN</button>
                     <button class="pattern-btn" id="pat1" onclick="setPattern('1')">1-WIN</button>
                 </div>
-                <div style="font-size:0.6rem; color:#888; text-align:center; margin-bottom:12px; font-weight:bold;">
-                    3-WIN (L-C-R) &nbsp;•&nbsp; 2-WIN (L-R) &nbsp;•&nbsp; 1-WIN (C)
-                </div>
                 
-                <div style="display:flex; gap:8px;">
-                    <div style="flex:1;"><label>Drop ID</label><input type="text" id="dropLetter" value="A" style="text-transform:uppercase;" oninput="handleDropChange()"></div>
-                    <div style="flex:2;"><label>Position</label><div style="display:flex;" id="posSelectorRow"></div></div>
-                </div>
+                <label style="color:#888; margin-top: 15px;">Starting Position</label>
+                <div style="display:flex;" id="posSelectorRow"></div>
             </div>
 
             <div class="target-banner" style="border-color:#333;">
                 <span class="target-label" style="color:#888;">TARGET ID (MAP)</span>
-                <div id="fullIDDisplay" class="target-id" style="color:#0cf;">A-12-L</div>
+                <div id="fullIDDisplay" class="target-id" style="color:#0cf;">12AL</div>
             </div>
             
+            <button id="btn-commit" class="action-btn btn-green" style="padding: 22px;" onclick="triggerCommit()">🚀 COMMIT TO DROP</button>
             <input type="hidden" id="dropPattern" value="3">
         </div>
 
         <div class="slide" id="slide-diagnose">
-            <label style="margin-left:5px; margin-top:10px;">SCAN & FLAG FINDINGS</label>
+            
+            <div style="background:#111; padding: 15px; border-radius: 8px; border: 1px solid #333; margin-top: 10px; margin-bottom: 15px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+                <label style="color:#f39c12; font-size: 0.8rem;">CURRENT THERMAL IMAGE</label>
+                <div style="display:flex; align-items:center; justify-content:center; gap: 10px; margin-top: 5px;">
+                    <span style="font-size:1.5rem; font-weight:900; color:#666;">FLIR</span>
+                    <input type="number" id="activeImgNum" style="width: 120px; font-size: 1.8rem; font-weight: 900; color: #f39c12; border: 2px solid #f39c12; background: #222;" onchange="syncBackToMap()">
+                </div>
+                <div style="font-size: 0.65rem; color: #666; margin-top: 5px; text-transform: uppercase;">Tap number to manually override if camera skips</div>
+            </div>
+
+            <label style="margin-left:5px;">SCAN & FLAG FINDINGS</label>
             <div class="check-grid">
                 <div class="check-item sound-box active" id="soundBtn" onclick="toggleSound()">CLEAR</div>
                 <div class="check-item defect" id="moistureDetectBtn" onclick="toggleDefect(this)">MOISTURE</div>
@@ -238,7 +275,7 @@
                 </div>
             </div>
 
-            <button class="action-btn btn-blue" onclick="logEvidence()">LOG DATA & VERIFY</button>
+            <button class="action-btn btn-blue" style="padding: 22px;" onclick="logEvidence()">LOG DATA & VERIFY</button>
         </div>
 
         <div class="slide" id="slide-command">
@@ -291,38 +328,107 @@
         let isCurrentWindowLogged = false;
         let pendingMoveCallback = null;
         let pendingFloorAction = null;
-        
-        // NEW FIX: Tracking if user actually looked at the window
         let hasVisitedDiagnose = false; 
         
         const patternConfigs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
 
         function initApp() {
-            if (localStorage.getItem('strataVault')) document.getElementById('logTable').querySelector('tbody').innerHTML = localStorage.getItem('strataVault');
-            
-            if (localStorage.getItem('strataDraft')) {
-                const data = JSON.parse(localStorage.getItem('strataDraft'));
-                document.getElementById('projectID').value = data.project || "";
-                document.getElementById('techName').value = data.tech || "";
-                document.getElementById('camID').value = data.cam || "";
+            if (localStorage.getItem('strataVault')) {
+                document.getElementById('logTable').querySelector('tbody').innerHTML = localStorage.getItem('strataVault');
             }
-
-            const savedState = JSON.parse(localStorage.getItem('strataState'));
-            if (savedState) {
-                document.getElementById('floorNum').value = savedState.floor;
-                document.getElementById('floorNumVal').innerText = savedState.floor;
-                document.getElementById('dropLetter').value = savedState.drop;
-                if(savedState.img) document.getElementById('imgNum').value = savedState.img;
-                setPattern(savedState.pattern, savedState.pos);
+            
+            // Check if we are mid-drop (fields locked in)
+            if (localStorage.getItem('isDropLocked') === 'true') {
+                if (localStorage.getItem('strataState')) {
+                    const savedState = JSON.parse(localStorage.getItem('strataState'));
+                    document.getElementById('projectID').value = savedState.project || "";
+                    document.getElementById('techName').value = savedState.tech || "";
+                    document.getElementById('camID').value = savedState.cam || "";
+                    document.getElementById('floorNum').value = savedState.floor;
+                    document.getElementById('floorNumVal').innerText = savedState.floor;
+                    document.getElementById('dropLetter').value = savedState.drop;
+                    if(savedState.img) {
+                        document.getElementById('imgNum').value = savedState.img;
+                        document.getElementById('activeImgNum').value = savedState.img;
+                    }
+                    setPattern(savedState.pattern, savedState.pos);
+                }
+                document.querySelectorAll('.setup-input').forEach(el => el.disabled = true);
+                document.getElementById('btn-commit').style.display = 'none';
+                document.getElementById('btn-unlock').style.display = 'block';
             } else {
+                // TRUE BLANK SLATE
+                document.getElementById('projectID').value = "";
+                document.getElementById('techName').value = "";
+                document.getElementById('camID').value = "";
+                document.getElementById('dropLetter').value = "";
+                document.getElementById('imgNum').value = "";
                 setPattern('3'); 
             }
 
             updateFixedHeaders(0); 
         }
 
+        // --- PRE-FLIGHT HARD GATE ---
+        function triggerCommit() {
+            const p = document.getElementById('projectID').value;
+            const t = document.getElementById('techName').value;
+            const c = document.getElementById('camID').value;
+            const d = document.getElementById('dropLetter').value;
+            const i = document.getElementById('imgNum').value;
+
+            if(!p || !t || !c || !d || !i) {
+                alert("⚠️ ALL FIELDS REQUIRED: Please fill out Project, Tech, Cam ID, Drop ID, and Start Image before committing.");
+                return;
+            }
+            
+            document.getElementById('pf-proj').innerText = p;
+            document.getElementById('pf-tech').innerText = t;
+            document.getElementById('pf-cam').innerText = c;
+            document.getElementById('pf-drop').innerText = "DROP " + d.toUpperCase();
+            document.getElementById('pf-img').innerText = "FLIR" + i.toString().padStart(4, '0');
+
+            document.getElementById('preFlightModal').style.display = 'flex';
+        }
+
+        function closePreFlight() {
+            document.getElementById('preFlightModal').style.display = 'none';
+        }
+
+        function lockInDrop() {
+            document.getElementById('preFlightModal').style.display = 'none';
+            document.querySelectorAll('.setup-input').forEach(el => el.disabled = true);
+            document.getElementById('btn-commit').style.display = 'none';
+            document.getElementById('btn-unlock').style.display = 'block';
+
+            // Sync the active image number to the diagnose tab override box
+            document.getElementById('activeImgNum').value = document.getElementById('imgNum').value;
+
+            localStorage.setItem('isDropLocked', 'true');
+            saveLocationState();
+            goToSlide(1); // Auto-jump to Diagnose
+        }
+
+        function unlockSetup() {
+            if(confirm("⚠️ Unlock setup? Be careful not to change the Drop ID or Image # unless necessary.")) {
+                document.querySelectorAll('.setup-input').forEach(el => el.disabled = false);
+                document.getElementById('btn-commit').style.display = 'block';
+                document.getElementById('btn-unlock').style.display = 'none';
+                localStorage.setItem('isDropLocked', 'false');
+            }
+        }
+
+        function syncBackToMap() {
+            // If they manually type an override on Diagnose tab, sync it back to Map tab
+            document.getElementById('imgNum').value = document.getElementById('activeImgNum').value;
+            saveLocationState();
+        }
+
         function saveLocationState() {
             const s = {
+                project: document.getElementById('projectID').value,
+                tech: document.getElementById('techName').value,
+                cam: document.getElementById('camID').value,
                 floor: document.getElementById('floorNum').value,
                 drop: document.getElementById('dropLetter').value,
                 pattern: document.getElementById('dropPattern').value,
@@ -332,7 +438,6 @@
             localStorage.setItem('strataState', JSON.stringify(s));
         }
         
-        // When typing a new Drop ID, reset setup flags
         function handleDropChange() {
             hasVisitedDiagnose = false;
             isCurrentWindowLogged = false;
@@ -345,18 +450,10 @@
             document.getElementById('header-command').style.display = (slideIndex === 2) ? 'block' : 'none';
         }
 
-        /* --- INTERCEPTOR 1: WINDOW CHECK WITH SETUP BYPASS --- */
+        /* --- INTERCEPTORS --- */
         function verifySafeMove(callback) {
-            // NEW FIX: If they haven't opened the Diagnose tab for this target, they are just setting up.
-            if (!hasVisitedDiagnose) {
-                callback();
-                return;
-            }
-
-            if (isCurrentWindowLogged) {
-                callback();
-                return;
-            } 
+            if (!hasVisitedDiagnose) { callback(); return; }
+            if (isCurrentWindowLogged) { callback(); return; } 
             
             const currentTarget = document.getElementById('fullIDDisplay').innerText;
             let alreadyInVault = false;
@@ -364,9 +461,7 @@
             document.querySelectorAll("#logTable tbody tr").forEach(tr => {
                 const tds = tr.querySelectorAll("td");
                 if (tds.length >= 4) {
-                    if (tds[3].textContent === currentTarget) {
-                        alreadyInVault = true;
-                    }
+                    if (tds[3].textContent === currentTarget) alreadyInVault = true;
                 }
             });
 
@@ -397,7 +492,6 @@
             pendingMoveCallback = null;
         }
 
-        /* --- INTERCEPTOR 2: THE VAULT AUDIT --- */
         function checkFloorCompletion() {
             const pat = document.getElementById('dropPattern').value;
             const required = patternConfigs[pat]; 
@@ -411,7 +505,8 @@
                 if (tds.length >= 4) {
                     const loggedID = tds[3].textContent; 
                     required.forEach(p => {
-                        if (loggedID === `${currentDrop}-${currentFloor}-${p}`) {
+                        // Checking against new 12AL format
+                        if (loggedID === `${currentFloor}${currentDrop}${p}`) {
                             foundPositions.add(p);
                         }
                     });
@@ -426,7 +521,6 @@
             verifySafeMove(() => {
                 const audit = checkFloorCompletion();
                 
-                // NEW FIX: If we haven't visited diagnose AND vault has 0 data for this floor, we are just in Map setup mode.
                 if (!hasVisitedDiagnose && audit.foundCount === 0) {
                     processFloorAction(actionType);
                     return;
@@ -442,16 +536,10 @@
             });
         }
 
-        function modalCancelFloorChange() {
-            document.getElementById('floorAuditModal').style.display = 'none';
-            pendingFloorAction = null;
-        }
-
+        function modalCancelFloorChange() { document.getElementById('floorAuditModal').style.display = 'none'; pendingFloorAction = null; }
         function modalForceFloorChange() {
             document.getElementById('floorAuditModal').style.display = 'none';
-            if (pendingFloorAction) {
-                processFloorAction(pendingFloorAction);
-            }
+            if (pendingFloorAction) processFloorAction(pendingFloorAction);
             pendingFloorAction = null;
         }
 
@@ -463,25 +551,26 @@
             currentPos = patternConfigs[pat][0];
             
             isCurrentWindowLogged = false;
-            hasVisitedDiagnose = false; // Reset for new window
+            hasVisitedDiagnose = false; 
             
             updatePosUI();
             updatePreview();
             saveLocationState(); 
             
-            if (actionType === 'descend_btn') {
-                goToSlide(0);
-            }
+            if (actionType === 'descend_btn') goToSlide(0);
         }
 
-        /* --- SMART MODAL (WIPE VAULT) --- */
+        /* --- SMART MODALS --- */
         function openWipeModal() { document.getElementById('wipeModal').style.display = 'flex'; }
         function closeWipeModal() { document.getElementById('wipeModal').style.display = 'none'; }
-        function confirmWipe() { localStorage.removeItem('strataVault'); localStorage.removeItem('strataState'); location.reload(); }
+        function confirmWipe() { 
+            localStorage.removeItem('strataVault'); 
+            localStorage.removeItem('strataState'); 
+            localStorage.setItem('isDropLocked', 'false');
+            location.reload(); 
+        }
 
-        /* --- SMART MODAL (PHOTO SYNC) --- */
         let destinationSlideAfterPhoto = 2;
-
         function triggerPhotoModal(imgString, targetSlide = 2) {
             destinationSlideAfterPhoto = targetSlide;
             document.getElementById('modalPhotoNum').innerText = imgString;
@@ -489,9 +578,7 @@
         }
         function closePhotoModal() {
             document.getElementById('photoModal').style.display = 'none';
-            if (destinationSlideAfterPhoto !== null) {
-                goToSlide(destinationSlideAfterPhoto); 
-            }
+            if (destinationSlideAfterPhoto !== null) goToSlide(destinationSlideAfterPhoto); 
         }
 
         /* --- LOGGING PROCESSES --- */
@@ -510,7 +597,8 @@
             const tech = document.getElementById('techName').value || "Tech";
             const id = document.getElementById('fullIDDisplay').innerText;
             
-            const imgEl = document.getElementById('imgNum');
+            // Reads from the active Diagnose tab override box
+            const imgEl = document.getElementById('activeImgNum');
             const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
             
             const row = `<tr>
@@ -528,7 +616,11 @@
             document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
             localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
             
-            imgEl.value = parseInt(imgEl.value) + 1;
+            // Auto-Increment BOTH the override box and the map box
+            const nextImg = parseInt(imgEl.value) + 1;
+            imgEl.value = nextImg;
+            document.getElementById('imgNum').value = nextImg;
+            
             saveLocationState(); 
             
             toggleSound(); 
@@ -547,7 +639,8 @@
             const tech = document.getElementById('techName').value || "Tech";
             const id = document.getElementById('fullIDDisplay').innerText;
             
-            const imgEl = document.getElementById('imgNum');
+            // Reads from the active Diagnose tab override box
+            const imgEl = document.getElementById('activeImgNum');
             const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
             
             let finds = [];
@@ -578,7 +671,11 @@
             
             isCurrentWindowLogged = true;
             
-            imgEl.value = parseInt(imgEl.value) + 1;
+            // Auto-Increment BOTH the override box and the map box
+            const nextImg = parseInt(imgEl.value) + 1;
+            imgEl.value = nextImg;
+            document.getElementById('imgNum').value = nextImg;
+            
             saveLocationState(); 
             
             toggleSound(); 
@@ -596,10 +693,7 @@
             if(hud) { hud.innerText = formatted; hud.style.transform = "translateX(-50%) scale(1)"; }
             document.getElementById(id).value = formatted;
         }
-        function slideEnd(id) {
-            const hud = document.getElementById('hud-' + id);
-            if(hud) hud.style.transform = "translateX(-50%) scale(0)";
-        }
+        function slideEnd(id) { const hud = document.getElementById('hud-' + id); if(hud) hud.style.transform = "translateX(-50%) scale(0)"; }
         function step(id, val) {
             const el = document.getElementById(id);
             let current = parseFloat(el.value);
@@ -645,7 +739,7 @@
             verifySafeMove(() => {
                 if (currentPos !== p) {
                     isCurrentWindowLogged = false; 
-                    hasVisitedDiagnose = false; // Reset for new window
+                    hasVisitedDiagnose = false; 
                 }
                 currentPos = p; 
                 updatePosUI(); 
@@ -705,7 +799,9 @@
         function updatePreview() {
             const f = document.getElementById('floorNum').value;
             const d = document.getElementById('dropLetter').value.toUpperCase();
-            const fullID = `${d}-${f}-${currentPos}`;
+            
+            // Corrected ID Format to 12AL (Floor + Drop + Position)
+            const fullID = `${f}${d}${currentPos}`;
             
             document.getElementById('fullIDDisplay').innerText = fullID; 
             document.getElementById('diagnoseIDDisplay').innerText = fullID; 
@@ -713,20 +809,18 @@
         }
 
         function goToSlide(n) {
+            // THE HARD BARRICADE
+            if ((n === 1 || n === 2) && localStorage.getItem('isDropLocked') !== 'true') {
+                alert("⚠️ PRE-FLIGHT REQUIRED: You must fill out your Logistics setup and tap 'COMMIT TO DROP' before diagnosing windows.");
+                return;
+            }
+
             document.getElementById('mainSlider').style.transform = `translateX(-${n * 100}vw)`;
             document.querySelectorAll('.nav-item').forEach((el, i) => el.classList.toggle('active', i === n));
             
             updateFixedHeaders(n);
             
-            // Mark diagnose tab as visited so safety nets engage
-            if (n === 1) {
-                hasVisitedDiagnose = true;
-            }
-        }
-
-        function saveDraft() {
-            const d = { tech: document.getElementById('techName').value, cam: document.getElementById('camID').value, project: document.getElementById('projectID').value };
-            localStorage.setItem('strataDraft', JSON.stringify(d));
+            if (n === 1) hasVisitedDiagnose = true;
         }
         
         async function exportAndSend() {
