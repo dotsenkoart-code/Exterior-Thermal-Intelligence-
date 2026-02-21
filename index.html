@@ -189,7 +189,7 @@
                 </div>
                 
                 <div style="display:flex; gap:8px;">
-                    <div style="flex:1;"><label>Drop ID</label><input type="text" id="dropLetter" value="A" style="text-transform:uppercase;" oninput="updatePreview(); saveLocationState();"></div>
+                    <div style="flex:1;"><label>Drop ID</label><input type="text" id="dropLetter" value="A" style="text-transform:uppercase;" oninput="handleDropChange()"></div>
                     <div style="flex:2;"><label>Position</label><div style="display:flex;" id="posSelectorRow"></div></div>
                 </div>
             </div>
@@ -292,6 +292,9 @@
         let pendingMoveCallback = null;
         let pendingFloorAction = null;
         
+        // NEW FIX: Tracking if user actually looked at the window
+        let hasVisitedDiagnose = false; 
+        
         const patternConfigs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
 
         function initApp() {
@@ -328,13 +331,28 @@
             };
             localStorage.setItem('strataState', JSON.stringify(s));
         }
+        
+        // When typing a new Drop ID, reset setup flags
+        function handleDropChange() {
+            hasVisitedDiagnose = false;
+            isCurrentWindowLogged = false;
+            updatePreview();
+            saveLocationState();
+        }
 
         function updateFixedHeaders(slideIndex) {
             document.getElementById('header-diagnose').style.display = (slideIndex === 1) ? 'block' : 'none';
             document.getElementById('header-command').style.display = (slideIndex === 2) ? 'block' : 'none';
         }
 
+        /* --- INTERCEPTOR 1: WINDOW CHECK WITH SETUP BYPASS --- */
         function verifySafeMove(callback) {
+            // NEW FIX: If they haven't opened the Diagnose tab for this target, they are just setting up.
+            if (!hasVisitedDiagnose) {
+                callback();
+                return;
+            }
+
             if (isCurrentWindowLogged) {
                 callback();
                 return;
@@ -379,6 +397,7 @@
             pendingMoveCallback = null;
         }
 
+        /* --- INTERCEPTOR 2: THE VAULT AUDIT --- */
         function checkFloorCompletion() {
             const pat = document.getElementById('dropPattern').value;
             const required = patternConfigs[pat]; 
@@ -400,18 +419,24 @@
             });
 
             const missing = required.filter(p => !foundPositions.has(p));
-            return missing;
+            return { missing: missing, foundCount: foundPositions.size };
         }
 
         function requestFloorChange(actionType) {
             verifySafeMove(() => {
-                const missing = checkFloorCompletion();
+                const audit = checkFloorCompletion();
                 
-                if (missing.length === 0) {
+                // NEW FIX: If we haven't visited diagnose AND vault has 0 data for this floor, we are just in Map setup mode.
+                if (!hasVisitedDiagnose && audit.foundCount === 0) {
+                    processFloorAction(actionType);
+                    return;
+                }
+                
+                if (audit.missing.length === 0) {
                     processFloorAction(actionType);
                 } else {
                     pendingFloorAction = actionType;
-                    document.getElementById('missingFloorWindows').innerText = missing.join(", ");
+                    document.getElementById('missingFloorWindows').innerText = audit.missing.join(", ");
                     document.getElementById('floorAuditModal').style.display = 'flex';
                 }
             });
@@ -438,6 +463,7 @@
             currentPos = patternConfigs[pat][0];
             
             isCurrentWindowLogged = false;
+            hasVisitedDiagnose = false; // Reset for new window
             
             updatePosUI();
             updatePreview();
@@ -448,10 +474,12 @@
             }
         }
 
+        /* --- SMART MODAL (WIPE VAULT) --- */
         function openWipeModal() { document.getElementById('wipeModal').style.display = 'flex'; }
         function closeWipeModal() { document.getElementById('wipeModal').style.display = 'none'; }
         function confirmWipe() { localStorage.removeItem('strataVault'); localStorage.removeItem('strataState'); location.reload(); }
 
+        /* --- SMART MODAL (PHOTO SYNC) --- */
         let destinationSlideAfterPhoto = 2;
 
         function triggerPhotoModal(imgString, targetSlide = 2) {
@@ -466,6 +494,7 @@
             }
         }
 
+        /* --- LOGGING PROCESSES --- */
         function getFormattedTime() {
             const now = new Date();
             return now.getHours().toString().padStart(2,'0') + ":" + 
@@ -616,6 +645,7 @@
             verifySafeMove(() => {
                 if (currentPos !== p) {
                     isCurrentWindowLogged = false; 
+                    hasVisitedDiagnose = false; // Reset for new window
                 }
                 currentPos = p; 
                 updatePosUI(); 
@@ -633,6 +663,7 @@
             row.innerHTML = ''; flow.innerHTML = '';
             
             isCurrentWindowLogged = false; 
+            hasVisitedDiagnose = false; 
             
             currentPos = forcePos ? forcePos : patternConfigs[val][0];
             
@@ -686,6 +717,11 @@
             document.querySelectorAll('.nav-item').forEach((el, i) => el.classList.toggle('active', i === n));
             
             updateFixedHeaders(n);
+            
+            // Mark diagnose tab as visited so safety nets engage
+            if (n === 1) {
+                hasVisitedDiagnose = true;
+            }
         }
 
         function saveDraft() {
