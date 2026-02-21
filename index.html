@@ -16,7 +16,6 @@
         body { font-family: 'Segoe UI', Roboto, sans-serif; background: #000; color: #fff; padding: 0; margin: 0; overflow: hidden; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
         .slide-container { display: flex; transition: transform 0.3s ease-in-out; width: 300vw; height: calc(100vh - 65px); }
         
-        /* Added extra padding-bottom so the commit button clears the navbar */
         .slide { width: 100vw; height: 100%; box-sizing: border-box; overflow-y: auto; padding-bottom: 120px; }
         #slide-map { padding: 10px 10px 120px 10px; }
         #slide-diagnose { padding: 100px 10px 120px 10px; } 
@@ -40,7 +39,7 @@
         .nav-item { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; color: #666; cursor: pointer; letter-spacing: 1px; }
         .nav-item.active { color: #0cf; border-top: 2px solid #0cf; background: #111; }
 
-        input[type="text"], input[type="number"] { width: 100%; padding: 12px; background: #222; color: #fff; border: 1px solid #444; border-radius: 6px; font-size: 1.1rem; text-align: center; box-sizing: border-box; }
+        input[type="text"], input[type="number"], input[inputmode="numeric"] { width: 100%; padding: 12px; background: #222; color: #fff; border: 1px solid #444; border-radius: 6px; font-size: 1.1rem; text-align: center; box-sizing: border-box; }
         input:disabled { background: #1a1a1a; color: #555; border-color: #333; }
         label { font-size: 0.65rem; color: #888; font-weight: 700; text-transform: uppercase; display: block; margin-bottom: 4px; letter-spacing: 0.5px; }
 
@@ -112,7 +111,7 @@
             <div class="preflight-data" id="pf-drop" style="color:#0cf;">DROP A</div>
             
             <p style="color:#888; margin:0; font-weight:bold;">STARTING WITH IMAGE:</p>
-            <div class="preflight-data" id="pf-img" style="color:#f39c12;">FLIR0045</div>
+            <div class="preflight-data" id="pf-img" style="color:#f39c12;">0045</div>
             
             <button class="modal-btn btn-green" onclick="lockInDrop()">🚀 YES, LOCK IT IN</button>
             <button class="modal-btn btn-dark" onclick="closePreFlight()">🔙 CANCEL</button>
@@ -152,8 +151,8 @@
             </p>
             
             <div style="display:flex; align-items:center; justify-content:center; gap: 10px; margin-bottom: 25px;">
-                <span style="font-size:1.5rem; font-weight:900; color:#666;">FLIR</span>
-                <input type="number" id="modalPhotoInput" style="width: 130px; font-size: 2.8rem; font-weight: 900; color: #f39c12; border: 2px solid #f39c12; background: #222; text-align: center; border-radius: 8px;">
+                <span style="font-size:1.5rem; font-weight:900; color:#666;">IMG</span>
+                <input type="text" inputmode="numeric" pattern="[0-9]*" id="modalPhotoInput" style="width: 140px; font-size: 2.8rem; font-weight: 900; color: #f39c12; border: 2px solid #f39c12; background: #222; text-align: center; border-radius: 8px;">
             </div>
 
             <button class="modal-btn btn-green" onclick="finalizeLogEvidence()" style="font-size: 1.2rem; padding: 25px 10px;">✅ CONFIRM & SAVE</button>
@@ -237,16 +236,7 @@
 
         <div class="slide" id="slide-diagnose">
             
-            <div style="background:#111; padding: 15px; border-radius: 8px; border: 1px solid #333; margin-top: 10px; margin-bottom: 15px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
-                <label style="color:#f39c12; font-size: 0.8rem;">CURRENT THERMAL IMAGE</label>
-                <div style="display:flex; align-items:center; justify-content:center; gap: 10px; margin-top: 5px;">
-                    <span style="font-size:1.5rem; font-weight:900; color:#666;">FLIR</span>
-                    <input type="number" id="activeImgNum" style="width: 120px; font-size: 1.8rem; font-weight: 900; color: #f39c12; border: 2px solid #f39c12; background: #222;" onchange="syncBackToMap()">
-                </div>
-                <div style="font-size: 0.65rem; color: #666; margin-top: 5px; text-transform: uppercase;">You can verify and edit this when you hit Log</div>
-            </div>
-
-            <label style="margin-left:5px;">SCAN & FLAG FINDINGS</label>
+            <label style="margin-left:5px; margin-top: 10px; display: block;">SCAN & FLAG FINDINGS</label>
             <div class="check-grid">
                 <div class="check-item sound-box active" id="soundBtn" onclick="toggleSound()">CLEAR</div>
                 <div class="check-item defect" id="moistureDetectBtn" onclick="toggleDefect(this)">MOISTURE</div>
@@ -356,7 +346,6 @@
                     document.getElementById('dropLetter').value = savedState.drop;
                     if(savedState.img) {
                         document.getElementById('imgNum').value = savedState.img;
-                        document.getElementById('activeImgNum').value = savedState.img;
                     }
                     setPattern(savedState.pattern, savedState.pos);
                 }
@@ -392,7 +381,7 @@
             document.getElementById('pf-tech').innerText = t;
             document.getElementById('pf-cam').innerText = c;
             document.getElementById('pf-drop').innerText = "DROP " + d.toUpperCase();
-            document.getElementById('pf-img').innerText = "FLIR" + i.toString().padStart(4, '0');
+            document.getElementById('pf-img').innerText = i.toString().padStart(4, '0');
 
             document.getElementById('preFlightModal').style.display = 'flex';
         }
@@ -407,8 +396,6 @@
             document.getElementById('btn-commit').style.display = 'none';
             document.getElementById('btn-unlock').style.display = 'block';
 
-            document.getElementById('activeImgNum').value = document.getElementById('imgNum').value;
-
             localStorage.setItem('isDropLocked', 'true');
             saveLocationState();
             goToSlide(1); 
@@ -421,11 +408,6 @@
                 document.getElementById('btn-unlock').style.display = 'none';
                 localStorage.setItem('isDropLocked', 'false');
             }
-        }
-
-        function syncBackToMap() {
-            document.getElementById('imgNum').value = document.getElementById('activeImgNum').value;
-            saveLocationState();
         }
 
         function saveLocationState() {
@@ -576,7 +558,11 @@
         function openPhotoVerificationModal(logType) {
             pendingLogType = logType;
             document.getElementById('modalConfirmID').innerText = document.getElementById('fullIDDisplay').innerText;
-            document.getElementById('modalPhotoInput').value = document.getElementById('activeImgNum').value;
+            
+            // Format the current number with leading zeros for the modal display
+            const currentImgVal = document.getElementById('imgNum').value;
+            document.getElementById('modalPhotoInput').value = currentImgVal.toString().padStart(4, '0');
+            
             document.getElementById('photoModal').style.display = 'flex';
         }
 
@@ -586,11 +572,10 @@
         }
 
         function finalizeLogEvidence() {
-            // Read what the tech verified/edited in the modal
-            const finalImageNum = document.getElementById('modalPhotoInput').value;
+            // Read what the tech verified/edited in the modal (parse as int to drop any zeros they typed)
+            const finalImageNum = parseInt(document.getElementById('modalPhotoInput').value, 10);
             
             // Sync it back to the main app math so we don't skip numbers
-            document.getElementById('activeImgNum').value = finalImageNum;
             document.getElementById('imgNum').value = finalImageNum;
 
             if (pendingLogType === 'full') {
@@ -617,8 +602,9 @@
             const cam = document.getElementById('camID').value || "--";
             const tech = document.getElementById('techName').value || "Tech";
             const id = document.getElementById('fullIDDisplay').innerText;
-            const imgEl = document.getElementById('activeImgNum');
-            const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
+            
+            const imgEl = document.getElementById('imgNum');
+            const imgStr = imgEl.value.toString().padStart(4, '0');
             
             const row = `<tr>
                 <td class="export-only">${proj}</td>
@@ -644,8 +630,9 @@
             const cam = document.getElementById('camID').value || "--";
             const tech = document.getElementById('techName').value || "Tech";
             const id = document.getElementById('fullIDDisplay').innerText;
-            const imgEl = document.getElementById('activeImgNum');
-            const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
+            
+            const imgEl = document.getElementById('imgNum');
+            const imgStr = imgEl.value.toString().padStart(4, '0');
             
             let finds = [];
             document.querySelectorAll('.check-item.active').forEach(el => finds.push(el.innerText));
@@ -681,9 +668,8 @@
             isCurrentWindowLogged = true;
             
             // Auto-Increment for the NEXT window
-            const nextImg = parseInt(imgEl.value) + 1;
+            const nextImg = parseInt(imgEl.value, 10) + 1;
             imgEl.value = nextImg;
-            document.getElementById('imgNum').value = nextImg;
             
             saveLocationState(); 
             
