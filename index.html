@@ -15,10 +15,12 @@
         /* --- CORE LAYOUT --- */
         body { font-family: 'Segoe UI', Roboto, sans-serif; background: #000; color: #fff; padding: 0; margin: 0; overflow: hidden; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
         .slide-container { display: flex; transition: transform 0.3s ease-in-out; width: 300vw; height: calc(100vh - 65px); }
-        .slide { width: 100vw; height: 100%; box-sizing: border-box; overflow-y: auto; padding-bottom: 80px; }
-        #slide-map { padding: 10px; }
-        #slide-diagnose { padding: 100px 10px 80px 10px; } 
-        #slide-command { padding: 100px 10px 80px 10px; }  
+        
+        /* Added extra padding-bottom so the commit button clears the navbar */
+        .slide { width: 100vw; height: 100%; box-sizing: border-box; overflow-y: auto; padding-bottom: 120px; }
+        #slide-map { padding: 10px 10px 120px 10px; }
+        #slide-diagnose { padding: 100px 10px 120px 10px; } 
+        #slide-command { padding: 100px 10px 120px 10px; }  
         
         .card { background: #121212; padding: 12px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #2a2a2a; }
         
@@ -90,11 +92,11 @@
 
     <div id="header-diagnose" class="fixed-header">
         <span class="fixed-label">CURRENT DIAGNOSIS TARGET</span>
-        <div id="diagnoseIDDisplay" class="fixed-id">12AL</div>
+        <div id="diagnoseIDDisplay" class="fixed-id">A-12-L</div>
     </div>
     <div id="header-command" class="fixed-header">
         <span class="fixed-label">YOU ARE CURRENTLY AT:</span>
-        <div id="cmdIDDisplay" class="fixed-id">12AL</div>
+        <div id="cmdIDDisplay" class="fixed-id">A-12-L</div>
     </div>
 
     <div id="preFlightModal" class="modal-overlay">
@@ -121,7 +123,7 @@
         <div class="modal-box">
             <h2 style="color:#f39c12; margin-top:0; font-size: 2rem;">⚠️ DATA MISSING!</h2>
             <p style="color:#ccc; font-size:1.1rem; margin-bottom:25px; line-height:1.4;">
-                You have not logged any findings for window <br><strong id="modalTargetID" style="color:#0cf; font-size: 1.5rem; display:inline-block; margin-top:5px;">12AL</strong>
+                You have not logged any findings for window <br><strong id="modalTargetID" style="color:#0cf; font-size: 1.5rem; display:inline-block; margin-top:5px;">A-12-L</strong>
             </p>
             <button class="modal-btn btn-blue" onclick="modalGoToDiagnose()">🔙 WAIT, TAKE ME TO DIAGNOSE</button>
             <button class="modal-btn btn-green" onclick="modalQuickLogAndMove()">✅ WINDOW IS CLEAR: LOG & MOVE</button>
@@ -146,12 +148,16 @@
         <div class="modal-box" style="border-color:#0cf;">
             <h2 style="color:#0cf; margin-top:0; font-size: 2rem;">📸 SNAP PHOTO</h2>
             <p style="color:#ccc; font-size:1.1rem; margin-bottom:15px; line-height:1.4;">
-                Data saved! Verify FLIR camera counter matches:
+                Match camera image for <strong id="modalConfirmID" style="color:#fff;">A-12-L</strong>:
             </p>
-            <div id="modalPhotoNum" style="background:#222; border:2px solid #555; border-radius:8px; padding:15px; font-size:3.5rem; font-weight:900; color:#f39c12; margin-bottom:25px; letter-spacing: 2px;">
-                0045
+            
+            <div style="display:flex; align-items:center; justify-content:center; gap: 10px; margin-bottom: 25px;">
+                <span style="font-size:1.5rem; font-weight:900; color:#666;">FLIR</span>
+                <input type="number" id="modalPhotoInput" style="width: 130px; font-size: 2.8rem; font-weight: 900; color: #f39c12; border: 2px solid #f39c12; background: #222; text-align: center; border-radius: 8px;">
             </div>
-            <button class="modal-btn btn-green" onclick="closePhotoModal()" style="font-size: 1.2rem; padding: 25px 10px;">✅ GOT IT - PROCEED</button>
+
+            <button class="modal-btn btn-green" onclick="finalizeLogEvidence()" style="font-size: 1.2rem; padding: 25px 10px;">✅ CONFIRM & SAVE</button>
+            <button class="modal-btn btn-dark" onclick="cancelLogEvidence()">🔙 CANCEL (DON'T SAVE YET)</button>
         </div>
     </div>
 
@@ -189,7 +195,7 @@
                 <div style="display:flex; gap:10px; margin-bottom: 15px;">
                     <div style="flex:1;">
                         <label style="color:#0cf; font-size:0.8rem;">Drop ID</label>
-                        <input type="text" id="dropLetter" class="setup-input" style="font-size: 1.5rem; font-weight: bold; border-color: #0cf;" placeholder="e.g. A" oninput="handleDropChange()">
+                        <input type="text" id="dropLetter" class="setup-input" style="font-size: 1.5rem; font-weight: bold; border-color: #0cf; text-transform: uppercase;" placeholder="e.g. A" oninput="handleDropChange()">
                     </div>
                     <div style="flex:1;">
                         <label style="color:#f39c12; font-size:0.8rem;">Start Image #</label>
@@ -222,10 +228,10 @@
 
             <div class="target-banner" style="border-color:#333;">
                 <span class="target-label" style="color:#888;">TARGET ID (MAP)</span>
-                <div id="fullIDDisplay" class="target-id" style="color:#0cf;">12AL</div>
+                <div id="fullIDDisplay" class="target-id" style="color:#0cf;">A-12-L</div>
             </div>
             
-            <button id="btn-commit" class="action-btn btn-green" style="padding: 22px;" onclick="triggerCommit()">🚀 COMMIT TO DROP</button>
+            <button id="btn-commit" class="action-btn btn-green" style="padding: 22px; margin-bottom: 40px;" onclick="triggerCommit()">🚀 COMMIT TO DROP</button>
             <input type="hidden" id="dropPattern" value="3">
         </div>
 
@@ -237,7 +243,7 @@
                     <span style="font-size:1.5rem; font-weight:900; color:#666;">FLIR</span>
                     <input type="number" id="activeImgNum" style="width: 120px; font-size: 1.8rem; font-weight: 900; color: #f39c12; border: 2px solid #f39c12; background: #222;" onchange="syncBackToMap()">
                 </div>
-                <div style="font-size: 0.65rem; color: #666; margin-top: 5px; text-transform: uppercase;">Tap number to manually override if camera skips</div>
+                <div style="font-size: 0.65rem; color: #666; margin-top: 5px; text-transform: uppercase;">You can verify and edit this when you hit Log</div>
             </div>
 
             <label style="margin-left:5px;">SCAN & FLAG FINDINGS</label>
@@ -275,7 +281,7 @@
                 </div>
             </div>
 
-            <button class="action-btn btn-blue" style="padding: 22px;" onclick="logEvidence()">LOG DATA & VERIFY</button>
+            <button class="action-btn btn-blue" style="padding: 22px;" onclick="openPhotoVerificationModal('full')">LOG DATA & VERIFY</button>
         </div>
 
         <div class="slide" id="slide-command">
@@ -330,6 +336,8 @@
         let pendingFloorAction = null;
         let hasVisitedDiagnose = false; 
         
+        let pendingLogType = null; // 'full' or 'quick'
+        
         const patternConfigs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
 
         function initApp() {
@@ -337,7 +345,6 @@
                 document.getElementById('logTable').querySelector('tbody').innerHTML = localStorage.getItem('strataVault');
             }
             
-            // Check if we are mid-drop (fields locked in)
             if (localStorage.getItem('isDropLocked') === 'true') {
                 if (localStorage.getItem('strataState')) {
                     const savedState = JSON.parse(localStorage.getItem('strataState'));
@@ -357,7 +364,6 @@
                 document.getElementById('btn-commit').style.display = 'none';
                 document.getElementById('btn-unlock').style.display = 'block';
             } else {
-                // TRUE BLANK SLATE
                 document.getElementById('projectID').value = "";
                 document.getElementById('techName').value = "";
                 document.getElementById('camID').value = "";
@@ -401,12 +407,11 @@
             document.getElementById('btn-commit').style.display = 'none';
             document.getElementById('btn-unlock').style.display = 'block';
 
-            // Sync the active image number to the diagnose tab override box
             document.getElementById('activeImgNum').value = document.getElementById('imgNum').value;
 
             localStorage.setItem('isDropLocked', 'true');
             saveLocationState();
-            goToSlide(1); // Auto-jump to Diagnose
+            goToSlide(1); 
         }
 
         function unlockSetup() {
@@ -419,7 +424,6 @@
         }
 
         function syncBackToMap() {
-            // If they manually type an override on Diagnose tab, sync it back to Map tab
             document.getElementById('imgNum').value = document.getElementById('activeImgNum').value;
             saveLocationState();
         }
@@ -481,9 +485,7 @@
 
         function modalQuickLogAndMove() {
             document.getElementById('safetyModal').style.display = 'none';
-            performQuickLog(); 
-            if(pendingMoveCallback) pendingMoveCallback();
-            pendingMoveCallback = null;
+            openPhotoVerificationModal('quick');
         }
 
         function modalForceSkip() {
@@ -505,8 +507,8 @@
                 if (tds.length >= 4) {
                     const loggedID = tds[3].textContent; 
                     required.forEach(p => {
-                        // Checking against new 12AL format
-                        if (loggedID === `${currentFloor}${currentDrop}${p}`) {
+                        // Checking against A-12-L format
+                        if (loggedID === `${currentDrop}-${currentFloor}-${p}`) {
                             foundPositions.add(p);
                         }
                     });
@@ -570,15 +572,35 @@
             location.reload(); 
         }
 
-        let destinationSlideAfterPhoto = 2;
-        function triggerPhotoModal(imgString, targetSlide = 2) {
-            destinationSlideAfterPhoto = targetSlide;
-            document.getElementById('modalPhotoNum').innerText = imgString;
+        // --- NEW PRE-SAVE VERIFICATION ---
+        function openPhotoVerificationModal(logType) {
+            pendingLogType = logType;
+            document.getElementById('modalConfirmID').innerText = document.getElementById('fullIDDisplay').innerText;
+            document.getElementById('modalPhotoInput').value = document.getElementById('activeImgNum').value;
             document.getElementById('photoModal').style.display = 'flex';
         }
-        function closePhotoModal() {
+
+        function cancelLogEvidence() {
             document.getElementById('photoModal').style.display = 'none';
-            if (destinationSlideAfterPhoto !== null) goToSlide(destinationSlideAfterPhoto); 
+            pendingLogType = null;
+        }
+
+        function finalizeLogEvidence() {
+            // Read what the tech verified/edited in the modal
+            const finalImageNum = document.getElementById('modalPhotoInput').value;
+            
+            // Sync it back to the main app math so we don't skip numbers
+            document.getElementById('activeImgNum').value = finalImageNum;
+            document.getElementById('imgNum').value = finalImageNum;
+
+            if (pendingLogType === 'full') {
+                executeFullLog();
+            } else if (pendingLogType === 'quick') {
+                executeQuickLog();
+            }
+            
+            document.getElementById('photoModal').style.display = 'none';
+            pendingLogType = null;
         }
 
         /* --- LOGGING PROCESSES --- */
@@ -589,15 +611,12 @@
                    now.getSeconds().toString().padStart(2,'0');
         }
 
-        function performQuickLog() {
+        function executeQuickLog() {
             const time = getFormattedTime();
-            
             const proj = document.getElementById('projectID').value || "No Project";
             const cam = document.getElementById('camID').value || "--";
             const tech = document.getElementById('techName').value || "Tech";
             const id = document.getElementById('fullIDDisplay').innerText;
-            
-            // Reads from the active Diagnose tab override box
             const imgEl = document.getElementById('activeImgNum');
             const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
             
@@ -613,33 +632,18 @@
                 <td>${time}</td>
             </tr>`;
             
-            document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
-            localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
-            
-            // Auto-Increment BOTH the override box and the map box
-            const nextImg = parseInt(imgEl.value) + 1;
-            imgEl.value = nextImg;
-            document.getElementById('imgNum').value = nextImg;
-            
-            saveLocationState(); 
-            
-            toggleSound(); 
-            document.getElementById('moisturePct').value = '';
-            document.getElementById('meterProvedBtn').classList.remove('active');
-            document.getElementById('meterProvedBtn').style.background = '#222';
-            
-            triggerPhotoModal(imgStr, null);
+            writeToVaultAndReset(row, imgEl);
+
+            if(pendingMoveCallback) pendingMoveCallback();
+            pendingMoveCallback = null;
         }
 
-        function logEvidence() {
+        function executeFullLog() {
             const time = getFormattedTime();
-            
             const proj = document.getElementById('projectID').value || "No Project";
             const cam = document.getElementById('camID').value || "--";
             const tech = document.getElementById('techName').value || "Tech";
             const id = document.getElementById('fullIDDisplay').innerText;
-            
-            // Reads from the active Diagnose tab override box
             const imgEl = document.getElementById('activeImgNum');
             const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
             
@@ -666,24 +670,28 @@
                 <td>${time}</td>
             </tr>`;
             
-            document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
+            writeToVaultAndReset(row, imgEl);
+            goToSlide(2); // Jump to Command to see the entry
+        }
+
+        function writeToVaultAndReset(htmlRow, imgEl) {
+            document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', htmlRow);
             localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
             
             isCurrentWindowLogged = true;
             
-            // Auto-Increment BOTH the override box and the map box
+            // Auto-Increment for the NEXT window
             const nextImg = parseInt(imgEl.value) + 1;
             imgEl.value = nextImg;
             document.getElementById('imgNum').value = nextImg;
             
             saveLocationState(); 
             
+            // Reset UI
             toggleSound(); 
             document.getElementById('moisturePct').value = '';
             document.getElementById('meterProvedBtn').classList.remove('active');
             document.getElementById('meterProvedBtn').style.background = '#222';
-            
-            triggerPhotoModal(imgStr, 2);
         }
 
         function slideUpdate(id, val) {
@@ -800,8 +808,8 @@
             const f = document.getElementById('floorNum').value;
             const d = document.getElementById('dropLetter').value.toUpperCase();
             
-            // Corrected ID Format to 12AL (Floor + Drop + Position)
-            const fullID = `${f}${d}${currentPos}`;
+            // Updated ID Format: Drop - Floor - Pos (e.g., A-12-L)
+            const fullID = `${d}-${f}-${currentPos}`;
             
             document.getElementById('fullIDDisplay').innerText = fullID; 
             document.getElementById('diagnoseIDDisplay').innerText = fullID; 
