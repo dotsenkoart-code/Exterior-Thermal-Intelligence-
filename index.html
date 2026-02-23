@@ -326,7 +326,7 @@
         let pendingFloorAction = null;
         let hasVisitedDiagnose = false; 
         
-        let pendingLogType = null; // 'full' or 'quick'
+        let pendingLogType = null; 
         
         const patternConfigs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
 
@@ -381,7 +381,6 @@
             document.getElementById('pf-tech').innerText = t;
             document.getElementById('pf-cam').innerText = c;
             document.getElementById('pf-drop').innerText = "DROP " + d.toUpperCase();
-            // ADDED FLIR PREFIX HERE
             document.getElementById('pf-img').innerText = "FLIR" + i.toString().padStart(4, '0');
 
             document.getElementById('preFlightModal').style.display = 'flex';
@@ -490,7 +489,6 @@
                 if (tds.length >= 4) {
                     const loggedID = tds[3].textContent; 
                     required.forEach(p => {
-                        // Checking against A-12-L format
                         if (loggedID === `${currentDrop}-${currentFloor}-${p}`) {
                             foundPositions.add(p);
                         }
@@ -560,7 +558,6 @@
             pendingLogType = logType;
             document.getElementById('modalConfirmID').innerText = document.getElementById('fullIDDisplay').innerText;
             
-            // Format the current number with leading zeros for the modal display
             const currentImgVal = document.getElementById('imgNum').value;
             document.getElementById('modalPhotoInput').value = currentImgVal.toString().padStart(4, '0');
             
@@ -573,10 +570,7 @@
         }
 
         function finalizeLogEvidence() {
-            // Read what the tech verified/edited in the modal (parse as int to drop any zeros they typed)
             const finalImageNum = parseInt(document.getElementById('modalPhotoInput').value, 10);
-            
-            // Sync it back to the main app math so we don't skip numbers
             document.getElementById('imgNum').value = finalImageNum;
 
             if (pendingLogType === 'full') {
@@ -605,7 +599,6 @@
             const id = document.getElementById('fullIDDisplay').innerText;
             
             const imgEl = document.getElementById('imgNum');
-            // ADDED FLIR PREFIX HERE
             const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
             
             const row = `<tr>
@@ -634,7 +627,6 @@
             const id = document.getElementById('fullIDDisplay').innerText;
             
             const imgEl = document.getElementById('imgNum');
-            // ADDED FLIR PREFIX HERE
             const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
             
             let finds = [];
@@ -661,7 +653,7 @@
             </tr>`;
             
             writeToVaultAndReset(row, imgEl);
-            goToSlide(2); // Jump to Command to see the entry
+            goToSlide(2); 
         }
 
         function writeToVaultAndReset(htmlRow, imgEl) {
@@ -670,31 +662,46 @@
             
             isCurrentWindowLogged = true;
             
-            // Auto-Increment for the NEXT window
             const nextImg = parseInt(imgEl.value, 10) + 1;
             imgEl.value = nextImg;
             
             saveLocationState(); 
             
-            // Reset UI
             toggleSound(); 
-            document.getElementById('moisturePct').value = '';
+            
+            // --- RESET MOISTURE BACK TO 85 FOR THE NEXT WINDOW ---
+            document.getElementById('moisturePct').value = '85';
+            document.getElementById('moisturePctVal').innerText = '85';
+            const slider = document.querySelector('#groundTruthCard .touch-slider');
+            if (slider) slider.value = 85;
+
             document.getElementById('meterProvedBtn').classList.remove('active');
             document.getElementById('meterProvedBtn').style.background = '#222';
+            document.getElementById('meterProvedBtn').style.color = '#888';
+            document.getElementById('meterProvedBtn').innerText = 'METER PROVED';
         }
 
         function slideUpdate(id, val) {
-            let formatted = parseInt(val);
+            let formatted = parseInt(val) || 0;
             document.getElementById(id + 'Val').innerText = formatted;
             const hud = document.getElementById('hud-' + id);
             if(hud) { hud.innerText = formatted; hud.style.transform = "translateX(-50%) scale(1)"; }
             document.getElementById(id).value = formatted;
         }
+        
         function slideEnd(id) { const hud = document.getElementById('hud-' + id); if(hud) hud.style.transform = "translateX(-50%) scale(0)"; }
+        
+        // --- SMART FALLBACK APPLIED HERE ---
         function step(id, val) {
             const el = document.getElementById(id);
+            
+            // If the box is empty, assume 85 for moisture, and 0 for anything else
+            let fallback = (id === 'moisturePct') ? 85 : 0;
             let current = parseFloat(el.value);
-            let newVal = (current + val).toFixed(id === 'moisturePct' || id === 'floorNum' ? 0 : 1);
+            if (isNaN(current)) current = fallback;
+            
+            let newVal = (current + val);
+            
             if(id === 'moisturePct') { if(newVal < 0) newVal = 0; if(newVal > 100) newVal = 100; }
             
             el.value = newVal;
@@ -794,10 +801,9 @@
         }
 
         function updatePreview() {
-            const f = document.getElementById('floorNum').value;
-            const d = document.getElementById('dropLetter').value.toUpperCase();
+            const f = document.getElementById('floorNum').value || 0;
+            const d = document.getElementById('dropLetter').value.toUpperCase() || "X";
             
-            // Updated ID Format: Drop - Floor - Pos (e.g., A-12-L)
             const fullID = `${d}-${f}-${currentPos}`;
             
             document.getElementById('fullIDDisplay').innerText = fullID; 
@@ -806,7 +812,6 @@
         }
 
         function goToSlide(n) {
-            // THE HARD BARRICADE
             if ((n === 1 || n === 2) && localStorage.getItem('isDropLocked') !== 'true') {
                 alert("⚠️ PRE-FLIGHT REQUIRED: You must fill out your Logistics setup and tap 'COMMIT TO DROP' before diagnosing windows.");
                 return;
