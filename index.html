@@ -1,880 +1,958 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: Gold Master (Restored)</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#000000">
+    <title>Strata Command Center | v5.6 Visual Merge</title>
     
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Strata-Scan">
-    <meta name="mobile-web-app-capable" content="yes">
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
 
     <style>
-        /* --- CORE LAYOUT --- */
-        body { font-family: 'Segoe UI', Roboto, sans-serif; background: #000; color: #fff; padding: 0; margin: 0; overflow: hidden; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
-        .slide-container { display: flex; transition: transform 0.3s ease-in-out; width: 300vw; height: calc(100vh - 65px); }
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background: #0f111a; color: #fff; margin: 0; padding: 20px; overflow-x: hidden; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0cf; padding-bottom: 15px; margin-bottom: 20px; }
+        .header h1 { margin: 0; font-size: 1.8rem; font-weight: 900; letter-spacing: 1px; color: #fff; }
+        .header span { color: #0cf; }
         
-        .slide { width: 100vw; height: 100%; box-sizing: border-box; overflow-y: auto; padding-bottom: 120px; }
-        #slide-map { padding: 10px 10px 120px 10px; }
-        #slide-diagnose { padding: 100px 10px 120px 10px; } 
-        #slide-command { padding: 100px 10px 120px 10px; }  
+        /* --- UPLOAD ZONE --- */
+        .upload-zone { background: #1a1d27; border: 2px dashed #333; border-radius: 12px; padding: 40px; text-align: center; cursor: pointer; transition: 0.3s; margin-bottom: 20px; }
+        .upload-zone:hover, .upload-zone.dragover { border-color: #0cf; background: #202430; }
+        .upload-zone h2 { margin: 0 0 10px 0; color: #888; font-size: 1.2rem; transition: 0.3s; }
+        .upload-zone.compact { padding: 15px; border-style: dotted; }
+        .upload-zone.compact h2 { font-size: 1rem; margin: 0 0 5px 0; }
+
+        /* --- MAPPING SCREEN --- */
+        #mapping-screen { background: #1a1d27; border-radius: 12px; padding: 25px; border: 1px solid #333; display: none; margin-bottom: 20px; }
+        .elevation-creator { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 20px; }
+        .elevation-creator input { flex: 1; padding: 12px; background: #111; border: 1px solid #444; color: #fff; border-radius: 6px; font-size: 1rem; }
+        .mapping-row { display: flex; justify-content: space-between; align-items: center; background: #111; padding: 15px; border-radius: 6px; margin-bottom: 10px; border: 1px solid #222; }
+        .mapping-row select { padding: 10px; background: #222; color: #0cf; border: 1px solid #444; border-radius: 4px; font-size: 1rem; font-weight: bold; width: 200px; }
+        .mapping-row select:disabled { color: #888; border-color: #333; cursor: not-allowed; }
+
+        /* --- DASHBOARD CONTROLS --- */
+        #dashboard-screen { display: none; }
+        .view-controls { display: flex; gap: 10px; margin-bottom: 20px; background: #1a1d27; padding: 10px; border-radius: 8px; border: 1px solid #333; align-items: center; }
+        .view-toggle-btn { flex: 1; padding: 12px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; background: #222; color: #888; transition: 0.2s; }
+        .view-toggle-btn.active { background: #0cf; color: #000; }
         
-        .card { background: #121212; padding: 12px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #2a2a2a; }
+        #btn-true3d { background: #2b113d; color: #d080ff; border: 1px solid #5a2e7a; }
+        #btn-true3d.active { background: #b055ff; color: #fff; }
+
+        .stitch-mode-on { border-color: #f39c12 !important; background: rgba(243, 156, 18, 0.2) !important; color: #f39c12 !important; box-shadow: 0 0 10px rgba(243, 156, 18, 0.5); }
+        .node-selected { border-color: #0cf !important; transform: scale(1.1); box-shadow: 0 0 15px #0cf !important; z-index: 20 !important; }
+
+        .tabs-container { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 5px; border-bottom: 2px solid #333; margin-bottom: 20px; }
+        .tab { padding: 12px 25px; background: #1a1d27; color: #888; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: bold; font-size: 1rem; border: 1px solid #333; border-bottom: none; transition: 0.2s; white-space: nowrap; }
+        .tab:hover { background: #202430; color: #ccc; }
+        .tab.active { background: #0cf; color: #000; border-color: #0cf; }
+
+        .stats-bar { display: flex; gap: 15px; margin-bottom: 20px; }
+        .stat-card { flex: 1; background: #1a1d27; padding: 15px; border-radius: 8px; border-left: 4px solid #333; }
+        .stat-label { font-size: 0.75rem; color: #888; text-transform: uppercase; font-weight: bold; }
+        .stat-value { font-size: 2rem; font-weight: 900; margin-top: 5px; }
+
+        /* --- 2D GRID STYLES --- */
+        #building-container-2d { display: flex; gap: 15px; overflow-x: auto; padding-bottom: 20px; align-items: flex-end; }
+        .drop-column { background: #161922; border: 1px solid #2a2d38; border-radius: 8px; padding: 10px; display: flex; flex-direction: column; min-width: max-content; }
+        .drop-header { text-align: center; font-size: 1.2rem; font-weight: bold; color: #0cf; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 10px; }
         
-        /* --- HIGHLIGHT CARD FOR CRITICAL DATA --- */
-        .critical-card { background: #0a1118; padding: 15px; border-radius: 8px; margin-bottom: 12px; border: 2px solid #0cf; box-shadow: 0 0 15px rgba(0, 204, 255, 0.1); }
+        .floor-row { display: flex; align-items: center; margin-bottom: 4px; }
+        .floor-label { width: 35px; font-weight: bold; color: #666; font-size: 0.85rem; text-align: right; margin-right: 8px; }
         
-        /* --- FIXED HEADERS --- */
-        .fixed-header { position: fixed; top: 0; left: 0; width: 100%; background: #111; padding: 15px 0 10px 0; text-align: center; z-index: 500; border-bottom: 2px solid #0cf; box-shadow: 0 10px 20px rgba(0,0,0,0.8); display: none; }
-        .fixed-label { font-size: 0.7rem; color: #888; font-weight: 800; letter-spacing: 1px; margin-bottom: 2px; display: block; text-transform: uppercase; }
-        .fixed-id { font-size: 2.8rem; font-weight: 900; color: #0cf; letter-spacing: 2px; margin: 0; line-height: 1; }
-        #header-command { border-bottom-color: #28a745; }
-        #header-command .fixed-id { color: #fff; }
-
-        .target-banner { background: #111; padding: 12px; border-radius: 8px; border: 2px solid #333; text-align: center; margin-bottom: 12px; }
-
-        .navbar { height: 65px; background: #080808; display: flex; border-top: 1px solid #333; position: fixed; bottom: 0; width: 100%; z-index: 1000; padding-bottom: env(safe-area-inset-bottom); }
-        .nav-item { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; color: #666; cursor: pointer; letter-spacing: 1px; }
-        .nav-item.active { color: #0cf; border-top: 2px solid #0cf; background: #111; }
-
-        input[type="text"], input[type="number"], input[inputmode="numeric"] { width: 100%; padding: 12px; background: #222; color: #fff; border: 1px solid #444; border-radius: 6px; font-size: 1.1rem; text-align: center; box-sizing: border-box; }
-        input:disabled { background: #1a1a1a; color: #555; border-color: #333; }
-        label { font-size: 0.65rem; color: #888; font-weight: 700; text-transform: uppercase; display: block; margin-bottom: 4px; letter-spacing: 0.5px; }
-
-        /* --- STEPPER --- */
-        .stepper-box { background: #1a1a1a; border-radius: 8px; border: 1px solid #333; padding: 5px; position: relative; overflow: visible; margin-bottom: 10px; }
-        .stepper-row { display: flex; align-items: center; justify-content: space-between; height: 70px; }
-        .step-btn { width: 60px; height: 100%; background: #252525; border: none; color: #fff; font-size: 2rem; font-weight: 300; cursor: pointer; z-index: 2; border-radius: 6px; }
-        .step-display { flex: 1; text-align: center; position: relative; height: 100%; display: flex; flex-direction: column; justify-content: center; }
-        .step-val { font-size: 2.2rem; font-weight: 700; color: #fff; z-index: 1; pointer-events: none; }
-        .touch-slider { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: ew-resize; z-index: 3; }
-
-        .hud-bubble { position: absolute; top: -100px; left: 50%; transform: translateX(-50%) scale(0); background: #f39c12; color: #000; padding: 10px 25px; border-radius: 30px; font-size: 3rem; font-weight: 900; z-index: 9999; pointer-events: none; transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275); border: 4px solid #fff; box-shadow: 0 10px 25px rgba(0,0,0,0.9); }
-
-        /* --- CHECKLIST & BUTTONS --- */
-        .check-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
-        .check-item { background: #222; padding: 15px 5px; border-radius: 6px; text-align: center; font-size: 0.65rem; font-weight: 700; border: 1px solid #333; color: #888; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1.2; height: 50px; }
-        .check-item.active { background: #0cf; color: #000; border-color: #fff; }
-        .check-item.sound-box.active { background: #28a745; color: #fff; border-color: #fff; }
+        .window-group { display: flex; gap: 4px; flex: 1; justify-content: center; width: 140px; } 
+        .window-node { flex: 1; height: 50px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: bold; color: rgba(255,255,255,0.9); border: 2px solid rgba(0,0,0,0.5); transition: transform 0.1s; position: relative; }
+        .window-node:hover { transform: scale(1.1); box-shadow: 0 5px 15px rgba(0,0,0,0.8); z-index: 10; }
         
-        .moisture-panel { background: #1a1a1a; border: 1px solid #d9534f; border-radius: 6px; padding: 10px; margin-top: 8px; display: none; }
+        /* CSS BRIDGE CLASS */
+        .stitch-bridge { position: absolute; top: -2px; bottom: -2px; right: -39px; width: 39px; z-index: -1; border-top: 2px solid rgba(0,0,0,0.5); border-bottom: 2px solid rgba(0,0,0,0.5); }
 
-        .action-btn { width: 100%; padding: 18px; border-radius: 8px; border: none; font-size: 1.2rem; font-weight: 900; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; margin-top: 15px; }
-        .btn-blue { background: linear-gradient(180deg, #007bff 0%, #0056b3 100%); }
-        .btn-green { background: linear-gradient(180deg, #28a745 0%, #1e7e34 100%); }
-        .btn-dark { background: #333; border: 1px solid #555; color: #aaa; }
-        .btn-red { background: linear-gradient(180deg, #d9534f 0%, #b00 100%); color: #fff; border: 2px solid #fff; }
-        
-        .pattern-btn { flex: 1; padding: 15px; background: #222; border: 1px solid #444; color: #666; font-size: 0.8rem; font-weight: bold; cursor: pointer; }
-        .pattern-btn.active { background: #0cf; color: #000; }
-        
-        .cmd-flow-btn { flex: 1; padding: 25px 10px; background: #333; border: 1px solid #555; color: #fff; font-size: 1.1rem; font-weight: 900; cursor: pointer; border-radius: 8px; transition: 0.2s; }
-        .cmd-action-btn { width: 100%; padding: 25px; border-radius: 8px; border: none; font-size: 1.2rem; font-weight: 900; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; margin-top: 15px; }
+        .status-clear { background: #28a745; } 
+        .status-flagged { background: #f1c40f; color: #000; } 
+        .status-confirmed { background: #d9534f; } 
+        .status-empty { background: #222; border: 2px dashed #444; color: #555; pointer-events: none; }
+        .status-void { background: transparent; border: 2px solid transparent; cursor: default; pointer-events: none; }
 
-        /* --- VAULT TABLE STYLES --- */
-        table { width: 100%; border-collapse: collapse; font-size: 0.7rem; color: #ccc; }
-        td, th { border: 1px solid #333; padding: 8px; text-align: left; }
-        .export-only { display: none; }
+        /* --- CSS 3D ARENA STYLES --- */
+        #arena-3d { display: none; perspective: 1500px; width: 100%; height: 80vh; min-height: 700px; background: radial-gradient(circle, #1a1d27 0%, #0f111a 100%); border: 1px solid #333; border-radius: 12px; overflow: hidden; position: relative; cursor: grab; align-items: center; justify-content: center; margin-bottom: 20px; }
+        #arena-3d:active { cursor: grabbing; }
+        #world-3d { transform-style: preserve-3d; transition: transform 0.1s ease-out; display: flex; align-items: center; justify-content: center; }
+        .wall-3d { position: absolute; transform-style: preserve-3d; background: rgba(15, 17, 26, 0.8); border: 2px solid #333; padding: 20px; border-radius: 12px; box-shadow: 0 0 50px rgba(0,0,0,0.8); backdrop-filter: blur(5px); display: flex; gap: 15px; align-items: flex-end; }
+        .wall-title-3d { position: absolute; top: -40px; left: 50%; transform: translateX(-50%); color: #0cf; font-size: 1.5rem; font-weight: 900; white-space: nowrap; text-shadow: 0 5px 10px rgba(0,0,0,0.8); }
 
-        /* --- CUSTOM MODALS --- */
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 9999; display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
-        .modal-box { background: #111; border: 2px solid #444; border-radius: 12px; padding: 25px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 15px 35px rgba(0,0,0,0.9); }
-        .modal-btn { width: 100%; padding: 22px 10px; border-radius: 8px; border: none; font-size: 1rem; font-weight: 900; cursor: pointer; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .modal-btn:last-child { margin-bottom: 0; }
+        /* --- TRUE 3D TWIN VIEWER --- */
+        #arena-true3d { display: none; width: 100%; height: 80vh; min-height: 700px; background: radial-gradient(circle, #2a2d38 0%, #0f111a 100%); border: 1px solid #5a2e7a; border-radius: 12px; overflow: hidden; position: relative; margin-bottom: 20px; box-shadow: 0 0 30px rgba(176, 85, 255, 0.2); }
+        model-viewer { width: 100%; height: 100%; outline: none; }
+
+        /* --- MODAL --- */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 2000; backdrop-filter: blur(3px); }
+        .modal-box { background: #1a1d27; border: 1px solid #0cf; border-radius: 12px; padding: 25px; width: 500px; max-height: 90vh; overflow-y: auto; box-shadow: 0 15px 35px rgba(0,0,0,0.9); }
+        .modal-title { font-size: 2rem; color: #0cf; margin: 0 0 5px 0; font-weight: 900; }
+        .modal-subtitle { color: #888; margin-bottom: 15px; font-size: 0.9rem; }
         
-        .preflight-data { font-size: 2.2rem; font-weight: 900; color: #fff; margin: 5px 0 15px 0; }
+        .photo-gallery { display: flex; gap: 10px; overflow-x: auto; margin-bottom: 15px; padding-bottom: 5px; }
+        .photo-gallery img { flex: 1; width: 100%; min-width: 200px; border-radius: 8px; border: 2px solid #333; object-fit: cover; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        
+        .no-photo-banner { background: #222; color: #666; padding: 20px; text-align: center; border-radius: 8px; border: 1px dashed #444; margin-bottom: 15px; font-size: 0.9rem; font-weight: bold; }
+
+        .data-row { display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding: 10px 0; }
+        .data-label { color: #888; font-size: 0.8rem; text-transform: uppercase; }
+        .data-val { font-weight: bold; text-align: right; max-width: 65%; color: #fff; }
+        
+        .manager-section { margin-top: 20px; background: #111; padding: 15px; border-radius: 8px; border: 1px solid #333; }
+        .modal-notes { width: 100%; height: 80px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; padding: 10px; margin-top: 5px; font-family: inherit; resize: none; box-sizing: border-box; }
+        
+        .status-btns { display: flex; gap: 10px; margin-top: 15px; margin-bottom: 15px; }
+        .btn-status { flex: 1; padding: 10px; font-size: 0.8rem; border-radius: 4px; }
+        .btn-status-yellow { background: #f1c40f; color: #000; }
+        .btn-status-yellow:hover { background: #e2b607; }
+
+        .btn { padding: 12px 20px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; font-size: 1rem; text-transform: uppercase; letter-spacing: 1px; }
+        .btn-blue { background: #0cf; color: #000; }
+        .btn-blue:hover { background: #00aadd; }
+        .btn-dark { background: #333; color: #fff; border: 1px solid #555; }
+        .btn-dark:hover { background: #444; }
+        .btn-red { background: #d9534f; color: #fff; }
+        .btn-red:hover { background: #c9302c; }
+        .btn-green { background: #28a745; color: #fff; }
+        .btn-green:hover { background: #218838; }
+        .btn-block { width: 100%; margin-top: 10px; }
+        .header-btns { display: flex; gap: 10px; }
     </style>
 </head>
-<body onload="initApp()">
+<body>
 
-    <div id="header-diagnose" class="fixed-header">
-        <span class="fixed-label">CURRENT DIAGNOSIS TARGET</span>
-        <div id="diagnoseIDDisplay" class="fixed-id">A-12-L</div>
-    </div>
-    <div id="header-command" class="fixed-header">
-        <span class="fixed-label">YOU ARE CURRENTLY AT:</span>
-        <div id="cmdIDDisplay" class="fixed-id">A-12-L</div>
-    </div>
-
-    <div id="preFlightModal" class="modal-overlay">
-        <div class="modal-box" style="border-color:#0cf;">
-            <h2 style="color:#0cf; margin-top:0; font-size: 2rem;">⚠️ PRE-FLIGHT CHECK</h2>
-            <div style="color:#aaa; font-size:0.9rem; margin-bottom:20px; border-bottom: 1px solid #333; padding-bottom: 15px;">
-                Proj: <strong id="pf-proj" style="color:#fff;">--</strong> | 
-                Tech: <strong id="pf-tech" style="color:#fff;">--</strong> | 
-                Cam: <strong id="pf-cam" style="color:#fff;">--</strong>
-            </div>
-            
-            <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-                <div style="flex: 1;">
-                    <p style="color:#888; margin:0; font-weight:bold; font-size:0.8rem;">STARTING DROP:</p>
-                    <div class="preflight-data" id="pf-drop" style="color:#0cf; margin-top:5px; font-size:1.8rem;">DROP A</div>
-                </div>
-                <div style="flex: 1; border-left: 1px solid #333;">
-                    <p style="color:#888; margin:0; font-weight:bold; font-size:0.8rem;">STARTING FLOOR:</p>
-                    <div class="preflight-data" id="pf-floor" style="color:#0cf; margin-top:5px; font-size:1.8rem;">12</div>
-                </div>
-            </div>
-            
-            <p style="color:#888; margin:0; font-weight:bold; font-size:0.8rem;">STARTING IMAGE:</p>
-            <div class="preflight-data" id="pf-img" style="color:#f39c12; margin-top:5px;">FLIR0045</div>
-            
-            <button class="modal-btn btn-green" onclick="lockInDrop()">🚀 YES, LOCK IT IN</button>
-            <button class="modal-btn btn-dark" onclick="closePreFlight()">🔙 CANCEL</button>
+    <div class="header">
+        <div>
+            <h1>STRATA COMMAND <span>| v5.6 Visual Merge</span></h1>
+            <div id="project-name" style="font-weight: bold; color: #888; margin-top: 5px;">Awaiting Data...</div>
+        </div>
+        <div class="header-btns">
+            <button class="btn btn-dark" id="btn-reset" style="display:none;" onclick="resetBoard()">🔄 CLEAR</button>
+            <button class="btn btn-dark" id="btn-edit-map" style="display:none;" onclick="editMapping()">🗺️ EDIT MAP</button>
+            <button class="btn btn-blue" id="btn-export" style="display:none;" onclick="exportReviewedCSV()">💾 EXPORT CSV</button>
         </div>
     </div>
 
-    <div id="safetyModal" class="modal-overlay">
-        <div class="modal-box">
-            <h2 style="color:#f39c12; margin-top:0; font-size: 2rem;">⚠️ DATA MISSING!</h2>
-            <p style="color:#ccc; font-size:1.1rem; margin-bottom:25px; line-height:1.4;">
-                You have not logged any findings for window <br><strong id="modalTargetID" style="color:#0cf; font-size: 1.5rem; display:inline-block; margin-top:5px;">A-12-L</strong>
-            </p>
-            <button class="modal-btn btn-blue" onclick="modalGoToDiagnose()">🔙 WAIT, TAKE ME TO DIAGNOSE</button>
-            <button class="modal-btn btn-green" onclick="modalQuickLogAndMove()">✅ WINDOW IS CLEAR: LOG & MOVE</button>
-            <button class="modal-btn btn-dark" onclick="modalForceSkip()">⚠️ FORCE SKIP (LEAVE BLANK)</button>
-        </div>
+    <input type="file" id="multiFileInput" multiple style="display: none;">
+    <div class="upload-zone" id="drop-zone" onclick="document.getElementById('multiFileInput').click()">
+        <h2 id="drop-text">📥 Drop CSVs, Photos, & 3D Models Here</h2>
+        <p id="drop-subtext" style="color:#555; margin:0; font-size:0.9rem;">Accepts .csv, .jpg, .png, .glb, and .gltf files</p>
     </div>
+    
+    <button id="btn-start-mapping" class="btn btn-green btn-block" style="display:none; padding: 20px; font-size: 1.2rem;" onclick="openMappingScreen()">🗺️ MAP BUILDING ELEVATIONS</button>
 
-    <div id="floorAuditModal" class="modal-overlay">
-        <div class="modal-box" style="border-color:#f39c12;">
-            <h2 style="color:#f39c12; margin-top:0; font-size: 2rem;">⚠️ INCOMPLETE FLOOR</h2>
-            <p style="color:#ccc; font-size:1.1rem; margin-bottom:25px; line-height:1.4;">
-                You selected a drop pattern, but you missed the following position(s):<br>
-                <strong id="missingFloorWindows" style="color:#0cf; font-size: 2rem; display:inline-block; margin-top:10px;">C, R</strong><br><br>
-                Are you sure you want to leave this floor?
-            </p>
-            <button class="modal-btn btn-blue" onclick="modalCancelFloorChange()">🔙 CANCEL (STAY ON FLOOR)</button>
-            <button class="modal-btn btn-dark" onclick="modalForceFloorChange()">⚠️ FORCE DESCEND (SKIP WINDOWS)</button>
-        </div>
-    </div>
-
-    <div id="photoModal" class="modal-overlay">
-        <div class="modal-box" style="border-color:#0cf;">
-            <h2 style="color:#0cf; margin-top:0; font-size: 2rem;">📸 SNAP PHOTO</h2>
-            <p style="color:#ccc; font-size:1.1rem; margin-bottom:15px; line-height:1.4;">
-                Match camera image for <strong id="modalConfirmID" style="color:#fff;">A-12-L</strong>:
-            </p>
-            
-            <div style="display:flex; align-items:center; justify-content:center; gap: 10px; margin-bottom: 25px;">
-                <span style="font-size:1.5rem; font-weight:900; color:#666;">FLIR</span>
-                <input type="text" inputmode="numeric" pattern="[0-9]*" id="modalPhotoInput" style="width: 140px; font-size: 2.8rem; font-weight: 900; color: #f39c12; border: 2px solid #f39c12; background: #222; text-align: center; border-radius: 8px;">
-            </div>
-
-            <button class="modal-btn btn-green" onclick="finalizeLogEvidence()" style="font-size: 1.2rem; padding: 25px 10px;">✅ CONFIRM & SAVE</button>
-            <button class="modal-btn btn-dark" onclick="cancelLogEvidence()">🔙 CANCEL (DON'T SAVE YET)</button>
-        </div>
-    </div>
-
-    <div id="wipeModal" class="modal-overlay">
-        <div class="modal-box" style="border-color:#b00;">
-            <h2 style="color:#d9534f; margin-top:0; font-size: 2rem;">🚨 WIPE DATA?</h2>
-            <p style="color:#ccc; font-size:1.1rem; margin-bottom:25px; line-height:1.4;">
-                This will permanently delete all logged findings in the Data Vault.<br><br><strong>Have you exported the CSV?</strong>
-            </p>
-            <button class="modal-btn btn-dark" onclick="closeWipeModal()">🔙 CANCEL (KEEP DATA)</button>
-            <button class="modal-btn btn-red" onclick="confirmWipe()">🚨 YES, WIPE ALL DATA</button>
-        </div>
-    </div>
-
-    <div class="slide-container" id="mainSlider">
+    <div id="mapping-screen">
+        <h2 style="margin-top:0; color:#0cf;">Assign Drops to Walls</h2>
+        <p style="color:#888; margin-bottom: 20px;">Create your architectural structure below. Add your custom walls, then assign drops.</p>
         
-        <div class="slide" id="slide-map">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <h2 style="color:#fff; margin:0; font-size:1.2rem;">LOGISTICS SETUP</h2>
-                <button id="btn-unlock" class="btn-dark" style="display:none; padding: 8px 15px; border-radius: 6px; font-size: 0.8rem; font-weight: bold;" onclick="unlockSetup()">✏️ EDIT SETUP</button>
-            </div>
-            
-            <div class="card">
-                <label>Project Name / Building</label>
-                <input type="text" id="projectID" class="setup-input" style="margin-bottom:12px;" placeholder="e.g. Torrance HOA">
-                
-                <label>Technician Name</label>
-                <input type="text" id="techName" class="setup-input" style="margin-bottom:12px;" placeholder="e.g. Art">
-                
-                <label>Cam ID</label>
-                <input type="text" id="camID" class="setup-input" placeholder="e.g. C1">
-            </div>
-
-            <div class="critical-card">
-                <div style="display:flex; gap:10px; margin-bottom: 15px;">
-                    <div style="flex:1;">
-                        <label style="color:#0cf; font-size:0.8rem;">Drop ID</label>
-                        <input type="text" id="dropLetter" class="setup-input" style="font-size: 1.5rem; font-weight: bold; border-color: #0cf; text-transform: uppercase;" placeholder="e.g. A" oninput="handleDropChange()">
-                    </div>
-                    <div style="flex:1;">
-                        <label style="color:#f39c12; font-size:0.8rem;">Start Image #</label>
-                        <input type="number" id="imgNum" class="setup-input" style="font-size: 1.5rem; font-weight: bold; border-color: #f39c12; color: #f39c12;" placeholder="e.g. 1">
-                    </div>
-                </div>
-
-                <label style="color:#888;">Starting Floor Level</label>
-                <div class="stepper-box">
-                    <div class="stepper-row">
-                        <button class="step-btn" onclick="requestFloorChange('down')">−</button>
-                        <div class="step-display">
-                            <div class="step-val" id="floorNumVal">12</div>
-                        </div>
-                        <button class="step-btn" onclick="requestFloorChange('up')">+</button>
-                    </div>
-                    <input type="hidden" id="floorNum" value="12">
-                </div>
-                
-                <label style="color:#888;">Drop Pattern</label>
-                <div style="display:flex; margin-bottom:4px;">
-                    <button class="pattern-btn active" id="pat3" onclick="setPattern('3')">3-WIN</button>
-                    <button class="pattern-btn" id="pat2" onclick="setPattern('2')">2-WIN</button>
-                    <button class="pattern-btn" id="pat1" onclick="setPattern('1')">1-WIN</button>
-                </div>
-                
-                <label style="color:#888; margin-top: 15px;">Starting Position</label>
-                <div style="display:flex;" id="posSelectorRow"></div>
-            </div>
-
-            <div class="target-banner" style="border-color:#333;">
-                <span class="target-label" style="color:#888;">TARGET ID (MAP)</span>
-                <div id="fullIDDisplay" class="target-id" style="color:#0cf;">A-12-L</div>
-            </div>
-            
-            <button id="btn-commit" class="action-btn btn-green" style="padding: 22px; margin-bottom: 40px;" onclick="triggerCommit()">🚀 COMMIT TO DROP</button>
-            <input type="hidden" id="dropPattern" value="3">
+        <div class="elevation-creator">
+            <input type="text" id="new-elevation-name" placeholder="e.g. North Face, Courtyard, Penthouse...">
+            <button class="btn btn-blue" onclick="addElevation()">➕ ADD WALL</button>
         </div>
-
-        <div class="slide" id="slide-diagnose">
-            
-            <label style="margin-left:5px; margin-top: 10px; display: block;">SCAN & FLAG FINDINGS</label>
-            <div class="check-grid">
-                <div class="check-item sound-box active" id="soundBtn" onclick="toggleSound()">CLEAR</div>
-                <div class="check-item defect" id="moistureDetectBtn" onclick="toggleDefect(this)">MOISTURE</div>
-                <div class="check-item defect" onclick="toggleDefect(this)">LEAK SUSPECT</div>
-                <div class="check-item defect" onclick="toggleDefect(this)">SEALANT FAIL</div>
-                <div class="check-item defect" onclick="toggleDefect(this)">GASKET GAP</div>
-                <div class="check-item defect" onclick="toggleDefect(this)">IGU FOG</div>
-                <div class="check-item defect" onclick="toggleDefect(this)">BLOCKED WEEPS</div>
-                <div class="check-item defect" onclick="toggleDefect(this)">GLASS CRACK</div>
-                <div class="check-item defect" onclick="toggleDefect(this)">SPALLING</div>
-                <div class="check-item defect" onclick="toggleDefect(this)">STAINING</div>
-                <div class="check-item defect" onclick="toggleDefect(this)">LOOSE FRAME</div>
-                <div class="check-item defect" onclick="toggleDefect(this)">AIR DRAFT</div>
-            </div>
-
-            <div class="moisture-panel" id="groundTruthCard">
-                <label style="color:#d9534f; margin-bottom:8px;">SURVEYMASTER CONFIRMATION</label>
-                <div style="display:flex; gap:8px;">
-                    <div class="stepper-box" style="flex:1; margin:0;">
-                        <div class="stepper-row" style="height:50px;">
-                            <button class="step-btn" style="width:30px;" onclick="step('moisturePct', -1)">-</button>
-                            <div class="step-display">
-                                <div class="step-val" id="moisturePctVal" style="font-size:1.5rem;">85</div>
-                                <div class="hud-bubble" id="hud-moisturePct">85</div>
-                                <input type="range" class="touch-slider" min="0" max="100" step="1" value="85" oninput="slideUpdate('moisturePct', this.value)" onchange="slideEnd('moisturePct')" ontouchend="slideEnd('moisturePct')">
-                            </div>
-                            <button class="step-btn" style="width:30px;" onclick="step('moisturePct', 1)">+</button>
-                        </div>
-                        <input type="hidden" id="moisturePct" value="85">
-                    </div>
-                    <div class="check-item" id="meterProvedBtn" onclick="toggleMeter(this)" style="flex:1.5; border:1px solid #555;">METER PROVED</div>
-                </div>
-            </div>
-
-            <button class="action-btn btn-blue" style="padding: 22px;" onclick="openPhotoVerificationModal('full')">LOG DATA & VERIFY</button>
-        </div>
-
-        <div class="slide" id="slide-command">
-            <div class="card">
-                <label>NEXT MOVE</label>
-                <div id="flowNextRow" style="display:flex; gap:8px; margin-bottom:10px;"></div>
-                <button class="cmd-action-btn" style="background:#28a745; margin-top:5px;" onclick="requestFloorChange('descend_btn')">
-                    ▼ DESCEND FLOOR & RESET
-                </button>
-            </div>
-
-            <div class="card" style="padding:0;">
-                <label style="padding:10px; display:block;">DATA VAULT</label>
-                <div style="overflow-x:auto; max-height:45vh; border-top:1px solid #333;">
-                    <table id="logTable">
-                        <thead style="background:#222;">
-                            <tr>
-                                <th class="export-only">Project</th>
-                                <th class="export-only">Cam</th>
-                                <th class="export-only">Tech</th>
-                                <th>ID</th>
-                                <th>Img</th>
-                                <th>Finds</th>
-                                <th class="export-only">M%</th>
-                                <th class="export-only">Proved</th>
-                                <th>Time</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div style="display:flex; gap:8px; margin-top:10px;">
-                <button class="cmd-action-btn" style="background:#333; margin:0;" onclick="exportAndSend()">📤 EXPORT & SEND</button>
-                <button class="cmd-action-btn" style="background:#b00; margin:0;" onclick="openWipeModal()">WIPE</button>
-            </div>
-        </div>
+        <div id="mapping-list"></div>
+        <button class="btn btn-green btn-block" style="padding: 20px; font-size: 1.2rem; margin-top: 20px;" onclick="generateDashboard()">✅ GENERATE DASHBOARD</button>
     </div>
 
-    <div class="navbar">
-        <div class="nav-item active" onclick="goToSlide(0)">MAP</div>
-        <div class="nav-item" onclick="goToSlide(1)">DIAGNOSE</div>
-        <div class="nav-item" onclick="goToSlide(2)">COMMAND</div>
+    <div id="dashboard-screen">
+        
+        <div class="view-controls">
+            <span style="color:#888; font-weight:bold; font-size:0.9rem; margin-right: 10px;">MODE:</span>
+            <button class="view-toggle-btn active" id="btn-2d" onclick="switchView('2d')">2D TABS</button>
+            <button class="view-toggle-btn" id="btn-3d" onclick="switchView('3d')">CSS 3D ORBIT</button>
+            <button class="view-toggle-btn" id="btn-true3d" onclick="switchView('true3d')">✨ TRUE 3D TWIN</button>
+            <div style="flex:0.2;"></div>
+            <button class="view-toggle-btn" style="border:1px solid #555;" id="btn-stitch" onclick="toggleStitchMode()">🔗 STITCH WIDE WINDOWS</button>
+        </div>
+
+        <div class="stats-bar" id="stats-bar">
+            <div class="stat-card" style="border-color:#28a745;">
+                <div class="stat-label">Total Windows</div>
+                <div class="stat-value" id="stat-total">0</div>
+            </div>
+            <div class="stat-card" style="border-color:#f1c40f;">
+                <div class="stat-label">Pending Review</div>
+                <div class="stat-value" id="stat-flagged" style="color:#f1c40f;">0</div>
+            </div>
+            <div class="stat-card" style="border-color:#d9534f;">
+                <div class="stat-label">Confirmed Defects</div>
+                <div class="stat-value" id="stat-confirmed" style="color:#d9534f;">0</div>
+            </div>
+            <div class="stat-card" style="border-color:#0cf;">
+                <div class="stat-label">Images Linked</div>
+                <div class="stat-value" id="stat-photos" style="color:#0cf;">0</div>
+            </div>
+        </div>
+
+        <div id="view-2d">
+            <div class="tabs-container" id="tabs-container"></div>
+            <div id="building-container-2d"></div>
+        </div>
+
+        <div id="arena-3d">
+            <div id="world-3d"></div>
+            <div style="position: absolute; bottom: 15px; right: 15px; color: #888; font-size: 0.8rem; font-weight: bold; background: rgba(0,0,0,0.5); padding: 8px 12px; border-radius: 20px; display: flex; gap: 15px;">
+                <span>🖱️ Click & Drag to Spin</span>
+                <span style="color:#0cf;">🖱️ Scroll to Zoom</span>
+            </div>
+        </div>
+
+        <div id="arena-true3d">
+            <model-viewer id="main-3d-viewer"
+                src="https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/LittlestTokyo.glb" 
+                alt="A 3D model of a building" 
+                auto-rotate 
+                camera-controls 
+                tone-mapping="neutral" 
+                shadow-intensity="1">
+            </model-viewer>
+            <div style="position: absolute; top: 15px; left: 15px; color: #fff; font-size: 0.9rem; font-weight: bold; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; border: 1px solid #d080ff;">
+                <strong>Drone Photogrammetry Engine</strong><br>
+                <span id="model-status" style="font-weight:normal; color:#ccc;">Showing Default Test Model. Drop a custom .glb file above to replace.</span>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="modal-overlay" id="info-modal">
+        <div class="modal-box">
+            <h2 class="modal-title" id="m-id">A-12-L</h2>
+            <div class="modal-subtitle" id="m-tech">Logged by Tech at 14:30</div>
+            
+            <button class="btn btn-dark btn-block" id="btn-unmerge" style="display:none; margin-bottom:15px; border-color:#f39c12; color:#f39c12;" onclick="unmergeCurrent()">✂️ UN-STITCH THESE WINDOWS</button>
+            
+            <div class="photo-gallery" id="m-photo-gallery"></div>
+            <div id="m-no-photo" class="no-photo-banner">IMAGE NOT UPLOADED TO DASHBOARD</div>
+            
+            <div class="data-row"><span class="data-label">Field Findings</span><span class="data-val" id="m-finds" style="color:#f1c40f;">--</span></div>
+            <div class="data-row"><span class="data-label">Moisture %</span><span class="data-val" id="m-moisture">--</span></div>
+            <div class="data-row"><span class="data-label">Meter Proved</span><span class="data-val" id="m-proved">--</span></div>
+            <div class="data-row"><span class="data-label">FLIR Image(s)</span><span class="data-val" id="m-flir" style="color:#0cf;">--</span></div>
+            
+            <div class="manager-section">
+                <span class="data-label" style="color:#fff;">Management Notes</span>
+                <textarea id="m-notes" class="modal-notes" placeholder="e.g. Schedule sealant replacement..."></textarea>
+                
+                <div style="margin-top: 15px; border-top: 1px solid #333; padding-top: 10px;">
+                    <span class="data-label" style="color:#888;">Office Override: Status</span>
+                    <div class="status-btns">
+                        <button class="btn btn-status btn-green" onclick="changeStatus('status-clear')">✅ MARK CLEAR</button>
+                        <button class="btn btn-status btn-status-yellow" onclick="changeStatus('status-flagged')">⚠️ FLAG (REVIEW)</button>
+                        <button class="btn btn-status btn-red" onclick="changeStatus('status-confirmed')">🚨 CONFIRM DEFECT</button>
+                    </div>
+                </div>
+
+            </div>
+            
+            <button class="btn btn-dark btn-block" onclick="saveNotesOnly()">💾 SAVE NOTES & CLOSE</button>
+        </div>
     </div>
 
     <script>
-        // --- GLOBAL STATE ---
-        let currentPos = "L";
-        let isCurrentWindowLogged = false;
-        let pendingMoveCallback = null;
-        let pendingFloorAction = null;
-        let hasVisitedDiagnose = false; 
+        let inspectionData = {};
+        let projectInfo = "Unknown Project";
         
-        let pendingLogType = null; // 'full' or 'quick'
+        let activeNodeDataArray = []; 
+        let isStitchMode = false;
+        let stitchSelection = [];
+        let stitchedPairs = []; 
         
-        const patternConfigs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
+        let imageBank = {}; 
+        let linkedPhotosCount = 0;
 
-        function initApp() {
-            if (localStorage.getItem('strataVault')) {
-                document.getElementById('logTable').querySelector('tbody').innerHTML = localStorage.getItem('strataVault');
-            }
-            
-            if (localStorage.getItem('isDropLocked') === 'true') {
-                if (localStorage.getItem('strataState')) {
-                    const savedState = JSON.parse(localStorage.getItem('strataState'));
-                    document.getElementById('projectID').value = savedState.project || "";
-                    document.getElementById('techName').value = savedState.tech || "";
-                    document.getElementById('camID').value = savedState.cam || "";
-                    document.getElementById('floorNum').value = savedState.floor;
-                    document.getElementById('floorNumVal').innerText = savedState.floor;
-                    document.getElementById('dropLetter').value = savedState.drop;
-                    if(savedState.img) {
-                        document.getElementById('imgNum').value = savedState.img;
-                    }
-                    setPattern(savedState.pattern, savedState.pos);
-                }
-                document.querySelectorAll('.setup-input').forEach(el => el.disabled = true);
-                document.getElementById('btn-commit').style.display = 'none';
-                document.getElementById('btn-unlock').style.display = 'block';
-            } else {
-                document.getElementById('projectID').value = "";
-                document.getElementById('techName').value = "";
-                document.getElementById('camID').value = "";
-                document.getElementById('dropLetter').value = "";
-                document.getElementById('imgNum').value = "";
-                setPattern('3'); 
-            }
+        let elevations = []; 
+        let dropAssignments = {}; 
+        let activeTab = "";
+        let globalStats = { t:0, f:0, c:0, maxFloor: -Infinity, minFloor: Infinity };
 
-            updateFixedHeaders(0); 
-        }
+        let currentMode = '2d'; 
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let rotationY = -30; 
+        let rotationX = 5;   
+        let zoomZ = -400; 
 
-        // --- PRE-FLIGHT HARD GATE ---
-        function triggerCommit() {
-            const p = document.getElementById('projectID').value;
-            const t = document.getElementById('techName').value;
-            const c = document.getElementById('camID').value;
-            const d = document.getElementById('dropLetter').value;
-            const i = document.getElementById('imgNum').value;
-            const f = document.getElementById('floorNum').value;
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('multiFileInput');
 
-            if(!p || !t || !c || !d || !i) {
-                alert("⚠️ ALL FIELDS REQUIRED: Please fill out Project, Tech, Cam ID, Drop ID, and Start Image before committing.");
-                return;
-            }
-            
-            document.getElementById('pf-proj').innerText = p;
-            document.getElementById('pf-tech').innerText = t;
-            document.getElementById('pf-cam').innerText = c;
-            
-            // Displays both Drop ID and Floor explicitly
-            document.getElementById('pf-drop').innerText = "DROP " + d.toUpperCase();
-            document.getElementById('pf-floor').innerText = f;
-            
-            document.getElementById('pf-img').innerText = "FLIR" + i.toString().padStart(4, '0');
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); });
+        dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); handleFiles(e.dataTransfer.files); });
+        fileInput.addEventListener('change', (e) => { handleFiles(e.target.files); });
 
-            document.getElementById('preFlightModal').style.display = 'flex';
-        }
+        async function handleFiles(files) {
+            if (!files || files.length === 0) return;
+            const csvPromises = [];
 
-        function closePreFlight() {
-            document.getElementById('preFlightModal').style.display = 'none';
-        }
-
-        function lockInDrop() {
-            document.getElementById('preFlightModal').style.display = 'none';
-            document.querySelectorAll('.setup-input').forEach(el => el.disabled = true);
-            document.getElementById('btn-commit').style.display = 'none';
-            document.getElementById('btn-unlock').style.display = 'block';
-
-            localStorage.setItem('isDropLocked', 'true');
-            saveLocationState();
-            goToSlide(1); 
-        }
-
-        function unlockSetup() {
-            if(confirm("⚠️ Unlock setup? Be careful not to change the Drop ID or Image # unless necessary.")) {
-                document.querySelectorAll('.setup-input').forEach(el => el.disabled = false);
-                document.getElementById('btn-commit').style.display = 'block';
-                document.getElementById('btn-unlock').style.display = 'none';
-                localStorage.setItem('isDropLocked', 'false');
-            }
-        }
-
-        function saveLocationState() {
-            const s = {
-                project: document.getElementById('projectID').value,
-                tech: document.getElementById('techName').value,
-                cam: document.getElementById('camID').value,
-                floor: document.getElementById('floorNum').value,
-                drop: document.getElementById('dropLetter').value,
-                pattern: document.getElementById('dropPattern').value,
-                pos: currentPos,
-                img: document.getElementById('imgNum').value
-            };
-            localStorage.setItem('strataState', JSON.stringify(s));
-        }
-        
-        function handleDropChange() {
-            hasVisitedDiagnose = false;
-            isCurrentWindowLogged = false;
-            updatePreview();
-            saveLocationState();
-        }
-
-        function updateFixedHeaders(slideIndex) {
-            document.getElementById('header-diagnose').style.display = (slideIndex === 1) ? 'block' : 'none';
-            document.getElementById('header-command').style.display = (slideIndex === 2) ? 'block' : 'none';
-        }
-
-        /* --- INTERCEPTORS --- */
-        function verifySafeMove(callback) {
-            if (!hasVisitedDiagnose) { callback(); return; }
-            if (isCurrentWindowLogged) { callback(); return; } 
-            
-            const currentTarget = document.getElementById('fullIDDisplay').innerText;
-            let alreadyInVault = false;
-            
-            document.querySelectorAll("#logTable tbody tr").forEach(tr => {
-                const tds = tr.querySelectorAll("td");
-                if (tds.length >= 4) {
-                    if (tds[3].textContent === currentTarget) alreadyInVault = true;
-                }
-            });
-
-            if (alreadyInVault) {
-                callback();
-            } else {
-                pendingMoveCallback = callback;
-                document.getElementById('modalTargetID').innerText = currentTarget;
-                document.getElementById('safetyModal').style.display = 'flex';
-            }
-        }
-
-        function modalGoToDiagnose() {
-            document.getElementById('safetyModal').style.display = 'none';
-            goToSlide(1); 
-        }
-
-        function modalQuickLogAndMove() {
-            document.getElementById('safetyModal').style.display = 'none';
-            openPhotoVerificationModal('quick');
-        }
-
-        function modalForceSkip() {
-            document.getElementById('safetyModal').style.display = 'none';
-            if(pendingMoveCallback) pendingMoveCallback();
-            pendingMoveCallback = null;
-        }
-
-        function checkFloorCompletion() {
-            const pat = document.getElementById('dropPattern').value;
-            const required = patternConfigs[pat]; 
-            
-            const currentFloor = document.getElementById('floorNum').value;
-            const currentDrop = document.getElementById('dropLetter').value.toUpperCase();
-            
-            let foundPositions = new Set();
-            document.querySelectorAll("#logTable tbody tr").forEach(tr => {
-                const tds = tr.querySelectorAll("td");
-                if (tds.length >= 4) {
-                    const loggedID = tds[3].textContent; 
-                    required.forEach(p => {
-                        if (loggedID === `${currentDrop}-${currentFloor}-${p}`) {
-                            foundPositions.add(p);
-                        }
-                    });
-                }
-            });
-
-            const missing = required.filter(p => !foundPositions.has(p));
-            return { missing: missing, foundCount: foundPositions.size };
-        }
-
-        function requestFloorChange(actionType) {
-            verifySafeMove(() => {
-                const audit = checkFloorCompletion();
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
                 
-                if (!hasVisitedDiagnose && audit.foundCount === 0) {
-                    processFloorAction(actionType);
+                if (file.type.startsWith('image/')) {
+                    const cleanName = file.name.split('.')[0].toUpperCase();
+                    imageBank[cleanName] = URL.createObjectURL(file);
+                    linkedPhotosCount++;
+                } 
+                else if (file.name.toLowerCase().endsWith('.glb') || file.name.toLowerCase().endsWith('.gltf')) {
+                    const modelUrl = URL.createObjectURL(file);
+                    document.getElementById('main-3d-viewer').src = modelUrl;
+                    document.getElementById('model-status').innerHTML = `<span style="color:#0cf;">Loaded Custom Model:</span> ${file.name}`;
+                }
+                else if (file.name.toLowerCase().endsWith('.csv')) {
+                    csvPromises.push(new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (event) => { parseCSV(event.target.result); resolve(); };
+                        reader.readAsText(file);
+                    }));
+                }
+            }
+
+            await Promise.all(csvPromises);
+
+            document.getElementById('project-name').innerText = "Project: " + projectInfo;
+            document.getElementById('stat-photos').innerText = linkedPhotosCount;
+            
+            dropZone.classList.add('compact');
+            document.getElementById('drop-text').innerText = "➕ Add More Files";
+            document.getElementById('drop-subtext').innerText = "Drop CSVs, Photos, or a 3D Model here";
+            
+            document.getElementById('btn-reset').style.display = 'inline-block';
+            document.getElementById('btn-start-mapping').style.display = 'block';
+            
+            if (document.getElementById('dashboard-screen').style.display === 'block') {
+                calculateBuildingGeometry();
+                if (currentMode !== 'true3d') refreshCurrentView();
+            }
+            fileInput.value = "";
+        }
+
+        function parseCSV(text) {
+            const rows = text.trim().split('\n');
+            for (let i = 1; i < rows.length; i++) {
+                if(!rows[i]) continue;
+                const cols = rows[i].replace(/"/g, '').split(',');
+                
+                if (cols.length >= 8) {
+                    if (projectInfo === "Unknown Project") projectInfo = cols[0];
+                    const tech = cols[2];
+                    const fullId = cols[3]; 
+                    const flir = cols[4];
+                    const finds = cols[5];
+                    const moistPct = cols[6];
+                    const proved = cols[7];
+                    const time = cols[8];
+
+                    let status = 'status-clear';
+                    if (!finds.includes('CLEAR')) status = 'status-flagged'; 
+
+                    const parts = fullId.split('-');
+                    if(parts.length === 3) {
+                        const drop = parts[0];
+                        const floor = parseInt(parts[1]);
+                        const pos = parts[2];
+
+                        if (!inspectionData[drop]) inspectionData[drop] = {};
+                        if (!inspectionData[drop][floor]) inspectionData[drop][floor] = {};
+                        
+                        let existingNotes = "";
+                        let existingStatus = status;
+                        if(inspectionData[drop][floor][pos]) {
+                            existingNotes = inspectionData[drop][floor][pos].notes;
+                            if(inspectionData[drop][floor][pos].status === 'status-confirmed') existingStatus = 'status-confirmed';
+                            if(inspectionData[drop][floor][pos].status === 'status-clear') existingStatus = 'status-clear';
+                            if(inspectionData[drop][floor][pos].status === 'status-flagged') existingStatus = 'status-flagged';
+                        }
+
+                        inspectionData[drop][floor][pos] = {
+                            id: fullId, flir: flir, finds: finds, mPct: moistPct, 
+                            proved: proved, tech: tech, time: time, status: existingStatus,
+                            notes: existingNotes
+                        };
+                        
+                        if(!dropAssignments[drop]) dropAssignments[drop] = "";
+                    }
+                }
+            }
+        }
+
+        function toggleStitchMode() {
+            isStitchMode = !isStitchMode;
+            document.getElementById('btn-stitch').classList.toggle('stitch-mode-on', isStitchMode);
+            stitchSelection = [];
+            if(isStitchMode) alert("STITCH MODE ACTIVE:\nClick the right half of the window, then click the left half. The system will merge them.");
+            if (currentMode !== 'true3d') refreshCurrentView();
+        }
+
+        function getNodeData(fullId) {
+            const parts = fullId.split('-');
+            if(inspectionData[parts[0]] && inspectionData[parts[0]][parts[1]]) {
+                return inspectionData[parts[0]][parts[1]][parts[2]];
+            }
+            return null;
+        }
+
+        function getCombinedStatus(id1, id2) {
+            let d1 = getNodeData(id1);
+            let d2 = getNodeData(id2);
+            if(!d1 || !d2) return 'status-clear';
+            if(d1.status === 'status-confirmed' || d2.status === 'status-confirmed') return 'status-confirmed';
+            if(d1.status === 'status-flagged' || d2.status === 'status-flagged') return 'status-flagged';
+            return 'status-clear';
+        }
+
+        function handleNodeClick(data, nodeElement) {
+            if(isStitchMode) {
+                // NEW UNMERGE FROM STITCH MODE LOGIC
+                let existingPairIndex = stitchedPairs.findIndex(p => p.includes(data.id));
+                if (existingPairIndex !== -1) {
+                    if(confirm("This window is already stitched. Do you want to un-stitch it?")) {
+                        stitchedPairs.splice(existingPairIndex, 1);
+                        stitchSelection = [];
+                        isStitchMode = false;
+                        document.getElementById('btn-stitch').classList.remove('stitch-mode-on');
+                        calculateBuildingGeometry();
+                        refreshCurrentView();
+                    }
                     return;
                 }
                 
-                if (audit.missing.length === 0) {
-                    processFloorAction(actionType);
-                } else {
-                    pendingFloorAction = actionType;
-                    document.getElementById('missingFloorWindows').innerText = audit.missing.join(", ");
-                    document.getElementById('floorAuditModal').style.display = 'flex';
-                }
-            });
-        }
-
-        function modalCancelFloorChange() { document.getElementById('floorAuditModal').style.display = 'none'; pendingFloorAction = null; }
-        function modalForceFloorChange() {
-            document.getElementById('floorAuditModal').style.display = 'none';
-            if (pendingFloorAction) processFloorAction(pendingFloorAction);
-            pendingFloorAction = null;
-        }
-
-        function processFloorAction(actionType) {
-            let val = (actionType === 'up') ? 1 : -1;
-            step('floorNum', val); 
-            
-            const pat = document.getElementById('dropPattern').value;
-            currentPos = patternConfigs[pat][0];
-            
-            isCurrentWindowLogged = false;
-            hasVisitedDiagnose = false; 
-            
-            updatePosUI();
-            updatePreview();
-            saveLocationState(); 
-            
-            if (actionType === 'descend_btn') goToSlide(0);
-        }
-
-        /* --- SMART MODALS --- */
-        function openWipeModal() { document.getElementById('wipeModal').style.display = 'flex'; }
-        function closeWipeModal() { document.getElementById('wipeModal').style.display = 'none'; }
-        function confirmWipe() { 
-            localStorage.removeItem('strataVault'); 
-            localStorage.removeItem('strataState'); 
-            localStorage.setItem('isDropLocked', 'false');
-            location.reload(); 
-        }
-
-        // --- PRE-SAVE VERIFICATION MODAL ---
-        function openPhotoVerificationModal(logType) {
-            pendingLogType = logType;
-            document.getElementById('modalConfirmID').innerText = document.getElementById('fullIDDisplay').innerText;
-            
-            const currentImgVal = document.getElementById('imgNum').value;
-            document.getElementById('modalPhotoInput').value = currentImgVal.toString().padStart(4, '0');
-            
-            document.getElementById('photoModal').style.display = 'flex';
-        }
-
-        function cancelLogEvidence() {
-            document.getElementById('photoModal').style.display = 'none';
-            pendingLogType = null;
-        }
-
-        function finalizeLogEvidence() {
-            const finalImageNum = parseInt(document.getElementById('modalPhotoInput').value, 10);
-            
-            document.getElementById('imgNum').value = finalImageNum;
-
-            if (pendingLogType === 'full') {
-                executeFullLog();
-            } else if (pendingLogType === 'quick') {
-                executeQuickLog();
-            }
-            
-            document.getElementById('photoModal').style.display = 'none';
-            pendingLogType = null;
-        }
-
-        /* --- LOGGING PROCESSES --- */
-        function getFormattedTime() {
-            const now = new Date();
-            return now.getHours().toString().padStart(2,'0') + ":" + 
-                   now.getMinutes().toString().padStart(2,'0') + ":" + 
-                   now.getSeconds().toString().padStart(2,'0');
-        }
-
-        function executeQuickLog() {
-            const time = getFormattedTime();
-            const proj = document.getElementById('projectID').value || "No Project";
-            const cam = document.getElementById('camID').value || "--";
-            const tech = document.getElementById('techName').value || "Tech";
-            const id = document.getElementById('fullIDDisplay').innerText;
-            
-            const imgEl = document.getElementById('imgNum');
-            const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
-            
-            const row = `<tr>
-                <td class="export-only">${proj}</td>
-                <td class="export-only">${cam}</td>
-                <td class="export-only">${tech}</td>
-                <td style="color:#0cf; font-weight:bold; white-space:nowrap;">${id}</td>
-                <td>${imgStr}</td>
-                <td style="color:#f39c12;">CLEAR (QUICK-LOG)</td>
-                <td class="export-only">--</td>
-                <td class="export-only">NO</td>
-                <td>${time}</td>
-            </tr>`;
-            
-            writeToVaultAndReset(row, imgEl);
-
-            if(pendingMoveCallback) pendingMoveCallback();
-            pendingMoveCallback = null;
-        }
-
-        function executeFullLog() {
-            const time = getFormattedTime();
-            const proj = document.getElementById('projectID').value || "No Project";
-            const cam = document.getElementById('camID').value || "--";
-            const tech = document.getElementById('techName').value || "Tech";
-            const id = document.getElementById('fullIDDisplay').innerText;
-            
-            const imgEl = document.getElementById('imgNum');
-            const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
-            
-            let finds = [];
-            document.querySelectorAll('.check-item.active').forEach(el => finds.push(el.innerText));
-            if(finds.length===0) finds.push("CLEAR"); 
-            
-            let mPct = "--";
-            let proved = "NO";
-            if(document.getElementById('groundTruthCard').style.display === 'block') {
-                mPct = document.getElementById('moisturePct').value + "%";
-                if(document.getElementById('meterProvedBtn').classList.contains('active')) proved = "YES";
-            }
-
-            const row = `<tr>
-                <td class="export-only">${proj}</td>
-                <td class="export-only">${cam}</td>
-                <td class="export-only">${tech}</td>
-                <td style="color:#0cf; font-weight:bold; white-space:nowrap;">${id}</td>
-                <td>${imgStr}</td>
-                <td>${finds.join(' | ')}</td>
-                <td class="export-only">${mPct}</td>
-                <td class="export-only">${proved}</td>
-                <td>${time}</td>
-            </tr>`;
-            
-            writeToVaultAndReset(row, imgEl);
-            goToSlide(2); 
-        }
-
-        function writeToVaultAndReset(htmlRow, imgEl) {
-            document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', htmlRow);
-            localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
-            
-            isCurrentWindowLogged = true;
-            
-            // Auto-Increment for the NEXT window
-            const nextImg = parseInt(imgEl.value, 10) + 1;
-            imgEl.value = nextImg;
-            
-            saveLocationState(); 
-            
-            // Reset UI
-            toggleSound(); 
-            
-            // Reset Moisture back to 85 default
-            document.getElementById('moisturePct').value = '85';
-            document.getElementById('moisturePctVal').innerText = '85';
-            const slider = document.querySelector('#groundTruthCard .touch-slider');
-            if (slider) slider.value = 85;
-
-            document.getElementById('meterProvedBtn').classList.remove('active');
-            document.getElementById('meterProvedBtn').style.background = '#222';
-            document.getElementById('meterProvedBtn').style.color = '#888';
-            document.getElementById('meterProvedBtn').innerText = 'METER PROVED';
-        }
-
-        function slideUpdate(id, val) {
-            let formatted = parseInt(val) || 0;
-            document.getElementById(id + 'Val').innerText = formatted;
-            const hud = document.getElementById('hud-' + id);
-            if(hud) { hud.innerText = formatted; hud.style.transform = "translateX(-50%) scale(1)"; }
-            document.getElementById(id).value = formatted;
-        }
-        
-        function slideEnd(id) { const hud = document.getElementById('hud-' + id); if(hud) hud.style.transform = "translateX(-50%) scale(0)"; }
-        
-        // --- SMART FALLBACK INCLUDED HERE ---
-        function step(id, val) {
-            const el = document.getElementById(id);
-            let fallback = (id === 'moisturePct') ? 85 : 0;
-            let current = parseFloat(el.value);
-            if (isNaN(current)) current = fallback;
-            
-            let newVal = (current + val);
-            
-            if(id === 'moisturePct') { if(newVal < 0) newVal = 0; if(newVal > 100) newVal = 100; }
-            
-            el.value = newVal;
-            const displayId = (id === 'floorNum') ? 'floorNumVal' : id + 'Val';
-            document.getElementById(displayId).innerText = newVal;
-            
-            const box = el.closest('.stepper-box');
-            if(box) { const s = box.querySelector('.touch-slider'); if(s) s.value = Math.round(newVal); }
-            if(id === 'floorNum') { updatePreview(); saveLocationState(); }
-        }
-
-        function toggleSound() {
-            document.getElementById('soundBtn').classList.add('active');
-            document.querySelectorAll('.defect').forEach(el => el.classList.remove('active'));
-            document.getElementById('groundTruthCard').style.display = 'none';
-        }
-
-        function toggleDefect(el) {
-            el.classList.toggle('active');
-            if (document.querySelectorAll('.defect.active').length > 0) {
-                document.getElementById('soundBtn').classList.remove('active');
-            } else {
-                document.getElementById('soundBtn').classList.add('active');
-            }
-            const mBtn = document.getElementById('moistureDetectBtn');
-            document.getElementById('groundTruthCard').style.display = (mBtn.classList.contains('active')) ? 'block' : 'none';
-        }
-
-        function toggleMeter(el) {
-            el.classList.toggle('active');
-            if(el.classList.contains('active')) {
-                el.style.background = '#28a745'; el.style.color='#fff'; el.innerText = 'PROVED';
-            } else {
-                el.style.background = '#222'; el.style.color='#888'; el.innerText = 'METER PROVED';
-            }
-        }
-
-        function attemptMovePosition(p, targetSlide = null) {
-            verifySafeMove(() => {
-                if (currentPos !== p) {
-                    isCurrentWindowLogged = false; 
-                    hasVisitedDiagnose = false; 
-                }
-                currentPos = p; 
-                updatePosUI(); 
-                updatePreview();
-                saveLocationState(); 
-                if (targetSlide !== null) goToSlide(targetSlide);
-            });
-        }
-
-        function setPattern(val, forcePos = null) {
-            document.getElementById('dropPattern').value = val;
-            document.querySelectorAll('.pattern-btn').forEach(b => b.classList.toggle('active', b.id === 'pat' + val));
-            const row = document.getElementById('posSelectorRow');
-            const flow = document.getElementById('flowNextRow');
-            row.innerHTML = ''; flow.innerHTML = '';
-            
-            isCurrentWindowLogged = false; 
-            hasVisitedDiagnose = false; 
-            
-            currentPos = forcePos ? forcePos : patternConfigs[val][0];
-            
-            patternConfigs[val].forEach(p => {
-                const btn = document.createElement('button');
-                btn.className = 'pattern-btn'; 
-                btn.innerText = p;
-                btn.onclick = () => { attemptMovePosition(p); };
-                row.appendChild(btn);
+                stitchSelection.push(data.id);
+                nodeElement.classList.add('node-selected');
                 
-                const fBtn = document.createElement('button');
-                fBtn.className = 'cmd-flow-btn';
-                fBtn.dataset.pos = p;
-                fBtn.innerText = "MOVE " + p;
-                fBtn.onclick = () => { attemptMovePosition(p, 1); };
-                flow.appendChild(fBtn);
-            });
-            updatePosUI();
-            updatePreview();
-            saveLocationState(); 
-        }
-        
-        function updatePosUI() {
-            Array.from(document.getElementById('posSelectorRow').children).forEach(b => {
-                const isMatch = b.innerText === currentPos;
-                b.style.background = isMatch ? '#0cf' : '#222';
-                b.style.color = isMatch ? '#000' : '#666';
-            });
-
-            Array.from(document.getElementById('flowNextRow').children).forEach(b => {
-                 const p = b.dataset.pos;
-                 const isMatch = p === currentPos;
-                 b.style.background = isMatch ? '#0cf' : '#333';
-                 b.style.color = isMatch ? '#000' : '#fff';
-                 b.innerText = isMatch ? "RE-TAKE" : "MOVE " + p;
-            });
-        }
-
-        function updatePreview() {
-            const f = document.getElementById('floorNum').value || 0;
-            const d = document.getElementById('dropLetter').value.toUpperCase() || "X";
-            
-            const fullID = `${d}-${f}-${currentPos}`;
-            
-            document.getElementById('fullIDDisplay').innerText = fullID; 
-            document.getElementById('diagnoseIDDisplay').innerText = fullID; 
-            document.getElementById('cmdIDDisplay').innerText = fullID; 
-        }
-
-        function goToSlide(n) {
-            if ((n === 1 || n === 2) && localStorage.getItem('isDropLocked') !== 'true') {
-                alert("⚠️ PRE-FLIGHT REQUIRED: You must fill out your Logistics setup and tap 'COMMIT TO DROP' before diagnosing windows.");
+                if(stitchSelection.length === 2) {
+                    stitchSelection.sort(); 
+                    stitchedPairs.push([...stitchSelection]);
+                    isStitchMode = false;
+                    document.getElementById('btn-stitch').classList.remove('stitch-mode-on');
+                    stitchSelection = [];
+                    refreshCurrentView();
+                }
                 return;
             }
-
-            document.getElementById('mainSlider').style.transform = `translateX(-${n * 100}vw)`;
-            document.querySelectorAll('.nav-item').forEach((el, i) => el.classList.toggle('active', i === n));
-            
-            updateFixedHeaders(n);
-            
-            if (n === 1) hasVisitedDiagnose = true;
+            openModal(data.id);
         }
-        
-        async function exportAndSend() {
-            let csv = "Project,Camera,Technician,Drop ID,FLIR Image,Findings,Moisture %,Meter Proved,Time\n";
-            document.querySelectorAll("#logTable tbody tr").forEach(tr => {
-                const cols = Array.from(tr.querySelectorAll("td"));
-                csv += cols.map(td => `"${td.textContent}"`).join(",") + "\n";
-            });
-            
-            const proj = document.getElementById('projectID').value || "Unknown_Project";
-            const tech = document.getElementById('techName').value || "Tech";
-            const drop = document.getElementById('dropLetter').value.toUpperCase() || "Drop";
-            
-            const fileName = `Strata_${proj}_Drop${drop}_${tech}.csv`.replace(/\s+/g, '_');
 
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const file = new File([blob], fileName, { type: 'text/csv' });
+        function openMappingScreen() {
+            document.getElementById('btn-start-mapping').style.display = 'none';
+            document.getElementById('mapping-screen').style.display = 'block';
+            renderMappingList();
+        }
 
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                try {
-                    await navigator.share({
-                        title: `Strata Report: ${proj} - Drop ${drop}`,
-                        text: `Attached is the latest drop report for ${proj}, Drop ${drop}. Completed by ${tech}.`,
-                        files: [file]
+        function editMapping() {
+            document.getElementById('dashboard-screen').style.display = 'none';
+            document.getElementById('mapping-screen').style.display = 'block';
+            document.getElementById('btn-export').style.display = 'none';
+            document.getElementById('btn-edit-map').style.display = 'none';
+            renderMappingList();
+        }
+
+        function addElevation() {
+            const input = document.getElementById('new-elevation-name');
+            const val = input.value.trim();
+            if(val && !elevations.includes(val)) {
+                elevations.push(val);
+                
+                if (elevations.length === 1) {
+                    activeTab = val;
+                    Object.keys(dropAssignments).forEach(d => {
+                        if (dropAssignments[d] === "") dropAssignments[d] = val;
                     });
-                } catch (err) {
-                    console.log("Share sheet canceled or failed. Falling back to direct download.", err);
-                    forceDownload(blob, fileName);
                 }
-            } else {
-                forceDownload(blob, fileName);
+                input.value = "";
+                renderMappingList();
             }
         }
 
-        function forceDownload(blob, fileName) {
+        function renderMappingList() {
+            const list = document.getElementById('mapping-list');
+            list.innerHTML = "";
+            const drops = Object.keys(inspectionData).sort();
+
+            if (elevations.length === 0 && drops.length > 0) {
+                const warning = document.createElement('div');
+                warning.style = "color: #f1c40f; margin-bottom: 15px; font-weight: bold;";
+                warning.innerText = "⚠️ Please add at least one wall above to map your drops.";
+                list.appendChild(warning);
+            }
+
+            drops.forEach(dropStr => {
+                const row = document.createElement('div');
+                row.className = 'mapping-row';
+                row.innerHTML = `<strong style="font-size:1.2rem; color:#0cf;">DROP ${dropStr}</strong>`;
+                
+                const select = document.createElement('select');
+                select.onchange = (e) => { dropAssignments[dropStr] = e.target.value; };
+                
+                if (elevations.length === 0) {
+                    const opt = document.createElement('option');
+                    opt.value = "";
+                    opt.innerText = "Awaiting Wall...";
+                    select.appendChild(opt);
+                    select.disabled = true;
+                } else {
+                    select.disabled = false;
+                    elevations.forEach(elev => {
+                        const opt = document.createElement('option');
+                        opt.value = elev;
+                        opt.innerText = elev;
+                        if(dropAssignments[dropStr] === elev) opt.selected = true;
+                        select.appendChild(opt);
+                    });
+                }
+                
+                row.appendChild(select);
+                list.appendChild(row);
+            });
+        }
+
+        function generateDashboard() {
+            if (elevations.length === 0) {
+                alert("⚠️ You must add at least one custom wall before generating the dashboard.");
+                return;
+            }
+            
+            document.getElementById('mapping-screen').style.display = 'none';
+            document.getElementById('dashboard-screen').style.display = 'block';
+            document.getElementById('btn-export').style.display = 'inline-block';
+            document.getElementById('btn-edit-map').style.display = 'inline-block';
+            
+            if(!elevations.includes(activeTab)) activeTab = elevations[0];
+            
+            calculateBuildingGeometry();
+            if (currentMode !== 'true3d') refreshCurrentView();
+        }
+
+        function calculateBuildingGeometry() {
+            globalStats = { t:0, f:0, c:0, maxFloor: -Infinity, minFloor: Infinity };
+            const drops = Object.keys(inspectionData);
+            
+            drops.forEach(dropStr => {
+                const floors = Object.keys(inspectionData[dropStr]).map(Number);
+                floors.forEach(f => {
+                    if (f > globalStats.maxFloor) globalStats.maxFloor = f;
+                    if (f < globalStats.minFloor) globalStats.minFloor = f;
+
+                    Object.keys(inspectionData[dropStr][f]).forEach(pos => {
+                        const d = inspectionData[dropStr][f][pos];
+                        globalStats.t++;
+                        if (d.status === 'status-flagged') globalStats.f++;
+                        if (d.status === 'status-confirmed') globalStats.c++;
+                    });
+                });
+            });
+
+            if (globalStats.maxFloor === -Infinity) {
+                globalStats.maxFloor = 0;
+                globalStats.minFloor = 0;
+            }
+            
+            stitchedPairs.forEach(pair => {
+                let d1 = getNodeData(pair[0]); let d2 = getNodeData(pair[1]);
+                if (d1 && d2) {
+                    if(d1.status === 'status-flagged' && d2.status === 'status-flagged') globalStats.f--;
+                    if(d1.status === 'status-confirmed' && d2.status === 'status-confirmed') globalStats.c--;
+                }
+            });
+            
+            updateStatsUI();
+        }
+
+        function updateStatsUI() {
+            document.getElementById('stat-total').innerText = globalStats.t;
+            document.getElementById('stat-flagged').innerText = globalStats.f;
+            document.getElementById('stat-confirmed').innerText = globalStats.c;
+        }
+
+        function switchView(mode) {
+            currentMode = mode;
+            document.getElementById('btn-2d').classList.toggle('active', mode === '2d');
+            document.getElementById('btn-3d').classList.toggle('active', mode === '3d');
+            document.getElementById('btn-true3d').classList.toggle('active', mode === 'true3d');
+            
+            document.getElementById('view-2d').style.display = (mode === '2d') ? 'block' : 'none';
+            document.getElementById('arena-3d').style.display = (mode === '3d') ? 'flex' : 'none';
+            document.getElementById('arena-true3d').style.display = (mode === 'true3d') ? 'block' : 'none';
+
+            if (mode !== 'true3d') {
+                refreshCurrentView();
+            }
+        }
+
+        function refreshCurrentView() {
+            if (currentMode === '2d') {
+                renderTabs();
+                render2DGrid();
+            } else if (currentMode === '3d') {
+                render3DArena();
+            }
+        }
+
+        function generateWallDOM(elevationName, useGlobalFloors = false) {
+            const fragment = document.createDocumentFragment();
+            const activeDrops = Object.keys(inspectionData).filter(d => dropAssignments[d] === elevationName).sort();
+
+            if(activeDrops.length === 0) {
+                const empty = document.createElement('div');
+                empty.style = "padding: 40px; color:#888; width:100%; text-align:center;";
+                empty.innerText = "No drops assigned.";
+                fragment.appendChild(empty);
+                return fragment;
+            }
+
+            let renderMaxFloor = -Infinity;
+            let renderMinFloor = Infinity;
+            
+            if (useGlobalFloors) {
+                renderMaxFloor = globalStats.maxFloor;
+                renderMinFloor = globalStats.minFloor;
+            } else {
+                activeDrops.forEach(d => {
+                    const floors = Object.keys(inspectionData[d]).map(Number);
+                    renderMaxFloor = Math.max(renderMaxFloor, ...floors);
+                    renderMinFloor = Math.min(renderMinFloor, ...floors);
+                });
+            }
+
+            activeDrops.forEach(dropStr => {
+                const dropDiv = document.createElement('div');
+                dropDiv.className = 'drop-column';
+                dropDiv.innerHTML = `<div class="drop-header">DROP ${dropStr}</div>`;
+
+                for (let f = renderMaxFloor; f >= renderMinFloor; f--) {
+                    const floorDiv = document.createElement('div');
+                    floorDiv.className = 'floor-row';
+                    floorDiv.innerHTML = `<div class="floor-label">${f}F</div>`;
+                    
+                    const winGroup = document.createElement('div');
+                    winGroup.className = 'window-group';
+
+                    if (inspectionData[dropStr] && inspectionData[dropStr][f]) {
+                        const order = { 'L': 1, 'C': 2, 'R': 3 };
+                        const activeFloorPattern = Object.keys(inspectionData[dropStr][f]).sort((a, b) => order[a] - order[b]);
+                        
+                        activeFloorPattern.forEach(pos => {
+                            const data = inspectionData[dropStr][f][pos];
+                            const winNode = document.createElement('div');
+                            
+                            let isStitchedLeft = false;
+                            let isStitchedRight = false;
+                            let finalStatus = data.status;
+
+                            let pair = stitchedPairs.find(p => p.includes(data.id));
+                            if (pair) {
+                                finalStatus = getCombinedStatus(pair[0], pair[1]);
+                                if (pair[0] === data.id) isStitchedLeft = true;
+                                if (pair[1] === data.id) isStitchedRight = true;
+                            }
+
+                            winNode.className = `window-node ${finalStatus}`;
+                            winNode.innerText = pos;
+                            winNode.onclick = () => handleNodeClick(data, winNode);
+                            
+                            if (imageBank[data.flir]) winNode.style.border = "2px solid #fff";
+
+                            // THE CSS BRIDGE HACK
+                            if (isStitchedLeft) {
+                                winNode.style.borderTopRightRadius = '0';
+                                winNode.style.borderBottomRightRadius = '0';
+                                winNode.style.borderRight = "none";
+                                winNode.style.zIndex = '5';
+                                
+                                const bridge = document.createElement('div');
+                                bridge.className = `stitch-bridge ${finalStatus}`;
+                                
+                                if (imageBank[data.flir]) {
+                                    winNode.style.borderRight = "none";
+                                    bridge.style.borderTop = "2px solid #fff";
+                                    bridge.style.borderBottom = "2px solid #fff";
+                                }
+                                winNode.appendChild(bridge);
+                            }
+                            if (isStitchedRight) {
+                                winNode.style.borderTopLeftRadius = '0';
+                                winNode.style.borderBottomLeftRadius = '0';
+                                winNode.style.borderLeft = "none";
+                                winNode.style.zIndex = '6'; 
+                                if (imageBank[data.flir]) {
+                                    winNode.style.borderLeft = "none";
+                                }
+                            }
+                            
+                            winGroup.appendChild(winNode);
+                        });
+                    } else {
+                        const winNode = document.createElement('div');
+                        winNode.className = `window-node status-void`;
+                        winGroup.appendChild(winNode);
+                    }
+
+                    floorDiv.appendChild(winGroup);
+                    dropDiv.appendChild(floorDiv);
+                }
+                fragment.appendChild(dropDiv);
+            });
+            return fragment;
+        }
+
+        function renderTabs() {
+            const container = document.getElementById('tabs-container');
+            container.innerHTML = "";
+            const usedElevations = new Set(Object.values(dropAssignments));
+            
+            elevations.forEach(elev => {
+                if(usedElevations.has(elev)) {
+                    const tab = document.createElement('div');
+                    tab.className = `tab ${activeTab === elev ? 'active' : ''}`;
+                    tab.innerText = elev;
+                    tab.onclick = () => { activeTab = elev; renderTabs(); render2DGrid(); };
+                    container.appendChild(tab);
+                }
+            });
+            if(!usedElevations.has(activeTab) && usedElevations.size > 0) {
+                activeTab = Array.from(usedElevations)[0];
+                renderTabs();
+                render2DGrid();
+            }
+        }
+
+        function render2DGrid() {
+            const container = document.getElementById('building-container-2d');
+            container.innerHTML = '';
+            container.appendChild(generateWallDOM(activeTab, false));
+        }
+
+        function render3DArena() {
+            const world = document.getElementById('world-3d');
+            world.innerHTML = '';
+            world.style.transform = `translateZ(${zoomZ}px) rotateX(${rotationX}deg) rotateY(${rotationY}deg)`;
+
+            const usedElevations = Array.from(new Set(Object.values(dropAssignments)));
+            const numWalls = usedElevations.length;
+            
+            if (numWalls === 0) return;
+            const angleStep = 360 / numWalls;
+            
+            let maxDropsOnAWall = 0;
+            usedElevations.forEach(elev => {
+                const dropsOnThisWall = Object.keys(inspectionData).filter(d => dropAssignments[d] === elev).length;
+                if(dropsOnThisWall > maxDropsOnAWall) maxDropsOnAWall = dropsOnThisWall;
+            });
+            
+            const estimatedMaxWidth = Math.max(300, (maxDropsOnAWall * 170) + 100);
+
+            let radius = 0;
+            if (numWalls === 1) {
+                radius = 0;
+            } else if (numWalls === 2) {
+                radius = estimatedMaxWidth / 2 + 50; 
+            } else {
+                radius = (estimatedMaxWidth / 2) / Math.tan(Math.PI / numWalls);
+                radius += 100; 
+            }
+
+            usedElevations.forEach((elev, index) => {
+                const wallDiv = document.createElement('div');
+                wallDiv.className = 'wall-3d';
+                wallDiv.innerHTML = `<div class="wall-title-3d">${elev}</div>`;
+                
+                wallDiv.appendChild(generateWallDOM(elev, true));
+                
+                wallDiv.style.transform = `rotateY(${index * angleStep}deg) translateZ(${radius}px)`;
+                world.appendChild(wallDiv);
+            });
+        }
+
+        const arena = document.getElementById('arena-3d');
+        
+        arena.addEventListener('wheel', (e) => {
+            if(currentMode === '3d') {
+                e.preventDefault();
+                zoomZ -= e.deltaY * 2; 
+                document.getElementById('world-3d').style.transform = `translateZ(${zoomZ}px) rotateX(${rotationX}deg) rotateY(${rotationY}deg)`;
+            }
+        }, { passive: false }); 
+
+        arena.addEventListener('mousedown', (e) => { isDragging = true; previousMousePosition = { x: e.clientX, y: e.clientY }; });
+        window.addEventListener('mousemove', (e) => {
+            if (isDragging && currentMode === '3d') {
+                rotationY += (e.clientX - previousMousePosition.x) * 0.4; 
+                rotationX -= (e.clientY - previousMousePosition.y) * 0.4; 
+                if(rotationX > 45) rotationX = 45;
+                if(rotationX < -45) rotationX = -45;
+                document.getElementById('world-3d').style.transform = `translateZ(${zoomZ}px) rotateX(${rotationX}deg) rotateY(${rotationY}deg)`;
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+            }
+        });
+        window.addEventListener('mouseup', () => { isDragging = false; });
+        
+        arena.addEventListener('touchstart', (e) => { isDragging = true; previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }, {passive: true});
+        window.addEventListener('touchmove', (e) => {
+            if (isDragging && currentMode === '3d') {
+                rotationY += (e.touches[0].clientX - previousMousePosition.x) * 0.5;
+                rotationX -= (e.touches[0].clientY - previousMousePosition.y) * 0.5;
+                if(rotationX > 45) rotationX = 45;
+                if(rotationX < -45) rotationX = -45;
+                document.getElementById('world-3d').style.transform = `translateZ(${zoomZ}px) rotateX(${rotationX}deg) rotateY(${rotationY}deg)`;
+                previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            }
+        }, {passive: true});
+        window.addEventListener('touchend', () => { isDragging = false; });
+
+        function openModal(nodeId) {
+            let pair = stitchedPairs.find(p => p.includes(nodeId));
+            activeNodeDataArray = [];
+            
+            // Show or Hide the Unmerge button
+            if (pair) {
+                activeNodeDataArray.push(getNodeData(pair[0]));
+                activeNodeDataArray.push(getNodeData(pair[1]));
+                document.getElementById('btn-unmerge').style.display = 'block';
+            } else {
+                activeNodeDataArray.push(getNodeData(nodeId));
+                document.getElementById('btn-unmerge').style.display = 'none';
+            }
+
+            let ids = activeNodeDataArray.map(d => d.id).join(' + ');
+            let techs = [...new Set(activeNodeDataArray.map(d => d.tech))].join(', ');
+            
+            let allFinds = [];
+            activeNodeDataArray.forEach(d => allFinds.push(...d.finds.split(' | ')));
+            allFinds = [...new Set(allFinds)].filter(f => f !== 'CLEAR' && f !== '');
+            if(allFinds.length === 0) allFinds = ['CLEAR'];
+
+            let mPcts = activeNodeDataArray.map(d => d.mPct).filter(m => m !== '--').join(' & ') || '--';
+            let proved = activeNodeDataArray.some(d => d.proved === 'YES') ? 'YES' : 'NO';
+            let flirs = activeNodeDataArray.map(d => d.flir).filter(f => f !== '--');
+            
+            let notes = activeNodeDataArray.map(d => d.notes).filter(n => n.trim() !== '').join('\n');
+
+            document.getElementById('m-id').innerText = ids;
+            document.getElementById('m-tech').innerText = `Logged by: ${techs}`;
+            document.getElementById('m-finds').innerText = allFinds.join(' | ');
+            document.getElementById('m-finds').style.color = allFinds.includes('CLEAR') ? '#28a745' : '#f1c40f';
+            
+            document.getElementById('m-moisture').innerText = mPcts;
+            document.getElementById('m-proved').innerText = proved;
+            document.getElementById('m-flir').innerText = flirs.join(' & ') || '--';
+            document.getElementById('m-notes').value = notes;
+            
+            const gallery = document.getElementById('m-photo-gallery');
+            const noPhoto = document.getElementById('m-no-photo');
+            gallery.innerHTML = '';
+            let hasPhoto = false;
+
+            flirs.forEach(f => {
+                if(imageBank[f]) {
+                    hasPhoto = true;
+                    let img = document.createElement('img');
+                    img.src = imageBank[f];
+                    gallery.appendChild(img);
+                }
+            });
+
+            gallery.style.display = hasPhoto ? 'flex' : 'none';
+            noPhoto.style.display = hasPhoto ? 'none' : 'block';
+            
+            document.getElementById('info-modal').style.display = 'flex';
+        }
+
+        // NEW UNMERGE FUNCTION FROM MODAL
+        function unmergeCurrent() {
+            if (activeNodeDataArray.length === 2) {
+                const id1 = activeNodeDataArray[0].id;
+                const idx = stitchedPairs.findIndex(p => p.includes(id1));
+                if (idx !== -1) {
+                    stitchedPairs.splice(idx, 1);
+                    closeModal();
+                    calculateBuildingGeometry();
+                    refreshCurrentView();
+                }
+            }
+        }
+
+        function changeStatus(newStatus) {
+            if (activeNodeDataArray.length > 0) {
+                let note = document.getElementById('m-notes').value;
+                activeNodeDataArray.forEach(d => {
+                    d.notes = note; 
+                    d.status = newStatus; 
+                });
+                if (currentMode !== 'true3d') refreshCurrentView();
+                closeModal();
+            }
+        }
+
+        function saveNotesOnly() {
+            if (activeNodeDataArray.length > 0) {
+                let note = document.getElementById('m-notes').value;
+                activeNodeDataArray.forEach(d => {
+                    d.notes = note;
+                });
+                if (currentMode !== 'true3d') refreshCurrentView();
+                closeModal();
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('info-modal').style.display = 'none';
+            activeNodeDataArray = [];
+        }
+
+        function resetBoard() {
+            if(confirm("Are you sure you want to clear all data and start over?")) {
+                inspectionData = {};
+                imageBank = {};
+                stitchedPairs = [];
+                linkedPhotosCount = 0;
+                projectInfo = "Unknown Project";
+                elevations = [];
+                dropAssignments = {};
+                
+                document.getElementById('project-name').innerText = "Awaiting Data...";
+                document.getElementById('stat-photos').innerText = "0";
+                document.getElementById('dashboard-screen').style.display = 'none';
+                document.getElementById('mapping-screen').style.display = 'none';
+                document.getElementById('btn-export').style.display = 'none';
+                document.getElementById('btn-edit-map').style.display = 'none';
+                document.getElementById('btn-reset').style.display = 'none';
+                document.getElementById('btn-start-mapping').style.display = 'none';
+                
+                document.getElementById('main-3d-viewer').src = "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/LittlestTokyo.glb";
+                document.getElementById('model-status').innerHTML = "Showing Default Test Model. Drop a custom .glb file above to replace.";
+                
+                dropZone.classList.remove('compact');
+                document.getElementById('drop-text').innerText = "📥 Drop CSVs, Photos, & 3D Models Here";
+                document.getElementById('drop-subtext').innerText = "Accepts .csv, .jpg, .png, .glb, and .gltf files";
+            }
+        }
+
+        function exportReviewedCSV() {
+            let csv = "Project,Architectural Wall,Drop ID,FLIR Image,Findings,Moisture %,Meter Proved,Office Review Status,Management Notes\n";
+            
+            const drops = Object.keys(inspectionData).sort();
+            drops.forEach(dropStr => {
+                const wall = dropAssignments[dropStr];
+                const floors = Object.keys(inspectionData[dropStr]).sort((a,b) => b-a); 
+                floors.forEach(f => {
+                    const order = { 'L': 1, 'C': 2, 'R': 3 };
+                    const activeFloorPattern = Object.keys(inspectionData[dropStr][f]).sort((a, b) => order[a] - order[b]);
+                    
+                    activeFloorPattern.forEach(pos => {
+                        if (inspectionData[dropStr][f] && inspectionData[dropStr][f][pos]) {
+                            const d = inspectionData[dropStr][f][pos];
+                            
+                            let textStatus = "Clear";
+                            if (d.status === 'status-flagged') textStatus = "Pending Review";
+                            if (d.status === 'status-confirmed') textStatus = "CONFIRMED DEFECT";
+
+                            const cleanNotes = `"${d.notes.replace(/"/g, '""')}"`;
+                            const cleanFinds = `"${d.finds}"`;
+
+                            csv += `"${projectInfo}","${wall}","${d.id}","${d.flir}",${cleanFinds},"${d.mPct}","${d.proved}","${textStatus}",${cleanNotes}\n`;
+                        }
+                    });
+                });
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
             const a = document.createElement('a'); 
             a.href = URL.createObjectURL(blob); 
-            a.download = fileName; 
+            a.download = `Strata_Master_Review_${projectInfo.replace(/\s+/g, '_')}.csv`; 
             a.click();
         }
     </script>
