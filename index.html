@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: Visual & Auto-FLIR</title>
+    <title>Strata-Scan Pro: v5.5 Bulletproof</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
@@ -59,7 +59,6 @@
         
         .moisture-panel { background: #1a1a1a; border: 1px solid #d9534f; border-radius: 6px; padding: 10px; margin-top: 8px; display: none; }
         
-        /* NEW BIG FLIR TOGGLE */
         .flir-toggle-btn { width: 100%; padding: 20px; background: #1a1a1a; border: 2px dashed #f39c12; color: #f39c12; font-size: 1.2rem; font-weight: 900; border-radius: 8px; margin-top: 15px; cursor: pointer; transition: 0.2s; }
         .flir-toggle-btn.active { background: #f39c12; color: #000; border-style: solid; box-shadow: 0 0 15px rgba(243, 156, 18, 0.4); }
 
@@ -110,14 +109,10 @@
                 Tech: <strong id="pf-tech" style="color:#fff;">--</strong> | 
                 Cam: <strong id="pf-cam" style="color:#fff;">--</strong>
             </div>
-            
             <p style="color:#888; margin:0; font-weight:bold;">STARTING TARGET:</p>
             <div class="preflight-data" id="pf-drop" style="color:#0cf;">DROP A</div>
-            
             <p style="color:#888; margin:0; font-weight:bold;">SYNCED FLIR NUMBER:</p>
             <div class="preflight-data" id="pf-img" style="color:#f39c12;">FLIR0045</div>
-
-            <p style="color:#aaa; font-size: 0.8rem;">Visual photos will auto-download with Window IDs.</p>
             <button class="modal-btn btn-green" onclick="lockInDrop()">🚀 YES, LOCK IT IN</button>
             <button class="modal-btn btn-dark" onclick="closePreFlight()">🔙 CANCEL</button>
         </div>
@@ -135,43 +130,7 @@
         </div>
     </div>
 
-    <div id="safetyModal" class="modal-overlay">
-        <div class="modal-box">
-            <h2 style="color:#f39c12; margin-top:0; font-size: 2rem;">⚠️ DATA MISSING!</h2>
-            <p style="color:#ccc; font-size:1.1rem; margin-bottom:25px; line-height:1.4;">
-                You have not logged any findings for window <br><strong id="modalTargetID" style="color:#0cf; font-size: 1.5rem; display:inline-block; margin-top:5px;">A-12-L</strong>
-            </p>
-            <button class="modal-btn btn-blue" onclick="modalGoToDiagnose()">🔙 WAIT, TAKE ME TO DIAGNOSE</button>
-            <button class="modal-btn btn-dark" onclick="modalForceSkip()">⚠️ FORCE SKIP (LEAVE BLANK)</button>
-        </div>
-    </div>
-
-    <div id="wipeModal" class="modal-overlay">
-        <div class="modal-box" style="border-color:#b00;">
-            <h2 style="color:#d9534f; margin-top:0; font-size: 2rem;">🚨 WIPE DATA?</h2>
-            <p style="color:#ccc; font-size:1.1rem; margin-bottom:25px; line-height:1.4;">
-                This will permanently delete all logged findings in the Data Vault.<br><br><strong>Have you exported the CSV?</strong>
-            </p>
-            <button class="modal-btn btn-dark" onclick="closeWipeModal()">🔙 CANCEL (KEEP DATA)</button>
-            <button class="modal-btn btn-red" onclick="confirmWipe()">🚨 YES, WIPE ALL DATA</button>
-        </div>
-    </div>
-
-    <div id="floorAuditModal" class="modal-overlay">
-        <div class="modal-box" style="border-color:#f39c12;">
-            <h2 style="color:#f39c12; margin-top:0; font-size: 2rem;">⚠️ INCOMPLETE FLOOR</h2>
-            <p style="color:#ccc; font-size:1.1rem; margin-bottom:25px; line-height:1.4;">
-                You selected a drop pattern, but you missed the following position(s):<br>
-                <strong id="missingFloorWindows" style="color:#0cf; font-size: 2rem; display:inline-block; margin-top:10px;">C, R</strong><br><br>
-                Are you sure you want to leave this floor?
-            </p>
-            <button class="modal-btn btn-blue" onclick="modalCancelFloorChange()">🔙 CANCEL (STAY ON FLOOR)</button>
-            <button class="modal-btn btn-dark" onclick="modalForceFloorChange()">⚠️ FORCE DESCEND (SKIP WINDOWS)</button>
-        </div>
-    </div>
-
     <div class="slide-container" id="mainSlider">
-        
         <div class="slide" id="slide-map">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <h2 style="color:#fff; margin:0; font-size:1.2rem;">LOGISTICS SETUP</h2>
@@ -181,7 +140,6 @@
             <div class="card">
                 <label>Project Name / Building</label>
                 <input type="text" id="projectID" class="setup-input" style="margin-bottom:12px;" placeholder="e.g. Torrance HOA">
-                
                 <div style="display:flex; gap:10px;">
                     <div style="flex:2;">
                         <label>Technician Name</label>
@@ -234,7 +192,6 @@
         </div>
 
         <div class="slide" id="slide-diagnose">
-            
             <label style="margin-left:5px; margin-top: 10px; display: block;">SCAN & FLAG FINDINGS</label>
             <div class="check-grid">
                 <div class="check-item sound-box active" id="soundBtn" onclick="toggleSound()">CLEAR</div>
@@ -311,7 +268,6 @@
 
             <div style="display:flex; gap:8px; margin-top:10px;">
                 <button class="cmd-action-btn" style="background:#333; margin:0;" onclick="exportAndSend()">📤 EXPORT CSV</button>
-                <button class="cmd-action-btn" style="background:#b00; margin:0;" onclick="openWipeModal()">WIPE</button>
             </div>
         </div>
     </div>
@@ -326,10 +282,7 @@
         // --- GLOBAL STATE ---
         let currentPos = "L";
         let isCurrentWindowLogged = false;
-        let pendingMoveCallback = null;
-        let pendingFloorAction = null;
         let hasVisitedDiagnose = false; 
-        
         const patternConfigs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
 
         // CAMERA & FLIR STATE
@@ -341,7 +294,6 @@
             if (localStorage.getItem('strataVault')) {
                 document.getElementById('logTable').querySelector('tbody').innerHTML = localStorage.getItem('strataVault');
             }
-            
             if (localStorage.getItem('isDropLocked') === 'true') {
                 if (localStorage.getItem('strataState')) {
                     const savedState = JSON.parse(localStorage.getItem('strataState'));
@@ -462,91 +414,7 @@
             document.getElementById('header-command').style.display = (slideIndex === 2) ? 'block' : 'none';
         }
 
-        function verifySafeMove(callback) {
-            if (!hasVisitedDiagnose) { callback(); return; }
-            if (isCurrentWindowLogged) { callback(); return; } 
-            
-            const currentTarget = document.getElementById('fullIDDisplay').innerText;
-            let alreadyInVault = false;
-            
-            document.querySelectorAll("#logTable tbody tr").forEach(tr => {
-                const tds = tr.querySelectorAll("td");
-                if (tds.length >= 4) {
-                    if (tds[3].textContent === currentTarget) alreadyInVault = true;
-                }
-            });
-
-            if (alreadyInVault) {
-                callback();
-            } else {
-                pendingMoveCallback = callback;
-                document.getElementById('modalTargetID').innerText = currentTarget;
-                document.getElementById('safetyModal').style.display = 'flex';
-            }
-        }
-
-        function modalGoToDiagnose() {
-            document.getElementById('safetyModal').style.display = 'none';
-            goToSlide(1); 
-        }
-
-        function modalForceSkip() {
-            document.getElementById('safetyModal').style.display = 'none';
-            if(pendingMoveCallback) pendingMoveCallback();
-            pendingMoveCallback = null;
-        }
-
-        function checkFloorCompletion() {
-            const pat = document.getElementById('dropPattern').value;
-            const required = patternConfigs[pat]; 
-            
-            const currentFloor = document.getElementById('floorNum').value;
-            const currentDrop = document.getElementById('dropLetter').value.toUpperCase();
-            
-            let foundPositions = new Set();
-            document.querySelectorAll("#logTable tbody tr").forEach(tr => {
-                const tds = tr.querySelectorAll("td");
-                if (tds.length >= 4) {
-                    const loggedID = tds[3].textContent; 
-                    required.forEach(p => {
-                        if (loggedID === `${currentDrop}-${currentFloor}-${p}`) {
-                            foundPositions.add(p);
-                        }
-                    });
-                }
-            });
-
-            const missing = required.filter(p => !foundPositions.has(p));
-            return { missing: missing, foundCount: foundPositions.size };
-        }
-
         function requestFloorChange(actionType) {
-            verifySafeMove(() => {
-                const audit = checkFloorCompletion();
-                
-                if (!hasVisitedDiagnose && audit.foundCount === 0) {
-                    processFloorAction(actionType);
-                    return;
-                }
-                
-                if (audit.missing.length === 0) {
-                    processFloorAction(actionType);
-                } else {
-                    pendingFloorAction = actionType;
-                    document.getElementById('missingFloorWindows').innerText = audit.missing.join(", ");
-                    document.getElementById('floorAuditModal').style.display = 'flex';
-                }
-            });
-        }
-
-        function modalCancelFloorChange() { document.getElementById('floorAuditModal').style.display = 'none'; pendingFloorAction = null; }
-        function modalForceFloorChange() {
-            document.getElementById('floorAuditModal').style.display = 'none';
-            if (pendingFloorAction) processFloorAction(pendingFloorAction);
-            pendingFloorAction = null;
-        }
-
-        function processFloorAction(actionType) {
             let val = (actionType === 'up') ? 1 : -1;
             step('floorNum', val); 
             
@@ -561,15 +429,6 @@
             saveLocationState(); 
             
             if (actionType === 'descend_btn') goToSlide(0);
-        }
-
-        function openWipeModal() { document.getElementById('wipeModal').style.display = 'flex'; }
-        function closeWipeModal() { document.getElementById('wipeModal').style.display = 'none'; }
-        function confirmWipe() { 
-            localStorage.removeItem('strataVault'); 
-            localStorage.removeItem('strataState'); 
-            localStorage.setItem('isDropLocked', 'false');
-            location.reload(); 
         }
 
         // --- NATIVE CAMERA ENGINE ---
@@ -600,18 +459,26 @@
         }
 
         function confirmSaveAndLog() {
-            if (pendingFileToSave) {
-                const url = URL.createObjectURL(pendingFileToSave);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = pendingFileName;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            }
-            
+            // FIX: We execute the log FIRST. Even if the download fails/crashes, your data is safe.
             executeVaultLog(pendingFileName);
+            
+            // FIX: Wrap the programmatic download in a try/catch bubble
+            try {
+                if (pendingFileToSave) {
+                    const url = URL.createObjectURL(pendingFileToSave);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = pendingFileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    
+                    setTimeout(() => URL.revokeObjectURL(url), 1000); 
+                }
+            } catch (err) {
+                console.error("Device blocked auto-download:", err);
+                alert("Your tablet blocked the automatic photo download. However, the data WAS successfully logged to the vault.");
+            }
             
             document.getElementById('savePhotoModal').style.display = 'none';
             pendingFileToSave = null;
@@ -638,12 +505,10 @@
             const tech = document.getElementById('techName').value || "Tech";
             const id = document.getElementById('fullIDDisplay').innerText;
             
-            // Collect Findings
             let finds = [];
             document.querySelectorAll('.check-item.active').forEach(el => finds.push(el.innerText));
             if(finds.length===0) finds.push("CLEAR"); 
             
-            // Collect Moisture
             let mPct = "--";
             let proved = "NO";
             if(document.getElementById('groundTruthCard').style.display === 'block') {
@@ -651,7 +516,6 @@
                 if(document.getElementById('meterProvedBtn').classList.contains('active')) proved = "YES";
             }
 
-            // AUTO-FLIR MATH
             let imageString = visualFileName;
             if (isFlirIncluded) {
                 const flirInputEl = document.getElementById('imgNum');
@@ -660,7 +524,6 @@
                 
                 imageString = `${visualFileName} & ${formattedFlir}`;
                 
-                // Increment the ghost counter
                 flirInputEl.value = currentFlir + 1;
                 syncFlirDisplay(); 
                 saveLocationState(); 
@@ -683,14 +546,11 @@
             
             isCurrentWindowLogged = true;
             
-            // Reset UI for next window
             toggleSound(); 
             
-            // Reset FLIR Button
             isFlirIncluded = false;
             document.getElementById('flirTrackerBtn').classList.remove('active');
 
-            // Reset Moisture
             document.getElementById('moisturePct').value = '85';
             document.getElementById('moisturePctVal').innerText = '85';
             const slider = document.querySelector('#groundTruthCard .touch-slider');
@@ -758,17 +618,15 @@
         }
 
         function attemptMovePosition(p, targetSlide = null) {
-            verifySafeMove(() => {
-                if (currentPos !== p) {
-                    isCurrentWindowLogged = false; 
-                    hasVisitedDiagnose = false; 
-                }
-                currentPos = p; 
-                updatePosUI(); 
-                updatePreview();
-                saveLocationState(); 
-                if (targetSlide !== null) goToSlide(targetSlide);
-            });
+            if (currentPos !== p) {
+                isCurrentWindowLogged = false; 
+                hasVisitedDiagnose = false; 
+            }
+            currentPos = p; 
+            updatePosUI(); 
+            updatePreview();
+            saveLocationState(); 
+            if (targetSlide !== null) goToSlide(targetSlide);
         }
 
         function setPattern(val, forcePos = null) {
