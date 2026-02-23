@@ -107,11 +107,19 @@
                 Cam: <strong id="pf-cam" style="color:#fff;">--</strong>
             </div>
             
-            <p style="color:#888; margin:0; font-weight:bold;">YOU ARE ABOUT TO START:</p>
-            <div class="preflight-data" id="pf-drop" style="color:#0cf;">DROP A</div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+                <div style="flex: 1;">
+                    <p style="color:#888; margin:0; font-weight:bold; font-size:0.8rem;">STARTING DROP:</p>
+                    <div class="preflight-data" id="pf-drop" style="color:#0cf; margin-top:5px; font-size:1.8rem;">DROP A</div>
+                </div>
+                <div style="flex: 1; border-left: 1px solid #333;">
+                    <p style="color:#888; margin:0; font-weight:bold; font-size:0.8rem;">STARTING FLOOR:</p>
+                    <div class="preflight-data" id="pf-floor" style="color:#0cf; margin-top:5px; font-size:1.8rem;">12</div>
+                </div>
+            </div>
             
-            <p style="color:#888; margin:0; font-weight:bold;">STARTING WITH IMAGE:</p>
-            <div class="preflight-data" id="pf-img" style="color:#f39c12;">FLIR0045</div>
+            <p style="color:#888; margin:0; font-weight:bold; font-size:0.8rem;">STARTING IMAGE:</p>
+            <div class="preflight-data" id="pf-img" style="color:#f39c12; margin-top:5px;">FLIR0045</div>
             
             <button class="modal-btn btn-green" onclick="lockInDrop()">🚀 YES, LOCK IT IN</button>
             <button class="modal-btn btn-dark" onclick="closePreFlight()">🔙 CANCEL</button>
@@ -371,6 +379,7 @@
             const c = document.getElementById('camID').value;
             const d = document.getElementById('dropLetter').value;
             const i = document.getElementById('imgNum').value;
+            const f = document.getElementById('floorNum').value;
 
             if(!p || !t || !c || !d || !i) {
                 alert("⚠️ ALL FIELDS REQUIRED: Please fill out Project, Tech, Cam ID, Drop ID, and Start Image before committing.");
@@ -380,7 +389,11 @@
             document.getElementById('pf-proj').innerText = p;
             document.getElementById('pf-tech').innerText = t;
             document.getElementById('pf-cam').innerText = c;
+            
+            // Displays both Drop ID and Floor explicitly
             document.getElementById('pf-drop').innerText = "DROP " + d.toUpperCase();
+            document.getElementById('pf-floor').innerText = f;
+            
             document.getElementById('pf-img').innerText = "FLIR" + i.toString().padStart(4, '0');
 
             document.getElementById('preFlightModal').style.display = 'flex';
