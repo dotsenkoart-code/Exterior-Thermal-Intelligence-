@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: v5.5 Bulletproof</title>
+    <title>Strata-Scan Pro: Gold Master (Restored)</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
@@ -22,6 +22,8 @@
         #slide-command { padding: 100px 10px 120px 10px; }  
         
         .card { background: #121212; padding: 12px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #2a2a2a; }
+        
+        /* --- HIGHLIGHT CARD FOR CRITICAL DATA --- */
         .critical-card { background: #0a1118; padding: 15px; border-radius: 8px; margin-bottom: 12px; border: 2px solid #0cf; box-shadow: 0 0 15px rgba(0, 204, 255, 0.1); }
         
         /* --- FIXED HEADERS --- */
@@ -58,11 +60,8 @@
         .check-item.sound-box.active { background: #28a745; color: #fff; border-color: #fff; }
         
         .moisture-panel { background: #1a1a1a; border: 1px solid #d9534f; border-radius: 6px; padding: 10px; margin-top: 8px; display: none; }
-        
-        .flir-toggle-btn { width: 100%; padding: 20px; background: #1a1a1a; border: 2px dashed #f39c12; color: #f39c12; font-size: 1.2rem; font-weight: 900; border-radius: 8px; margin-top: 15px; cursor: pointer; transition: 0.2s; }
-        .flir-toggle-btn.active { background: #f39c12; color: #000; border-style: solid; box-shadow: 0 0 15px rgba(243, 156, 18, 0.4); }
 
-        .action-btn { width: 100%; padding: 18px; border-radius: 8px; border: none; font-size: 1.2rem; font-weight: 900; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; margin-top: 15px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .action-btn { width: 100%; padding: 18px; border-radius: 8px; border: none; font-size: 1.2rem; font-weight: 900; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; margin-top: 15px; }
         .btn-blue { background: linear-gradient(180deg, #007bff 0%, #0056b3 100%); }
         .btn-green { background: linear-gradient(180deg, #28a745 0%, #1e7e34 100%); }
         .btn-dark { background: #333; border: 1px solid #555; color: #aaa; }
@@ -90,8 +89,6 @@
 </head>
 <body onload="initApp()">
 
-    <input type="file" accept="image/*" capture="environment" id="nativeCameraInput" style="display:none;" onchange="handleCameraCapture(event)">
-
     <div id="header-diagnose" class="fixed-header">
         <span class="fixed-label">CURRENT DIAGNOSIS TARGET</span>
         <div id="diagnoseIDDisplay" class="fixed-id">A-12-L</div>
@@ -109,28 +106,73 @@
                 Tech: <strong id="pf-tech" style="color:#fff;">--</strong> | 
                 Cam: <strong id="pf-cam" style="color:#fff;">--</strong>
             </div>
-            <p style="color:#888; margin:0; font-weight:bold;">STARTING TARGET:</p>
+            
+            <p style="color:#888; margin:0; font-weight:bold;">YOU ARE ABOUT TO START:</p>
             <div class="preflight-data" id="pf-drop" style="color:#0cf;">DROP A</div>
-            <p style="color:#888; margin:0; font-weight:bold;">SYNCED FLIR NUMBER:</p>
+            
+            <p style="color:#888; margin:0; font-weight:bold;">STARTING WITH IMAGE:</p>
             <div class="preflight-data" id="pf-img" style="color:#f39c12;">FLIR0045</div>
+            
             <button class="modal-btn btn-green" onclick="lockInDrop()">🚀 YES, LOCK IT IN</button>
             <button class="modal-btn btn-dark" onclick="closePreFlight()">🔙 CANCEL</button>
         </div>
     </div>
 
-    <div id="savePhotoModal" class="modal-overlay">
-        <div class="modal-box" style="border-color:#28a745;">
-            <h2 style="color:#28a745; margin-top:0; font-size: 2rem;">📸 CAPTURE OK</h2>
-            <p style="color:#ccc; font-size:1.1rem; margin-bottom:20px;">
-                Photo processed. Tap below to save it to the device and officially log this window.
+    <div id="safetyModal" class="modal-overlay">
+        <div class="modal-box">
+            <h2 style="color:#f39c12; margin-top:0; font-size: 2rem;">⚠️ DATA MISSING!</h2>
+            <p style="color:#ccc; font-size:1.1rem; margin-bottom:25px; line-height:1.4;">
+                You have not logged any findings for window <br><strong id="modalTargetID" style="color:#0cf; font-size: 1.5rem; display:inline-block; margin-top:5px;">A-12-L</strong>
             </p>
-            <p style="color:#888; font-size:0.8rem; margin-bottom:25px;" id="saveFileNameDisplay">Torrance_A-12-L_Visual.jpg</p>
-            <button class="modal-btn btn-green" style="padding: 30px 10px; font-size: 1.2rem;" onclick="confirmSaveAndLog()">💾 SAVE TO DEVICE & LOG</button>
-            <button class="modal-btn btn-dark" onclick="cancelSave()">🔙 CANCEL (DON'T SAVE)</button>
+            <button class="modal-btn btn-blue" onclick="modalGoToDiagnose()">🔙 WAIT, TAKE ME TO DIAGNOSE</button>
+            <button class="modal-btn btn-green" onclick="modalQuickLogAndMove()">✅ WINDOW IS CLEAR: LOG & MOVE</button>
+            <button class="modal-btn btn-dark" onclick="modalForceSkip()">⚠️ FORCE SKIP (LEAVE BLANK)</button>
+        </div>
+    </div>
+
+    <div id="floorAuditModal" class="modal-overlay">
+        <div class="modal-box" style="border-color:#f39c12;">
+            <h2 style="color:#f39c12; margin-top:0; font-size: 2rem;">⚠️ INCOMPLETE FLOOR</h2>
+            <p style="color:#ccc; font-size:1.1rem; margin-bottom:25px; line-height:1.4;">
+                You selected a drop pattern, but you missed the following position(s):<br>
+                <strong id="missingFloorWindows" style="color:#0cf; font-size: 2rem; display:inline-block; margin-top:10px;">C, R</strong><br><br>
+                Are you sure you want to leave this floor?
+            </p>
+            <button class="modal-btn btn-blue" onclick="modalCancelFloorChange()">🔙 CANCEL (STAY ON FLOOR)</button>
+            <button class="modal-btn btn-dark" onclick="modalForceFloorChange()">⚠️ FORCE DESCEND (SKIP WINDOWS)</button>
+        </div>
+    </div>
+
+    <div id="photoModal" class="modal-overlay">
+        <div class="modal-box" style="border-color:#0cf;">
+            <h2 style="color:#0cf; margin-top:0; font-size: 2rem;">📸 SNAP PHOTO</h2>
+            <p style="color:#ccc; font-size:1.1rem; margin-bottom:15px; line-height:1.4;">
+                Match camera image for <strong id="modalConfirmID" style="color:#fff;">A-12-L</strong>:
+            </p>
+            
+            <div style="display:flex; align-items:center; justify-content:center; gap: 10px; margin-bottom: 25px;">
+                <span style="font-size:1.5rem; font-weight:900; color:#666;">FLIR</span>
+                <input type="text" inputmode="numeric" pattern="[0-9]*" id="modalPhotoInput" style="width: 140px; font-size: 2.8rem; font-weight: 900; color: #f39c12; border: 2px solid #f39c12; background: #222; text-align: center; border-radius: 8px;">
+            </div>
+
+            <button class="modal-btn btn-green" onclick="finalizeLogEvidence()" style="font-size: 1.2rem; padding: 25px 10px;">✅ CONFIRM & SAVE</button>
+            <button class="modal-btn btn-dark" onclick="cancelLogEvidence()">🔙 CANCEL (DON'T SAVE YET)</button>
+        </div>
+    </div>
+
+    <div id="wipeModal" class="modal-overlay">
+        <div class="modal-box" style="border-color:#b00;">
+            <h2 style="color:#d9534f; margin-top:0; font-size: 2rem;">🚨 WIPE DATA?</h2>
+            <p style="color:#ccc; font-size:1.1rem; margin-bottom:25px; line-height:1.4;">
+                This will permanently delete all logged findings in the Data Vault.<br><br><strong>Have you exported the CSV?</strong>
+            </p>
+            <button class="modal-btn btn-dark" onclick="closeWipeModal()">🔙 CANCEL (KEEP DATA)</button>
+            <button class="modal-btn btn-red" onclick="confirmWipe()">🚨 YES, WIPE ALL DATA</button>
         </div>
     </div>
 
     <div class="slide-container" id="mainSlider">
+        
         <div class="slide" id="slide-map">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <h2 style="color:#fff; margin:0; font-size:1.2rem;">LOGISTICS SETUP</h2>
@@ -140,16 +182,12 @@
             <div class="card">
                 <label>Project Name / Building</label>
                 <input type="text" id="projectID" class="setup-input" style="margin-bottom:12px;" placeholder="e.g. Torrance HOA">
-                <div style="display:flex; gap:10px;">
-                    <div style="flex:2;">
-                        <label>Technician Name</label>
-                        <input type="text" id="techName" class="setup-input" placeholder="e.g. Art">
-                    </div>
-                    <div style="flex:1;">
-                        <label>Cam ID</label>
-                        <input type="text" id="camID" class="setup-input" placeholder="e.g. C1">
-                    </div>
-                </div>
+                
+                <label>Technician Name</label>
+                <input type="text" id="techName" class="setup-input" style="margin-bottom:12px;" placeholder="e.g. Art">
+                
+                <label>Cam ID</label>
+                <input type="text" id="camID" class="setup-input" placeholder="e.g. C1">
             </div>
 
             <div class="critical-card">
@@ -159,8 +197,8 @@
                         <input type="text" id="dropLetter" class="setup-input" style="font-size: 1.5rem; font-weight: bold; border-color: #0cf; text-transform: uppercase;" placeholder="e.g. A" oninput="handleDropChange()">
                     </div>
                     <div style="flex:1;">
-                        <label style="color:#f39c12; font-size:0.8rem;">SYNC FLIR #</label>
-                        <input type="number" id="imgNum" class="setup-input" style="font-size: 1.5rem; font-weight: bold; border-color: #f39c12; color: #f39c12;" placeholder="e.g. 45" oninput="syncFlirDisplay()">
+                        <label style="color:#f39c12; font-size:0.8rem;">Start Image #</label>
+                        <input type="number" id="imgNum" class="setup-input" style="font-size: 1.5rem; font-weight: bold; border-color: #f39c12; color: #f39c12;" placeholder="e.g. 1">
                     </div>
                 </div>
 
@@ -186,12 +224,18 @@
                 <label style="color:#888; margin-top: 15px;">Starting Position</label>
                 <div style="display:flex;" id="posSelectorRow"></div>
             </div>
+
+            <div class="target-banner" style="border-color:#333;">
+                <span class="target-label" style="color:#888;">TARGET ID (MAP)</span>
+                <div id="fullIDDisplay" class="target-id" style="color:#0cf;">A-12-L</div>
+            </div>
             
             <button id="btn-commit" class="action-btn btn-green" style="padding: 22px; margin-bottom: 40px;" onclick="triggerCommit()">🚀 COMMIT TO DROP</button>
             <input type="hidden" id="dropPattern" value="3">
         </div>
 
         <div class="slide" id="slide-diagnose">
+            
             <label style="margin-left:5px; margin-top: 10px; display: block;">SCAN & FLAG FINDINGS</label>
             <div class="check-grid">
                 <div class="check-item sound-box active" id="soundBtn" onclick="toggleSound()">CLEAR</div>
@@ -227,12 +271,7 @@
                 </div>
             </div>
 
-            <button class="flir-toggle-btn" id="flirTrackerBtn" onclick="toggleFlirState()">
-                🌡️ THERMAL CAPTURED (FLIR----)
-            </button>
-
-            <button class="action-btn btn-blue" style="padding: 25px; margin-top: 20px; font-size: 1.4rem;" onclick="triggerNativeCamera()">📸 SNAP VISUAL & LOG</button>
-            <button class="action-btn btn-dark" style="padding: 15px; font-size: 0.9rem;" onclick="logWithoutPhoto()">⚠️ LOG WITHOUT PHOTO</button>
+            <button class="action-btn btn-blue" style="padding: 22px;" onclick="openPhotoVerificationModal('full')">LOG DATA & VERIFY</button>
         </div>
 
         <div class="slide" id="slide-command">
@@ -254,7 +293,7 @@
                                 <th class="export-only">Cam</th>
                                 <th class="export-only">Tech</th>
                                 <th>ID</th>
-                                <th>Images</th>
+                                <th>Img</th>
                                 <th>Finds</th>
                                 <th class="export-only">M%</th>
                                 <th class="export-only">Proved</th>
@@ -267,7 +306,8 @@
             </div>
 
             <div style="display:flex; gap:8px; margin-top:10px;">
-                <button class="cmd-action-btn" style="background:#333; margin:0;" onclick="exportAndSend()">📤 EXPORT CSV</button>
+                <button class="cmd-action-btn" style="background:#333; margin:0;" onclick="exportAndSend()">📤 EXPORT & SEND</button>
+                <button class="cmd-action-btn" style="background:#b00; margin:0;" onclick="openWipeModal()">WIPE</button>
             </div>
         </div>
     </div>
@@ -282,18 +322,19 @@
         // --- GLOBAL STATE ---
         let currentPos = "L";
         let isCurrentWindowLogged = false;
+        let pendingMoveCallback = null;
+        let pendingFloorAction = null;
         let hasVisitedDiagnose = false; 
+        
+        let pendingLogType = null; // 'full' or 'quick'
+        
         const patternConfigs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
-
-        // CAMERA & FLIR STATE
-        let pendingFileToSave = null;
-        let pendingFileName = "";
-        let isFlirIncluded = false; 
 
         function initApp() {
             if (localStorage.getItem('strataVault')) {
                 document.getElementById('logTable').querySelector('tbody').innerHTML = localStorage.getItem('strataVault');
             }
+            
             if (localStorage.getItem('isDropLocked') === 'true') {
                 if (localStorage.getItem('strataState')) {
                     const savedState = JSON.parse(localStorage.getItem('strataState'));
@@ -303,9 +344,10 @@
                     document.getElementById('floorNum').value = savedState.floor;
                     document.getElementById('floorNumVal').innerText = savedState.floor;
                     document.getElementById('dropLetter').value = savedState.drop;
-                    document.getElementById('imgNum').value = savedState.img || ""; 
+                    if(savedState.img) {
+                        document.getElementById('imgNum').value = savedState.img;
+                    }
                     setPattern(savedState.pattern, savedState.pos);
-                    syncFlirDisplay(); 
                 }
                 document.querySelectorAll('.setup-input').forEach(el => el.disabled = true);
                 document.getElementById('btn-commit').style.display = 'none';
@@ -317,33 +359,12 @@
                 document.getElementById('dropLetter').value = "";
                 document.getElementById('imgNum').value = "";
                 setPattern('3'); 
-                syncFlirDisplay();
             }
+
             updateFixedHeaders(0); 
         }
 
-        function syncFlirDisplay() {
-            const currentNum = document.getElementById('imgNum').value;
-            const btn = document.getElementById('flirTrackerBtn');
-            if(currentNum) {
-                const padded = currentNum.toString().padStart(4, '0');
-                btn.innerText = `🌡️ THERMAL CAPTURED (FLIR${padded})`;
-            } else {
-                btn.innerText = `🌡️ THERMAL CAPTURED (FLIR----)`;
-            }
-        }
-
-        function toggleFlirState() {
-            const currentNum = document.getElementById('imgNum').value;
-            if(!currentNum) {
-                alert("Please enter a starting FLIR # in Logistics Setup first.");
-                return;
-            }
-            isFlirIncluded = !isFlirIncluded;
-            const btn = document.getElementById('flirTrackerBtn');
-            btn.classList.toggle('active', isFlirIncluded);
-        }
-
+        // --- PRE-FLIGHT HARD GATE ---
         function triggerCommit() {
             const p = document.getElementById('projectID').value;
             const t = document.getElementById('techName').value;
@@ -351,8 +372,8 @@
             const d = document.getElementById('dropLetter').value;
             const i = document.getElementById('imgNum').value;
 
-            if(!p || !t || !d || !c || !i) {
-                alert("⚠️ ALL FIELDS REQUIRED: Please fill out Project, Tech, Cam, Drop ID, and Sync FLIR # before committing.");
+            if(!p || !t || !c || !d || !i) {
+                alert("⚠️ ALL FIELDS REQUIRED: Please fill out Project, Tech, Cam ID, Drop ID, and Start Image before committing.");
                 return;
             }
             
@@ -365,7 +386,9 @@
             document.getElementById('preFlightModal').style.display = 'flex';
         }
 
-        function closePreFlight() { document.getElementById('preFlightModal').style.display = 'none'; }
+        function closePreFlight() {
+            document.getElementById('preFlightModal').style.display = 'none';
+        }
 
         function lockInDrop() {
             document.getElementById('preFlightModal').style.display = 'none';
@@ -375,12 +398,11 @@
 
             localStorage.setItem('isDropLocked', 'true');
             saveLocationState();
-            syncFlirDisplay();
             goToSlide(1); 
         }
 
         function unlockSetup() {
-            if(confirm("⚠️ Unlock setup? Be careful not to change the Drop ID or Sync # unless necessary.")) {
+            if(confirm("⚠️ Unlock setup? Be careful not to change the Drop ID or Image # unless necessary.")) {
                 document.querySelectorAll('.setup-input').forEach(el => el.disabled = false);
                 document.getElementById('btn-commit').style.display = 'block';
                 document.getElementById('btn-unlock').style.display = 'none';
@@ -414,7 +436,97 @@
             document.getElementById('header-command').style.display = (slideIndex === 2) ? 'block' : 'none';
         }
 
+        /* --- INTERCEPTORS --- */
+        function verifySafeMove(callback) {
+            if (!hasVisitedDiagnose) { callback(); return; }
+            if (isCurrentWindowLogged) { callback(); return; } 
+            
+            const currentTarget = document.getElementById('fullIDDisplay').innerText;
+            let alreadyInVault = false;
+            
+            document.querySelectorAll("#logTable tbody tr").forEach(tr => {
+                const tds = tr.querySelectorAll("td");
+                if (tds.length >= 4) {
+                    if (tds[3].textContent === currentTarget) alreadyInVault = true;
+                }
+            });
+
+            if (alreadyInVault) {
+                callback();
+            } else {
+                pendingMoveCallback = callback;
+                document.getElementById('modalTargetID').innerText = currentTarget;
+                document.getElementById('safetyModal').style.display = 'flex';
+            }
+        }
+
+        function modalGoToDiagnose() {
+            document.getElementById('safetyModal').style.display = 'none';
+            goToSlide(1); 
+        }
+
+        function modalQuickLogAndMove() {
+            document.getElementById('safetyModal').style.display = 'none';
+            openPhotoVerificationModal('quick');
+        }
+
+        function modalForceSkip() {
+            document.getElementById('safetyModal').style.display = 'none';
+            if(pendingMoveCallback) pendingMoveCallback();
+            pendingMoveCallback = null;
+        }
+
+        function checkFloorCompletion() {
+            const pat = document.getElementById('dropPattern').value;
+            const required = patternConfigs[pat]; 
+            
+            const currentFloor = document.getElementById('floorNum').value;
+            const currentDrop = document.getElementById('dropLetter').value.toUpperCase();
+            
+            let foundPositions = new Set();
+            document.querySelectorAll("#logTable tbody tr").forEach(tr => {
+                const tds = tr.querySelectorAll("td");
+                if (tds.length >= 4) {
+                    const loggedID = tds[3].textContent; 
+                    required.forEach(p => {
+                        if (loggedID === `${currentDrop}-${currentFloor}-${p}`) {
+                            foundPositions.add(p);
+                        }
+                    });
+                }
+            });
+
+            const missing = required.filter(p => !foundPositions.has(p));
+            return { missing: missing, foundCount: foundPositions.size };
+        }
+
         function requestFloorChange(actionType) {
+            verifySafeMove(() => {
+                const audit = checkFloorCompletion();
+                
+                if (!hasVisitedDiagnose && audit.foundCount === 0) {
+                    processFloorAction(actionType);
+                    return;
+                }
+                
+                if (audit.missing.length === 0) {
+                    processFloorAction(actionType);
+                } else {
+                    pendingFloorAction = actionType;
+                    document.getElementById('missingFloorWindows').innerText = audit.missing.join(", ");
+                    document.getElementById('floorAuditModal').style.display = 'flex';
+                }
+            });
+        }
+
+        function modalCancelFloorChange() { document.getElementById('floorAuditModal').style.display = 'none'; pendingFloorAction = null; }
+        function modalForceFloorChange() {
+            document.getElementById('floorAuditModal').style.display = 'none';
+            if (pendingFloorAction) processFloorAction(pendingFloorAction);
+            pendingFloorAction = null;
+        }
+
+        function processFloorAction(actionType) {
             let val = (actionType === 'up') ? 1 : -1;
             step('floorNum', val); 
             
@@ -431,66 +543,48 @@
             if (actionType === 'descend_btn') goToSlide(0);
         }
 
-        // --- NATIVE CAMERA ENGINE ---
-        function triggerNativeCamera() {
-            document.getElementById('nativeCameraInput').click();
+        /* --- SMART MODALS --- */
+        function openWipeModal() { document.getElementById('wipeModal').style.display = 'flex'; }
+        function closeWipeModal() { document.getElementById('wipeModal').style.display = 'none'; }
+        function confirmWipe() { 
+            localStorage.removeItem('strataVault'); 
+            localStorage.removeItem('strataState'); 
+            localStorage.setItem('isDropLocked', 'false');
+            location.reload(); 
         }
 
-        function handleCameraCapture(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const proj = document.getElementById('projectID').value.replace(/\s+/g, '_') || "Project";
-            const id = document.getElementById('fullIDDisplay').innerText;
+        // --- PRE-SAVE VERIFICATION MODAL ---
+        function openPhotoVerificationModal(logType) {
+            pendingLogType = logType;
+            document.getElementById('modalConfirmID').innerText = document.getElementById('fullIDDisplay').innerText;
             
-            pendingFileName = `${proj}_${id}_Visual.jpg`;
-            pendingFileToSave = file;
+            const currentImgVal = document.getElementById('imgNum').value;
+            document.getElementById('modalPhotoInput').value = currentImgVal.toString().padStart(4, '0');
             
-            document.getElementById('saveFileNameDisplay').innerText = pendingFileName;
-            document.getElementById('savePhotoModal').style.display = 'flex';
-            
-            event.target.value = ""; 
+            document.getElementById('photoModal').style.display = 'flex';
         }
 
-        function cancelSave() {
-            document.getElementById('savePhotoModal').style.display = 'none';
-            pendingFileToSave = null;
-            pendingFileName = "";
+        function cancelLogEvidence() {
+            document.getElementById('photoModal').style.display = 'none';
+            pendingLogType = null;
         }
 
-        function confirmSaveAndLog() {
-            // FIX: We execute the log FIRST. Even if the download fails/crashes, your data is safe.
-            executeVaultLog(pendingFileName);
+        function finalizeLogEvidence() {
+            const finalImageNum = parseInt(document.getElementById('modalPhotoInput').value, 10);
             
-            // FIX: Wrap the programmatic download in a try/catch bubble
-            try {
-                if (pendingFileToSave) {
-                    const url = URL.createObjectURL(pendingFileToSave);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = pendingFileName;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    
-                    setTimeout(() => URL.revokeObjectURL(url), 1000); 
-                }
-            } catch (err) {
-                console.error("Device blocked auto-download:", err);
-                alert("Your tablet blocked the automatic photo download. However, the data WAS successfully logged to the vault.");
+            document.getElementById('imgNum').value = finalImageNum;
+
+            if (pendingLogType === 'full') {
+                executeFullLog();
+            } else if (pendingLogType === 'quick') {
+                executeQuickLog();
             }
             
-            document.getElementById('savePhotoModal').style.display = 'none';
-            pendingFileToSave = null;
-            pendingFileName = "";
+            document.getElementById('photoModal').style.display = 'none';
+            pendingLogType = null;
         }
 
-        function logWithoutPhoto() {
-            if(confirm("Log this window without capturing a visual photo?")) {
-                executeVaultLog("NO_PHOTO");
-            }
-        }
-
+        /* --- LOGGING PROCESSES --- */
         function getFormattedTime() {
             const now = new Date();
             return now.getHours().toString().padStart(2,'0') + ":" + 
@@ -498,12 +592,43 @@
                    now.getSeconds().toString().padStart(2,'0');
         }
 
-        function executeVaultLog(visualFileName) {
+        function executeQuickLog() {
             const time = getFormattedTime();
             const proj = document.getElementById('projectID').value || "No Project";
             const cam = document.getElementById('camID').value || "--";
             const tech = document.getElementById('techName').value || "Tech";
             const id = document.getElementById('fullIDDisplay').innerText;
+            
+            const imgEl = document.getElementById('imgNum');
+            const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
+            
+            const row = `<tr>
+                <td class="export-only">${proj}</td>
+                <td class="export-only">${cam}</td>
+                <td class="export-only">${tech}</td>
+                <td style="color:#0cf; font-weight:bold; white-space:nowrap;">${id}</td>
+                <td>${imgStr}</td>
+                <td style="color:#f39c12;">CLEAR (QUICK-LOG)</td>
+                <td class="export-only">--</td>
+                <td class="export-only">NO</td>
+                <td>${time}</td>
+            </tr>`;
+            
+            writeToVaultAndReset(row, imgEl);
+
+            if(pendingMoveCallback) pendingMoveCallback();
+            pendingMoveCallback = null;
+        }
+
+        function executeFullLog() {
+            const time = getFormattedTime();
+            const proj = document.getElementById('projectID').value || "No Project";
+            const cam = document.getElementById('camID').value || "--";
+            const tech = document.getElementById('techName').value || "Tech";
+            const id = document.getElementById('fullIDDisplay').innerText;
+            
+            const imgEl = document.getElementById('imgNum');
+            const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
             
             let finds = [];
             document.querySelectorAll('.check-item.active').forEach(el => finds.push(el.innerText));
@@ -516,51 +641,47 @@
                 if(document.getElementById('meterProvedBtn').classList.contains('active')) proved = "YES";
             }
 
-            let imageString = visualFileName;
-            if (isFlirIncluded) {
-                const flirInputEl = document.getElementById('imgNum');
-                const currentFlir = parseInt(flirInputEl.value, 10);
-                const formattedFlir = "FLIR" + currentFlir.toString().padStart(4, '0');
-                
-                imageString = `${visualFileName} & ${formattedFlir}`;
-                
-                flirInputEl.value = currentFlir + 1;
-                syncFlirDisplay(); 
-                saveLocationState(); 
-            }
-
             const row = `<tr>
                 <td class="export-only">${proj}</td>
                 <td class="export-only">${cam}</td>
                 <td class="export-only">${tech}</td>
                 <td style="color:#0cf; font-weight:bold; white-space:nowrap;">${id}</td>
-                <td style="font-size:0.6rem;">${imageString}</td>
+                <td>${imgStr}</td>
                 <td>${finds.join(' | ')}</td>
                 <td class="export-only">${mPct}</td>
                 <td class="export-only">${proved}</td>
                 <td>${time}</td>
             </tr>`;
             
-            document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', row);
+            writeToVaultAndReset(row, imgEl);
+            goToSlide(2); 
+        }
+
+        function writeToVaultAndReset(htmlRow, imgEl) {
+            document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', htmlRow);
             localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
             
             isCurrentWindowLogged = true;
             
+            // Auto-Increment for the NEXT window
+            const nextImg = parseInt(imgEl.value, 10) + 1;
+            imgEl.value = nextImg;
+            
+            saveLocationState(); 
+            
+            // Reset UI
             toggleSound(); 
             
-            isFlirIncluded = false;
-            document.getElementById('flirTrackerBtn').classList.remove('active');
-
+            // Reset Moisture back to 85 default
             document.getElementById('moisturePct').value = '85';
             document.getElementById('moisturePctVal').innerText = '85';
             const slider = document.querySelector('#groundTruthCard .touch-slider');
             if (slider) slider.value = 85;
+
             document.getElementById('meterProvedBtn').classList.remove('active');
             document.getElementById('meterProvedBtn').style.background = '#222';
             document.getElementById('meterProvedBtn').style.color = '#888';
             document.getElementById('meterProvedBtn').innerText = 'METER PROVED';
-            
-            goToSlide(2); 
         }
 
         function slideUpdate(id, val) {
@@ -573,6 +694,7 @@
         
         function slideEnd(id) { const hud = document.getElementById('hud-' + id); if(hud) hud.style.transform = "translateX(-50%) scale(0)"; }
         
+        // --- SMART FALLBACK INCLUDED HERE ---
         function step(id, val) {
             const el = document.getElementById(id);
             let fallback = (id === 'moisturePct') ? 85 : 0;
@@ -580,6 +702,7 @@
             if (isNaN(current)) current = fallback;
             
             let newVal = (current + val);
+            
             if(id === 'moisturePct') { if(newVal < 0) newVal = 0; if(newVal > 100) newVal = 100; }
             
             el.value = newVal;
@@ -618,15 +741,17 @@
         }
 
         function attemptMovePosition(p, targetSlide = null) {
-            if (currentPos !== p) {
-                isCurrentWindowLogged = false; 
-                hasVisitedDiagnose = false; 
-            }
-            currentPos = p; 
-            updatePosUI(); 
-            updatePreview();
-            saveLocationState(); 
-            if (targetSlide !== null) goToSlide(targetSlide);
+            verifySafeMove(() => {
+                if (currentPos !== p) {
+                    isCurrentWindowLogged = false; 
+                    hasVisitedDiagnose = false; 
+                }
+                currentPos = p; 
+                updatePosUI(); 
+                updatePreview();
+                saveLocationState(); 
+                if (targetSlide !== null) goToSlide(targetSlide);
+            });
         }
 
         function setPattern(val, forcePos = null) {
@@ -679,6 +804,7 @@
         function updatePreview() {
             const f = document.getElementById('floorNum').value || 0;
             const d = document.getElementById('dropLetter').value.toUpperCase() || "X";
+            
             const fullID = `${d}-${f}-${currentPos}`;
             
             document.getElementById('fullIDDisplay').innerText = fullID; 
@@ -696,11 +822,12 @@
             document.querySelectorAll('.nav-item').forEach((el, i) => el.classList.toggle('active', i === n));
             
             updateFixedHeaders(n);
+            
             if (n === 1) hasVisitedDiagnose = true;
         }
         
         async function exportAndSend() {
-            let csv = "Project,Camera,Technician,Drop ID,Images,Findings,Moisture %,Meter Proved,Time\n";
+            let csv = "Project,Camera,Technician,Drop ID,FLIR Image,Findings,Moisture %,Meter Proved,Time\n";
             document.querySelectorAll("#logTable tbody tr").forEach(tr => {
                 const cols = Array.from(tr.querySelectorAll("td"));
                 csv += cols.map(td => `"${td.textContent}"`).join(",") + "\n";
