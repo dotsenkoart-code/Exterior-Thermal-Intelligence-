@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: Thermal-Only Gold Master</title>
+    <title>Strata-Scan Pro: JSA + Thermal Master</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
@@ -14,17 +14,15 @@
     <style>
         /* --- CORE LAYOUT --- */
         body { font-family: 'Segoe UI', Roboto, sans-serif; background: #000; color: #fff; padding: 0; margin: 0; overflow: hidden; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
-        .slide-container { display: flex; transition: transform 0.3s ease-in-out; width: 300vw; height: calc(100vh - 65px); }
+        .slide-container { display: flex; transition: transform 0.3s ease-in-out; width: 400vw; height: calc(100vh - 65px); }
         
-        .slide { width: 100vw; height: 100%; box-sizing: border-box; overflow-y: auto; padding-bottom: 120px; }
-        #slide-map { padding: 10px 10px 120px 10px; }
+        .slide { width: 100vw; height: 100%; box-sizing: border-box; overflow-y: auto; padding: 10px 10px 120px 10px; }
         #slide-diagnose { padding: 100px 10px 120px 10px; } 
         #slide-command { padding: 100px 10px 120px 10px; }  
         
         .card { background: #121212; padding: 12px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #2a2a2a; }
-        
-        /* --- HIGHLIGHT CARD FOR CRITICAL DATA --- */
         .critical-card { background: #0a1118; padding: 15px; border-radius: 8px; margin-bottom: 12px; border: 2px solid #0cf; box-shadow: 0 0 15px rgba(0, 204, 255, 0.1); }
+        .warning-card { background: #1a0f00; padding: 15px; border-radius: 8px; margin-bottom: 12px; border: 2px solid #f39c12; }
         
         /* --- FIXED HEADERS --- */
         .fixed-header { position: fixed; top: 0; left: 0; width: 100%; background: #111; padding: 15px 0 10px 0; text-align: center; z-index: 500; border-bottom: 2px solid #0cf; box-shadow: 0 10px 20px rgba(0,0,0,0.8); display: none; }
@@ -35,9 +33,11 @@
 
         .target-banner { background: #111; padding: 12px; border-radius: 8px; border: 2px solid #333; text-align: center; margin-bottom: 12px; }
 
+        /* --- NAVBAR --- */
         .navbar { height: 65px; background: #080808; display: flex; border-top: 1px solid #333; position: fixed; bottom: 0; width: 100%; z-index: 1000; padding-bottom: env(safe-area-inset-bottom); }
-        .nav-item { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; color: #666; cursor: pointer; letter-spacing: 1px; }
+        .nav-item { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 0.70rem; font-weight: 700; color: #666; cursor: pointer; letter-spacing: 1px; }
         .nav-item.active { color: #0cf; border-top: 2px solid #0cf; background: #111; }
+        .nav-item.locked { opacity: 0.4; pointer-events: none; }
 
         input[type="text"], input[type="number"], input[inputmode="numeric"] { width: 100%; padding: 12px; background: #222; color: #fff; border: 1px solid #444; border-radius: 6px; font-size: 1.1rem; text-align: center; box-sizing: border-box; }
         input:disabled { background: #1a1a1a; color: #555; border-color: #333; }
@@ -54,10 +54,16 @@
         .hud-bubble { position: absolute; top: -100px; left: 50%; transform: translateX(-50%) scale(0); background: #f39c12; color: #000; padding: 10px 25px; border-radius: 30px; font-size: 3rem; font-weight: 900; z-index: 9999; pointer-events: none; transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275); border: 4px solid #fff; box-shadow: 0 10px 25px rgba(0,0,0,0.9); }
 
         /* --- CHECKLIST & BUTTONS --- */
-        .check-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+        .check-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 10px; }
         .check-item { background: #222; padding: 15px 5px; border-radius: 6px; text-align: center; font-size: 0.65rem; font-weight: 700; border: 1px solid #333; color: #888; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1.2; height: 50px; }
         .check-item.active { background: #0cf; color: #000; border-color: #fff; }
         .check-item.sound-box.active { background: #28a745; color: #fff; border-color: #fff; }
+        
+        /* JSA Specific Styles */
+        .jsa-toggle { display: flex; align-items: center; justify-content: space-between; background: #222; padding: 15px; border-radius: 6px; border: 1px solid #444; margin-bottom: 8px; cursor: pointer; }
+        .jsa-toggle.active { border-color: #f39c12; background: rgba(243, 156, 18, 0.1); }
+        .jsa-conditional { display: none; background: #111; padding: 12px; border-left: 3px solid #f39c12; margin-bottom: 12px; font-size: 0.8rem; color: #aaa; }
+        .sig-pad { width: 100%; height: 150px; background: #fff; border-radius: 8px; margin-top: 10px; border: 2px solid #444; touch-action: none; }
         
         .moisture-panel { background: #1a1a1a; border: 1px solid #d9534f; border-radius: 6px; padding: 10px; margin-top: 8px; display: none; }
 
@@ -66,6 +72,7 @@
         .btn-green { background: linear-gradient(180deg, #28a745 0%, #1e7e34 100%); }
         .btn-dark { background: #333; border: 1px solid #555; color: #aaa; }
         .btn-red { background: linear-gradient(180deg, #d9534f 0%, #b00 100%); color: #fff; border: 2px solid #fff; }
+        .btn-gold { background: linear-gradient(180deg, #f39c12 0%, #d68910 100%); color: #000; }
         
         .pattern-btn { flex: 1; padding: 15px; background: #222; border: 1px solid #444; color: #666; font-size: 0.8rem; font-weight: bold; cursor: pointer; }
         .pattern-btn.active { background: #0cf; color: #000; }
@@ -73,17 +80,14 @@
         .cmd-flow-btn { flex: 1; padding: 25px 10px; background: #333; border: 1px solid #555; color: #fff; font-size: 1.1rem; font-weight: 900; cursor: pointer; border-radius: 8px; transition: 0.2s; }
         .cmd-action-btn { width: 100%; padding: 25px; border-radius: 8px; border: none; font-size: 1.2rem; font-weight: 900; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; margin-top: 15px; }
 
-        /* --- VAULT TABLE STYLES --- */
         table { width: 100%; border-collapse: collapse; font-size: 0.7rem; color: #ccc; }
         td, th { border: 1px solid #333; padding: 8px; text-align: left; }
         .export-only { display: none; }
 
-        /* --- CUSTOM MODALS --- */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 9999; display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
         .modal-box { background: #111; border: 2px solid #444; border-radius: 12px; padding: 25px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 15px 35px rgba(0,0,0,0.9); }
         .modal-btn { width: 100%; padding: 22px 10px; border-radius: 8px; border: none; font-size: 1rem; font-weight: 900; cursor: pointer; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
         .modal-btn:last-child { margin-bottom: 0; }
-        
         .preflight-data { font-size: 2.2rem; font-weight: 900; color: #fff; margin: 5px 0 15px 0; }
     </style>
 </head>
@@ -142,12 +146,12 @@
         <div class="modal-box" style="border-color:#f39c12;">
             <h2 style="color:#f39c12; margin-top:0; font-size: 2rem;">⚠️ INCOMPLETE FLOOR</h2>
             <p style="color:#ccc; font-size:1.1rem; margin-bottom:25px; line-height:1.4;">
-                You selected a drop pattern, but you missed the following position(s):<br>
+                You missed the following position(s):<br>
                 <strong id="missingFloorWindows" style="color:#0cf; font-size: 2rem; display:inline-block; margin-top:10px;">C, R</strong><br><br>
                 Are you sure you want to leave this floor?
             </p>
-            <button class="modal-btn btn-blue" onclick="modalCancelFloorChange()">🔙 CANCEL (STAY ON FLOOR)</button>
-            <button class="modal-btn btn-dark" onclick="modalForceFloorChange()">⚠️ FORCE DESCEND (SKIP WINDOWS)</button>
+            <button class="modal-btn btn-blue" onclick="modalCancelFloorChange()">🔙 CANCEL (STAY)</button>
+            <button class="modal-btn btn-dark" onclick="modalForceFloorChange()">⚠️ FORCE DESCEND</button>
         </div>
     </div>
 
@@ -157,14 +161,12 @@
             <p style="color:#ccc; font-size:1.1rem; margin-bottom:15px; line-height:1.4;">
                 Match camera image for <strong id="modalConfirmID" style="color:#fff;">A-12-L</strong>:
             </p>
-            
             <div style="display:flex; align-items:center; justify-content:center; gap: 10px; margin-bottom: 25px;">
                 <span style="font-size:1.5rem; font-weight:900; color:#666;">FLIR</span>
                 <input type="text" inputmode="numeric" pattern="[0-9]*" id="modalPhotoInput" style="width: 140px; font-size: 2.8rem; font-weight: 900; color: #f39c12; border: 2px solid #f39c12; background: #222; text-align: center; border-radius: 8px;">
             </div>
-
             <button class="modal-btn btn-green" onclick="finalizeLogEvidence()" style="font-size: 1.2rem; padding: 25px 10px;">✅ CONFIRM & SAVE</button>
-            <button class="modal-btn btn-dark" onclick="cancelLogEvidence()">🔙 CANCEL (DON'T SAVE YET)</button>
+            <button class="modal-btn btn-dark" onclick="cancelLogEvidence()">🔙 CANCEL</button>
         </div>
     </div>
 
@@ -181,16 +183,73 @@
 
     <div class="slide-container" id="mainSlider">
         
+        <div class="slide" id="slide-safety">
+            <h2 style="color:#f39c12; margin:0 0 15px 0; font-size:1.5rem;">DAILY COMPLIANCE & JSA</h2>
+            
+            <div class="card">
+                <label>Emergency & Hospital Info</label>
+                <input type="text" id="jsaHospital" value="Providence Little Company of Mary" disabled style="margin-bottom:8px; font-size:0.9rem;">
+                <input type="text" id="jsaDriveTime" value="Drive Time: 9 Mins | 4101 Torrance Blvd" disabled style="font-size:0.9rem; color:#f39c12;">
+            </div>
+
+            <div class="warning-card">
+                <label style="color:#f39c12;">Pre-Drop Equipment Verification</label>
+                <div class="jsa-toggle" onclick="this.classList.toggle('active')">
+                    <span style="font-size:0.9rem; font-weight:bold;">12kN Anchor Systems Verified</span>
+                    <span>✔️</span>
+                </div>
+                <div class="jsa-toggle" onclick="this.classList.toggle('active')">
+                    <span style="font-size:0.9rem; font-weight:bold;">PPE & Kernmantle Ropes Inspected</span>
+                    <span>✔️</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <label>Conditional Hazards</label>
+                <div class="jsa-toggle" onclick="toggleConditional('loto-block', this)">
+                    <span style="font-size:0.9rem; font-weight:bold;">Roof Access / LOTO Required?</span>
+                    <span style="color:#aaa;">TAP IF YES</span>
+                </div>
+                <div id="loto-block" class="jsa-conditional">
+                    Access to rigging zone shall be restricted. Barricades and Lock Out tags must be applied before drop.
+                </div>
+
+                <div class="jsa-toggle" onclick="toggleConditional('rf-block', this)">
+                    <span style="font-size:0.9rem; font-weight:bold;">Cell Antennas / High RF?</span>
+                    <span style="color:#aaa;">TAP IF YES</span>
+                </div>
+                <div id="rf-block" class="jsa-conditional">
+                    Maintain clearance from active antennas. Exposure must not exceed 10mW/cm2 for 6 minutes. Use RF Meter.
+                </div>
+            </div>
+
+            <div class="card">
+                <label style="color:#0cf;">Technician Acknowledgment</label>
+                <p style="font-size:0.75rem; color:#aaa; line-height:1.4;">
+                    I have been briefed and understand the content of this Access Work Plan. I understand my responsibilities, and I am competent to use the required equipment and to carry out the intended tasks Safely.
+                </p>
+                <label>Sign Below (L3 / Tech)</label>
+                <canvas id="sigCanvas" class="sig-pad"></canvas>
+                <button class="action-btn btn-dark" style="margin-top: 10px; padding: 12px; font-size: 0.9rem;" onclick="clearSignature()">Clear Signature</button>
+            </div>
+
+            <button id="btn-unlock-app" class="action-btn btn-gold" style="padding: 22px; margin-bottom: 40px;" onclick="signAndUnlock()">🔒 SIGN & UNLOCK APP</button>
+            
+            <div id="jsa-signed-banner" style="display:none; text-align:center; margin-bottom: 40px;">
+                <div style="background:#1e7e34; padding:15px; border-radius:8px; font-weight:bold; letter-spacing:1px;">✅ JSA COMPLETED FOR TODAY</div>
+                <button class="action-btn btn-dark" style="margin-top:10px;" onclick="resetJSA()">Reset JSA (New Day)</button>
+            </div>
+        </div>
+
         <div class="slide" id="slide-map">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <h2 style="color:#fff; margin:0; font-size:1.2rem;">LOGISTICS SETUP</h2>
-                <button id="btn-unlock" class="btn-dark" style="display:none; padding: 8px 15px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; width:auto;" onclick="unlockSetup()">✏️ EDIT SETUP</button>
+                <button id="btn-unlock" class="btn-dark" style="display:none; padding: 8px 15px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; width:auto;" onclick="unlockSetup()">✏️ EDIT</button>
             </div>
             
             <div class="card">
                 <label>Project Name / Building</label>
                 <input type="text" id="projectID" class="setup-input" style="margin-bottom:12px;" placeholder="e.g. Torrance HOA">
-                
                 <div style="display:flex; gap:10px;">
                     <div style="flex:2;">
                         <label>Technician Name</label>
@@ -248,7 +307,6 @@
         </div>
 
         <div class="slide" id="slide-diagnose">
-            
             <label style="margin-left:5px; margin-top: 10px; display: block;">SCAN & FLAG FINDINGS</label>
             <div class="check-grid">
                 <div class="check-item sound-box active" id="soundBtn" onclick="toggleSound()">CLEAR</div>
@@ -260,6 +318,7 @@
                 <div class="check-item defect" onclick="toggleDefect(this)">BLOCKED WEEPS</div>
                 <div class="check-item defect" onclick="toggleDefect(this)">GLASS CRACK</div>
                 <div class="check-item defect" onclick="toggleDefect(this)">SPALLING</div>
+                
                 <div class="check-item defect" onclick="toggleDefect(this)">STAINING</div>
                 <div class="check-item defect" onclick="toggleDefect(this)">LOOSE FRAME</div>
                 <div class="check-item defect" onclick="toggleDefect(this)">AIR DRAFT</div>
@@ -319,16 +378,17 @@
             </div>
 
             <div style="display:flex; gap:8px; margin-top:10px;">
-                <button class="cmd-action-btn" style="background:#333; margin:0;" onclick="exportAndSend()">📤 EXPORT & SEND</button>
+                <button class="cmd-action-btn" style="background:#333; margin:0;" onclick="exportAndSend()">📤 EXPORT CSV</button>
                 <button class="cmd-action-btn" style="background:#b00; margin:0;" onclick="openWipeModal()">WIPE</button>
             </div>
         </div>
     </div>
 
     <div class="navbar">
-        <div class="nav-item active" onclick="goToSlide(0)">MAP</div>
-        <div class="nav-item" onclick="goToSlide(1)">DIAGNOSE</div>
-        <div class="nav-item" onclick="goToSlide(2)">COMMAND</div>
+        <div class="nav-item active" id="nav-0" onclick="goToSlide(0)">SAFETY</div>
+        <div class="nav-item locked" id="nav-1" onclick="goToSlide(1)">MAP</div>
+        <div class="nav-item locked" id="nav-2" onclick="goToSlide(2)">DIAGNOSE</div>
+        <div class="nav-item locked" id="nav-3" onclick="goToSlide(3)">COMMAND</div>
     </div>
 
     <script>
@@ -338,12 +398,132 @@
         let pendingMoveCallback = null;
         let pendingFloorAction = null;
         let hasVisitedDiagnose = false; 
-        
-        let pendingLogType = null; // 'full' or 'quick'
+        let pendingLogType = null; 
+        let isJsaSigned = false;
         
         const patternConfigs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
 
+        // --- SIGNATURE CANVAS LOGIC ---
+        const canvas = document.getElementById('sigCanvas');
+        const ctx = canvas.getContext('2d');
+        let drawing = false;
+
+        function initCanvas() {
+            // Resize for device pixel ratio to prevent blur
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#0cf';
+        }
+
+        function getPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            let clientX = e.clientX;
+            let clientY = e.clientY;
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            }
+            return { x: clientX - rect.left, y: clientY - rect.top };
+        }
+
+        function startDraw(e) {
+            e.preventDefault(); // Stop screen scrolling
+            drawing = true;
+            const pos = getPos(e);
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+        }
+
+        function draw(e) {
+            if (!drawing) return;
+            e.preventDefault();
+            const pos = getPos(e);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+        }
+
+        function stopDraw(e) {
+            e.preventDefault();
+            drawing = false;
+        }
+
+        canvas.addEventListener('mousedown', startDraw);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDraw);
+        canvas.addEventListener('mouseout', stopDraw);
+        canvas.addEventListener('touchstart', startDraw, {passive: false});
+        canvas.addEventListener('touchmove', draw, {passive: false});
+        canvas.addEventListener('touchend', stopDraw, {passive: false});
+
+        function clearSignature() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function toggleConditional(id, el) {
+            el.classList.toggle('active');
+            const block = document.getElementById(id);
+            block.style.display = block.style.display === 'block' ? 'none' : 'block';
+        }
+
+        // --- JSA LOCK LOGIC ---
+        function signAndUnlock() {
+            // Verify checkboxes
+            const toggles = document.querySelectorAll('.warning-card .jsa-toggle');
+            let allChecked = true;
+            toggles.forEach(t => { if(!t.classList.contains('active')) allChecked = false; });
+            
+            if (!allChecked) {
+                alert("⚠️ Please verify both Pre-Drop Equipment checks before signing.");
+                return;
+            }
+
+            localStorage.setItem('jsaSigned', 'true');
+            isJsaSigned = true;
+            checkJsaState();
+            goToSlide(1); // Auto-forward to Map
+        }
+
+        function checkJsaState() {
+            if (localStorage.getItem('jsaSigned') === 'true') {
+                isJsaSigned = true;
+                document.getElementById('btn-unlock-app').style.display = 'none';
+                document.getElementById('jsa-signed-banner').style.display = 'block';
+                document.querySelector('.sig-pad').style.pointerEvents = 'none';
+                document.querySelector('.sig-pad').style.opacity = '0.5';
+                
+                // Unlock Nav
+                document.getElementById('nav-1').classList.remove('locked');
+                document.getElementById('nav-2').classList.remove('locked');
+                document.getElementById('nav-3').classList.remove('locked');
+            } else {
+                isJsaSigned = false;
+                document.getElementById('btn-unlock-app').style.display = 'block';
+                document.getElementById('jsa-signed-banner').style.display = 'none';
+                document.querySelector('.sig-pad').style.pointerEvents = 'auto';
+                document.querySelector('.sig-pad').style.opacity = '1';
+                
+                // Lock Nav
+                document.getElementById('nav-1').classList.add('locked');
+                document.getElementById('nav-2').classList.add('locked');
+                document.getElementById('nav-3').classList.add('locked');
+            }
+        }
+
+        function resetJSA() {
+            if(confirm("Are you sure? This will lock the app until a new signature is collected.")) {
+                localStorage.setItem('jsaSigned', 'false');
+                clearSignature();
+                checkJsaState();
+            }
+        }
+
         function initApp() {
+            initCanvas();
+            checkJsaState();
+
             if (localStorage.getItem('strataVault')) {
                 document.getElementById('logTable').querySelector('tbody').innerHTML = localStorage.getItem('strataVault');
             }
@@ -366,15 +546,15 @@
                 document.getElementById('btn-commit').style.display = 'none';
                 document.getElementById('btn-unlock').style.display = 'block';
             } else {
-                document.getElementById('projectID').value = "";
-                document.getElementById('techName').value = "";
-                document.getElementById('camID').value = "";
-                document.getElementById('dropLetter').value = "";
-                document.getElementById('imgNum').value = "";
                 setPattern('3'); 
             }
 
-            updateFixedHeaders(0); 
+            // Start on JSA if not signed, else Map
+            if(isJsaSigned) {
+                goToSlide(1);
+            } else {
+                updateFixedHeaders(0); 
+            }
         }
 
         // --- PRE-FLIGHT HARD GATE ---
@@ -395,18 +575,14 @@
             document.getElementById('pf-tech').innerText = t;
             document.getElementById('pf-cam').innerText = c;
             
-            // Displays both Drop ID and Floor explicitly
             document.getElementById('pf-drop').innerText = "DROP " + d.toUpperCase();
             document.getElementById('pf-floor').innerText = f;
-            
             document.getElementById('pf-img').innerText = "FLIR" + i.toString().padStart(4, '0');
 
             document.getElementById('preFlightModal').style.display = 'flex';
         }
 
-        function closePreFlight() {
-            document.getElementById('preFlightModal').style.display = 'none';
-        }
+        function closePreFlight() { document.getElementById('preFlightModal').style.display = 'none'; }
 
         function lockInDrop() {
             document.getElementById('preFlightModal').style.display = 'none';
@@ -416,7 +592,7 @@
 
             localStorage.setItem('isDropLocked', 'true');
             saveLocationState();
-            goToSlide(1); 
+            goToSlide(2); // Go to Diagnose
         }
 
         function unlockSetup() {
@@ -450,11 +626,11 @@
         }
 
         function updateFixedHeaders(slideIndex) {
-            document.getElementById('header-diagnose').style.display = (slideIndex === 1) ? 'block' : 'none';
-            document.getElementById('header-command').style.display = (slideIndex === 2) ? 'block' : 'none';
+            document.getElementById('header-diagnose').style.display = (slideIndex === 2) ? 'block' : 'none';
+            document.getElementById('header-command').style.display = (slideIndex === 3) ? 'block' : 'none';
         }
 
-        /* --- INTERCEPTORS --- */
+        // --- NAVIGATION & INTERCEPTS ---
         function verifySafeMove(callback) {
             if (!hasVisitedDiagnose) { callback(); return; }
             if (isCurrentWindowLogged) { callback(); return; } 
@@ -480,7 +656,7 @@
 
         function modalGoToDiagnose() {
             document.getElementById('safetyModal').style.display = 'none';
-            goToSlide(1); 
+            goToSlide(2); 
         }
 
         function modalQuickLogAndMove() {
@@ -507,9 +683,7 @@
                 if (tds.length >= 4) {
                     const loggedID = tds[3].textContent; 
                     required.forEach(p => {
-                        if (loggedID === `${currentDrop}-${currentFloor}-${p}`) {
-                            foundPositions.add(p);
-                        }
+                        if (loggedID === `${currentDrop}-${currentFloor}-${p}`) foundPositions.add(p);
                     });
                 }
             });
@@ -558,10 +732,9 @@
             updatePreview();
             saveLocationState(); 
             
-            if (actionType === 'descend_btn') goToSlide(0);
+            if (actionType === 'descend_btn') goToSlide(1);
         }
 
-        /* --- SMART MODALS --- */
         function openWipeModal() { document.getElementById('wipeModal').style.display = 'flex'; }
         function closeWipeModal() { document.getElementById('wipeModal').style.display = 'none'; }
         function confirmWipe() { 
@@ -571,7 +744,6 @@
             location.reload(); 
         }
 
-        // --- PRE-SAVE VERIFICATION MODAL ---
         function openPhotoVerificationModal(logType) {
             pendingLogType = logType;
             document.getElementById('modalConfirmID').innerText = document.getElementById('fullIDDisplay').innerText;
@@ -589,7 +761,6 @@
 
         function finalizeLogEvidence() {
             const finalImageNum = parseInt(document.getElementById('modalPhotoInput').value, 10);
-            
             document.getElementById('imgNum').value = finalImageNum;
 
             if (pendingLogType === 'full') {
@@ -602,7 +773,6 @@
             pendingLogType = null;
         }
 
-        /* --- LOGGING PROCESSES --- */
         function getFormattedTime() {
             const now = new Date();
             return now.getHours().toString().padStart(2,'0') + ":" + 
@@ -672,7 +842,7 @@
             </tr>`;
             
             writeToVaultAndReset(row, imgEl);
-            goToSlide(2); 
+            goToSlide(3); // Go to Command
         }
 
         function writeToVaultAndReset(htmlRow, imgEl) {
@@ -681,16 +851,13 @@
             
             isCurrentWindowLogged = true;
             
-            // Auto-Increment for the NEXT window
             const nextImg = parseInt(imgEl.value, 10) + 1;
             imgEl.value = nextImg;
             
             saveLocationState(); 
             
-            // Reset UI
             toggleSound(); 
             
-            // Reset Moisture back to 85 default
             document.getElementById('moisturePct').value = '85';
             document.getElementById('moisturePctVal').innerText = '85';
             const slider = document.querySelector('#groundTruthCard .touch-slider');
@@ -712,7 +879,6 @@
         
         function slideEnd(id) { const hud = document.getElementById('hud-' + id); if(hud) hud.style.transform = "translateX(-50%) scale(0)"; }
         
-        // --- SMART FALLBACK INCLUDED HERE ---
         function step(id, val) {
             const el = document.getElementById(id);
             let fallback = (id === 'moisturePct') ? 85 : 0;
@@ -720,7 +886,6 @@
             if (isNaN(current)) current = fallback;
             
             let newVal = (current + val);
-            
             if(id === 'moisturePct') { if(newVal < 0) newVal = 0; if(newVal > 100) newVal = 100; }
             
             el.value = newVal;
@@ -795,7 +960,7 @@
                 fBtn.className = 'cmd-flow-btn';
                 fBtn.dataset.pos = p;
                 fBtn.innerText = "MOVE " + p;
-                fBtn.onclick = () => { attemptMovePosition(p, 1); };
+                fBtn.onclick = () => { attemptMovePosition(p, 2); }; // 2 = Diagnose
                 flow.appendChild(fBtn);
             });
             updatePosUI();
@@ -831,7 +996,13 @@
         }
 
         function goToSlide(n) {
-            if ((n === 1 || n === 2) && localStorage.getItem('isDropLocked') !== 'true') {
+            // Block navigation if JSA is not signed
+            if (n > 0 && !isJsaSigned) {
+                alert("⚠️ SAFETY FIRST: You must complete and sign the daily JSA before accessing the application.");
+                return;
+            }
+
+            if ((n === 2 || n === 3) && localStorage.getItem('isDropLocked') !== 'true') {
                 alert("⚠️ PRE-FLIGHT REQUIRED: You must fill out your Logistics setup and tap 'COMMIT TO DROP' before diagnosing windows.");
                 return;
             }
@@ -841,7 +1012,7 @@
             
             updateFixedHeaders(n);
             
-            if (n === 1) hasVisitedDiagnose = true;
+            if (n === 2) hasVisitedDiagnose = true;
         }
         
         async function exportAndSend() {
