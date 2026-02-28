@@ -207,26 +207,26 @@
             <div class="card">
                 <label>Conditional Hazards</label>
                 <div class="jsa-toggle" onclick="toggleConditional('loto-block', this)">
-                    <span style="font-size:0.9rem; font-weight:bold;">Roof Access / LOTO Required?</span>
+                    [cite_start]<span style="font-size:0.9rem; font-weight:bold;">Roof Access / LOTO Required? [cite: 78]</span>
                     <span style="color:#aaa;">TAP IF YES</span>
                 </div>
                 <div id="loto-block" class="jsa-conditional">
-                    Access to rigging zone shall be restricted. Barricades and Lock Out tags must be applied before drop.
+                    Access to rigging zone shall be restricted. [cite_start]Barricades and Lock Out tags must be applied before drop. [cite: 78]
                 </div>
 
                 <div class="jsa-toggle" onclick="toggleConditional('rf-block', this)">
-                    <span style="font-size:0.9rem; font-weight:bold;">Cell Antennas / High RF?</span>
+                    [cite_start]<span style="font-size:0.9rem; font-weight:bold;">Cell Antennas / High RF? [cite: 126]</span>
                     <span style="color:#aaa;">TAP IF YES</span>
                 </div>
                 <div id="rf-block" class="jsa-conditional">
-                    Maintain clearance from active antennas. Exposure must not exceed 10mW/cm2 for 6 minutes. Use RF Meter.
+                    Maintain clearance from active antennas. Exposure must not exceed 10mW/cm2 for 6 minutes. [cite_start]Use RF Meter. [cite: 126]
                 </div>
             </div>
 
             <div class="card">
                 <label style="color:#0cf;">Technician Acknowledgment</label>
                 <p style="font-size:0.75rem; color:#aaa; line-height:1.4;">
-                    I have been briefed and understand the content of this Access Work Plan. I understand my responsibilities, and I am competent to use the required equipment and to carry out the intended tasks Safely.
+                    I have been briefed and understand the content of this Access Work Plan. [cite_start]I understand my responsibilities, and I am competent to use the required equipment and to carry out the intended tasks Safely. [cite: 129, 130]
                 </p>
                 <label>Sign Below (L3 / Tech)</label>
                 <canvas id="sigCanvas" class="sig-pad"></canvas>
@@ -1037,6 +1037,7 @@
             }
 
             const proj = document.getElementById('projectID').value || "Unknown_Project";
+            const tech = document.getElementById('techName').value || "Tech";
             const date = new Date().toLocaleDateString();
             const time = new Date().toLocaleTimeString();
             
@@ -1049,55 +1050,182 @@
 <head>
     <title>Strata Access Group - JSA Report</title>
     <style>
-        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; color: #333; max-width: 800px; margin: auto; }
-        h1 { color: #000; border-bottom: 3px solid #f39c12; padding-bottom: 10px; margin-bottom: 30px; }
-        .section { margin-bottom: 25px; background: #f9f9f9; padding: 20px; border-radius: 8px; border: 1px solid #ddd; }
-        h3 { margin-top: 0; color: #222; }
-        .row { display: flex; margin-bottom: 10px; }
-        .label { font-weight: bold; width: 300px; color: #555; }
-        .val { font-weight: bold; color: #000; }
-        .sig-box { border: 2px dashed #ccc; padding: 10px; width: 100%; max-width: 400px; height: 150px; margin-top: 15px; background: #fff; }
-        .sig-img { width: 100%; height: 100%; object-fit: contain; }
-        .footer { margin-top: 40px; font-size: 0.8rem; color: #888; text-align: center; border-top: 1px solid #eee; padding-top: 20px; }
+        body { font-family: 'Arial', sans-serif; padding: 20px; color: #000; font-size: 11px; max-width: 900px; margin: auto; }
+        @media print {
+            body { padding: 0; }
+            .page-break { page-break-after: always; }
+            .no-break { page-break-inside: avoid; }
+        }
+        h1 { color: #000; border-bottom: 2px solid #000; font-size: 18px; text-transform: uppercase; margin-bottom: 15px; }
+        h2 { font-size: 14px; background: #eee; padding: 5px; margin-top: 20px; border: 1px solid #000; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 15px; page-break-inside: avoid; }
+        th, td { border: 1px solid #000; padding: 6px; text-align: left; vertical-align: top; }
+        th { background: #f5f5f5; font-weight: bold; }
+        .sig-img { max-height: 40px; max-width: 150px; }
+        .checkbox { font-family: 'Courier New', Courier, monospace; font-size: 14px; font-weight: bold; }
     </style>
 </head>
 <body>
     <h1>Strata Access Group - Job Safety Analysis (JSA)</h1>
     
-    <div class="section">
-        <h3>Project Details</h3>
-        <div class="row"><div class="label">Project/Building:</div><div class="val">${proj}</div></div>
-        <div class="row"><div class="label">Date:</div><div class="val">${date}</div></div>
-        <div class="row"><div class="label">Time of Briefing:</div><div class="val">${time}</div></div>
-    </div>
+    [cite_start]<h2>WORK METHOD [cite: 1]</h2>
+    <table>
+        <tr>
+            [cite_start]<td width="50%"><strong>Client / Site Name & Location: [cite: 4, 5]</strong><br>${proj}</td>
+            [cite_start]<td width="50%"><strong>Date: [cite: 3]</strong><br>${date}</td>
+        </tr>
+        <tr>
+            [cite_start]<td><strong>Start/Finish Times: [cite: 45]</strong><br>${time} to End of Shift</td>
+            [cite_start]<td><strong>Prepared By: [cite: 2]</strong><br>${tech}</td>
+        </tr>
+    </table>
 
-    <div class="section">
-        <h3>Pre-Drop Equipment Verification</h3>
-        <div class="row"><div class="label">12kN Anchor Systems Verified:</div><div class="val" style="color:green;">YES</div></div>
-        <div class="row"><div class="label">PPE & Kernmantle Ropes Inspected:</div><div class="val" style="color:green;">YES</div></div>
-    </div>
+    <table>
+        <tr>
+            [cite_start]<th colspan="3">Work Team & Personnel Role [cite: 7, 9]</th>
+        </tr>
+        <tr>
+            [cite_start]<td width="33%"><strong>Rope Access Supervisor L3: [cite: 15, 17]</strong><br>${tech}</td>
+            [cite_start]<td width="33%"><strong>Rope Access Technician L1: [cite: 21, 23, 27]</strong><br>--</td>
+            [cite_start]<td width="33%"><strong>Ground Control: [cite: 81]</strong><br>--</td>
+        </tr>
+    </table>
 
-    <div class="section">
-        <h3>Conditional Hazards</h3>
-        <div class="row"><div class="label">Roof Access / LOTO Required:</div><div class="val">${loto}</div></div>
-        <div class="row"><div class="label">Cell Antennas / High RF:</div><div class="val">${rf}</div></div>
-    </div>
+    [cite_start]<h2>INITIAL TASK ASSESSMENT [cite: 55]</h2>
+    [cite_start]<p><span class="checkbox">☑</span> There is no feasible access alternative (scaffolds, boom lift, or suspended platform (swing stage)) to perform the work, or using such alternative would create greater risk for workers, public, vehicular traffic, and/or property[cite: 57].</p>
+    [cite_start]<p><span class="checkbox">☑</span> Relative short duration/scale of the project makes Industrial Rope Access a better choice due to the faster rigging and mobilization[cite: 58].</p>
 
-    <div class="section">
-        <h3>Technician Acknowledgment</h3>
-        <p style="line-height:1.6; color:#444;">I have been briefed and understand the content of this Access Work Plan. I understand my responsibilities, and I am competent to use the required equipment and to carry out the intended tasks Safely.</p>
-        <div class="label" style="margin-top:20px;">Digital Signatures (L3 / Tech):</div>
-        <div class="sig-box">
-            <img src="${sigData}" class="sig-img" alt="Digital Signature" />
-        </div>
-    </div>
+    [cite_start]<h2>COMMUNICATION PLAN & EMERGENCY SERVICES [cite: 64, 74]</h2>
+    <table>
+        <tr>
+            [cite_start]<th width="33%">Mode of Communication [cite: 66]</th>
+            [cite_start]<th width="33%">Hospital Information [cite: 71]</th>
+            [cite_start]<th width="33%">Emergency Services [cite: 74]</th>
+        </tr>
+        <tr>
+            <td>
+                [cite_start]☑ Radio [cite: 65]<br>
+                [cite_start]☑ Cell Phone [cite: 67]<br>
+                [cite_start]☑ Hand Signals Reviewed [cite: 68]
+            </td>
+            <td>
+                [cite_start]<strong>Location: [cite: 72]</strong> Providence Little Company of Mary<br>
+                [cite_start]<strong>Drive Time: [cite: 73]</strong> 9 Mins | 4101 Torrance Blvd
+            </td>
+            <td>
+                [cite_start]<strong>EMS Phone: [cite: 74][cite_start]</strong> 911 [cite: 79]<br>
+                [cite_start]<strong>Life Flight?: [cite: 75]</strong> NO
+            </td>
+        </tr>
+    </table>
+
+    [cite_start]<h2>LOCK OUT/TAG OUT PROCEDURES [cite: 77]</h2>
+    <table>
+        <tr>
+            [cite_start]<th>Isolation Component [cite: 78]</th>
+            <th>Required? (Y/N) [cite_start][cite: 78]</th>
+            [cite_start]<th>NOTES [cite: 78]</th>
+        </tr>
+        <tr>
+            [cite_start]<td>Roof Access [cite: 78]</td>
+            <td><strong>${loto}</strong></td>
+            <td>Access to Rigging zone shall be restricted for Public. [cite_start]Set barricades, send notices[cite: 78].</td>
+        </tr>
+        <tr>
+            [cite_start]<td>Cell Antennas [cite: 78]</td>
+            <td><strong>${rf}</strong></td>
+            <td>Maintain clearance from active antennas. [cite_start]Max exposure 10mW/cm2 for 6 mins[cite: 126].</td>
+        </tr>
+    </table>
+
+    <div class="page-break"></div>
+
+    [cite_start]<h2>WORK PLAN & EQUIPMENT VERIFICATION [cite: 80, 82]</h2>
+    <table>
+        <tr>
+            [cite_start]<th width="20%">KEY JOB PROCESS [cite: 81]</th>
+            [cite_start]<th width="80%">STEPS & PROCEDURES [cite: 81]</th>
+        </tr>
+        <tr>
+            [cite_start]<td><strong>Briefing, Safety Meeting [cite: 81]</strong></td>
+            [cite_start]<td>Equipment unloading, transportation and pre-use inspection [cite: 81][cite_start].<br>Installing barricades around hazard zone[cite: 81]. [cite_start]Anchor points assessment[cite: 81].</td>
+        </tr>
+        <tr>
+            [cite_start]<td><strong>Access/Fall Zone [cite: 81]</strong></td>
+            [cite_start]<td>Whenever on ropes, 6 feet from the unprotected edge (parapet/railings lower than 42 inches)[cite: 81]. [cite_start]No one shall enter the fall zone without appropriate fall protection system[cite: 81].</td>
+        </tr>
+        <tr>
+            [cite_start]<td><strong>Anchorage Description [cite: 81]</strong></td>
+            [cite_start]<td>Engineered access anchors, roof shafts, structural building elements, beam structures, etc.[cite: 81]. [cite_start]Anchorage systems used as the primary support within a main or backup system shall have a minimum strength of either 12 kN (2700 lbf), or two times the maximum arrest force of the backup system when used in accordance with manufacturer specifications, whichever is greater[cite: 81]. <strong>(VERIFIED IN APP)</strong></td>
+        </tr>
+        <tr>
+            [cite_start]<td><strong>Required Rope Access Equipment [cite: 82]</strong></td>
+            [cite_start]<td>7/16" Kernmantle Static Ropes (MBS 22.2KN/5000 lbf), Connectors (Petzl Am'd, Oxan, Ok, must be locking type, with MBS 22.2kN, 5000Lbs), Full-body Rope Access Harness, Descenders (Petzl ID/ Rig), Backup Devices (Petzl ASAP, SafeTec Duck), Energy Absorber Lanyard (Petzl ASAP'Sorber, ASAP'Sorber Axxess)[cite: 82]. <strong>(VERIFIED IN APP)</strong></td>
+        </tr>
+    </table>
+
+    [cite_start]<h2>RISK ASSESSMENT & JSA [cite: 98]</h2>
+    [cite_start]<p><em>Stop work, notify supervisor and other technicians immediately if new hazard is identified or taken measures are inadequate[cite: 99].</em></p>
+    <table>
+        <tr>
+            [cite_start]<th width="20%">Activity/Hazard [cite: 102]</th>
+            [cite_start]<th width="25%">Hazard Effect [cite: 102]</th>
+            [cite_start]<th width="10%">Risk Lvl [cite: 102]</th>
+            [cite_start]<th width="45%">Control Measures [cite: 102]</th>
+        </tr>
+        <tr>
+            [cite_start]<td><strong>Personal Falling [cite: 102]</strong></td>
+            [cite_start]<td>Gravity-induced injury or death [cite: 102]</td>
+            [cite_start]<td><strong>H [cite: 102]</strong></td>
+            [cite_start]<td>All personnel must be properly trained, briefed and follow IRATA/SPRAT and OSHA Rope Access and Fall-Protection standards[cite: 102]. [cite_start]Always maintain 2-point attachments while using Rope Access (main and safety line)[cite: 102]. [cite_start]Always use 2 independent anchor points capable to withstand 5000 lbs/22KN load[cite: 102].</td>
+        </tr>
+        <tr>
+            [cite_start]<td><strong>Mental/Physical Fatigue [cite: 102]</strong></td>
+            [cite_start]<td>Rigging mistakes, poor judgement, limited awareness, movement, tools handling and balance issues [cite: 102]</td>
+            [cite_start]<td><strong>H [cite: 102]</strong></td>
+            [cite_start]<td>Stay alert and Control physical and mental exhaustion by taking breaks[cite: 102]. [cite_start]Replenish by having appropriate food and drink breaks[cite: 102]. [cite_start]Use "Buddy" check: always help team member to identify mistake or issue if you notice it[cite: 102]. [cite_start]Ask Level 2 or Level 3 Rope Access Technician for checking if you have any doubts in your rigging[cite: 102].</td>
+        </tr>
+        <tr>
+            [cite_start]<td><strong>Dropped Tools / Materials [cite: 124]</strong></td>
+            [cite_start]<td>Injury to personnel working below, injury to public passersby, damage to property [cite: 124]</td>
+            [cite_start]<td><strong>H [cite: 124]</strong></td>
+            [cite_start]<td>Clearly mark and barricade Hazard Zone (10ft around Access Zone projection)[cite: 124]. [cite_start]All tools and devices must be tethered or secured[cite: 124]. [cite_start]Helmets and hard hats must be always worn within Hazard Zone[cite: 125]. [cite_start]Keep clean and organized workplace[cite: 125].</td>
+        </tr>
+    </table>
+
+    <div class="page-break"></div>
+
+    [cite_start]<h2>TECHNICIAN ACKNOWLEDGMENT & SIGNATURES [cite: 131]</h2>
+    [cite_start]<p>My signature states that I have been briefed and understand the content of this Access Work Plan[cite: 129]. [cite_start]I understand my responsibilities, and I am competent to use the required equipment and to carry out the intended tasks Safely[cite: 130].</p>
     
-    <div class="footer">
-        Generated by Strata-Scan Pro Fleet App &bull; ${date} ${time}
+    <table>
+        <tr>
+            [cite_start]<th width="20%">Personnel Roles [cite: 131]</th>
+            [cite_start]<th width="25%">Name [cite: 131]</th>
+            [cite_start]<th width="35%">Signature [cite: 131]</th>
+            [cite_start]<th width="20%">Emergency Contact [cite: 131]</th>
+        </tr>
+        <tr>
+            [cite_start]<td><strong>Rope Access Supervisor L3 / Technician [cite: 131]</strong></td>
+            <td>${tech}</td>
+            <td style="text-align:center; vertical-align:middle;">
+                <img src="${sigData}" class="sig-img" alt="Digital Signature" />
+            </td>
+            <td>On File</td>
+        </tr>
+        <tr>
+            [cite_start]<td><strong>Rope Access Technician L1 [cite: 131]</strong></td>
+            <td></td>
+            <td></td>
+            <td></td>
+        </tr>
+    </table>
+
+    <div style="margin-top: 30px; font-size: 10px; color: #666; text-align: center;">
+        Strata Access Group, Inc. &bull; Generated via Strata-Scan Pro Fleet &bull; Document Timestamp: ${date} ${time}
     </div>
-    
+
     <script>
-        // Automatically open the print dialog to allow saving as PDF
         window.onload = function() { window.print(); }
     <\/script>
 </body>
