@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: Offline PIN & GPS</title>
+    <title>Strata-Scan Pro: Compliance & Thermal Master</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
@@ -39,7 +39,7 @@
         .nav-item.active { color: #0cf; border-top: 2px solid #0cf; background: #111; }
         .nav-item.locked { opacity: 0.4; pointer-events: none; }
 
-        input[type="text"], input[type="number"], input[inputmode="numeric"], select { width: 100%; padding: 12px; background: #222; color: #fff; border: 1px solid #444; border-radius: 6px; font-size: 1.1rem; text-align: center; box-sizing: border-box; }
+        input[type="text"], input[type="number"], input[type="tel"], input[inputmode="numeric"], select { width: 100%; padding: 12px; background: #222; color: #fff; border: 1px solid #444; border-radius: 6px; font-size: 1.1rem; text-align: center; box-sizing: border-box; }
         input:disabled, select:disabled { background: #1a1a1a; color: #555; border-color: #333; }
         label { font-size: 0.65rem; color: #888; font-weight: 700; text-transform: uppercase; display: block; margin-bottom: 4px; letter-spacing: 0.5px; }
 
@@ -150,7 +150,13 @@
             <div id="l3-view" style="display:block;">
                 <div class="card">
                     <label style="color:#0cf;">Step 1: Site Logistics</label>
-                    <input type="text" id="jsaProjectName" placeholder="Project / Site Name" style="margin-bottom:8px;">
+                    
+                    <select id="recentSitesDropdown" style="margin-bottom:8px; background:#1e7e34; color:#fff; font-weight:bold; display:none; border:2px solid #28a745;" onchange="loadRecentSite()">
+                        <option value="">🔄 LOAD RECENT SITE PROFILE</option>
+                    </select>
+
+                    <input type="text" id="jsaClient" placeholder="Client (e.g. Century 21)" style="margin-bottom:8px;">
+                    <input type="text" id="jsaSiteName" placeholder="Site Name & Location (e.g. Torrance HOA)" style="margin-bottom:8px;">
                     <input type="text" id="l3JsaName" placeholder="Your Full Name (L3 Supervisor)" style="margin-bottom:8px;">
                     
                     <div style="display:flex; gap:8px; margin-bottom:8px;">
@@ -196,45 +202,83 @@
                     <div id="rf-block" class="jsa-conditional">Maintain clearance from active antennas. Exposure must not exceed 10mW/cm2 for 6 minutes. Use RF Meter.</div>
                 </div>
 
-                <div class="card">
-                    <label style="color:#0cf;">Pass & Sign Roster</label>
-                    <p style="font-size:0.75rem; color:#aaa; line-height:1.4;">
-                        Select team members on the ropes today. Pass this tablet to them to collect signatures before generating the Master PDF.
-                    </p>
-                    <div style="display:flex; flex-direction:column; gap:6px;" id="rosterChecklist">
-                        <label><input type="checkbox" value="Art Dotsenko"> Art Dotsenko (L2)</label>
-                        <label><input type="checkbox" value="John Doe"> John Doe (L1)</label>
-                        <label><input type="checkbox" value="Sarah Smith"> Sarah Smith (L1)</label>
+                <div class="card" id="roster-setup-card">
+                    <label style="color:#0cf;">Step 4: Roster & Signatures</label>
+                    <p style="font-size:0.75rem; color:#aaa; margin-bottom:10px;">How many total personnel are on the ropes today (including yourself)?</p>
+                    <div class="stepper-box">
+                        <div class="stepper-row">
+                            <button class="step-btn" onclick="stepCrew(-1)">−</button>
+                            <div class="step-display">
+                                <div class="step-val" id="crewCountVal">2</div>
+                            </div>
+                            <button class="step-btn" onclick="stepCrew(1)">+</button>
+                        </div>
                     </div>
+                    <button class="action-btn btn-gold" onclick="startSignatureCarousel()">📝 START PASS-AND-SIGN</button>
                 </div>
+            </div>
 
-                <button class="action-btn btn-gold" style="padding: 22px; margin-bottom: 40px;" onclick="l3SignAndGenerate()">🔒 L3 SIGN & GENERATE PIN</button>
+            <div id="carousel-view" style="display:none; margin-bottom: 40px;">
+                <h3 id="carousel-title" style="color:#f39c12; text-align:center; font-size:1.8rem; margin-top:0;">SIGNER 1 OF 2</h3>
+                <p style="color:#aaa; text-align:center; font-size:0.8rem; margin-bottom:20px;">Please fill out your required OSHA compliance data below and sign.</p>
                 
-                <div id="l3-signed-banner" style="display:none; text-align:center; padding-bottom: 40px;">
-                    <div class="pin-display-box">
-                        <span style="color:#ccc; font-weight:bold; font-size:0.9rem; display:block; margin-bottom:10px; text-transform:uppercase;">TODAY'S AUTHORIZATION PIN</span>
-                        <div class="pin-number" id="displayDailyPin">8492</div>
-                        <span style="color:#888; font-size:0.75rem; display:block; margin-top:10px;">Provide this PIN to L1/L2 Techs to unlock their phones.</span>
-                    </div>
-                    
-                    <button class="action-btn btn-blue" style="padding: 22px; margin-top: 0; margin-bottom: 15px;" onclick="exportJSAPDF()">
-                        📤 1. SEND JSA TO OFFICE
-                    </button>
-                    
-                    <button class="action-btn btn-green" style="padding: 22px; margin-top: 0; margin-bottom: 20px;" onclick="goToSlide(1)">
-                        🚀 2. PROCEED TO DROP SETUP
-                    </button>
-
-                    <button class="action-btn btn-dark" style="margin-top:10px; font-size: 0.9rem;" onclick="resetJSA()">
-                        Undo / Reset JSA (New Day)
-                    </button>
+                <div class="card">
+                    <label>Your Role & Identity</label>
+                    <select id="signRole" style="margin-bottom:8px;">
+                        <option value="Rope Access Supervisor L3">Rope Access Supervisor L3</option>
+                        <option value="Rope Access Lead Technician L2">Rope Access Lead Technician L2</option>
+                        <option value="Rope Access Technician L1">Rope Access Technician L1</option>
+                        <option value="Ground Control">Ground Control</option>
+                    </select>
+                    <input type="text" id="signName" placeholder="Your Full Name" style="margin-bottom:8px;">
+                    <input type="tel" id="signPhone" placeholder="Your Cell Phone #" style="margin-bottom:8px;">
+                    <input type="text" id="signTraining" placeholder="Training (e.g. SPRAT L3, IRATA L1)">
                 </div>
+
+                <div class="card">
+                    <label style="color:#d9534f;">Emergency Contact Info</label>
+                    <input type="text" id="signEmergName" placeholder="Name & Relation (e.g. Jane - Wife)" style="margin-bottom:8px;">
+                    <input type="tel" id="signEmergPhone" placeholder="Emergency Phone #">
+                </div>
+
+                <div class="card">
+                    <label style="color:#0cf;">Legal Acknowledgment</label>
+                    <p style="font-size:0.7rem; color:#aaa; line-height:1.4; margin-bottom:10px;">
+                        I have been briefed and understand the content of this Access Work Plan. I understand my responsibilities, and I am competent to use the required equipment and to carry out the intended tasks Safely.
+                    </p>
+                    <label>Sign Below</label>
+                    <canvas id="sigCanvas" class="sig-pad"></canvas>
+                    <button class="action-btn btn-dark" style="margin-top: 10px; padding: 12px; font-size: 0.9rem;" onclick="clearSignature()">Clear Signature</button>
+                </div>
+
+                <button id="btnNextSigner" class="action-btn btn-green" style="padding: 22px;" onclick="processSignature()">✅ SAVE & PASS DEVICE</button>
+            </div>
+
+
+            <div id="l3-signed-banner" style="display:none; text-align:center; padding-bottom: 40px;">
+                <div class="pin-display-box">
+                    <span style="color:#ccc; font-weight:bold; font-size:0.9rem; display:block; margin-bottom:10px; text-transform:uppercase;">TODAY'S AUTHORIZATION PIN</span>
+                    <div class="pin-number" id="displayDailyPin">8492</div>
+                    <span style="color:#888; font-size:0.75rem; display:block; margin-top:10px;">Provide this PIN to your Technicians to unlock their individual phones.</span>
+                </div>
+                
+                <button class="action-btn btn-blue" style="padding: 22px; margin-top: 0; margin-bottom: 15px;" onclick="exportJSAPDF()">
+                    📤 1. SEND JSA TO OFFICE
+                </button>
+                
+                <button class="action-btn btn-green" style="padding: 22px; margin-top: 0; margin-bottom: 20px;" onclick="goToSlide(1)">
+                    🚀 2. PROCEED TO DROP SETUP
+                </button>
+
+                <button class="action-btn btn-dark" style="margin-top:10px; font-size: 0.9rem;" onclick="resetJSA()">
+                    Undo / Reset JSA (New Day)
+                </button>
             </div>
 
             <div id="tech-view" style="display:none; text-align:center; padding-top: 20px;">
                 <h3 style="color:#0cf; font-size:1.5rem; margin-bottom:10px;">L1 / L2 TECHNICIAN</h3>
                 <p style="color:#aaa; font-size:0.9rem; margin-bottom:20px; line-height:1.4;">
-                    Your L3 Supervisor must complete the Master JSA on their tablet before you can begin. Once completed, enter the 4-digit PIN provided by your Supervisor to unlock your diagnostic tools.
+                    You must physically sign the Master JSA on your L3 Supervisor's tablet before you can begin. Once signed, enter the 4-digit PIN provided by your Supervisor to unlock your diagnostic tools.
                 </p>
 
                 <div class="card" style="padding: 25px 15px;">
@@ -245,6 +289,11 @@
                 <div class="card" style="margin-top:20px;">
                     <label>Your Name (Auto-fills Map Data)</label>
                     <input type="text" id="techPersonalName" placeholder="e.g. John Doe">
+                </div>
+
+                <div class="card" style="margin-top:10px;">
+                    <label>Project Name (From Tailgate Meeting)</label>
+                    <input type="text" id="techProjectName" placeholder="Client - Site Name">
                 </div>
 
                 <button class="action-btn btn-green" style="padding: 25px; margin-top:20px;" onclick="techUnlockApp()">🔓 UNLOCK MY APP</button>
@@ -260,7 +309,7 @@
             
             <div class="card">
                 <label>Project Name / Building</label>
-                <input type="text" id="projectID" class="setup-input" style="margin-bottom:12px;" placeholder="Auto-Filled">
+                <input type="text" id="projectID" class="setup-input" style="margin-bottom:12px;" placeholder="Auto-Filled" disabled>
                 <div style="display:flex; gap:10px;">
                     <div style="flex:2;">
                         <label>Technician Name</label>
@@ -411,17 +460,21 @@
         let pendingFloorAction = null;
         let hasVisitedDiagnose = false; 
         let pendingLogType = null; 
+        
         let isJsaSigned = false;
         let activeComplianceMode = 'L3'; // 'L3' or 'TECH'
+        
+        // --- PASS & SIGN CAROUSEL STATE ---
+        let totalCrewCount = 2;
+        let currentSignerIndex = 1;
+        let capturedSignatures = []; // Array to hold {role, name, phone, training, emergName, emergPhone, signatureData}
         
         const patternConfigs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
 
         // --- ALGORITHMIC PIN GENERATOR (OFFLINE) ---
         function getDailyPIN() {
             const d = new Date();
-            // Create a unique seed based on today's date multiplied by a static factor
             const seed = (d.getMonth() + 1) * d.getDate() * d.getFullYear() * 42;
-            // Force it to be a 4-digit number
             let pin = (seed % 9000) + 1000; 
             return pin.toString();
         }
@@ -434,9 +487,8 @@
             
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition((position) => {
-                    // In a production build, you would pass position.coords.latitude and longitude to Google Places API here
                     setTimeout(() => {
-                        input.value = "GPS: Found Nearest ER (9 Mins)";
+                        input.value = "GPS: Found Nearest ER (<15 Mins)";
                         input.style.color = "#0cf";
                         btn.innerText = "✅ Linked";
                         btn.style.background = "#1e7e34";
@@ -453,6 +505,58 @@
             }
         }
 
+        // --- SMART MEMORY LOGIC (SAVE & LOAD SITES) ---
+        function populateRecentSites() {
+            let sites = JSON.parse(localStorage.getItem('strataRecentSites')) || [];
+            const dd = document.getElementById('recentSitesDropdown');
+            if(sites.length > 0) {
+                dd.style.display = 'block';
+                // Reset options to keep the placeholder
+                dd.innerHTML = '<option value="">🔄 LOAD RECENT SITE PROFILE</option>';
+                sites.forEach((s, index) => {
+                    let opt = document.createElement('option');
+                    opt.value = index;
+                    opt.text = s.client + " - " + s.site;
+                    dd.appendChild(opt);
+                });
+            } else {
+                dd.style.display = 'none';
+            }
+        }
+
+        function loadRecentSite() {
+            const dd = document.getElementById('recentSitesDropdown');
+            const idx = dd.value;
+            if(idx !== "") {
+                let sites = JSON.parse(localStorage.getItem('strataRecentSites')) || [];
+                const s = sites[idx];
+                document.getElementById('jsaClient').value = s.client || "";
+                document.getElementById('jsaSiteName').value = s.site || "";
+                document.getElementById('jsaEnvironment').value = s.env || "Commercial Building";
+                document.getElementById('jsaHeight').value = s.height || "";
+            }
+        }
+
+        function saveSiteToMemory() {
+            const client = document.getElementById('jsaClient').value.trim();
+            const site = document.getElementById('jsaSiteName').value.trim();
+            const env = document.getElementById('jsaEnvironment').value;
+            const height = document.getElementById('jsaHeight').value;
+
+            if(client && site) {
+                let sites = JSON.parse(localStorage.getItem('strataRecentSites')) || [];
+                // Prevent duplicates by checking if client & site already exist
+                const exists = sites.findIndex(s => s.client === client && s.site === site);
+                if(exists !== -1) {
+                    sites.splice(exists, 1); // Remove it so we can push it to the top
+                }
+                sites.unshift({client, site, env, height}); // Add to front
+                if(sites.length > 5) sites.pop(); // Keep only the 5 most recent
+                localStorage.setItem('strataRecentSites', JSON.stringify(sites));
+                populateRecentSites(); // Refresh dropdown
+            }
+        }
+
         // --- COMPLIANCE MODE LOGIC ---
         function setComplianceMode(mode) {
             activeComplianceMode = mode;
@@ -460,6 +564,10 @@
             document.getElementById('modeBtnTech').classList.toggle('active', mode === 'TECH');
             document.getElementById('l3-view').style.display = mode === 'L3' ? 'block' : 'none';
             document.getElementById('tech-view').style.display = mode === 'TECH' ? 'block' : 'none';
+            
+            // Hide carousel and banner if switching modes
+            document.getElementById('carousel-view').style.display = 'none';
+            if(!isJsaSigned) document.getElementById('l3-signed-banner').style.display = 'none';
         }
 
         function toggleConditional(id, el) {
@@ -468,33 +576,119 @@
             block.style.display = block.style.display === 'block' ? 'none' : 'block';
         }
 
-        // --- L3 GENERATION LOGIC ---
-        function l3SignAndGenerate() {
+        // --- CAROUSEL CREW COUNTER ---
+        function stepCrew(val) {
+            totalCrewCount += val;
+            if(totalCrewCount < 1) totalCrewCount = 1;
+            if(totalCrewCount > 10) totalCrewCount = 10;
+            document.getElementById('crewCountVal').innerText = totalCrewCount;
+        }
+
+        // --- START PASS & SIGN CAROUSEL ---
+        function startSignatureCarousel() {
             const toggles = document.querySelectorAll('.warning-card .jsa-toggle');
             let allChecked = true;
             toggles.forEach(t => { if(!t.classList.contains('active')) allChecked = false; });
             
-            if (!document.getElementById('jsaProjectName').value || !document.getElementById('l3JsaName').value) {
-                alert("⚠️ Please enter the Project Name and your Name before locking the JSA.");
+            // Validation includes BOTH Client and Site Name now
+            if (!document.getElementById('jsaClient').value || !document.getElementById('jsaSiteName').value) {
+                alert("⚠️ Please enter both the Client and Site Name before starting signatures.");
                 return;
             }
             if (!allChecked) {
-                alert("⚠️ Please verify both Pre-Drop Equipment checks before locking.");
+                alert("⚠️ Please verify both Pre-Drop Equipment checks first.");
                 return;
             }
 
-            // Lock the form
+            currentSignerIndex = 1;
+            capturedSignatures = [];
+            
+            const l3Name = document.getElementById('l3JsaName').value;
+            if(l3Name) document.getElementById('signName').value = l3Name;
+            document.getElementById('signRole').value = "Rope Access Supervisor L3";
+
+            updateCarouselUI();
+
+            document.getElementById('l3-view').style.display = 'none';
+            document.querySelector('.role-toggle-row').style.display = 'none';
+            document.getElementById('carousel-view').style.display = 'block';
+            
+            setTimeout(initCanvas, 50);
+            window.scrollTo(0, 0); 
+        }
+
+        function updateCarouselUI() {
+            document.getElementById('carousel-title').innerText = `SIGNER ${currentSignerIndex} OF ${totalCrewCount}`;
+            const btn = document.getElementById('btnNextSigner');
+            
+            if (currentSignerIndex === totalCrewCount) {
+                btn.innerText = "🔒 FINISH & LOCK JSA";
+                btn.className = "action-btn btn-gold";
+            } else {
+                btn.innerText = "✅ SAVE & PASS DEVICE";
+                btn.className = "action-btn btn-green";
+            }
+        }
+
+        function processSignature() {
+            const name = document.getElementById('signName').value;
+            const phone = document.getElementById('signPhone').value;
+            const emergName = document.getElementById('signEmergName').value;
+            const emergPhone = document.getElementById('signEmergPhone').value;
+            
+            if(!name || !phone || !emergName || !emergPhone) {
+                alert("⚠️ Please fill out all Identity and Emergency Contact fields before proceeding.");
+                return;
+            }
+
+            capturedSignatures.push({
+                role: document.getElementById('signRole').value,
+                name: name,
+                phone: phone,
+                training: document.getElementById('signTraining').value || "--",
+                emergName: emergName,
+                emergPhone: emergPhone,
+                signatureData: canvas.toDataURL("image/png")
+            });
+
+            if (currentSignerIndex < totalCrewCount) {
+                currentSignerIndex++;
+                document.getElementById('signRole').value = "Rope Access Technician L1";
+                document.getElementById('signName').value = "";
+                document.getElementById('signPhone').value = "";
+                document.getElementById('signTraining').value = "";
+                document.getElementById('signEmergName').value = "";
+                document.getElementById('signEmergPhone').value = "";
+                clearSignature();
+                
+                updateCarouselUI();
+                window.scrollTo(0, 0);
+            } else {
+                finalizeL3JSA();
+            }
+        }
+
+        function finalizeL3JSA() {
+            // Save the Smart Memory Profile
+            saveSiteToMemory();
+
+            localStorage.setItem('jsaSignaturesPayload', JSON.stringify(capturedSignatures));
             localStorage.setItem('jsaSigned', 'true');
             isJsaSigned = true;
-            
-            // Auto-fill Map Screen
-            document.getElementById('projectID').value = document.getElementById('jsaProjectName').value;
-            document.getElementById('techName').value = document.getElementById('l3JsaName').value;
 
-            // Generate and show the Daily PIN
-            const dailyPin = getDailyPIN();
-            document.getElementById('displayDailyPin').innerText = dailyPin;
+            // Auto-fill Map Screen combining Client and Site
+            const c = document.getElementById('jsaClient').value;
+            const s = document.getElementById('jsaSiteName').value;
+            document.getElementById('projectID').value = `${c} - ${s}`;
             
+            let leadName = capturedSignatures[0].name;
+            const l3Sig = capturedSignatures.find(s => s.role.includes("L3"));
+            if(l3Sig) leadName = l3Sig.name;
+            document.getElementById('techName').value = leadName;
+
+            document.getElementById('displayDailyPin').innerText = getDailyPIN();
+            
+            document.getElementById('carousel-view').style.display = 'none';
             checkJsaState();
             window.scrollTo(0, 0); 
         }
@@ -503,6 +697,7 @@
         function techUnlockApp() {
             const enteredPin = document.getElementById('techPinInput').value;
             const techName = document.getElementById('techPersonalName').value;
+            const projName = document.getElementById('techProjectName').value;
             const requiredPin = getDailyPIN();
 
             if (enteredPin !== requiredPin) {
@@ -510,21 +705,19 @@
                 document.getElementById('techPinInput').value = "";
                 return;
             }
-            if (!techName) {
-                alert("⚠️ Please enter your Name before unlocking.");
+            if (!techName || !projName) {
+                alert("⚠️ Please enter your Name and Project Name before unlocking.");
                 return;
             }
 
-            // Success
             localStorage.setItem('jsaSigned', 'true');
             isJsaSigned = true;
 
-            // Auto-fill Map Screen
-            document.getElementById('projectID').disabled = false; // Allow them to type it in if needed since they didn't get QR payload
+            document.getElementById('projectID').value = projName;
             document.getElementById('techName').value = techName;
             
             checkJsaState();
-            goToSlide(1); // Jump straight to Map since they are a tech
+            goToSlide(1); 
         }
 
         function checkJsaState() {
@@ -536,16 +729,14 @@
                 document.getElementById('nav-3').classList.remove('locked');
 
                 if (activeComplianceMode === 'L3') {
-                    // Hide L3 form inputs, show success banner with PIN
                     document.getElementById('l3-view').querySelector('.card').style.display = 'none';
                     document.getElementById('l3-view').querySelector('.warning-card').style.display = 'none';
-                    document.querySelectorAll('#l3-view .card')[1].style.display = 'none'; // Hazards
-                    document.querySelectorAll('#l3-view .card')[2].style.display = 'none'; // Roster
-                    document.querySelector('.action-btn.btn-gold').style.display = 'none'; // Sign button
+                    document.querySelectorAll('#l3-view .card')[1].style.display = 'none'; 
+                    document.querySelectorAll('#l3-view .card')[2].style.display = 'none'; 
                     document.getElementById('l3-signed-banner').style.display = 'block';
-                    document.getElementById('btnReprintJsa').style.display = 'block'; // Show on Command
+                    document.getElementById('btnReprintJsa').style.display = 'block'; 
                 } else {
-                    document.getElementById('btnReprintJsa').style.display = 'none'; // Hide PDF export for techs
+                    document.getElementById('btnReprintJsa').style.display = 'none'; 
                 }
 
             } else {
@@ -556,28 +747,92 @@
                 document.getElementById('nav-3').classList.add('locked');
 
                 if (activeComplianceMode === 'L3') {
-                    // Unhide form
+                    document.getElementById('l3-view').style.display = 'block';
                     document.getElementById('l3-view').querySelector('.card').style.display = 'block';
                     document.getElementById('l3-view').querySelector('.warning-card').style.display = 'block';
                     document.querySelectorAll('#l3-view .card')[1].style.display = 'block'; 
                     document.querySelectorAll('#l3-view .card')[2].style.display = 'block'; 
-                    document.querySelector('.action-btn.btn-gold').style.display = 'block'; 
                     document.getElementById('l3-signed-banner').style.display = 'none';
+                    document.querySelector('.role-toggle-row').style.display = 'flex';
                 }
             }
         }
 
         function resetJSA() {
-            if(confirm("Are you sure? This will lock the app and erase today's PDF setup.")) {
+            if(confirm("Are you sure? This will lock the app and erase today's PDF setup and signatures.")) {
                 localStorage.setItem('jsaSigned', 'false');
+                localStorage.removeItem('jsaSignaturesPayload');
+                capturedSignatures = [];
+                
                 document.getElementById('projectID').value = "";
                 document.getElementById('techName').value = "";
+                
                 checkJsaState();
                 goToSlide(0);
             }
         }
 
+        // --- SIGNATURE CANVAS LOGIC ---
+        const canvas = document.getElementById('sigCanvas');
+        const ctx = canvas.getContext('2d');
+        let drawing = false;
+
+        function initCanvas() {
+            canvas.width = canvas.offsetWidth || (window.innerWidth - 44);
+            canvas.height = canvas.offsetHeight || 150;
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#0cf';
+        }
+
+        function getPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            let clientX = e.clientX;
+            let clientY = e.clientY;
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            }
+            return { x: clientX - rect.left, y: clientY - rect.top };
+        }
+
+        function startDraw(e) {
+            e.preventDefault(); 
+            drawing = true;
+            const pos = getPos(e);
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+            ctx.lineTo(pos.x, pos.y + 1); 
+            ctx.stroke();
+        }
+
+        function draw(e) {
+            if (!drawing) return;
+            e.preventDefault();
+            const pos = getPos(e);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+        }
+
+        function stopDraw(e) {
+            e.preventDefault();
+            drawing = false;
+        }
+
+        canvas.addEventListener('mousedown', startDraw);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDraw);
+        canvas.addEventListener('mouseout', stopDraw);
+        canvas.addEventListener('touchstart', startDraw, {passive: false});
+        canvas.addEventListener('touchmove', draw, {passive: false});
+        canvas.addEventListener('touchend', stopDraw, {passive: false});
+
+        function clearSignature() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
         function initApp() {
+            populateRecentSites(); // Load dropdown options
             checkJsaState();
             if (localStorage.getItem('strataVault')) {
                 document.getElementById('logTable').querySelector('tbody').innerHTML = localStorage.getItem('strataVault');
@@ -600,8 +855,12 @@
             } else {
                 setPattern('3'); 
             }
-            if(isJsaSigned && activeComplianceMode !== 'L3') goToSlide(1); 
-            else updateFixedHeaders(0); 
+            
+            if(isJsaSigned && activeComplianceMode !== 'L3') {
+                goToSlide(1); 
+            } else {
+                updateFixedHeaders(0); 
+            }
         }
 
         // --- PRE-FLIGHT HARD GATE ---
@@ -1040,8 +1299,8 @@
 
         // --- HTML/PDF EXPORT LOGIC ---
         async function exportJSAPDF() {
-            const proj = document.getElementById('jsaProjectName').value || "Unknown_Project";
-            const tech = document.getElementById('l3JsaName').value || "L3 Supervisor";
+            const client = document.getElementById('jsaClient').value || "Unknown_Client";
+            const site = document.getElementById('jsaSiteName').value || "Unknown_Location";
             const date = new Date().toLocaleDateString();
             const time = new Date().toLocaleTimeString();
             
@@ -1049,23 +1308,33 @@
             const rf = document.getElementById('rf-block').style.display === 'block' ? 'YES' : 'NO';
             const env = document.getElementById('jsaEnvironment') ? document.getElementById('jsaEnvironment').value : "Commercial Building";
 
-            // Extract the checked roster names
-            let checkedRoster = [];
-            document.querySelectorAll('#rosterChecklist input[type="checkbox"]:checked').forEach(cb => {
-                checkedRoster.push(cb.value);
-            });
+            let storedSigs = [];
+            try {
+                storedSigs = JSON.parse(localStorage.getItem('jsaSignaturesPayload')) || [];
+            } catch(e) {}
+
             let rosterRows = "";
-            checkedRoster.forEach(name => {
-                rosterRows += `
-                <tr>
-                    <td><strong>Rope Access Technician</strong></td>
-                    <td>${name}</td>
-                    <td style="color:#aaa;"><em>Signed on pass-around device</em></td>
-                    <td>On File</td>
-                </tr>`;
-            });
-            if(checkedRoster.length === 0) {
-                rosterRows = `<tr><td colspan="4" style="text-align:center; color:#888;">No additional technicians selected</td></tr>`;
+            let l3NameDisplay = "--";
+
+            if (storedSigs.length > 0) {
+                const l3Sig = storedSigs.find(s => s.role.includes("L3"));
+                if(l3Sig) l3NameDisplay = l3Sig.name;
+
+                storedSigs.forEach(sig => {
+                    rosterRows += `
+                    <tr>
+                        <td><strong>${sig.role}</strong></td>
+                        <td>${sig.name}</td>
+                        <td>${sig.phone}</td>
+                        <td style="text-align:center; vertical-align:middle;">
+                            <img src="${sig.signatureData}" class="sig-img" alt="Digital Signature" />
+                        </td>
+                        <td>${sig.training}</td>
+                        <td>${sig.emergName}<br>${sig.emergPhone}</td>
+                    </tr>`;
+                });
+            } else {
+                rosterRows = `<tr><td colspan="6" style="text-align:center; color:#888;">No signatures found.</td></tr>`;
             }
 
             const htmlContent = `<!DOCTYPE html>
@@ -1091,58 +1360,61 @@
 <body>
     <h1>Strata Access Group - Job Safety Analysis (JSA)</h1>
     
-    <h2>WORK METHOD</h2>
+    [cite_start]<h2>WORK METHOD [cite: 1]</h2>
     <table>
         <tr>
-            <td width="50%"><strong>Client / Site Name & Location:</strong><br>${proj}</td>
-            <td width="50%"><strong>Date:</strong><br>${date}</td>
+            <td width="50%">
+                [cite_start]<strong>Client:</strong> ${client} [cite: 4]<br>
+                [cite_start]<strong>Site Name & Location:</strong> ${site} [cite: 5]
+            </td>
+            [cite_start]<td width="50%"><strong>Date:</strong><br>${date} [cite: 3]</td>
         </tr>
         <tr>
-            <td><strong>Start/Finish Times:</strong><br>${time} to End of Shift</td>
-            <td><strong>Environment:</strong><br>${env}</td>
+            [cite_start]<td><strong>Start/Finish Times:</strong><br>${time} to End of Shift [cite: 45]</td>
+            [cite_start]<td><strong>Environment:</strong><br>${env} [cite: 6]</td>
         </tr>
     </table>
 
     <table>
         <tr>
-            <th colspan="3">Work Team & Personnel Role</th>
+            [cite_start]<th colspan="3">Work Team & Personnel Role [cite: 7]</th>
         </tr>
         <tr>
-            <td width="33%"><strong>Rope Access Supervisor L3:</strong><br>${tech}</td>
-            <td width="33%"><strong>Rope Access Technician L1/L2:</strong><br>See Signatures Below</td>
+            [cite_start]<td width="33%"><strong>Rope Access Supervisor L3:</strong><br>${l3NameDisplay} [cite: 15]</td>
+            [cite_start]<td width="33%"><strong>Rope Access Technician L1/L2:</strong><br>See Signatures Below [cite: 19, 21]</td>
             <td width="33%"><strong>Ground Control:</strong><br>--</td>
         </tr>
     </table>
 
-    <h2>INITIAL TASK ASSESSMENT</h2>
-    <p><span class="checkbox">☑</span> There is no feasible access alternative (scaffolds, boom lift, or suspended platform) to perform the work, or using such alternative would create greater risk for workers, public, vehicular traffic, and/or property.</p>
-    <p><span class="checkbox">☑</span> Relative short duration/scale of the project makes Industrial Rope Access a better choice due to the faster rigging and mobilization.</p>
+    [cite_start]<h2>INITIAL TASK ASSESSMENT [cite: 55]</h2>
+    [cite_start]<p><span class="checkbox">☑</span> There is no feasible access alternative (scaffolds, boom lift, or suspended platform (swing stage)) to perform the work, or using such alternative would create greater risk for workers, public, vehicular traffic, and/or property. [cite: 57]</p>
+    [cite_start]<p><span class="checkbox">☑</span> Relative short duration/scale of the project makes Industrial Rope Access a better choice due to the faster rigging and mobilization. [cite: 58]</p>
 
-    <h2>COMMUNICATION PLAN & EMERGENCY SERVICES</h2>
+    [cite_start]<h2>COMMUNICATION PLAN & EMERGENCY SERVICES [cite: 64]</h2>
     <table>
         <tr>
-            <th width="33%">Mode of Communication</th>
-            <th width="33%">Hospital Information</th>
-            <th width="33%">Emergency Services</th>
+            [cite_start]<th width="33%">Mode of Communication [cite: 66]</th>
+            [cite_start]<th width="33%">Hospital Information [cite: 71]</th>
+            [cite_start]<th width="33%">Emergency Services [cite: 74]</th>
         </tr>
         <tr>
             <td>
-                ☑ Radio<br>
-                ☑ Cell Phone<br>
-                ☑ Hand Signals Reviewed
+                [cite_start]☑ Radio [cite: 65]<br>
+                [cite_start]☑ Cell Phone [cite: 67]<br>
+                [cite_start]☑ Hand Signals Reviewed [cite: 68]
             </td>
             <td>
-                <strong>Location:</strong> GPS Linked Nearest ER<br>
-                <strong>Drive Time:</strong> < 15 Mins
+                [cite_start]<strong>Location:</strong> GPS Linked Nearest ER [cite: 72]<br>
+                [cite_start]<strong>Drive Time:</strong> < 15 Mins [cite: 73]
             </td>
             <td>
-                <strong>EMS Phone:</strong> 911<br>
-                <strong>Life Flight?:</strong> NO
+                [cite_start]<strong>EMS Phone:</strong> 911 [cite: 74, 79]<br>
+                [cite_start]<strong>Life Flight?:</strong> NO [cite: 75]
             </td>
         </tr>
     </table>
 
-    <h2>LOCK OUT/TAG OUT PROCEDURES</h2>
+    [cite_start]<h2>LOCK OUT/TAG OUT PROCEDURES [cite: 77]</h2>
     <table>
         <tr>
             <th>Isolation Component</th>
@@ -1152,7 +1424,7 @@
         <tr>
             <td>Roof Access</td>
             <td><strong>${loto}</strong></td>
-            <td>Access to Rigging zone shall be restricted for Public. Set barricades, send notices.</td>
+            <td>Access to Rigging zone shall be restricted for Public. [cite_start]Set barricades, send notices. [cite: 78]</td>
         </tr>
         <tr>
             <td>Cell Antennas</td>
@@ -1163,7 +1435,7 @@
 
     <div class="page-break"></div>
 
-    <h2>WORK PLAN & EQUIPMENT VERIFICATION</h2>
+    [cite_start]<h2>WORK PLAN & EQUIPMENT VERIFICATION [cite: 80]</h2>
     <table>
         <tr>
             <th width="20%">KEY JOB PROCESS</th>
@@ -1171,24 +1443,24 @@
         </tr>
         <tr>
             <td><strong>Briefing, Safety Meeting</strong></td>
-            <td>Equipment unloading, transportation and pre-use inspection.<br>Installing barricades around hazard zone. Anchor points assessment.</td>
+            <td>Equipment unloading, transportation and pre-use inspection.<br>Installing barricades around hazard zone. [cite_start]Anchor points assessment. [cite: 81]</td>
         </tr>
         <tr>
             <td><strong>Access/Fall Zone</strong></td>
-            <td>Whenever on ropes, 6 feet from the unprotected edge (parapet/railings lower than 42 inches). No one shall enter the fall zone without appropriate fall protection system.</td>
+            <td>Whenever on ropes, 6 feet from the unprotected edge (parapet/railings lower than 42 inches). [cite_start]No one shall enter the fall zone without appropriate fall protection system. [cite: 81]</td>
         </tr>
         <tr>
             <td><strong>Anchorage Description</strong></td>
-            <td>Engineered access anchors, roof shafts, structural building elements, beam structures, etc.. Anchorage systems used as the primary support within a main or backup system shall have a minimum strength of either 12 kN (2700 lbf), or two times the maximum arrest force of the backup system when used in accordance with manufacturer specifications, whichever is greater. <strong>(VERIFIED IN APP)</strong></td>
+            <td>Engineered access anchors, roof shafts, structural building elements, beam structures, etc.. Anchorage systems used as the primary support within a main or backup system shall have a minimum strength of either 12 kN (2700 lbf), or two times the maximum arrest force of the backup system when used in accordance with manufacturer specifications, whichever is greater. [cite_start]<strong>(VERIFIED IN APP)</strong> [cite: 81]</td>
         </tr>
         <tr>
             <td><strong>Required Rope Access Equipment</strong></td>
-            <td>7/16" Kernmantle Static Ropes (MBS 22.2KN/5000 lbf), Connectors (Petzl Am'd, Oxan, Ok, must be locking type, with MBS 22.2kN, 5000Lbs), Full-body Rope Access Harness, Descenders (Petzl ID/ Rig), Backup Devices (Petzl ASAP, SafeTec Duck), Energy Absorber Lanyard (Petzl ASAP'Sorber, ASAP'Sorber Axxess). <strong>(VERIFIED IN APP)</strong></td>
+            [cite_start]<td>7/16" Kernmantle Static Ropes (MBS 22.2KN/5000 lbf), Connectors (Petzl Am'd, Oxan, Ok, must be locking type, with MBS 22.2kN, 5000Lbs), Full-body Rope Access Harness, Descenders (Petzl ID/ Rig), Backup Devices (Petzl ASAP, SafeTec Duck), Energy Absorber Lanyard (Petzl ASAP'Sorber, ASAP'Sorber Axxess). <strong>(VERIFIED IN APP)</strong> [cite: 82]</td>
         </tr>
     </table>
 
-    <h2>RISK ASSESSMENT & JSA</h2>
-    <p><em>Stop work, notify supervisor and other technicians immediately if new hazard is identified or taken measures are inadequate.</em></p>
+    [cite_start]<h2>RISK ASSESSMENT & JSA [cite: 98]</h2>
+    [cite_start]<p><em>Stop work, notify supervisor and other technicians immediately if new hazard is identified or taken measures are inadequate. [cite: 99]</em></p>
     <table>
         <tr>
             <th width="20%">Activity/Hazard</th>
@@ -1197,42 +1469,38 @@
             <th width="45%">Control Measures</th>
         </tr>
         <tr>
-            <td><strong>Personal Falling</strong></td>
-            <td>Gravity-induced injury or death</td>
+            [cite_start]<td><strong>Personal Falling [cite: 102]</strong></td>
+            [cite_start]<td>Gravity-induced injury or death [cite: 102]</td>
             <td><strong>H</strong></td>
-            <td>All personnel must be properly trained, briefed and follow IRATA/SPRAT and OSHA Rope Access and Fall-Protection standards. Always maintain 2-point attachments while using Rope Access (main and safety line). Always use 2 independent anchor points capable to withstand 5000 lbs/22KN load.</td>
+            <td>All personnel must be properly trained, briefed and follow IRATA/SPRAT and OSHA Rope Access and Fall-Protection standards. Always maintain 2-point attachments while using Rope Access (main and safety line). [cite_start]Always use 2 independent anchor points capable to withstand 5000 lbs/22KN load. [cite: 102]</td>
         </tr>
         <tr>
-            <td><strong>Mental/Physical Fatigue</strong></td>
-            <td>Rigging mistakes, poor judgement, limited awareness, movement, tools handling and balance issues</td>
+            [cite_start]<td><strong>Mental/Physical Fatigue [cite: 102]</strong></td>
+            [cite_start]<td>Rigging mistakes, poor judgement, limited awareness, movement, tools handling and balance issues [cite: 102]</td>
             <td><strong>H</strong></td>
-            <td>Stay alert and Control physical and mental exhaustion by taking breaks. Replenish by having appropriate food and drink breaks. Use "Buddy" check: always help team member to identify mistake or issue if you notice it. Ask Level 2 or Level 3 Rope Access Technician for checking if you have any doubts in your rigging.</td>
+            <td>Stay alert and Control physical and mental exhaustion by taking breaks. Replenish by having appropriate food and drink breaks. Use "Buddy" check: always help team member to identify mistake or issue if you notice it. [cite_start]Ask Level 2 or Level 3 Rope Access Technician for checking if you have any doubts in your rigging. [cite: 102, 124]</td>
         </tr>
         <tr>
-            <td><strong>Dropped Tools / Materials</strong></td>
-            <td>Injury to personnel working below, injury to public passersby, damage to property</td>
+            [cite_start]<td><strong>Dropped Tools / Materials [cite: 124]</strong></td>
+            [cite_start]<td>Injury to personnel working below, injury to public passersby, damage to property [cite: 124]</td>
             <td><strong>H</strong></td>
-            <td>Clearly mark and barricade Hazard Zone (10ft around Access Zone projection). All tools and devices must be tethered or secured. Helmets and hard hats must be always worn within Hazard Zone. Keep clean and organized workplace.</td>
+            <td>Clearly mark and barricade Hazard Zone (10ft around Access Zone projection). All tools and devices must be tethered or secured. Helmets and hard hats must be always worn within Hazard Zone. [cite_start]Keep clean and organized workplace. [cite: 124, 125]</td>
         </tr>
     </table>
 
     <div class="page-break"></div>
 
     <h2>TECHNICIAN ACKNOWLEDGMENT & SIGNATURES</h2>
-    <p>My signature states that I have been briefed and understand the content of this Access Work Plan. I understand my responsibilities, and I am competent to use the required equipment and to carry out the intended tasks Safely.</p>
+    <p>My signature states that I have been briefed and understand the content of this Access Work Plan. [cite_start]I understand my responsibilities, and I am competent to use the required equipment and to carry out the intended tasks Safely. [cite: 129, 130]</p>
     
     <table>
         <tr>
-            <th width="25%">Personnel Roles</th>
-            <th width="25%">Name</th>
-            <th width="25%">Signature</th>
-            <th width="25%">Emergency Contact</th>
-        </tr>
-        <tr>
-            <td><strong>Rope Access Supervisor L3</strong></td>
-            <td>${tech}</td>
-            <td style="color:#aaa;"><em>Signed on Pass-Around Tablet</em></td>
-            <td>On File</td>
+            [cite_start]<th width="15%">Personnel Roles [cite: 131]</th>
+            [cite_start]<th width="20%">Name [cite: 131]</th>
+            [cite_start]<th width="15%">Contact Phone # [cite: 131]</th>
+            [cite_start]<th width="25%">Signature [cite: 131]</th>
+            [cite_start]<th width="10%">Training [cite: 131]</th>
+            [cite_start]<th width="15%">Emergency Contact [cite: 131]</th>
         </tr>
         ${rosterRows}
     </table>
@@ -1247,15 +1515,15 @@
 </body>
 </html>`;
 
-            const fileName = `Strata_JSA_${proj.replace(/\s+/g, '_')}_${new Date().getTime()}.html`;
+            const fileName = `Strata_JSA_${client.replace(/\s+/g, '_')}_${new Date().getTime()}.html`;
             const blob = new Blob([htmlContent], { type: 'text/html' });
             const file = new File([blob], fileName, { type: 'text/html' });
 
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
                 try {
                     await navigator.share({
-                        title: `JSA Report: ${proj}`,
-                        text: `Attached is the signed JSA compliance report for ${proj}. Open it in any browser to save as PDF.`,
+                        title: `JSA Report: ${client}`,
+                        text: `Attached is the signed JSA compliance report for ${client} at ${site}. Open it in any browser to save as PDF.`,
                         files: [file]
                     });
                 } catch (err) {
