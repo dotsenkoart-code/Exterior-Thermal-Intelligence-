@@ -300,12 +300,28 @@
                     <button class="action-btn btn-dark" style="margin-top: 10px; padding: 12px; font-size: 0.9rem;" onclick="clearSignature()">Clear Signature</button>
                 </div>
 
-                <button id="btn-unlock-app" class="action-btn btn-gold" style="padding: 22px; margin-bottom: 40px;" onclick="signAndUnlock()">🔒 SIGN & UNLOCK APP</button>
+                <button id="btn-unlock-app" class="action-btn btn-gold" style="padding: 22px; margin-bottom: 40px;" onclick="signAndUnlock()">🔒 SIGN & SECURE JSA</button>
             </div>
             
-            <div id="jsa-signed-banner" style="display:none; text-align:center; margin-bottom: 40px;">
-                <div style="background:#1e7e34; padding:15px; border-radius:8px; font-weight:bold; letter-spacing:1px;">✅ JSA COMPLETED FOR TODAY</div>
-                <button class="action-btn btn-dark" style="margin-top:10px;" onclick="resetJSA()">Reset JSA (New Day)</button>
+            <div id="jsa-signed-banner" style="display:none; text-align:center; padding-bottom: 40px;">
+                <div style="background:#1e7e34; padding:15px; border-radius:8px; font-weight:bold; letter-spacing:1px; margin-bottom: 20px;">
+                    ✅ JSA COMPLETED & LOCKED
+                </div>
+                <p style="color:#aaa; font-size: 0.9rem; margin-bottom: 15px; line-height:1.4;">
+                    <strong>Mandatory Step:</strong> Send the completed JSA to the office records before starting your drop.
+                </p>
+                
+                <button class="action-btn btn-blue" style="padding: 22px; margin-top: 0; margin-bottom: 15px;" onclick="exportJSAPDF()">
+                    📤 1. SEND JSA TO OFFICE
+                </button>
+                
+                <button class="action-btn btn-green" style="padding: 22px; margin-top: 0; margin-bottom: 20px;" onclick="goToSlide(1)">
+                    🚀 2. PROCEED TO DROP SETUP
+                </button>
+
+                <button class="action-btn btn-dark" style="margin-top:10px; font-size: 0.9rem;" onclick="resetJSA()">
+                    Undo / Reset JSA (New Day)
+                </button>
             </div>
         </div>
 
@@ -445,10 +461,10 @@
                 </div>
             </div>
 
-            <button class="cmd-action-btn btn-gold" style="margin-top:20px; margin-bottom:0;" onclick="exportJSAPDF()">🛡️ EXPORT SIGNED JSA</button>
+            <button class="cmd-action-btn btn-gold" style="margin-top:20px; margin-bottom:0;" onclick="exportJSAPDF()">🛡️ RE-EXPORT SIGNED JSA</button>
 
             <div style="display:flex; gap:8px; margin-top:10px;">
-                <button class="cmd-action-btn" style="background:#333; margin:0;" onclick="exportAndSend()">📤 EXPORT CSV</button>
+                <button class="cmd-action-btn" style="background:#333; margin:0;" onclick="exportAndSend()">📤 EXPORT CSV DATA</button>
                 <button class="cmd-action-btn" style="background:#b00; margin:0;" onclick="openWipeModal()">WIPE</button>
             </div>
         </div>
@@ -642,7 +658,9 @@
 
             isJsaSigned = true;
             checkJsaState();
-            goToSlide(1); 
+            
+            // Scroll to the top so they see the success banner and export button
+            window.scrollTo(0, 0); 
         }
 
         function checkJsaState() {
@@ -715,7 +733,7 @@
             }
 
             if(isJsaSigned) {
-                goToSlide(1);
+                goToSlide(1); // If already signed on app load, take them to the map
             } else {
                 updateFixedHeaders(0); 
             }
