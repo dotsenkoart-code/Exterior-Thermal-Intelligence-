@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: JSA + Thermal Master</title>
+    <title>Strata-Scan Pro: Compliance & Thermal Master</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
@@ -39,8 +39,8 @@
         .nav-item.active { color: #0cf; border-top: 2px solid #0cf; background: #111; }
         .nav-item.locked { opacity: 0.4; pointer-events: none; }
 
-        input[type="text"], input[type="number"], input[inputmode="numeric"] { width: 100%; padding: 12px; background: #222; color: #fff; border: 1px solid #444; border-radius: 6px; font-size: 1.1rem; text-align: center; box-sizing: border-box; }
-        input:disabled { background: #1a1a1a; color: #555; border-color: #333; }
+        input[type="text"], input[type="number"], input[inputmode="numeric"], select { width: 100%; padding: 12px; background: #222; color: #fff; border: 1px solid #444; border-radius: 6px; font-size: 1.1rem; text-align: center; box-sizing: border-box; }
+        input:disabled, select:disabled { background: #1a1a1a; color: #555; border-color: #333; }
         label { font-size: 0.65rem; color: #888; font-weight: 700; text-transform: uppercase; display: block; margin-bottom: 4px; letter-spacing: 0.5px; }
 
         /* --- STEPPER --- */
@@ -60,6 +60,10 @@
         .check-item.sound-box.active { background: #28a745; color: #fff; border-color: #fff; }
         
         /* JSA Specific Styles */
+        .role-toggle-row { display: flex; gap: 10px; margin-bottom: 15px; }
+        .role-btn { flex: 1; padding: 15px; border-radius: 8px; border: 2px solid #333; background: #111; color: #666; font-weight: 900; font-size: 0.9rem; cursor: pointer; transition: 0.2s; }
+        .role-btn.active { border-color: #0cf; color: #0cf; background: rgba(0, 204, 255, 0.1); }
+        
         .jsa-toggle { display: flex; align-items: center; justify-content: space-between; background: #222; padding: 15px; border-radius: 6px; border: 1px solid #444; margin-bottom: 8px; cursor: pointer; }
         .jsa-toggle.active { border-color: #f39c12; background: rgba(243, 156, 18, 0.1); }
         .jsa-conditional { display: none; background: #111; padding: 12px; border-left: 3px solid #f39c12; margin-bottom: 12px; font-size: 0.8rem; color: #aaa; }
@@ -73,6 +77,7 @@
         .btn-dark { background: #333; border: 1px solid #555; color: #aaa; }
         .btn-red { background: linear-gradient(180deg, #d9534f 0%, #b00 100%); color: #fff; border: 2px solid #fff; }
         .btn-gold { background: linear-gradient(180deg, #f39c12 0%, #d68910 100%); color: #000; }
+        .btn-purple { background: linear-gradient(180deg, #8e44ad 0%, #732d91 100%); color: #fff; }
         
         .pattern-btn { flex: 1; padding: 15px; background: #222; border: 1px solid #444; color: #666; font-size: 0.8rem; font-weight: bold; cursor: pointer; }
         .pattern-btn.active { background: #0cf; color: #000; }
@@ -89,6 +94,8 @@
         .modal-btn { width: 100%; padding: 22px 10px; border-radius: 8px; border: none; font-size: 1rem; font-weight: 900; cursor: pointer; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
         .modal-btn:last-child { margin-bottom: 0; }
         .preflight-data { font-size: 2.2rem; font-weight: 900; color: #fff; margin: 5px 0 15px 0; }
+        
+        #qr-placeholder { width: 250px; height: 250px; background: #fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23fff"/><path d="M10,10 h20 v20 h-20 z M15,15 h10 v10 h-10 z M70,10 h20 v20 h-20 z M75,15 h10 v10 h-10 z M10,70 h20 v20 h-20 z M15,75 h10 v10 h-10 z M40,10 h20 v10 h-20 z M40,25 h10 v20 h-10 z M55,25 h10 v10 h-10 z M40,55 h30 v10 h-30 z M70,40 h20 v20 h-20 z M10,40 h20 v10 h-20 z M10,55 h10 v10 h-10 z M85,70 h5 v20 h-5 z M70,85 h10 v5 h-10 z M40,80 h20 v10 h-20 z M55,70 h10 v5 h-10 z" fill="%23000"/></svg>') no-repeat center center; background-size: contain; margin: 0 auto 20px auto; border: 10px solid #fff; border-radius: 8px; }
     </style>
 </head>
 <body onload="initApp()">
@@ -181,59 +188,120 @@
         </div>
     </div>
 
+    <div id="qrModal" class="modal-overlay">
+        <div class="modal-box" style="border-color:#f39c12;">
+            <h2 style="color:#f39c12; margin-top:0; font-size: 1.8rem;">SCAN TO JOIN DROP</h2>
+            <p style="color:#ccc; font-size:0.9rem; margin-bottom:20px; line-height:1.4;">
+                Have your technicians scan this code using their Strata-Scan app to receive the JSA data payload.
+            </p>
+            <div id="qr-placeholder"></div>
+            <p style="color:#0cf; font-weight:bold; margin-bottom: 20px;">Waiting for signatures...</p>
+            <button class="modal-btn btn-dark" onclick="closeQRModal()">CLOSE & PROCEED TO SIGN</button>
+        </div>
+    </div>
+
     <div class="slide-container" id="mainSlider">
         
-        <div class="slide" id="slide-safety">
+        <div class="slide" id="slide-compliance">
             <h2 style="color:#f39c12; margin:0 0 15px 0; font-size:1.5rem;">DAILY COMPLIANCE & JSA</h2>
             
-            <div class="card">
-                <label>Emergency & Hospital Info</label>
-                <input type="text" id="jsaHospital" value="Providence Little Company of Mary" disabled style="margin-bottom:8px; font-size:0.9rem;">
-                <input type="text" id="jsaDriveTime" value="Drive Time: 9 Mins | 4101 Torrance Blvd" disabled style="font-size:0.9rem; color:#f39c12;">
+            <div class="role-toggle-row">
+                <button id="modeBtnL3" class="role-btn active" onclick="setComplianceMode('L3')">L3 SUPERVISOR</button>
+                <button id="modeBtnTech" class="role-btn" onclick="setComplianceMode('TECH')">TECHNICIAN</button>
             </div>
 
-            <div class="warning-card">
-                <label style="color:#f39c12;">Pre-Drop Equipment Verification</label>
-                <div class="jsa-toggle" onclick="this.classList.toggle('active')">
-                    <span style="font-size:0.9rem; font-weight:bold;">12kN Anchor Systems Verified</span>
-                    <span>✔️</span>
+            <div id="l3-view" style="display:block;">
+                <div class="card">
+                    <label style="color:#0cf;">Step 1: Site Logistics</label>
+                    <input type="text" id="jsaProjectName" placeholder="Project / Site Name" style="margin-bottom:8px;">
+                    <input type="text" id="l3JsaName" placeholder="Your Full Name (L3 Supervisor)" style="margin-bottom:8px;">
+                    <div style="display:flex; gap:8px; margin-bottom:8px;">
+                        <select id="jsaEnvironment" style="flex:2;">
+                            <option value="Commercial Building">Commercial Building</option>
+                            <option value="Residential Building">Residential Building</option>
+                            <option value="Industrial Facility">Industrial Facility</option>
+                            <option value="Hotel">Hotel</option>
+                        </select>
+                        <input type="number" id="jsaHeight" placeholder="Height (FT)" style="flex:1;">
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="jsaRadio" placeholder="Radio Ch (e.g. 1)" style="flex:1;">
+                        <input type="text" id="jsaHospital" value="Providence Little Co. Mary" disabled style="flex:2; font-size:0.8rem;">
+                    </div>
                 </div>
-                <div class="jsa-toggle" onclick="this.classList.toggle('active')">
-                    <span style="font-size:0.9rem; font-weight:bold;">PPE & Kernmantle Ropes Inspected</span>
-                    <span>✔️</span>
+
+                <div class="warning-card">
+                    <label style="color:#f39c12;">Step 2: Pre-Drop Equipment Verification</label>
+                    <div class="jsa-toggle" onclick="this.classList.toggle('active')">
+                        <span style="font-size:0.9rem; font-weight:bold;">12kN Anchor Systems Verified</span>
+                        <span>✔️</span>
+                    </div>
+                    <div class="jsa-toggle" onclick="this.classList.toggle('active')">
+                        <span style="font-size:0.9rem; font-weight:bold;">PPE & Kernmantle Ropes Inspected</span>
+                        <span>✔️</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <label style="color:#d9534f;">Step 3: Conditional Hazards</label>
+                    <div class="jsa-toggle" onclick="toggleConditional('loto-block', this)">
+                        <span style="font-size:0.9rem; font-weight:bold;">Roof Access / LOTO Required?</span>
+                        <span style="color:#aaa;">TAP IF YES</span>
+                    </div>
+                    <div id="loto-block" class="jsa-conditional">
+                        Access to rigging zone shall be restricted. Barricades and Lock Out tags must be applied before drop.
+                    </div>
+
+                    <div class="jsa-toggle" onclick="toggleConditional('rf-block', this)">
+                        <span style="font-size:0.9rem; font-weight:bold;">Cell Antennas / High RF?</span>
+                        <span style="color:#aaa;">TAP IF YES</span>
+                    </div>
+                    <div id="rf-block" class="jsa-conditional">
+                        Maintain clearance from active antennas. Exposure must not exceed 10mW/cm2 for 6 minutes. Use RF Meter.
+                    </div>
+                </div>
+
+                <button class="action-btn btn-purple" style="padding: 22px; margin-top:5px; margin-bottom: 20px;" onclick="generateQR()">📱 GENERATE QR FOR TEAM</button>
+            </div>
+
+
+            <div id="tech-view" style="display:none;">
+                
+                <div id="tech-scan-prompt" style="text-align:center; padding: 40px 10px;">
+                    <p style="color:#aaa; margin-bottom:20px;">Wait for the L3 Supervisor to complete the Master JSA, then scan their tablet to receive the work plan.</p>
+                    <button class="action-btn btn-purple" style="padding: 25px;" onclick="simulateQRScan()">📷 SCAN QR CODE</button>
+                </div>
+
+                <div id="tech-details" style="display:none;">
+                    <div class="card" style="border-color:#28a745;">
+                        <label style="color:#28a745;">DATA PAYLOAD RECEIVED ✅</label>
+                        <div style="font-size:0.8rem; color:#aaa; margin-bottom:5px;"><strong>Project:</strong> <span id="syncProj">--</span></div>
+                        <div style="font-size:0.8rem; color:#aaa; margin-bottom:5px;"><strong>Hazards:</strong> <span id="syncHazards">Standard Fall/Fatigue</span></div>
+                        <div style="font-size:0.8rem; color:#aaa;"><strong>Equip Verified:</strong> 12kN Anchors, Kernmantle Ropes, PPE</div>
+                    </div>
+
+                    <div class="card">
+                        <label>Your Information</label>
+                        <input type="text" id="techJsaName" placeholder="Your Full Name" style="margin-bottom:8px;">
+                        <input type="text" id="techEmergencyName" placeholder="Emergency Contact Name" style="margin-bottom:8px;">
+                        <input type="text" id="techEmergencyPhone" placeholder="Emergency Contact Phone Number" inputmode="numeric">
+                    </div>
                 </div>
             </div>
 
-            <div class="card">
-                <label>Conditional Hazards</label>
-                <div class="jsa-toggle" onclick="toggleConditional('loto-block', this)">
-                    [cite_start]<span style="font-size:0.9rem; font-weight:bold;">Roof Access / LOTO Required? [cite: 78]</span>
-                    <span style="color:#aaa;">TAP IF YES</span>
-                </div>
-                <div id="loto-block" class="jsa-conditional">
-                    Access to rigging zone shall be restricted. [cite_start]Barricades and Lock Out tags must be applied before drop. [cite: 78]
+            <div id="shared-sig-block" style="display:block;">
+                <div class="card">
+                    <label style="color:#0cf;">Technician Acknowledgment</label>
+                    <p style="font-size:0.75rem; color:#aaa; line-height:1.4;">
+                        I have been briefed and understand the content of this Access Work Plan. I understand my responsibilities, and I am competent to use the required equipment and to carry out the intended tasks Safely.
+                    </p>
+                    <label>Sign Below</label>
+                    <canvas id="sigCanvas" class="sig-pad"></canvas>
+                    <button class="action-btn btn-dark" style="margin-top: 10px; padding: 12px; font-size: 0.9rem;" onclick="clearSignature()">Clear Signature</button>
                 </div>
 
-                <div class="jsa-toggle" onclick="toggleConditional('rf-block', this)">
-                    [cite_start]<span style="font-size:0.9rem; font-weight:bold;">Cell Antennas / High RF? [cite: 126]</span>
-                    <span style="color:#aaa;">TAP IF YES</span>
-                </div>
-                <div id="rf-block" class="jsa-conditional">
-                    Maintain clearance from active antennas. Exposure must not exceed 10mW/cm2 for 6 minutes. [cite_start]Use RF Meter. [cite: 126]
-                </div>
+                <button id="btn-unlock-app" class="action-btn btn-gold" style="padding: 22px; margin-bottom: 40px;" onclick="signAndUnlock()">🔒 SIGN & UNLOCK APP</button>
             </div>
-
-            <div class="card">
-                <label style="color:#0cf;">Technician Acknowledgment</label>
-                <p style="font-size:0.75rem; color:#aaa; line-height:1.4;">
-                    I have been briefed and understand the content of this Access Work Plan. [cite_start]I understand my responsibilities, and I am competent to use the required equipment and to carry out the intended tasks Safely. [cite: 129, 130]
-                </p>
-                <label>Sign Below (L3 / Tech)</label>
-                <canvas id="sigCanvas" class="sig-pad"></canvas>
-                <button class="action-btn btn-dark" style="margin-top: 10px; padding: 12px; font-size: 0.9rem;" onclick="clearSignature()">Clear Signature</button>
-            </div>
-
-            <button id="btn-unlock-app" class="action-btn btn-gold" style="padding: 22px; margin-bottom: 40px;" onclick="signAndUnlock()">🔒 SIGN & UNLOCK APP</button>
             
             <div id="jsa-signed-banner" style="display:none; text-align:center; margin-bottom: 40px;">
                 <div style="background:#1e7e34; padding:15px; border-radius:8px; font-weight:bold; letter-spacing:1px;">✅ JSA COMPLETED FOR TODAY</div>
@@ -249,11 +317,11 @@
             
             <div class="card">
                 <label>Project Name / Building</label>
-                <input type="text" id="projectID" class="setup-input" style="margin-bottom:12px;" placeholder="e.g. Torrance HOA">
+                <input type="text" id="projectID" class="setup-input" style="margin-bottom:12px;" placeholder="Auto-Filled from JSA" disabled>
                 <div style="display:flex; gap:10px;">
                     <div style="flex:2;">
                         <label>Technician Name</label>
-                        <input type="text" id="techName" class="setup-input" placeholder="e.g. Art">
+                        <input type="text" id="techName" class="setup-input" placeholder="Auto-Filled from JSA" disabled>
                     </div>
                     <div style="flex:1;">
                         <label>Cam ID</label>
@@ -387,7 +455,7 @@
     </div>
 
     <div class="navbar">
-        <div class="nav-item active" id="nav-0" onclick="goToSlide(0)">SAFETY</div>
+        <div class="nav-item active" id="nav-0" onclick="goToSlide(0)">COMPLIANCE</div>
         <div class="nav-item locked" id="nav-1" onclick="goToSlide(1)">MAP</div>
         <div class="nav-item locked" id="nav-2" onclick="goToSlide(2)">DIAGNOSE</div>
         <div class="nav-item locked" id="nav-3" onclick="goToSlide(3)">COMMAND</div>
@@ -402,8 +470,71 @@
         let hasVisitedDiagnose = false; 
         let pendingLogType = null; 
         let isJsaSigned = false;
+        let activeComplianceMode = 'L3'; // 'L3' or 'TECH'
         
         const patternConfigs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
+
+        // --- COMPLIANCE MODE LOGIC ---
+        function setComplianceMode(mode) {
+            activeComplianceMode = mode;
+            
+            // Toggle Buttons
+            document.getElementById('modeBtnL3').classList.toggle('active', mode === 'L3');
+            document.getElementById('modeBtnTech').classList.toggle('active', mode === 'TECH');
+            
+            // Show/Hide Sections
+            document.getElementById('l3-view').style.display = mode === 'L3' ? 'block' : 'none';
+            document.getElementById('tech-view').style.display = mode === 'TECH' ? 'block' : 'none';
+            
+            if (mode === 'TECH') {
+                // Hide signature until scan happens
+                document.getElementById('shared-sig-block').style.display = 'none';
+                document.getElementById('tech-scan-prompt').style.display = 'block';
+                document.getElementById('tech-details').style.display = 'none';
+            } else {
+                document.getElementById('shared-sig-block').style.display = 'block';
+                // Redraw canvas to prevent 0-width issue
+                setTimeout(initCanvas, 50);
+            }
+        }
+
+        function generateQR() {
+            // Check L3 validations
+            const projName = document.getElementById('jsaProjectName').value;
+            if(!projName) {
+                alert("Please enter a Project / Site Name before generating the QR code.");
+                return;
+            }
+            
+            document.getElementById('qrModal').style.display = 'flex';
+        }
+
+        function closeQRModal() {
+            document.getElementById('qrModal').style.display = 'none';
+        }
+
+        function simulateQRScan() {
+            // Fake loading state
+            const btn = document.querySelector('#tech-scan-prompt button');
+            const originalText = btn.innerText;
+            btn.innerText = "SCANNING...";
+            
+            setTimeout(() => {
+                btn.innerText = originalText;
+                document.getElementById('tech-scan-prompt').style.display = 'none';
+                
+                // Populate fake sync data
+                document.getElementById('syncProj').innerText = document.getElementById('jsaProjectName').value || "Unknown Site";
+                let hz = "Standard Fall/Fatigue";
+                if(document.getElementById('loto-block').style.display === 'block') hz += ", LOTO";
+                if(document.getElementById('rf-block').style.display === 'block') hz += ", High RF";
+                document.getElementById('syncHazards').innerText = hz;
+
+                document.getElementById('tech-details').style.display = 'block';
+                document.getElementById('shared-sig-block').style.display = 'block';
+                setTimeout(initCanvas, 50); // Initialize canvas now that it's visible
+            }, 800);
+        }
 
         // --- SIGNATURE CANVAS LOGIC ---
         const canvas = document.getElementById('sigCanvas');
@@ -411,7 +542,6 @@
         let drawing = false;
 
         function initCanvas() {
-            // Updated to ensure the canvas has width even if browser CSS is lagging
             canvas.width = canvas.offsetWidth || (window.innerWidth - 44);
             canvas.height = canvas.offsetHeight || 150;
             ctx.lineWidth = 3;
@@ -436,8 +566,7 @@
             const pos = getPos(e);
             ctx.beginPath();
             ctx.moveTo(pos.x, pos.y);
-            // Draw a tiny line immediately so a single "tap" registers as a dot
-            ctx.lineTo(pos.x, pos.y + 1);
+            ctx.lineTo(pos.x, pos.y + 1); // Single tap registers dot
             ctx.stroke();
         }
 
@@ -472,20 +601,42 @@
             block.style.display = block.style.display === 'block' ? 'none' : 'block';
         }
 
-        // --- JSA LOCK LOGIC ---
+        // --- JSA LOCK LOGIC WITH DATA HAND-OFF ---
         function signAndUnlock() {
-            const toggles = document.querySelectorAll('.warning-card .jsa-toggle');
-            let allChecked = true;
-            toggles.forEach(t => { if(!t.classList.contains('active')) allChecked = false; });
-            
-            if (!allChecked) {
-                alert("⚠️ Please verify both Pre-Drop Equipment checks before signing.");
-                return;
+            let mappedProj = "";
+            let mappedTech = "";
+
+            // Validation based on mode
+            if (activeComplianceMode === 'L3') {
+                const toggles = document.querySelectorAll('.warning-card .jsa-toggle');
+                let allChecked = true;
+                toggles.forEach(t => { if(!t.classList.contains('active')) allChecked = false; });
+                
+                if (!document.getElementById('jsaProjectName').value || !document.getElementById('l3JsaName').value) {
+                    alert("⚠️ Please enter the Project Name and your Name before signing.");
+                    return;
+                }
+                if (!allChecked) {
+                    alert("⚠️ Please verify both Pre-Drop Equipment checks before signing.");
+                    return;
+                }
+
+                mappedProj = document.getElementById('jsaProjectName').value;
+                mappedTech = document.getElementById('l3JsaName').value;
+            } else {
+                if(!document.getElementById('techJsaName').value || !document.getElementById('techEmergencyName').value) {
+                    alert("⚠️ Please enter your Name and Emergency Contact info before signing.");
+                    return;
+                }
+                mappedProj = document.getElementById('syncProj').innerText;
+                mappedTech = document.getElementById('techJsaName').value;
             }
 
+            // AUTO-POPULATE THE LOGISTICS SCREEN
+            document.getElementById('projectID').value = mappedProj;
+            document.getElementById('techName').value = mappedTech;
+
             localStorage.setItem('jsaSigned', 'true');
-            
-            // Save signature image to memory for later export
             const sigData = canvas.toDataURL("image/png");
             localStorage.setItem('jsaSignatureData', sigData);
 
@@ -497,28 +648,20 @@
         function checkJsaState() {
             if (localStorage.getItem('jsaSigned') === 'true') {
                 isJsaSigned = true;
-                document.getElementById('btn-unlock-app').style.display = 'none';
+                document.getElementById('shared-sig-block').style.display = 'none';
+                document.getElementById('l3-view').style.display = 'none';
+                document.getElementById('tech-view').style.display = 'none';
+                document.querySelector('.role-toggle-row').style.display = 'none';
                 document.getElementById('jsa-signed-banner').style.display = 'block';
-                document.querySelector('.sig-pad').style.pointerEvents = 'none';
-                document.querySelector('.sig-pad').style.opacity = '0.5';
                 
                 document.getElementById('nav-1').classList.remove('locked');
                 document.getElementById('nav-2').classList.remove('locked');
                 document.getElementById('nav-3').classList.remove('locked');
-                
-                // Repopulate signature if returning
-                const savedSig = localStorage.getItem('jsaSignatureData');
-                if(savedSig) {
-                    const img = new Image();
-                    img.onload = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0); };
-                    img.src = savedSig;
-                }
             } else {
                 isJsaSigned = false;
-                document.getElementById('btn-unlock-app').style.display = 'block';
                 document.getElementById('jsa-signed-banner').style.display = 'none';
-                document.querySelector('.sig-pad').style.pointerEvents = 'auto';
-                document.querySelector('.sig-pad').style.opacity = '1';
+                document.querySelector('.role-toggle-row').style.display = 'flex';
+                setComplianceMode(activeComplianceMode); // Restore selected mode view
                 
                 document.getElementById('nav-1').classList.add('locked');
                 document.getElementById('nav-2').classList.add('locked');
@@ -530,13 +673,17 @@
             if(confirm("Are you sure? This will lock the app until a new signature is collected.")) {
                 localStorage.setItem('jsaSigned', 'false');
                 localStorage.removeItem('jsaSignatureData');
+                
+                // Clear the map auto-pop fields
+                document.getElementById('projectID').value = "";
+                document.getElementById('techName').value = "";
+                
                 clearSignature();
                 checkJsaState();
             }
         }
 
         function initApp() {
-            // Delay initialization slightly to ensure CSS is applied for offsetWidth
             setTimeout(initCanvas, 100);
             checkJsaState();
 
@@ -547,8 +694,10 @@
             if (localStorage.getItem('isDropLocked') === 'true') {
                 if (localStorage.getItem('strataState')) {
                     const savedState = JSON.parse(localStorage.getItem('strataState'));
-                    document.getElementById('projectID').value = savedState.project || "";
-                    document.getElementById('techName').value = savedState.tech || "";
+                    // Re-populate from state if drop is locked
+                    document.getElementById('projectID').value = savedState.project || document.getElementById('projectID').value;
+                    document.getElementById('techName').value = savedState.tech || document.getElementById('techName').value;
+                    
                     document.getElementById('camID').value = savedState.cam || "";
                     document.getElementById('floorNum').value = savedState.floor;
                     document.getElementById('floorNumVal').innerText = savedState.floor;
@@ -589,7 +738,6 @@
             document.getElementById('pf-proj').innerText = p;
             document.getElementById('pf-tech').innerText = t;
             document.getElementById('pf-cam').innerText = c;
-            
             document.getElementById('pf-drop').innerText = "DROP " + d.toUpperCase();
             document.getElementById('pf-floor').innerText = f;
             document.getElementById('pf-img').innerText = "FLIR" + i.toString().padStart(4, '0');
@@ -612,7 +760,11 @@
 
         function unlockSetup() {
             if(confirm("⚠️ Unlock setup? Be careful not to change the Drop ID or Image # unless necessary.")) {
-                document.querySelectorAll('.setup-input').forEach(el => el.disabled = false);
+                // Keep the auto-populated names locked to maintain JSA consistency, just unlock the others
+                document.getElementById('camID').disabled = false;
+                document.getElementById('dropLetter').disabled = false;
+                document.getElementById('imgNum').disabled = false;
+                
                 document.getElementById('btn-commit').style.display = 'block';
                 document.getElementById('btn-unlock').style.display = 'none';
                 localStorage.setItem('isDropLocked', 'false');
@@ -1012,7 +1164,7 @@
 
         function goToSlide(n) {
             if (n > 0 && !isJsaSigned) {
-                alert("⚠️ SAFETY FIRST: You must complete and sign the daily JSA before accessing the application.");
+                alert("⚠️ COMPLIANCE REQUIRED: You must complete and sign the daily JSA before accessing the application.");
                 return;
             }
 
@@ -1036,14 +1188,28 @@
                 return;
             }
 
-            const proj = document.getElementById('projectID').value || "Unknown_Project";
-            const tech = document.getElementById('techName').value || "Tech";
+            // Pull details depending on who signed
+            let sigName = "Tech";
+            let role = "Rope Access Technician L1";
+            let eContact = "On File";
+            
+            if (activeComplianceMode === 'L3') {
+                sigName = document.getElementById('techName').value || "L3 Supervisor";
+                role = "Rope Access Supervisor L3";
+            } else {
+                sigName = document.getElementById('techName').value || "Technician";
+                const eName = document.getElementById('techEmergencyName').value || "--";
+                const ePhone = document.getElementById('techEmergencyPhone').value || "--";
+                eContact = `${eName} (${ePhone})`;
+            }
+
+            const proj = document.getElementById('projectID').value || document.getElementById('jsaProjectName').value || "Unknown_Project";
             const date = new Date().toLocaleDateString();
             const time = new Date().toLocaleTimeString();
-            
             const sigData = localStorage.getItem('jsaSignatureData') || "";
             const loto = document.getElementById('loto-block').style.display === 'block' ? 'YES' : 'NO';
             const rf = document.getElementById('rf-block').style.display === 'block' ? 'YES' : 'NO';
+            const env = document.getElementById('jsaEnvironment') ? document.getElementById('jsaEnvironment').value : "Commercial Building";
 
             const htmlContent = `<!DOCTYPE html>
 <html>
@@ -1068,156 +1234,150 @@
 <body>
     <h1>Strata Access Group - Job Safety Analysis (JSA)</h1>
     
-    [cite_start]<h2>WORK METHOD [cite: 1]</h2>
+    <h2>WORK METHOD</h2>
     <table>
         <tr>
-            [cite_start]<td width="50%"><strong>Client / Site Name & Location: [cite: 4, 5]</strong><br>${proj}</td>
-            [cite_start]<td width="50%"><strong>Date: [cite: 3]</strong><br>${date}</td>
+            <td width="50%"><strong>Client / Site Name & Location:</strong><br>${proj}</td>
+            <td width="50%"><strong>Date:</strong><br>${date}</td>
         </tr>
         <tr>
-            [cite_start]<td><strong>Start/Finish Times: [cite: 45]</strong><br>${time} to End of Shift</td>
-            [cite_start]<td><strong>Prepared By: [cite: 2]</strong><br>${tech}</td>
+            <td><strong>Start/Finish Times:</strong><br>${time} to End of Shift</td>
+            <td><strong>Environment:</strong><br>${env}</td>
         </tr>
     </table>
 
     <table>
         <tr>
-            [cite_start]<th colspan="3">Work Team & Personnel Role [cite: 7, 9]</th>
+            <th colspan="3">Work Team & Personnel Role</th>
         </tr>
         <tr>
-            [cite_start]<td width="33%"><strong>Rope Access Supervisor L3: [cite: 15, 17]</strong><br>${tech}</td>
-            [cite_start]<td width="33%"><strong>Rope Access Technician L1: [cite: 21, 23, 27]</strong><br>--</td>
-            [cite_start]<td width="33%"><strong>Ground Control: [cite: 81]</strong><br>--</td>
-        </tr>
-    </table>
-
-    [cite_start]<h2>INITIAL TASK ASSESSMENT [cite: 55]</h2>
-    [cite_start]<p><span class="checkbox">☑</span> There is no feasible access alternative (scaffolds, boom lift, or suspended platform (swing stage)) to perform the work, or using such alternative would create greater risk for workers, public, vehicular traffic, and/or property[cite: 57].</p>
-    [cite_start]<p><span class="checkbox">☑</span> Relative short duration/scale of the project makes Industrial Rope Access a better choice due to the faster rigging and mobilization[cite: 58].</p>
-
-    [cite_start]<h2>COMMUNICATION PLAN & EMERGENCY SERVICES [cite: 64, 74]</h2>
-    <table>
-        <tr>
-            [cite_start]<th width="33%">Mode of Communication [cite: 66]</th>
-            [cite_start]<th width="33%">Hospital Information [cite: 71]</th>
-            [cite_start]<th width="33%">Emergency Services [cite: 74]</th>
-        </tr>
-        <tr>
-            <td>
-                [cite_start]☑ Radio [cite: 65]<br>
-                [cite_start]☑ Cell Phone [cite: 67]<br>
-                [cite_start]☑ Hand Signals Reviewed [cite: 68]
-            </td>
-            <td>
-                [cite_start]<strong>Location: [cite: 72]</strong> Providence Little Company of Mary<br>
-                [cite_start]<strong>Drive Time: [cite: 73]</strong> 9 Mins | 4101 Torrance Blvd
-            </td>
-            <td>
-                [cite_start]<strong>EMS Phone: [cite: 74][cite_start]</strong> 911 [cite: 79]<br>
-                [cite_start]<strong>Life Flight?: [cite: 75]</strong> NO
-            </td>
+            <td width="33%"><strong>Rope Access Supervisor L3:</strong><br>See Signatures</td>
+            <td width="33%"><strong>Rope Access Technician L1:</strong><br>See Signatures</td>
+            <td width="33%"><strong>Ground Control:</strong><br>--</td>
         </tr>
     </table>
 
-    [cite_start]<h2>LOCK OUT/TAG OUT PROCEDURES [cite: 77]</h2>
+    <h2>INITIAL TASK ASSESSMENT</h2>
+    <p><span class="checkbox">☑</span> There is no feasible access alternative (scaffolds, boom lift, or suspended platform (swing stage)) to perform the work, or using such alternative would create greater risk for workers, public, vehicular traffic, and/or property.</p>
+    <p><span class="checkbox">☑</span> Relative short duration/scale of the project makes Industrial Rope Access a better choice due to the faster rigging and mobilization.</p>
+
+    <h2>COMMUNICATION PLAN & EMERGENCY SERVICES</h2>
     <table>
         <tr>
-            [cite_start]<th>Isolation Component [cite: 78]</th>
-            <th>Required? (Y/N) [cite_start][cite: 78]</th>
-            [cite_start]<th>NOTES [cite: 78]</th>
+            <th width="33%">Mode of Communication</th>
+            <th width="33%">Hospital Information</th>
+            <th width="33%">Emergency Services</th>
         </tr>
         <tr>
-            [cite_start]<td>Roof Access [cite: 78]</td>
+            <td>
+                ☑ Radio<br>
+                ☑ Cell Phone<br>
+                ☑ Hand Signals Reviewed
+            </td>
+            <td>
+                <strong>Location:</strong> Providence Little Company of Mary<br>
+                <strong>Drive Time:</strong> 9 Mins | 4101 Torrance Blvd
+            </td>
+            <td>
+                <strong>EMS Phone:</strong> 911<br>
+                <strong>Life Flight?:</strong> NO
+            </td>
+        </tr>
+    </table>
+
+    <h2>LOCK OUT/TAG OUT PROCEDURES</h2>
+    <table>
+        <tr>
+            <th>Isolation Component</th>
+            <th>Required? (Y/N)</th>
+            <th>NOTES</th>
+        </tr>
+        <tr>
+            <td>Roof Access</td>
             <td><strong>${loto}</strong></td>
-            <td>Access to Rigging zone shall be restricted for Public. [cite_start]Set barricades, send notices[cite: 78].</td>
+            <td>Access to Rigging zone shall be restricted for Public. Set barricades, send notices.</td>
         </tr>
         <tr>
-            [cite_start]<td>Cell Antennas [cite: 78]</td>
+            <td>Cell Antennas</td>
             <td><strong>${rf}</strong></td>
-            <td>Maintain clearance from active antennas. [cite_start]Max exposure 10mW/cm2 for 6 mins[cite: 126].</td>
+            <td>Maintain clearance from active antennas. Max exposure 10mW/cm2 for 6 mins.</td>
         </tr>
     </table>
 
     <div class="page-break"></div>
 
-    [cite_start]<h2>WORK PLAN & EQUIPMENT VERIFICATION [cite: 80, 82]</h2>
+    <h2>WORK PLAN & EQUIPMENT VERIFICATION</h2>
     <table>
         <tr>
-            [cite_start]<th width="20%">KEY JOB PROCESS [cite: 81]</th>
-            [cite_start]<th width="80%">STEPS & PROCEDURES [cite: 81]</th>
+            <th width="20%">KEY JOB PROCESS</th>
+            <th width="80%">STEPS & PROCEDURES</th>
         </tr>
         <tr>
-            [cite_start]<td><strong>Briefing, Safety Meeting [cite: 81]</strong></td>
-            [cite_start]<td>Equipment unloading, transportation and pre-use inspection [cite: 81][cite_start].<br>Installing barricades around hazard zone[cite: 81]. [cite_start]Anchor points assessment[cite: 81].</td>
+            <td><strong>Briefing, Safety Meeting</strong></td>
+            <td>Equipment unloading, transportation and pre-use inspection.<br>Installing barricades around hazard zone. Anchor points assessment.</td>
         </tr>
         <tr>
-            [cite_start]<td><strong>Access/Fall Zone [cite: 81]</strong></td>
-            [cite_start]<td>Whenever on ropes, 6 feet from the unprotected edge (parapet/railings lower than 42 inches)[cite: 81]. [cite_start]No one shall enter the fall zone without appropriate fall protection system[cite: 81].</td>
+            <td><strong>Access/Fall Zone</strong></td>
+            <td>Whenever on ropes, 6 feet from the unprotected edge (parapet/railings lower than 42 inches). No one shall enter the fall zone without appropriate fall protection system.</td>
         </tr>
         <tr>
-            [cite_start]<td><strong>Anchorage Description [cite: 81]</strong></td>
-            [cite_start]<td>Engineered access anchors, roof shafts, structural building elements, beam structures, etc.[cite: 81]. [cite_start]Anchorage systems used as the primary support within a main or backup system shall have a minimum strength of either 12 kN (2700 lbf), or two times the maximum arrest force of the backup system when used in accordance with manufacturer specifications, whichever is greater[cite: 81]. <strong>(VERIFIED IN APP)</strong></td>
+            <td><strong>Anchorage Description</strong></td>
+            <td>Engineered access anchors, roof shafts, structural building elements, beam structures, etc.. Anchorage systems used as the primary support within a main or backup system shall have a minimum strength of either 12 kN (2700 lbf), or two times the maximum arrest force of the backup system when used in accordance with manufacturer specifications, whichever is greater. <strong>(VERIFIED IN APP)</strong></td>
         </tr>
         <tr>
-            [cite_start]<td><strong>Required Rope Access Equipment [cite: 82]</strong></td>
-            [cite_start]<td>7/16" Kernmantle Static Ropes (MBS 22.2KN/5000 lbf), Connectors (Petzl Am'd, Oxan, Ok, must be locking type, with MBS 22.2kN, 5000Lbs), Full-body Rope Access Harness, Descenders (Petzl ID/ Rig), Backup Devices (Petzl ASAP, SafeTec Duck), Energy Absorber Lanyard (Petzl ASAP'Sorber, ASAP'Sorber Axxess)[cite: 82]. <strong>(VERIFIED IN APP)</strong></td>
+            <td><strong>Required Rope Access Equipment</strong></td>
+            <td>7/16" Kernmantle Static Ropes (MBS 22.2KN/5000 lbf), Connectors (Petzl Am'd, Oxan, Ok, must be locking type, with MBS 22.2kN, 5000Lbs), Full-body Rope Access Harness, Descenders (Petzl ID/ Rig), Backup Devices (Petzl ASAP, SafeTec Duck), Energy Absorber Lanyard (Petzl ASAP'Sorber, ASAP'Sorber Axxess). <strong>(VERIFIED IN APP)</strong></td>
         </tr>
     </table>
 
-    [cite_start]<h2>RISK ASSESSMENT & JSA [cite: 98]</h2>
-    [cite_start]<p><em>Stop work, notify supervisor and other technicians immediately if new hazard is identified or taken measures are inadequate[cite: 99].</em></p>
+    <h2>RISK ASSESSMENT & JSA</h2>
+    <p><em>Stop work, notify supervisor and other technicians immediately if new hazard is identified or taken measures are inadequate.</em></p>
     <table>
         <tr>
-            [cite_start]<th width="20%">Activity/Hazard [cite: 102]</th>
-            [cite_start]<th width="25%">Hazard Effect [cite: 102]</th>
-            [cite_start]<th width="10%">Risk Lvl [cite: 102]</th>
-            [cite_start]<th width="45%">Control Measures [cite: 102]</th>
+            <th width="20%">Activity/Hazard</th>
+            <th width="25%">Hazard Effect</th>
+            <th width="10%">Risk Lvl</th>
+            <th width="45%">Control Measures</th>
         </tr>
         <tr>
-            [cite_start]<td><strong>Personal Falling [cite: 102]</strong></td>
-            [cite_start]<td>Gravity-induced injury or death [cite: 102]</td>
-            [cite_start]<td><strong>H [cite: 102]</strong></td>
-            [cite_start]<td>All personnel must be properly trained, briefed and follow IRATA/SPRAT and OSHA Rope Access and Fall-Protection standards[cite: 102]. [cite_start]Always maintain 2-point attachments while using Rope Access (main and safety line)[cite: 102]. [cite_start]Always use 2 independent anchor points capable to withstand 5000 lbs/22KN load[cite: 102].</td>
+            <td><strong>Personal Falling</strong></td>
+            <td>Gravity-induced injury or death</td>
+            <td><strong>H</strong></td>
+            <td>All personnel must be properly trained, briefed and follow IRATA/SPRAT and OSHA Rope Access and Fall-Protection standards. Always maintain 2-point attachments while using Rope Access (main and safety line). Always use 2 independent anchor points capable to withstand 5000 lbs/22KN load.</td>
         </tr>
         <tr>
-            [cite_start]<td><strong>Mental/Physical Fatigue [cite: 102]</strong></td>
-            [cite_start]<td>Rigging mistakes, poor judgement, limited awareness, movement, tools handling and balance issues [cite: 102]</td>
-            [cite_start]<td><strong>H [cite: 102]</strong></td>
-            [cite_start]<td>Stay alert and Control physical and mental exhaustion by taking breaks[cite: 102]. [cite_start]Replenish by having appropriate food and drink breaks[cite: 102]. [cite_start]Use "Buddy" check: always help team member to identify mistake or issue if you notice it[cite: 102]. [cite_start]Ask Level 2 or Level 3 Rope Access Technician for checking if you have any doubts in your rigging[cite: 102].</td>
+            <td><strong>Mental/Physical Fatigue</strong></td>
+            <td>Rigging mistakes, poor judgement, limited awareness, movement, tools handling and balance issues</td>
+            <td><strong>H</strong></td>
+            <td>Stay alert and Control physical and mental exhaustion by taking breaks. Replenish by having appropriate food and drink breaks. Use "Buddy" check: always help team member to identify mistake or issue if you notice it. Ask Level 2 or Level 3 Rope Access Technician for checking if you have any doubts in your rigging.</td>
         </tr>
         <tr>
-            [cite_start]<td><strong>Dropped Tools / Materials [cite: 124]</strong></td>
-            [cite_start]<td>Injury to personnel working below, injury to public passersby, damage to property [cite: 124]</td>
-            [cite_start]<td><strong>H [cite: 124]</strong></td>
-            [cite_start]<td>Clearly mark and barricade Hazard Zone (10ft around Access Zone projection)[cite: 124]. [cite_start]All tools and devices must be tethered or secured[cite: 124]. [cite_start]Helmets and hard hats must be always worn within Hazard Zone[cite: 125]. [cite_start]Keep clean and organized workplace[cite: 125].</td>
+            <td><strong>Dropped Tools / Materials</strong></td>
+            <td>Injury to personnel working below, injury to public passersby, damage to property</td>
+            <td><strong>H</strong></td>
+            <td>Clearly mark and barricade Hazard Zone (10ft around Access Zone projection). All tools and devices must be tethered or secured. Helmets and hard hats must be always worn within Hazard Zone. Keep clean and organized workplace.</td>
         </tr>
     </table>
 
     <div class="page-break"></div>
 
-    [cite_start]<h2>TECHNICIAN ACKNOWLEDGMENT & SIGNATURES [cite: 131]</h2>
-    [cite_start]<p>My signature states that I have been briefed and understand the content of this Access Work Plan[cite: 129]. [cite_start]I understand my responsibilities, and I am competent to use the required equipment and to carry out the intended tasks Safely[cite: 130].</p>
+    <h2>TECHNICIAN ACKNOWLEDGMENT & SIGNATURES</h2>
+    <p>My signature states that I have been briefed and understand the content of this Access Work Plan. I understand my responsibilities, and I am competent to use the required equipment and to carry out the intended tasks Safely.</p>
     
     <table>
         <tr>
-            [cite_start]<th width="20%">Personnel Roles [cite: 131]</th>
-            [cite_start]<th width="25%">Name [cite: 131]</th>
-            [cite_start]<th width="35%">Signature [cite: 131]</th>
-            [cite_start]<th width="20%">Emergency Contact [cite: 131]</th>
+            <th width="25%">Personnel Roles</th>
+            <th width="25%">Name</th>
+            <th width="25%">Signature</th>
+            <th width="25%">Emergency Contact</th>
         </tr>
         <tr>
-            [cite_start]<td><strong>Rope Access Supervisor L3 / Technician [cite: 131]</strong></td>
-            <td>${tech}</td>
+            <td><strong>${role}</strong></td>
+            <td>${sigName}</td>
             <td style="text-align:center; vertical-align:middle;">
                 <img src="${sigData}" class="sig-img" alt="Digital Signature" />
             </td>
-            <td>On File</td>
-        </tr>
-        <tr>
-            [cite_start]<td><strong>Rope Access Technician L1 [cite: 131]</strong></td>
-            <td></td>
-            <td></td>
-            <td></td>
+            <td>${eContact}</td>
         </tr>
     </table>
 
