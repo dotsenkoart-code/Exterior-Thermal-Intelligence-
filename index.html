@@ -411,9 +411,9 @@
         let drawing = false;
 
         function initCanvas() {
-            const rect = canvas.getBoundingClientRect();
-            canvas.width = rect.width;
-            canvas.height = rect.height;
+            // Updated to ensure the canvas has width even if browser CSS is lagging
+            canvas.width = canvas.offsetWidth || (window.innerWidth - 44);
+            canvas.height = canvas.offsetHeight || 150;
             ctx.lineWidth = 3;
             ctx.lineCap = 'round';
             ctx.strokeStyle = '#0cf';
@@ -436,6 +436,9 @@
             const pos = getPos(e);
             ctx.beginPath();
             ctx.moveTo(pos.x, pos.y);
+            // Draw a tiny line immediately so a single "tap" registers as a dot
+            ctx.lineTo(pos.x, pos.y + 1);
+            ctx.stroke();
         }
 
         function draw(e) {
@@ -533,7 +536,8 @@
         }
 
         function initApp() {
-            initCanvas();
+            // Delay initialization slightly to ensure CSS is applied for offsetWidth
+            setTimeout(initCanvas, 100);
             checkJsaState();
 
             if (localStorage.getItem('strataVault')) {
@@ -1025,7 +1029,7 @@
             if (n === 2) hasVisitedDiagnose = true;
         }
 
-        // --- NEW: HTML/PDF EXPORT LOGIC ---
+        // --- HTML/PDF EXPORT LOGIC ---
         async function exportJSAPDF() {
             if (!isJsaSigned) {
                 alert("⚠️ JSA has not been signed yet.");
@@ -1095,7 +1099,7 @@
     <script>
         // Automatically open the print dialog to allow saving as PDF
         window.onload = function() { window.print(); }
-    </script>
+    <\/script>
 </body>
 </html>`;
 
