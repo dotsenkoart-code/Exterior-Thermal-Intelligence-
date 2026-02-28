@@ -377,6 +377,8 @@
                 </div>
             </div>
 
+            <button class="cmd-action-btn btn-gold" style="margin-top:20px; margin-bottom:0;" onclick="exportJSAPDF()">🛡️ EXPORT SIGNED JSA</button>
+
             <div style="display:flex; gap:8px; margin-top:10px;">
                 <button class="cmd-action-btn" style="background:#333; margin:0;" onclick="exportAndSend()">📤 EXPORT CSV</button>
                 <button class="cmd-action-btn" style="background:#b00; margin:0;" onclick="openWipeModal()">WIPE</button>
@@ -409,7 +411,6 @@
         let drawing = false;
 
         function initCanvas() {
-            // Resize for device pixel ratio to prevent blur
             const rect = canvas.getBoundingClientRect();
             canvas.width = rect.width;
             canvas.height = rect.height;
@@ -430,7 +431,7 @@
         }
 
         function startDraw(e) {
-            e.preventDefault(); // Stop screen scrolling
+            e.preventDefault(); 
             drawing = true;
             const pos = getPos(e);
             ctx.beginPath();
@@ -470,7 +471,6 @@
 
         // --- JSA LOCK LOGIC ---
         function signAndUnlock() {
-            // Verify checkboxes
             const toggles = document.querySelectorAll('.warning-card .jsa-toggle');
             let allChecked = true;
             toggles.forEach(t => { if(!t.classList.contains('active')) allChecked = false; });
@@ -481,9 +481,14 @@
             }
 
             localStorage.setItem('jsaSigned', 'true');
+            
+            // Save signature image to memory for later export
+            const sigData = canvas.toDataURL("image/png");
+            localStorage.setItem('jsaSignatureData', sigData);
+
             isJsaSigned = true;
             checkJsaState();
-            goToSlide(1); // Auto-forward to Map
+            goToSlide(1); 
         }
 
         function checkJsaState() {
@@ -494,10 +499,17 @@
                 document.querySelector('.sig-pad').style.pointerEvents = 'none';
                 document.querySelector('.sig-pad').style.opacity = '0.5';
                 
-                // Unlock Nav
                 document.getElementById('nav-1').classList.remove('locked');
                 document.getElementById('nav-2').classList.remove('locked');
                 document.getElementById('nav-3').classList.remove('locked');
+                
+                // Repopulate signature if returning
+                const savedSig = localStorage.getItem('jsaSignatureData');
+                if(savedSig) {
+                    const img = new Image();
+                    img.onload = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0); };
+                    img.src = savedSig;
+                }
             } else {
                 isJsaSigned = false;
                 document.getElementById('btn-unlock-app').style.display = 'block';
@@ -505,7 +517,6 @@
                 document.querySelector('.sig-pad').style.pointerEvents = 'auto';
                 document.querySelector('.sig-pad').style.opacity = '1';
                 
-                // Lock Nav
                 document.getElementById('nav-1').classList.add('locked');
                 document.getElementById('nav-2').classList.add('locked');
                 document.getElementById('nav-3').classList.add('locked');
@@ -515,6 +526,7 @@
         function resetJSA() {
             if(confirm("Are you sure? This will lock the app until a new signature is collected.")) {
                 localStorage.setItem('jsaSigned', 'false');
+                localStorage.removeItem('jsaSignatureData');
                 clearSignature();
                 checkJsaState();
             }
@@ -549,7 +561,6 @@
                 setPattern('3'); 
             }
 
-            // Start on JSA if not signed, else Map
             if(isJsaSigned) {
                 goToSlide(1);
             } else {
@@ -592,7 +603,7 @@
 
             localStorage.setItem('isDropLocked', 'true');
             saveLocationState();
-            goToSlide(2); // Go to Diagnose
+            goToSlide(2); 
         }
 
         function unlockSetup() {
@@ -842,7 +853,7 @@
             </tr>`;
             
             writeToVaultAndReset(row, imgEl);
-            goToSlide(3); // Go to Command
+            goToSlide(3); 
         }
 
         function writeToVaultAndReset(htmlRow, imgEl) {
@@ -960,7 +971,7 @@
                 fBtn.className = 'cmd-flow-btn';
                 fBtn.dataset.pos = p;
                 fBtn.innerText = "MOVE " + p;
-                fBtn.onclick = () => { attemptMovePosition(p, 2); }; // 2 = Diagnose
+                fBtn.onclick = () => { attemptMovePosition(p, 2); }; 
                 flow.appendChild(fBtn);
             });
             updatePosUI();
@@ -996,7 +1007,6 @@
         }
 
         function goToSlide(n) {
-            // Block navigation if JSA is not signed
             if (n > 0 && !isJsaSigned) {
                 alert("⚠️ SAFETY FIRST: You must complete and sign the daily JSA before accessing the application.");
                 return;
@@ -1013,6 +1023,100 @@
             updateFixedHeaders(n);
             
             if (n === 2) hasVisitedDiagnose = true;
+        }
+
+        // --- NEW: HTML/PDF EXPORT LOGIC ---
+        async function exportJSAPDF() {
+            if (!isJsaSigned) {
+                alert("⚠️ JSA has not been signed yet.");
+                return;
+            }
+
+            const proj = document.getElementById('projectID').value || "Unknown_Project";
+            const date = new Date().toLocaleDateString();
+            const time = new Date().toLocaleTimeString();
+            
+            const sigData = localStorage.getItem('jsaSignatureData') || "";
+            const loto = document.getElementById('loto-block').style.display === 'block' ? 'YES' : 'NO';
+            const rf = document.getElementById('rf-block').style.display === 'block' ? 'YES' : 'NO';
+
+            const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+    <title>Strata Access Group - JSA Report</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; color: #333; max-width: 800px; margin: auto; }
+        h1 { color: #000; border-bottom: 3px solid #f39c12; padding-bottom: 10px; margin-bottom: 30px; }
+        .section { margin-bottom: 25px; background: #f9f9f9; padding: 20px; border-radius: 8px; border: 1px solid #ddd; }
+        h3 { margin-top: 0; color: #222; }
+        .row { display: flex; margin-bottom: 10px; }
+        .label { font-weight: bold; width: 300px; color: #555; }
+        .val { font-weight: bold; color: #000; }
+        .sig-box { border: 2px dashed #ccc; padding: 10px; width: 100%; max-width: 400px; height: 150px; margin-top: 15px; background: #fff; }
+        .sig-img { width: 100%; height: 100%; object-fit: contain; }
+        .footer { margin-top: 40px; font-size: 0.8rem; color: #888; text-align: center; border-top: 1px solid #eee; padding-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Strata Access Group - Job Safety Analysis (JSA)</h1>
+    
+    <div class="section">
+        <h3>Project Details</h3>
+        <div class="row"><div class="label">Project/Building:</div><div class="val">${proj}</div></div>
+        <div class="row"><div class="label">Date:</div><div class="val">${date}</div></div>
+        <div class="row"><div class="label">Time of Briefing:</div><div class="val">${time}</div></div>
+    </div>
+
+    <div class="section">
+        <h3>Pre-Drop Equipment Verification</h3>
+        <div class="row"><div class="label">12kN Anchor Systems Verified:</div><div class="val" style="color:green;">YES</div></div>
+        <div class="row"><div class="label">PPE & Kernmantle Ropes Inspected:</div><div class="val" style="color:green;">YES</div></div>
+    </div>
+
+    <div class="section">
+        <h3>Conditional Hazards</h3>
+        <div class="row"><div class="label">Roof Access / LOTO Required:</div><div class="val">${loto}</div></div>
+        <div class="row"><div class="label">Cell Antennas / High RF:</div><div class="val">${rf}</div></div>
+    </div>
+
+    <div class="section">
+        <h3>Technician Acknowledgment</h3>
+        <p style="line-height:1.6; color:#444;">I have been briefed and understand the content of this Access Work Plan. I understand my responsibilities, and I am competent to use the required equipment and to carry out the intended tasks Safely.</p>
+        <div class="label" style="margin-top:20px;">Digital Signatures (L3 / Tech):</div>
+        <div class="sig-box">
+            <img src="${sigData}" class="sig-img" alt="Digital Signature" />
+        </div>
+    </div>
+    
+    <div class="footer">
+        Generated by Strata-Scan Pro Fleet App &bull; ${date} ${time}
+    </div>
+    
+    <script>
+        // Automatically open the print dialog to allow saving as PDF
+        window.onload = function() { window.print(); }
+    </script>
+</body>
+</html>`;
+
+            const fileName = `Strata_JSA_${proj.replace(/\s+/g, '_')}_${new Date().getTime()}.html`;
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const file = new File([blob], fileName, { type: 'text/html' });
+
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        title: `JSA Report: ${proj}`,
+                        text: `Attached is the signed JSA compliance report for ${proj}. Open it in any browser to save as PDF.`,
+                        files: [file]
+                    });
+                } catch (err) {
+                    console.log("Share sheet canceled or failed.", err);
+                    forceDownload(blob, fileName);
+                }
+            } else {
+                forceDownload(blob, fileName);
+            }
         }
         
         async function exportAndSend() {
@@ -1039,7 +1143,7 @@
                         files: [file]
                     });
                 } catch (err) {
-                    console.log("Share sheet canceled or failed. Falling back to direct download.", err);
+                    console.log("Share sheet canceled or failed.", err);
                     forceDownload(blob, fileName);
                 }
             } else {
