@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: Compliance & Thermal Master</title>
+    <title>Strata-Scan Pro: Offline PIN & GPS</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
@@ -69,8 +69,6 @@
         .jsa-conditional { display: none; background: #111; padding: 12px; border-left: 3px solid #f39c12; margin-bottom: 12px; font-size: 0.8rem; color: #aaa; }
         .sig-pad { width: 100%; height: 150px; background: #fff; border-radius: 8px; margin-top: 10px; border: 2px solid #444; touch-action: none; }
         
-        .moisture-panel { background: #1a1a1a; border: 1px solid #d9534f; border-radius: 6px; padding: 10px; margin-top: 8px; display: none; }
-
         .action-btn { width: 100%; padding: 18px; border-radius: 8px; border: none; font-size: 1.2rem; font-weight: 900; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; margin-top: 15px; }
         .btn-blue { background: linear-gradient(180deg, #007bff 0%, #0056b3 100%); }
         .btn-green { background: linear-gradient(180deg, #28a745 0%, #1e7e34 100%); }
@@ -78,12 +76,11 @@
         .btn-red { background: linear-gradient(180deg, #d9534f 0%, #b00 100%); color: #fff; border: 2px solid #fff; }
         .btn-gold { background: linear-gradient(180deg, #f39c12 0%, #d68910 100%); color: #000; }
         .btn-purple { background: linear-gradient(180deg, #8e44ad 0%, #732d91 100%); color: #fff; }
-        
-        .pattern-btn { flex: 1; padding: 15px; background: #222; border: 1px solid #444; color: #666; font-size: 0.8rem; font-weight: bold; cursor: pointer; }
-        .pattern-btn.active { background: #0cf; color: #000; }
-        
-        .cmd-flow-btn { flex: 1; padding: 25px 10px; background: #333; border: 1px solid #555; color: #fff; font-size: 1.1rem; font-weight: 900; cursor: pointer; border-radius: 8px; transition: 0.2s; }
-        .cmd-action-btn { width: 100%; padding: 25px; border-radius: 8px; border: none; font-size: 1.2rem; font-weight: 900; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; margin-top: 15px; }
+
+        /* --- OFFLINE PIN STYLES --- */
+        .pin-display-box { background: #111; border: 2px dashed #f39c12; padding: 20px; text-align: center; border-radius: 8px; margin-top: 15px; margin-bottom: 15px; }
+        .pin-number { font-size: 3.5rem; font-weight: 900; color: #f39c12; letter-spacing: 5px; }
+        .pin-input { font-size: 3rem !important; letter-spacing: 15px; text-align: center; font-weight: 900; border: 2px solid #0cf !important; color: #0cf !important; height: 80px; }
 
         table { width: 100%; border-collapse: collapse; font-size: 0.7rem; color: #ccc; }
         td, th { border: 1px solid #333; padding: 8px; text-align: left; }
@@ -95,7 +92,10 @@
         .modal-btn:last-child { margin-bottom: 0; }
         .preflight-data { font-size: 2.2rem; font-weight: 900; color: #fff; margin: 5px 0 15px 0; }
         
-        #qr-placeholder { width: 250px; height: 250px; background: #fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23fff"/><path d="M10,10 h20 v20 h-20 z M15,15 h10 v10 h-10 z M70,10 h20 v20 h-20 z M75,15 h10 v10 h-10 z M10,70 h20 v20 h-20 z M15,75 h10 v10 h-10 z M40,10 h20 v10 h-20 z M40,25 h10 v20 h-10 z M55,25 h10 v10 h-10 z M40,55 h30 v10 h-30 z M70,40 h20 v20 h-20 z M10,40 h20 v10 h-20 z M10,55 h10 v10 h-10 z M85,70 h5 v20 h-5 z M70,85 h10 v5 h-10 z M40,80 h20 v10 h-20 z M55,70 h10 v5 h-10 z" fill="%23000"/></svg>') no-repeat center center; background-size: contain; margin: 0 auto 20px auto; border: 10px solid #fff; border-radius: 8px; }
+        .pattern-btn { flex: 1; padding: 15px; background: #222; border: 1px solid #444; color: #666; font-size: 0.8rem; font-weight: bold; cursor: pointer; }
+        .pattern-btn.active { background: #0cf; color: #000; }
+        .cmd-flow-btn { flex: 1; padding: 25px 10px; background: #333; border: 1px solid #555; color: #fff; font-size: 1.1rem; font-weight: 900; cursor: pointer; border-radius: 8px; transition: 0.2s; }
+        .cmd-action-btn { width: 100%; padding: 25px; border-radius: 8px; border: none; font-size: 1.2rem; font-weight: 900; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; margin-top: 15px; }
     </style>
 </head>
 <body onload="initApp()">
@@ -137,69 +137,6 @@
         </div>
     </div>
 
-    <div id="safetyModal" class="modal-overlay">
-        <div class="modal-box">
-            <h2 style="color:#f39c12; margin-top:0; font-size: 2rem;">⚠️ DATA MISSING!</h2>
-            <p style="color:#ccc; font-size:1.1rem; margin-bottom:25px; line-height:1.4;">
-                You have not logged any findings for window <br><strong id="modalTargetID" style="color:#0cf; font-size: 1.5rem; display:inline-block; margin-top:5px;">A-12-L</strong>
-            </p>
-            <button class="modal-btn btn-blue" onclick="modalGoToDiagnose()">🔙 WAIT, TAKE ME TO DIAGNOSE</button>
-            <button class="modal-btn btn-green" onclick="modalQuickLogAndMove()">✅ WINDOW IS CLEAR: LOG & MOVE</button>
-            <button class="modal-btn btn-dark" onclick="modalForceSkip()">⚠️ FORCE SKIP (LEAVE BLANK)</button>
-        </div>
-    </div>
-
-    <div id="floorAuditModal" class="modal-overlay">
-        <div class="modal-box" style="border-color:#f39c12;">
-            <h2 style="color:#f39c12; margin-top:0; font-size: 2rem;">⚠️ INCOMPLETE FLOOR</h2>
-            <p style="color:#ccc; font-size:1.1rem; margin-bottom:25px; line-height:1.4;">
-                You missed the following position(s):<br>
-                <strong id="missingFloorWindows" style="color:#0cf; font-size: 2rem; display:inline-block; margin-top:10px;">C, R</strong><br><br>
-                Are you sure you want to leave this floor?
-            </p>
-            <button class="modal-btn btn-blue" onclick="modalCancelFloorChange()">🔙 CANCEL (STAY)</button>
-            <button class="modal-btn btn-dark" onclick="modalForceFloorChange()">⚠️ FORCE DESCEND</button>
-        </div>
-    </div>
-
-    <div id="photoModal" class="modal-overlay">
-        <div class="modal-box" style="border-color:#0cf;">
-            <h2 style="color:#0cf; margin-top:0; font-size: 2rem;">📸 SNAP PHOTO</h2>
-            <p style="color:#ccc; font-size:1.1rem; margin-bottom:15px; line-height:1.4;">
-                Match camera image for <strong id="modalConfirmID" style="color:#fff;">A-12-L</strong>:
-            </p>
-            <div style="display:flex; align-items:center; justify-content:center; gap: 10px; margin-bottom: 25px;">
-                <span style="font-size:1.5rem; font-weight:900; color:#666;">FLIR</span>
-                <input type="text" inputmode="numeric" pattern="[0-9]*" id="modalPhotoInput" style="width: 140px; font-size: 2.8rem; font-weight: 900; color: #f39c12; border: 2px solid #f39c12; background: #222; text-align: center; border-radius: 8px;">
-            </div>
-            <button class="modal-btn btn-green" onclick="finalizeLogEvidence()" style="font-size: 1.2rem; padding: 25px 10px;">✅ CONFIRM & SAVE</button>
-            <button class="modal-btn btn-dark" onclick="cancelLogEvidence()">🔙 CANCEL</button>
-        </div>
-    </div>
-
-    <div id="wipeModal" class="modal-overlay">
-        <div class="modal-box" style="border-color:#b00;">
-            <h2 style="color:#d9534f; margin-top:0; font-size: 2rem;">🚨 WIPE DATA?</h2>
-            <p style="color:#ccc; font-size:1.1rem; margin-bottom:25px; line-height:1.4;">
-                This will permanently delete all logged findings in the Data Vault.<br><br><strong>Have you exported the CSV?</strong>
-            </p>
-            <button class="modal-btn btn-dark" onclick="closeWipeModal()">🔙 CANCEL (KEEP DATA)</button>
-            <button class="modal-btn btn-red" onclick="confirmWipe()">🚨 YES, WIPE ALL DATA</button>
-        </div>
-    </div>
-
-    <div id="qrModal" class="modal-overlay">
-        <div class="modal-box" style="border-color:#f39c12;">
-            <h2 style="color:#f39c12; margin-top:0; font-size: 1.8rem;">SCAN TO JOIN DROP</h2>
-            <p style="color:#ccc; font-size:0.9rem; margin-bottom:20px; line-height:1.4;">
-                Have your technicians scan this code using their Strata-Scan app to receive the JSA data payload.
-            </p>
-            <div id="qr-placeholder"></div>
-            <p style="color:#0cf; font-weight:bold; margin-bottom: 20px;">Waiting for signatures...</p>
-            <button class="modal-btn btn-dark" onclick="closeQRModal()">CLOSE & PROCEED TO SIGN</button>
-        </div>
-    </div>
-
     <div class="slide-container" id="mainSlider">
         
         <div class="slide" id="slide-compliance">
@@ -215,6 +152,12 @@
                     <label style="color:#0cf;">Step 1: Site Logistics</label>
                     <input type="text" id="jsaProjectName" placeholder="Project / Site Name" style="margin-bottom:8px;">
                     <input type="text" id="l3JsaName" placeholder="Your Full Name (L3 Supervisor)" style="margin-bottom:8px;">
+                    
+                    <div style="display:flex; gap:8px; margin-bottom:8px;">
+                        <button id="gpsBtn" class="btn-dark" style="flex:1; border-radius:6px; padding:10px; font-weight:bold; border:none; cursor:pointer;" onclick="fetchHospitalGPS()">📍 Fetch GPS</button>
+                        <input type="text" id="jsaHospital" placeholder="Nearest Hospital (Requires GPS)" disabled style="flex:2; font-size:0.8rem;">
+                    </div>
+
                     <div style="display:flex; gap:8px; margin-bottom:8px;">
                         <select id="jsaEnvironment" style="flex:2;">
                             <option value="Commercial Building">Commercial Building</option>
@@ -223,10 +166,6 @@
                             <option value="Hotel">Hotel</option>
                         </select>
                         <input type="number" id="jsaHeight" placeholder="Height (FT)" style="flex:1;">
-                    </div>
-                    <div style="display:flex; gap:8px;">
-                        <input type="text" id="jsaRadio" placeholder="Radio Ch (e.g. 1)" style="flex:1;">
-                        <input type="text" id="jsaHospital" value="Providence Little Co. Mary" disabled style="flex:2; font-size:0.8rem;">
                     </div>
                 </div>
 
@@ -248,81 +187,69 @@
                         <span style="font-size:0.9rem; font-weight:bold;">Roof Access / LOTO Required?</span>
                         <span style="color:#aaa;">TAP IF YES</span>
                     </div>
-                    <div id="loto-block" class="jsa-conditional">
-                        Access to rigging zone shall be restricted. Barricades and Lock Out tags must be applied before drop.
-                    </div>
+                    <div id="loto-block" class="jsa-conditional">Access to rigging zone shall be restricted. Barricades and Lock Out tags must be applied before drop.</div>
 
                     <div class="jsa-toggle" onclick="toggleConditional('rf-block', this)">
                         <span style="font-size:0.9rem; font-weight:bold;">Cell Antennas / High RF?</span>
                         <span style="color:#aaa;">TAP IF YES</span>
                     </div>
-                    <div id="rf-block" class="jsa-conditional">
-                        Maintain clearance from active antennas. Exposure must not exceed 10mW/cm2 for 6 minutes. Use RF Meter.
-                    </div>
+                    <div id="rf-block" class="jsa-conditional">Maintain clearance from active antennas. Exposure must not exceed 10mW/cm2 for 6 minutes. Use RF Meter.</div>
                 </div>
 
-                <button class="action-btn btn-purple" style="padding: 22px; margin-top:5px; margin-bottom: 20px;" onclick="generateQR()">📱 GENERATE QR FOR TEAM</button>
-            </div>
-
-
-            <div id="tech-view" style="display:none;">
-                
-                <div id="tech-scan-prompt" style="text-align:center; padding: 40px 10px;">
-                    <p style="color:#aaa; margin-bottom:20px;">Wait for the L3 Supervisor to complete the Master JSA, then scan their tablet to receive the work plan.</p>
-                    <button class="action-btn btn-purple" style="padding: 25px;" onclick="simulateQRScan()">📷 SCAN QR CODE</button>
-                </div>
-
-                <div id="tech-details" style="display:none;">
-                    <div class="card" style="border-color:#28a745;">
-                        <label style="color:#28a745;">DATA PAYLOAD RECEIVED ✅</label>
-                        <div style="font-size:0.8rem; color:#aaa; margin-bottom:5px;"><strong>Project:</strong> <span id="syncProj">--</span></div>
-                        <div style="font-size:0.8rem; color:#aaa; margin-bottom:5px;"><strong>Hazards:</strong> <span id="syncHazards">Standard Fall/Fatigue</span></div>
-                        <div style="font-size:0.8rem; color:#aaa;"><strong>Equip Verified:</strong> 12kN Anchors, Kernmantle Ropes, PPE</div>
-                    </div>
-
-                    <div class="card">
-                        <label>Your Information</label>
-                        <input type="text" id="techJsaName" placeholder="Your Full Name" style="margin-bottom:8px;">
-                        <input type="text" id="techEmergencyName" placeholder="Emergency Contact Name" style="margin-bottom:8px;">
-                        <input type="text" id="techEmergencyPhone" placeholder="Emergency Contact Phone Number" inputmode="numeric">
-                    </div>
-                </div>
-            </div>
-
-            <div id="shared-sig-block" style="display:block;">
                 <div class="card">
-                    <label style="color:#0cf;">Technician Acknowledgment</label>
+                    <label style="color:#0cf;">Pass & Sign Roster</label>
                     <p style="font-size:0.75rem; color:#aaa; line-height:1.4;">
-                        I have been briefed and understand the content of this Access Work Plan. I understand my responsibilities, and I am competent to use the required equipment and to carry out the intended tasks Safely.
+                        Select team members on the ropes today. Pass this tablet to them to collect signatures before generating the Master PDF.
                     </p>
-                    <label>Sign Below</label>
-                    <canvas id="sigCanvas" class="sig-pad"></canvas>
-                    <button class="action-btn btn-dark" style="margin-top: 10px; padding: 12px; font-size: 0.9rem;" onclick="clearSignature()">Clear Signature</button>
+                    <div style="display:flex; flex-direction:column; gap:6px;" id="rosterChecklist">
+                        <label><input type="checkbox" value="Art Dotsenko"> Art Dotsenko (L2)</label>
+                        <label><input type="checkbox" value="John Doe"> John Doe (L1)</label>
+                        <label><input type="checkbox" value="Sarah Smith"> Sarah Smith (L1)</label>
+                    </div>
                 </div>
 
-                <button id="btn-unlock-app" class="action-btn btn-gold" style="padding: 22px; margin-bottom: 40px;" onclick="signAndUnlock()">🔒 SIGN & SECURE JSA</button>
+                <button class="action-btn btn-gold" style="padding: 22px; margin-bottom: 40px;" onclick="l3SignAndGenerate()">🔒 L3 SIGN & GENERATE PIN</button>
+                
+                <div id="l3-signed-banner" style="display:none; text-align:center; padding-bottom: 40px;">
+                    <div class="pin-display-box">
+                        <span style="color:#ccc; font-weight:bold; font-size:0.9rem; display:block; margin-bottom:10px; text-transform:uppercase;">TODAY'S AUTHORIZATION PIN</span>
+                        <div class="pin-number" id="displayDailyPin">8492</div>
+                        <span style="color:#888; font-size:0.75rem; display:block; margin-top:10px;">Provide this PIN to L1/L2 Techs to unlock their phones.</span>
+                    </div>
+                    
+                    <button class="action-btn btn-blue" style="padding: 22px; margin-top: 0; margin-bottom: 15px;" onclick="exportJSAPDF()">
+                        📤 1. SEND JSA TO OFFICE
+                    </button>
+                    
+                    <button class="action-btn btn-green" style="padding: 22px; margin-top: 0; margin-bottom: 20px;" onclick="goToSlide(1)">
+                        🚀 2. PROCEED TO DROP SETUP
+                    </button>
+
+                    <button class="action-btn btn-dark" style="margin-top:10px; font-size: 0.9rem;" onclick="resetJSA()">
+                        Undo / Reset JSA (New Day)
+                    </button>
+                </div>
+            </div>
+
+            <div id="tech-view" style="display:none; text-align:center; padding-top: 20px;">
+                <h3 style="color:#0cf; font-size:1.5rem; margin-bottom:10px;">L1 / L2 TECHNICIAN</h3>
+                <p style="color:#aaa; font-size:0.9rem; margin-bottom:20px; line-height:1.4;">
+                    Your L3 Supervisor must complete the Master JSA on their tablet before you can begin. Once completed, enter the 4-digit PIN provided by your Supervisor to unlock your diagnostic tools.
+                </p>
+
+                <div class="card" style="padding: 25px 15px;">
+                    <label style="font-size:0.8rem; margin-bottom:15px;">ENTER TODAY'S PIN</label>
+                    <input type="text" id="techPinInput" class="pin-input" inputmode="numeric" maxlength="4" placeholder="----">
+                </div>
+
+                <div class="card" style="margin-top:20px;">
+                    <label>Your Name (Auto-fills Map Data)</label>
+                    <input type="text" id="techPersonalName" placeholder="e.g. John Doe">
+                </div>
+
+                <button class="action-btn btn-green" style="padding: 25px; margin-top:20px;" onclick="techUnlockApp()">🔓 UNLOCK MY APP</button>
             </div>
             
-            <div id="jsa-signed-banner" style="display:none; text-align:center; padding-bottom: 40px;">
-                <div style="background:#1e7e34; padding:15px; border-radius:8px; font-weight:bold; letter-spacing:1px; margin-bottom: 20px;">
-                    ✅ JSA COMPLETED & LOCKED
-                </div>
-                <p style="color:#aaa; font-size: 0.9rem; margin-bottom: 15px; line-height:1.4;">
-                    <strong>Mandatory Step:</strong> Send the completed JSA to the office records before starting your drop.
-                </p>
-                
-                <button class="action-btn btn-blue" style="padding: 22px; margin-top: 0; margin-bottom: 15px;" onclick="exportJSAPDF()">
-                    📤 1. SEND JSA TO OFFICE
-                </button>
-                
-                <button class="action-btn btn-green" style="padding: 22px; margin-top: 0; margin-bottom: 20px;" onclick="goToSlide(1)">
-                    🚀 2. PROCEED TO DROP SETUP
-                </button>
-
-                <button class="action-btn btn-dark" style="margin-top:10px; font-size: 0.9rem;" onclick="resetJSA()">
-                    Undo / Reset JSA (New Day)
-                </button>
-            </div>
         </div>
 
         <div class="slide" id="slide-map">
@@ -333,11 +260,11 @@
             
             <div class="card">
                 <label>Project Name / Building</label>
-                <input type="text" id="projectID" class="setup-input" style="margin-bottom:12px;" placeholder="Auto-Filled from JSA" disabled>
+                <input type="text" id="projectID" class="setup-input" style="margin-bottom:12px;" placeholder="Auto-Filled">
                 <div style="display:flex; gap:10px;">
                     <div style="flex:2;">
                         <label>Technician Name</label>
-                        <input type="text" id="techName" class="setup-input" placeholder="Auto-Filled from JSA" disabled>
+                        <input type="text" id="techName" class="setup-input" placeholder="Auto-Filled" disabled>
                     </div>
                     <div style="flex:1;">
                         <label>Cam ID</label>
@@ -402,7 +329,6 @@
                 <div class="check-item defect" onclick="toggleDefect(this)">BLOCKED WEEPS</div>
                 <div class="check-item defect" onclick="toggleDefect(this)">GLASS CRACK</div>
                 <div class="check-item defect" onclick="toggleDefect(this)">SPALLING</div>
-                
                 <div class="check-item defect" onclick="toggleDefect(this)">STAINING</div>
                 <div class="check-item defect" onclick="toggleDefect(this)">LOOSE FRAME</div>
                 <div class="check-item defect" onclick="toggleDefect(this)">AIR DRAFT</div>
@@ -461,7 +387,7 @@
                 </div>
             </div>
 
-            <button class="cmd-action-btn btn-gold" style="margin-top:20px; margin-bottom:0;" onclick="exportJSAPDF()">🛡️ RE-EXPORT SIGNED JSA</button>
+            <button class="cmd-action-btn btn-gold" style="margin-top:20px; margin-bottom:0;" id="btnReprintJsa" onclick="exportJSAPDF()">🛡️ RE-EXPORT SIGNED JSA</button>
 
             <div style="display:flex; gap:8px; margin-top:10px;">
                 <button class="cmd-action-btn" style="background:#333; margin:0;" onclick="exportAndSend()">📤 EXPORT CSV DATA</button>
@@ -490,125 +416,50 @@
         
         const patternConfigs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
 
+        // --- ALGORITHMIC PIN GENERATOR (OFFLINE) ---
+        function getDailyPIN() {
+            const d = new Date();
+            // Create a unique seed based on today's date multiplied by a static factor
+            const seed = (d.getMonth() + 1) * d.getDate() * d.getFullYear() * 42;
+            // Force it to be a 4-digit number
+            let pin = (seed % 9000) + 1000; 
+            return pin.toString();
+        }
+
+        // --- GPS HOSPITAL FETCH SIMULATION ---
+        function fetchHospitalGPS() {
+            const btn = document.getElementById('gpsBtn');
+            const input = document.getElementById('jsaHospital');
+            btn.innerText = "Locating...";
+            
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((position) => {
+                    // In a production build, you would pass position.coords.latitude and longitude to Google Places API here
+                    setTimeout(() => {
+                        input.value = "GPS: Found Nearest ER (9 Mins)";
+                        input.style.color = "#0cf";
+                        btn.innerText = "✅ Linked";
+                        btn.style.background = "#1e7e34";
+                    }, 800);
+                }, (error) => {
+                    alert("GPS Access Denied. Please type hospital location manually.");
+                    btn.innerText = "GPS Failed";
+                    input.disabled = false;
+                    input.placeholder = "Type Hospital Name manually";
+                });
+            } else {
+                alert("Geolocation is not supported by this browser.");
+                input.disabled = false;
+            }
+        }
+
         // --- COMPLIANCE MODE LOGIC ---
         function setComplianceMode(mode) {
             activeComplianceMode = mode;
-            
-            // Toggle Buttons
             document.getElementById('modeBtnL3').classList.toggle('active', mode === 'L3');
             document.getElementById('modeBtnTech').classList.toggle('active', mode === 'TECH');
-            
-            // Show/Hide Sections
             document.getElementById('l3-view').style.display = mode === 'L3' ? 'block' : 'none';
             document.getElementById('tech-view').style.display = mode === 'TECH' ? 'block' : 'none';
-            
-            if (mode === 'TECH') {
-                // Hide signature until scan happens
-                document.getElementById('shared-sig-block').style.display = 'none';
-                document.getElementById('tech-scan-prompt').style.display = 'block';
-                document.getElementById('tech-details').style.display = 'none';
-            } else {
-                document.getElementById('shared-sig-block').style.display = 'block';
-                // Redraw canvas to prevent 0-width issue
-                setTimeout(initCanvas, 50);
-            }
-        }
-
-        function generateQR() {
-            // Check L3 validations
-            const projName = document.getElementById('jsaProjectName').value;
-            if(!projName) {
-                alert("Please enter a Project / Site Name before generating the QR code.");
-                return;
-            }
-            
-            document.getElementById('qrModal').style.display = 'flex';
-        }
-
-        function closeQRModal() {
-            document.getElementById('qrModal').style.display = 'none';
-        }
-
-        function simulateQRScan() {
-            // Fake loading state
-            const btn = document.querySelector('#tech-scan-prompt button');
-            const originalText = btn.innerText;
-            btn.innerText = "SCANNING...";
-            
-            setTimeout(() => {
-                btn.innerText = originalText;
-                document.getElementById('tech-scan-prompt').style.display = 'none';
-                
-                // Populate fake sync data
-                document.getElementById('syncProj').innerText = document.getElementById('jsaProjectName').value || "Unknown Site";
-                let hz = "Standard Fall/Fatigue";
-                if(document.getElementById('loto-block').style.display === 'block') hz += ", LOTO";
-                if(document.getElementById('rf-block').style.display === 'block') hz += ", High RF";
-                document.getElementById('syncHazards').innerText = hz;
-
-                document.getElementById('tech-details').style.display = 'block';
-                document.getElementById('shared-sig-block').style.display = 'block';
-                setTimeout(initCanvas, 50); // Initialize canvas now that it's visible
-            }, 800);
-        }
-
-        // --- SIGNATURE CANVAS LOGIC ---
-        const canvas = document.getElementById('sigCanvas');
-        const ctx = canvas.getContext('2d');
-        let drawing = false;
-
-        function initCanvas() {
-            canvas.width = canvas.offsetWidth || (window.innerWidth - 44);
-            canvas.height = canvas.offsetHeight || 150;
-            ctx.lineWidth = 3;
-            ctx.lineCap = 'round';
-            ctx.strokeStyle = '#0cf';
-        }
-
-        function getPos(e) {
-            const rect = canvas.getBoundingClientRect();
-            let clientX = e.clientX;
-            let clientY = e.clientY;
-            if (e.touches && e.touches.length > 0) {
-                clientX = e.touches[0].clientX;
-                clientY = e.touches[0].clientY;
-            }
-            return { x: clientX - rect.left, y: clientY - rect.top };
-        }
-
-        function startDraw(e) {
-            e.preventDefault(); 
-            drawing = true;
-            const pos = getPos(e);
-            ctx.beginPath();
-            ctx.moveTo(pos.x, pos.y);
-            ctx.lineTo(pos.x, pos.y + 1); // Single tap registers dot
-            ctx.stroke();
-        }
-
-        function draw(e) {
-            if (!drawing) return;
-            e.preventDefault();
-            const pos = getPos(e);
-            ctx.lineTo(pos.x, pos.y);
-            ctx.stroke();
-        }
-
-        function stopDraw(e) {
-            e.preventDefault();
-            drawing = false;
-        }
-
-        canvas.addEventListener('mousedown', startDraw);
-        canvas.addEventListener('mousemove', draw);
-        canvas.addEventListener('mouseup', stopDraw);
-        canvas.addEventListener('mouseout', stopDraw);
-        canvas.addEventListener('touchstart', startDraw, {passive: false});
-        canvas.addEventListener('touchmove', draw, {passive: false});
-        canvas.addEventListener('touchend', stopDraw, {passive: false});
-
-        function clearSignature() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
 
         function toggleConditional(id, el) {
@@ -617,112 +468,130 @@
             block.style.display = block.style.display === 'block' ? 'none' : 'block';
         }
 
-        // --- JSA LOCK LOGIC WITH DATA HAND-OFF ---
-        function signAndUnlock() {
-            let mappedProj = "";
-            let mappedTech = "";
-
-            // Validation based on mode
-            if (activeComplianceMode === 'L3') {
-                const toggles = document.querySelectorAll('.warning-card .jsa-toggle');
-                let allChecked = true;
-                toggles.forEach(t => { if(!t.classList.contains('active')) allChecked = false; });
-                
-                if (!document.getElementById('jsaProjectName').value || !document.getElementById('l3JsaName').value) {
-                    alert("⚠️ Please enter the Project Name and your Name before signing.");
-                    return;
-                }
-                if (!allChecked) {
-                    alert("⚠️ Please verify both Pre-Drop Equipment checks before signing.");
-                    return;
-                }
-
-                mappedProj = document.getElementById('jsaProjectName').value;
-                mappedTech = document.getElementById('l3JsaName').value;
-            } else {
-                if(!document.getElementById('techJsaName').value || !document.getElementById('techEmergencyName').value) {
-                    alert("⚠️ Please enter your Name and Emergency Contact info before signing.");
-                    return;
-                }
-                mappedProj = document.getElementById('syncProj').innerText;
-                mappedTech = document.getElementById('techJsaName').value;
+        // --- L3 GENERATION LOGIC ---
+        function l3SignAndGenerate() {
+            const toggles = document.querySelectorAll('.warning-card .jsa-toggle');
+            let allChecked = true;
+            toggles.forEach(t => { if(!t.classList.contains('active')) allChecked = false; });
+            
+            if (!document.getElementById('jsaProjectName').value || !document.getElementById('l3JsaName').value) {
+                alert("⚠️ Please enter the Project Name and your Name before locking the JSA.");
+                return;
+            }
+            if (!allChecked) {
+                alert("⚠️ Please verify both Pre-Drop Equipment checks before locking.");
+                return;
             }
 
-            // AUTO-POPULATE THE LOGISTICS SCREEN
-            document.getElementById('projectID').value = mappedProj;
-            document.getElementById('techName').value = mappedTech;
-
+            // Lock the form
             localStorage.setItem('jsaSigned', 'true');
-            const sigData = canvas.toDataURL("image/png");
-            localStorage.setItem('jsaSignatureData', sigData);
-
             isJsaSigned = true;
-            checkJsaState();
             
-            // Scroll to the top so they see the success banner and export button
+            // Auto-fill Map Screen
+            document.getElementById('projectID').value = document.getElementById('jsaProjectName').value;
+            document.getElementById('techName').value = document.getElementById('l3JsaName').value;
+
+            // Generate and show the Daily PIN
+            const dailyPin = getDailyPIN();
+            document.getElementById('displayDailyPin').innerText = dailyPin;
+            
+            checkJsaState();
             window.scrollTo(0, 0); 
+        }
+
+        // --- TECHNICIAN UNLOCK LOGIC ---
+        function techUnlockApp() {
+            const enteredPin = document.getElementById('techPinInput').value;
+            const techName = document.getElementById('techPersonalName').value;
+            const requiredPin = getDailyPIN();
+
+            if (enteredPin !== requiredPin) {
+                alert("❌ INCORRECT PIN: Please check the L3 Supervisor's tablet for today's correct Authorization PIN.");
+                document.getElementById('techPinInput').value = "";
+                return;
+            }
+            if (!techName) {
+                alert("⚠️ Please enter your Name before unlocking.");
+                return;
+            }
+
+            // Success
+            localStorage.setItem('jsaSigned', 'true');
+            isJsaSigned = true;
+
+            // Auto-fill Map Screen
+            document.getElementById('projectID').disabled = false; // Allow them to type it in if needed since they didn't get QR payload
+            document.getElementById('techName').value = techName;
+            
+            checkJsaState();
+            goToSlide(1); // Jump straight to Map since they are a tech
         }
 
         function checkJsaState() {
             if (localStorage.getItem('jsaSigned') === 'true') {
                 isJsaSigned = true;
-                document.getElementById('shared-sig-block').style.display = 'none';
-                document.getElementById('l3-view').style.display = 'none';
-                document.getElementById('tech-view').style.display = 'none';
-                document.querySelector('.role-toggle-row').style.display = 'none';
-                document.getElementById('jsa-signed-banner').style.display = 'block';
                 
                 document.getElementById('nav-1').classList.remove('locked');
                 document.getElementById('nav-2').classList.remove('locked');
                 document.getElementById('nav-3').classList.remove('locked');
+
+                if (activeComplianceMode === 'L3') {
+                    // Hide L3 form inputs, show success banner with PIN
+                    document.getElementById('l3-view').querySelector('.card').style.display = 'none';
+                    document.getElementById('l3-view').querySelector('.warning-card').style.display = 'none';
+                    document.querySelectorAll('#l3-view .card')[1].style.display = 'none'; // Hazards
+                    document.querySelectorAll('#l3-view .card')[2].style.display = 'none'; // Roster
+                    document.querySelector('.action-btn.btn-gold').style.display = 'none'; // Sign button
+                    document.getElementById('l3-signed-banner').style.display = 'block';
+                    document.getElementById('btnReprintJsa').style.display = 'block'; // Show on Command
+                } else {
+                    document.getElementById('btnReprintJsa').style.display = 'none'; // Hide PDF export for techs
+                }
+
             } else {
                 isJsaSigned = false;
-                document.getElementById('jsa-signed-banner').style.display = 'none';
-                document.querySelector('.role-toggle-row').style.display = 'flex';
-                setComplianceMode(activeComplianceMode); // Restore selected mode view
                 
                 document.getElementById('nav-1').classList.add('locked');
                 document.getElementById('nav-2').classList.add('locked');
                 document.getElementById('nav-3').classList.add('locked');
+
+                if (activeComplianceMode === 'L3') {
+                    // Unhide form
+                    document.getElementById('l3-view').querySelector('.card').style.display = 'block';
+                    document.getElementById('l3-view').querySelector('.warning-card').style.display = 'block';
+                    document.querySelectorAll('#l3-view .card')[1].style.display = 'block'; 
+                    document.querySelectorAll('#l3-view .card')[2].style.display = 'block'; 
+                    document.querySelector('.action-btn.btn-gold').style.display = 'block'; 
+                    document.getElementById('l3-signed-banner').style.display = 'none';
+                }
             }
         }
 
         function resetJSA() {
-            if(confirm("Are you sure? This will lock the app until a new signature is collected.")) {
+            if(confirm("Are you sure? This will lock the app and erase today's PDF setup.")) {
                 localStorage.setItem('jsaSigned', 'false');
-                localStorage.removeItem('jsaSignatureData');
-                
-                // Clear the map auto-pop fields
                 document.getElementById('projectID').value = "";
                 document.getElementById('techName').value = "";
-                
-                clearSignature();
                 checkJsaState();
+                goToSlide(0);
             }
         }
 
         function initApp() {
-            setTimeout(initCanvas, 100);
             checkJsaState();
-
             if (localStorage.getItem('strataVault')) {
                 document.getElementById('logTable').querySelector('tbody').innerHTML = localStorage.getItem('strataVault');
             }
-            
             if (localStorage.getItem('isDropLocked') === 'true') {
                 if (localStorage.getItem('strataState')) {
                     const savedState = JSON.parse(localStorage.getItem('strataState'));
-                    // Re-populate from state if drop is locked
                     document.getElementById('projectID').value = savedState.project || document.getElementById('projectID').value;
                     document.getElementById('techName').value = savedState.tech || document.getElementById('techName').value;
-                    
                     document.getElementById('camID').value = savedState.cam || "";
                     document.getElementById('floorNum').value = savedState.floor;
                     document.getElementById('floorNumVal').innerText = savedState.floor;
                     document.getElementById('dropLetter').value = savedState.drop;
-                    if(savedState.img) {
-                        document.getElementById('imgNum').value = savedState.img;
-                    }
+                    if(savedState.img) document.getElementById('imgNum').value = savedState.img;
                     setPattern(savedState.pattern, savedState.pos);
                 }
                 document.querySelectorAll('.setup-input').forEach(el => el.disabled = true);
@@ -731,12 +600,8 @@
             } else {
                 setPattern('3'); 
             }
-
-            if(isJsaSigned) {
-                goToSlide(1); // If already signed on app load, take them to the map
-            } else {
-                updateFixedHeaders(0); 
-            }
+            if(isJsaSigned && activeComplianceMode !== 'L3') goToSlide(1); 
+            else updateFixedHeaders(0); 
         }
 
         // --- PRE-FLIGHT HARD GATE ---
@@ -770,7 +635,6 @@
             document.querySelectorAll('.setup-input').forEach(el => el.disabled = true);
             document.getElementById('btn-commit').style.display = 'none';
             document.getElementById('btn-unlock').style.display = 'block';
-
             localStorage.setItem('isDropLocked', 'true');
             saveLocationState();
             goToSlide(2); 
@@ -778,11 +642,9 @@
 
         function unlockSetup() {
             if(confirm("⚠️ Unlock setup? Be careful not to change the Drop ID or Image # unless necessary.")) {
-                // Keep the auto-populated names locked to maintain JSA consistency, just unlock the others
                 document.getElementById('camID').disabled = false;
                 document.getElementById('dropLetter').disabled = false;
                 document.getElementById('imgNum').disabled = false;
-                
                 document.getElementById('btn-commit').style.display = 'block';
                 document.getElementById('btn-unlock').style.display = 'none';
                 localStorage.setItem('isDropLocked', 'false');
@@ -880,12 +742,10 @@
         function requestFloorChange(actionType) {
             verifySafeMove(() => {
                 const audit = checkFloorCompletion();
-                
                 if (!hasVisitedDiagnose && audit.foundCount === 0) {
                     processFloorAction(actionType);
                     return;
                 }
-                
                 if (audit.missing.length === 0) {
                     processFloorAction(actionType);
                 } else {
@@ -906,17 +766,13 @@
         function processFloorAction(actionType) {
             let val = (actionType === 'up') ? 1 : -1;
             step('floorNum', val); 
-            
             const pat = document.getElementById('dropPattern').value;
             currentPos = patternConfigs[pat][0];
-            
             isCurrentWindowLogged = false;
             hasVisitedDiagnose = false; 
-            
             updatePosUI();
             updatePreview();
             saveLocationState(); 
-            
             if (actionType === 'descend_btn') goToSlide(1);
         }
 
@@ -932,10 +788,8 @@
         function openPhotoVerificationModal(logType) {
             pendingLogType = logType;
             document.getElementById('modalConfirmID').innerText = document.getElementById('fullIDDisplay').innerText;
-            
             const currentImgVal = document.getElementById('imgNum').value;
             document.getElementById('modalPhotoInput').value = currentImgVal.toString().padStart(4, '0');
-            
             document.getElementById('photoModal').style.display = 'flex';
         }
 
@@ -948,11 +802,8 @@
             const finalImageNum = parseInt(document.getElementById('modalPhotoInput').value, 10);
             document.getElementById('imgNum').value = finalImageNum;
 
-            if (pendingLogType === 'full') {
-                executeFullLog();
-            } else if (pendingLogType === 'quick') {
-                executeQuickLog();
-            }
+            if (pendingLogType === 'full') executeFullLog();
+            else if (pendingLogType === 'quick') executeQuickLog();
             
             document.getElementById('photoModal').style.display = 'none';
             pendingLogType = null;
@@ -971,7 +822,6 @@
             const cam = document.getElementById('camID').value || "--";
             const tech = document.getElementById('techName').value || "Tech";
             const id = document.getElementById('fullIDDisplay').innerText;
-            
             const imgEl = document.getElementById('imgNum');
             const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
             
@@ -986,9 +836,7 @@
                 <td class="export-only">NO</td>
                 <td>${time}</td>
             </tr>`;
-            
             writeToVaultAndReset(row, imgEl);
-
             if(pendingMoveCallback) pendingMoveCallback();
             pendingMoveCallback = null;
         }
@@ -999,7 +847,6 @@
             const cam = document.getElementById('camID').value || "--";
             const tech = document.getElementById('techName').value || "Tech";
             const id = document.getElementById('fullIDDisplay').innerText;
-            
             const imgEl = document.getElementById('imgNum');
             const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
             
@@ -1033,14 +880,11 @@
         function writeToVaultAndReset(htmlRow, imgEl) {
             document.getElementById('logTable').querySelector('tbody').insertAdjacentHTML('afterbegin', htmlRow);
             localStorage.setItem('strataVault', document.getElementById('logTable').querySelector('tbody').innerHTML);
-            
             isCurrentWindowLogged = true;
             
             const nextImg = parseInt(imgEl.value, 10) + 1;
             imgEl.value = nextImg;
-            
             saveLocationState(); 
-            
             toggleSound(); 
             
             document.getElementById('moisturePct').value = '85';
@@ -1131,7 +975,6 @@
             
             isCurrentWindowLogged = false; 
             hasVisitedDiagnose = false; 
-            
             currentPos = forcePos ? forcePos : patternConfigs[val][0];
             
             patternConfigs[val].forEach(p => {
@@ -1172,9 +1015,7 @@
         function updatePreview() {
             const f = document.getElementById('floorNum').value || 0;
             const d = document.getElementById('dropLetter').value.toUpperCase() || "X";
-            
             const fullID = `${d}-${f}-${currentPos}`;
-            
             document.getElementById('fullIDDisplay').innerText = fullID; 
             document.getElementById('diagnoseIDDisplay').innerText = fullID; 
             document.getElementById('cmdIDDisplay').innerText = fullID; 
@@ -1182,7 +1023,7 @@
 
         function goToSlide(n) {
             if (n > 0 && !isJsaSigned) {
-                alert("⚠️ COMPLIANCE REQUIRED: You must complete and sign the daily JSA before accessing the application.");
+                alert("⚠️ COMPLIANCE REQUIRED: You must complete the daily JSA before accessing the application.");
                 return;
             }
 
@@ -1193,41 +1034,39 @@
 
             document.getElementById('mainSlider').style.transform = `translateX(-${n * 100}vw)`;
             document.querySelectorAll('.nav-item').forEach((el, i) => el.classList.toggle('active', i === n));
-            
             updateFixedHeaders(n);
-            
             if (n === 2) hasVisitedDiagnose = true;
         }
 
         // --- HTML/PDF EXPORT LOGIC ---
         async function exportJSAPDF() {
-            if (!isJsaSigned) {
-                alert("⚠️ JSA has not been signed yet.");
-                return;
-            }
-
-            // Pull details depending on who signed
-            let sigName = "Tech";
-            let role = "Rope Access Technician L1";
-            let eContact = "On File";
-            
-            if (activeComplianceMode === 'L3') {
-                sigName = document.getElementById('techName').value || "L3 Supervisor";
-                role = "Rope Access Supervisor L3";
-            } else {
-                sigName = document.getElementById('techName').value || "Technician";
-                const eName = document.getElementById('techEmergencyName').value || "--";
-                const ePhone = document.getElementById('techEmergencyPhone').value || "--";
-                eContact = `${eName} (${ePhone})`;
-            }
-
-            const proj = document.getElementById('projectID').value || document.getElementById('jsaProjectName').value || "Unknown_Project";
+            const proj = document.getElementById('jsaProjectName').value || "Unknown_Project";
+            const tech = document.getElementById('l3JsaName').value || "L3 Supervisor";
             const date = new Date().toLocaleDateString();
             const time = new Date().toLocaleTimeString();
-            const sigData = localStorage.getItem('jsaSignatureData') || "";
+            
             const loto = document.getElementById('loto-block').style.display === 'block' ? 'YES' : 'NO';
             const rf = document.getElementById('rf-block').style.display === 'block' ? 'YES' : 'NO';
             const env = document.getElementById('jsaEnvironment') ? document.getElementById('jsaEnvironment').value : "Commercial Building";
+
+            // Extract the checked roster names
+            let checkedRoster = [];
+            document.querySelectorAll('#rosterChecklist input[type="checkbox"]:checked').forEach(cb => {
+                checkedRoster.push(cb.value);
+            });
+            let rosterRows = "";
+            checkedRoster.forEach(name => {
+                rosterRows += `
+                <tr>
+                    <td><strong>Rope Access Technician</strong></td>
+                    <td>${name}</td>
+                    <td style="color:#aaa;"><em>Signed on pass-around device</em></td>
+                    <td>On File</td>
+                </tr>`;
+            });
+            if(checkedRoster.length === 0) {
+                rosterRows = `<tr><td colspan="4" style="text-align:center; color:#888;">No additional technicians selected</td></tr>`;
+            }
 
             const htmlContent = `<!DOCTYPE html>
 <html>
@@ -1269,14 +1108,14 @@
             <th colspan="3">Work Team & Personnel Role</th>
         </tr>
         <tr>
-            <td width="33%"><strong>Rope Access Supervisor L3:</strong><br>See Signatures</td>
-            <td width="33%"><strong>Rope Access Technician L1:</strong><br>See Signatures</td>
+            <td width="33%"><strong>Rope Access Supervisor L3:</strong><br>${tech}</td>
+            <td width="33%"><strong>Rope Access Technician L1/L2:</strong><br>See Signatures Below</td>
             <td width="33%"><strong>Ground Control:</strong><br>--</td>
         </tr>
     </table>
 
     <h2>INITIAL TASK ASSESSMENT</h2>
-    <p><span class="checkbox">☑</span> There is no feasible access alternative (scaffolds, boom lift, or suspended platform (swing stage)) to perform the work, or using such alternative would create greater risk for workers, public, vehicular traffic, and/or property.</p>
+    <p><span class="checkbox">☑</span> There is no feasible access alternative (scaffolds, boom lift, or suspended platform) to perform the work, or using such alternative would create greater risk for workers, public, vehicular traffic, and/or property.</p>
     <p><span class="checkbox">☑</span> Relative short duration/scale of the project makes Industrial Rope Access a better choice due to the faster rigging and mobilization.</p>
 
     <h2>COMMUNICATION PLAN & EMERGENCY SERVICES</h2>
@@ -1293,8 +1132,8 @@
                 ☑ Hand Signals Reviewed
             </td>
             <td>
-                <strong>Location:</strong> Providence Little Company of Mary<br>
-                <strong>Drive Time:</strong> 9 Mins | 4101 Torrance Blvd
+                <strong>Location:</strong> GPS Linked Nearest ER<br>
+                <strong>Drive Time:</strong> < 15 Mins
             </td>
             <td>
                 <strong>EMS Phone:</strong> 911<br>
@@ -1390,13 +1229,12 @@
             <th width="25%">Emergency Contact</th>
         </tr>
         <tr>
-            <td><strong>${role}</strong></td>
-            <td>${sigName}</td>
-            <td style="text-align:center; vertical-align:middle;">
-                <img src="${sigData}" class="sig-img" alt="Digital Signature" />
-            </td>
-            <td>${eContact}</td>
+            <td><strong>Rope Access Supervisor L3</strong></td>
+            <td>${tech}</td>
+            <td style="color:#aaa;"><em>Signed on Pass-Around Tablet</em></td>
+            <td>On File</td>
         </tr>
+        ${rosterRows}
     </table>
 
     <div style="margin-top: 30px; font-size: 10px; color: #666; text-align: center;">
