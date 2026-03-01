@@ -61,6 +61,10 @@
         .check-item.active { background: #0cf; color: #000; border-color: #fff; }
         .check-item.sound-box.active { background: #28a745; color: #fff; border-color: #fff; }
         
+        .ppe-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+        .ppe-item { background: #111; padding: 10px; border-radius: 4px; font-size: 0.75rem; border: 1px solid #333; color: #aaa; text-align: left; }
+        .ppe-item input { margin-right: 8px; transform: scale(1.2); }
+
         /* JSA Specific Styles */
         .role-toggle-row { display: flex; gap: 10px; margin-bottom: 15px; }
         .role-btn { flex: 1; padding: 15px; border-radius: 8px; border: 2px solid #333; background: #111; color: #666; font-weight: 900; font-size: 0.9rem; cursor: pointer; transition: 0.2s; }
@@ -78,9 +82,7 @@
         .btn-dark { background: #333; border: 1px solid #555; color: #aaa; }
         .btn-red { background: linear-gradient(180deg, #d9534f 0%, #b00 100%); color: #fff; border: 2px solid #fff; }
         .btn-gold { background: linear-gradient(180deg, #f39c12 0%, #d68910 100%); color: #000; }
-        .btn-purple { background: linear-gradient(180deg, #8e44ad 0%, #732d91 100%); color: #fff; }
-
-        /* --- OFFLINE PIN STYLES --- */
+        
         .pin-display-box { background: #111; border: 2px dashed #f39c12; padding: 20px; text-align: center; border-radius: 8px; margin-top: 15px; margin-bottom: 15px; }
         .pin-number { font-size: 3.5rem; font-weight: 900; color: #f39c12; letter-spacing: 5px; }
         .pin-input { font-size: 3rem !important; letter-spacing: 15px; text-align: center; font-weight: 900; border: 2px solid #0cf !important; color: #0cf !important; height: 80px; }
@@ -120,7 +122,6 @@
                 Tech: <strong id="pf-tech" style="color:#fff;">--</strong> | 
                 Cam: <strong id="pf-cam" style="color:#fff;">--</strong>
             </div>
-            
             <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
                 <div style="flex: 1;">
                     <p style="color:#888; margin:0; font-weight:bold; font-size:0.8rem;">STARTING DROP:</p>
@@ -131,10 +132,8 @@
                     <div class="preflight-data" id="pf-floor" style="color:#0cf; margin-top:5px; font-size:1.8rem;">12</div>
                 </div>
             </div>
-            
             <p style="color:#888; margin:0; font-weight:bold; font-size:0.8rem;">STARTING IMAGE:</p>
             <div class="preflight-data" id="pf-img" style="color:#f39c12; margin-top:5px;">FLIR0045</div>
-            
             <button class="modal-btn btn-green" onclick="lockInDrop()">🚀 YES, LOCK IT IN</button>
             <button class="modal-btn btn-dark" onclick="closePreFlight()">🔙 CANCEL</button>
         </div>
@@ -202,22 +201,18 @@
             </div>
 
             <div id="l3-view" style="display:block;">
+                
+                <select id="recentSitesDropdown" style="margin-bottom:12px; background:#1e7e34; color:#fff; font-weight:bold; display:none; border:2px solid #28a745; width:100%; padding:15px; border-radius:6px; font-size:1.1rem; text-align:center;" onchange="loadRecentSite()">
+                    <option value="">🔄 LOAD RECENT SITE PROFILE</option>
+                </select>
+
                 <div class="card">
                     <label style="color:#0cf;">Step 1: Site Logistics</label>
-                    
-                    <select id="recentSitesDropdown" style="margin-bottom:8px; background:#1e7e34; color:#fff; font-weight:bold; display:none; border:2px solid #28a745;" onchange="loadRecentSite()">
-                        <option value="">🔄 LOAD RECENT SITE PROFILE</option>
-                    </select>
-
                     <input type="text" id="jsaClient" placeholder="Client (e.g. Century 21)" style="margin-bottom:8px;">
                     <input type="text" id="jsaSiteName" placeholder="Site Name & Location (e.g. Torrance HOA)" style="margin-bottom:8px;">
                     <input type="text" id="l3JsaName" placeholder="Your Full Name (L3 Supervisor)" style="margin-bottom:8px;">
+                    <input type="text" id="jsaTask" placeholder="Operation / Task (e.g. Facade Inspection)" value="Facade Thermal Scan & Diagnostics" style="margin-bottom:8px;">
                     
-                    <div style="display:flex; gap:8px; margin-bottom:8px;">
-                        <button id="gpsBtn" class="btn-dark" style="flex:1; border-radius:6px; padding:10px; font-weight:bold; border:none; cursor:pointer;" onclick="fetchHospitalGPS()">📍 Fetch GPS (ER)</button>
-                        <input type="text" id="jsaHospital" placeholder="Nearest ER (Requires GPS)" disabled style="flex:2; font-size:0.8rem;">
-                    </div>
-
                     <div style="display:flex; gap:8px; margin-bottom:8px;">
                         <select id="jsaEnvironment" style="flex:2;">
                             <option value="Commercial Building">Commercial Building</option>
@@ -226,41 +221,103 @@
                             <option value="Hotel">Hotel</option>
                             <option value="Church/Cathedral">Church/Cathedral</option>
                             <option value="Amusement Park">Amusement Park</option>
+                            <option value="Wind Tower/Turbine">Wind Tower/Turbine</option>
+                            <option value="Antenna/Cell Tower">Antenna/Cell Tower</option>
+                            <option value="Bridge">Bridge</option>
+                            <option value="High Interior (Atrium)">High Interior (Atrium)</option>
                         </select>
                         <input type="number" id="jsaHeight" placeholder="Height (FT)" style="flex:1;">
                     </div>
                 </div>
 
+                <div class="card">
+                    <label style="color:#0cf;">Step 2: Contacts & EMS</label>
+                    <div style="display:flex; gap:8px; margin-bottom:8px;">
+                        <input type="text" id="jsaMainName" placeholder="Main Contact Name" style="flex:1;">
+                        <input type="tel" id="jsaMainPhone" placeholder="Phone #" style="flex:1;">
+                    </div>
+                    <div style="display:flex; gap:8px; margin-bottom:8px;">
+                        <input type="text" id="jsaSecName" placeholder="Sec. Contact Name" style="flex:1;">
+                        <input type="tel" id="jsaSecPhone" placeholder="Phone #" style="flex:1;">
+                    </div>
+                    <div style="display:flex; gap:8px; margin-bottom:8px;">
+                        <input type="text" id="jsaRadio" placeholder="Radio Ch (e.g. 1)" style="flex:1;">
+                        <input type="text" id="jsaGather" placeholder="Gathering Loc (e.g. Entrance)" value="Site Entrance" style="flex:1;">
+                    </div>
+                    <div style="display:flex; gap:8px; margin-bottom:8px;">
+                        <button id="gpsBtn" class="btn-dark" style="flex:1; border-radius:6px; padding:10px; font-weight:bold; border:none; cursor:pointer;" onclick="fetchHospitalGPS()">📍 Fetch GPS (ER)</button>
+                        <input type="text" id="jsaHospital" placeholder="Nearest ER (Requires GPS)" disabled style="flex:2; font-size:0.8rem;">
+                    </div>
+                    <div style="display:flex; align-items:center; justify-content:space-between; background:#222; padding:10px; border-radius:6px; border:1px solid #444;">
+                        <span style="font-size:0.8rem; color:#ccc;">Life Flight Required?</span>
+                        <select id="jsaLifeFlight" style="width:100px; padding:8px; font-size:0.9rem;">
+                            <option value="NO">NO</option>
+                            <option value="YES">YES</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div class="warning-card">
-                    <label style="color:#f39c12;">Step 2: Pre-Drop Equipment Verification</label>
+                    <label style="color:#f39c12;">Step 3: Pre-Drop & PPE</label>
                     <div class="jsa-toggle" onclick="this.classList.toggle('active')">
-                        <span style="font-size:0.9rem; font-weight:bold;">12kN Anchor Systems Verified</span>
+                        <span style="font-size:0.9rem; font-weight:bold;">12kN Anchors Verified</span>
                         <span>✔️</span>
                     </div>
                     <div class="jsa-toggle" onclick="this.classList.toggle('active')">
-                        <span style="font-size:0.9rem; font-weight:bold;">PPE & Kernmantle Ropes Inspected</span>
+                        <span style="font-size:0.9rem; font-weight:bold;">Ropes/Gear Inspected</span>
                         <span>✔️</span>
+                    </div>
+                    
+                    <label style="margin-top:15px;">Ground Control Required?</label>
+                    <div style="display:flex; gap:8px; margin-bottom:15px;">
+                        <select id="jsaGroundReq" style="flex:1;" onchange="document.getElementById('jsaGroundName').style.display = this.value === 'YES' ? 'block' : 'none'">
+                            <option value="NO">NO</option>
+                            <option value="YES">YES</option>
+                        </select>
+                        <input type="text" id="jsaGroundName" placeholder="Controller Name" style="flex:2; display:none;">
+                    </div>
+
+                    <label>Required PPE (Check all that apply)</label>
+                    <div class="ppe-grid">
+                        <label class="ppe-item"><input type="checkbox" id="ppeEye" checked> Eye Protection</label>
+                        <label class="ppe-item"><input type="checkbox" id="ppeBoots" checked> Steel-toe boots</label>
+                        <label class="ppe-item"><input type="checkbox" id="ppeHeadlamp" checked> Head Lamp</label>
+                        <label class="ppe-item"><input type="checkbox" id="ppeHelmet" checked> Helmet/Hard Hat</label>
+                        <label class="ppe-item"><input type="checkbox" id="ppeGloves" checked> Gloves</label>
+                        <label class="ppe-item"><input type="checkbox" id="ppeKnee"> Knee Pads</label>
+                        <label class="ppe-item"><input type="checkbox" id="ppeDust"> Dust Respirator N95</label>
                     </div>
                 </div>
 
                 <div class="card">
-                    <label style="color:#d9534f;">Step 3: Conditional Hazards (Required)</label>
+                    <label style="color:#d9534f;">Step 4: LOTO & Hazards</label>
                     
-                    <label style="margin-top:10px;">Roof Access / LOTO Required?</label>
-                    <select id="jsaLoto" style="margin-bottom:12px; font-size: 0.9rem;">
+                    <label style="margin-top:5px;">Machinery / Equipment LOTO?</label>
+                    <select id="jsaMachinery" style="margin-bottom:8px; font-size: 0.9rem;">
+                        <option value="NO">NO - N/A</option>
+                        <option value="YES">YES - Tagged Out</option>
+                    </select>
+
+                    <label>Roof Access LOTO / Barricades?</label>
+                    <select id="jsaLoto" style="margin-bottom:8px; font-size: 0.9rem;">
                         <option value="NO">NO - Standard Access</option>
                         <option value="YES">YES - LOTO & Barricades Required</option>
                     </select>
 
                     <label>Cell Antennas / High RF Present?</label>
-                    <select id="jsaRf" style="margin-bottom:5px; font-size: 0.9rem;">
+                    <select id="jsaRf" style="margin-bottom:15px; font-size: 0.9rem;">
                         <option value="NO">NO - No Antennas in Area</option>
                         <option value="YES">YES - Maintain 10mW/cm2 Clearance</option>
                     </select>
+
+                    <label>Site Specific Custom Hazard (Optional)</label>
+                    <input type="text" id="jsaCustomHaz" placeholder="Hazard (e.g. Seagulls)" style="margin-bottom:4px; font-size:0.9rem;">
+                    <input type="text" id="jsaCustomEff" placeholder="Effect (e.g. Distraction/Bites)" style="margin-bottom:4px; font-size:0.9rem;">
+                    <input type="text" id="jsaCustomCtrl" placeholder="Control (e.g. Avoid area)" style="font-size:0.9rem;">
                 </div>
 
                 <div class="card" id="roster-setup-card">
-                    <label style="color:#0cf;">Step 4: Roster & Signatures</label>
+                    <label style="color:#0cf;">Step 5: Roster & Signatures</label>
                     <p style="font-size:0.75rem; color:#aaa; margin-bottom:10px;">How many total personnel are on the ropes today (including yourself)?</p>
                     <div class="stepper-box">
                         <div class="stepper-row">
@@ -286,6 +343,7 @@
                         <option value="Rope Access Lead Technician L2">Rope Access Lead Technician L2</option>
                         <option value="Rope Access Technician L1">Rope Access Technician L1</option>
                         <option value="Ground Control">Ground Control</option>
+                        <option value="Operations Manager">Operations Manager</option>
                     </select>
                     <input type="text" id="signName" placeholder="Your Full Name" style="margin-bottom:8px;">
                     <input type="tel" id="signPhone" placeholder="Your Cell Phone #" style="margin-bottom:8px;">
@@ -547,7 +605,6 @@
                     const lat = position.coords.latitude;
                     const lon = position.coords.longitude;
                     
-                    // Filter: MUST have emergency=yes tag to filter out psych/rehab clinics. Search within 20km (12 miles)
                     const overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json][timeout:15];(node["amenity"="hospital"]["emergency"="yes"](around:20000,${lat},${lon});way["amenity"="hospital"]["emergency"="yes"](around:20000,${lat},${lon}););out center;`;
 
                     fetch(overpassUrl)
@@ -630,7 +687,6 @@
                     dd.appendChild(opt);
                 });
                 
-                // Add Wipe Option
                 let wipeOpt = document.createElement('option');
                 wipeOpt.value = "wipe";
                 wipeOpt.text = "🚨 CLEAR ALL SAVED SITES";
@@ -651,7 +707,7 @@
                     document.getElementById('jsaClient').value = "";
                     document.getElementById('jsaSiteName').value = "";
                 } else {
-                    dd.value = ""; // Reset dropdown
+                    dd.value = ""; 
                 }
                 return;
             }
@@ -663,20 +719,38 @@
                 document.getElementById('jsaSiteName').value = s.site || "";
                 document.getElementById('jsaEnvironment').value = s.env || "Commercial Building";
                 document.getElementById('jsaHeight').value = s.height || "";
+                
+                // Load extended fields if they exist
+                if(s.task) document.getElementById('jsaTask').value = s.task;
+                if(s.mName) document.getElementById('jsaMainName').value = s.mName;
+                if(s.mPhone) document.getElementById('jsaMainPhone').value = s.mPhone;
+                if(s.sName) document.getElementById('jsaSecName').value = s.sName;
+                if(s.sPhone) document.getElementById('jsaSecPhone').value = s.sPhone;
+                if(s.radio) document.getElementById('jsaRadio').value = s.radio;
+                if(s.gather) document.getElementById('jsaGather').value = s.gather;
             }
         }
 
         function saveSiteToMemory() {
-            const client = document.getElementById('jsaClient').value.trim();
-            const site = document.getElementById('jsaSiteName').value.trim();
-            const env = document.getElementById('jsaEnvironment').value;
-            const height = document.getElementById('jsaHeight').value;
+            const siteData = {
+                client: document.getElementById('jsaClient').value.trim(),
+                site: document.getElementById('jsaSiteName').value.trim(),
+                env: document.getElementById('jsaEnvironment').value,
+                height: document.getElementById('jsaHeight').value,
+                task: document.getElementById('jsaTask').value,
+                mName: document.getElementById('jsaMainName').value,
+                mPhone: document.getElementById('jsaMainPhone').value,
+                sName: document.getElementById('jsaSecName').value,
+                sPhone: document.getElementById('jsaSecPhone').value,
+                radio: document.getElementById('jsaRadio').value,
+                gather: document.getElementById('jsaGather').value
+            };
 
-            if(client && site) {
+            if(siteData.client && siteData.site) {
                 let sites = JSON.parse(localStorage.getItem('strataRecentSites')) || [];
-                const exists = sites.findIndex(s => s.client === client && s.site === site);
+                const exists = sites.findIndex(s => s.client === siteData.client && s.site === siteData.site);
                 if(exists !== -1) sites.splice(exists, 1);
-                sites.unshift({client, site, env, height}); 
+                sites.unshift(siteData); 
                 if(sites.length > 10) sites.pop(); 
                 localStorage.setItem('strataRecentSites', JSON.stringify(sites));
                 populateRecentSites(); 
@@ -851,6 +925,7 @@
                     document.getElementById('l3-view').querySelector('.warning-card').style.display = 'none';
                     document.querySelectorAll('#l3-view .card')[1].style.display = 'none'; 
                     document.querySelectorAll('#l3-view .card')[2].style.display = 'none'; 
+                    document.getElementById('recentSitesDropdown').style.display = 'none';
                     document.getElementById('l3-signed-banner').style.display = 'block';
                     document.getElementById('btnReprintJsa').style.display = 'block'; 
                 } else {
@@ -872,6 +947,7 @@
                     document.querySelectorAll('#l3-view .card')[2].style.display = 'block'; 
                     document.getElementById('l3-signed-banner').style.display = 'none';
                     document.querySelector('.role-toggle-row').style.display = 'flex';
+                    populateRecentSites();
                 }
             }
         }
@@ -1412,7 +1488,7 @@
             if (n === 2) hasVisitedDiagnose = true;
         }
 
-        // --- TRUE PDF EXPORT LOGIC (PIXEL-PERFECT REPLICA) ---
+        // --- TRUE PDF EXPORT LOGIC (PIXEL-PERFECT REPLICA - LANDSCAPE) ---
         async function exportJSAPDF() {
             const btnPrimary = document.getElementById('btnExportPdfPrimary');
             const loadingText = document.getElementById('pdfLoadingStatus');
@@ -1420,16 +1496,47 @@
             if(btnPrimary) btnPrimary.style.display = 'none';
             if(loadingText) loadingText.style.display = 'block';
 
-            const client = document.getElementById('jsaClient').value || "Unknown_Client";
-            const site = document.getElementById('jsaSiteName').value || "Unknown_Location";
+            // Gather all UI inputs
+            const client = document.getElementById('jsaClient').value || "--";
+            const site = document.getElementById('jsaSiteName').value || "--";
             const date = new Date().toLocaleDateString();
             const time = new Date().toLocaleTimeString();
+            const task = document.getElementById('jsaTask').value || "Facade Thermal Scan & Diagnostics";
             const height = document.getElementById('jsaHeight').value || "--";
             
-            const loto = document.getElementById('jsaLoto').value;
-            const rf = document.getElementById('jsaRf').value;
             const env = document.getElementById('jsaEnvironment') ? document.getElementById('jsaEnvironment').value : "Commercial Building";
+            
+            const mName = document.getElementById('jsaMainName').value || "On File";
+            const mPhone = document.getElementById('jsaMainPhone').value || "On File";
+            const sName = document.getElementById('jsaSecName').value || "--";
+            const sPhone = document.getElementById('jsaSecPhone').value || "--";
+            
+            const radioCh = document.getElementById('jsaRadio').value || "1";
+            const gatherLoc = document.getElementById('jsaGather').value || "Site Entrance";
             const hospitalText = document.getElementById('jsaHospital').value || "Not Linked";
+            const lifeFlight = document.getElementById('jsaLifeFlight').value;
+            
+            const gcReq = document.getElementById('jsaGroundReq').value;
+            const gcName = document.getElementById('jsaGroundName').value || "--";
+            
+            const lotoMach = document.getElementById('jsaMachinery').value;
+            const lotoRoof = document.getElementById('jsaLoto').value;
+            const lotoRf = document.getElementById('jsaRf').value;
+            
+            // Custom Hazard
+            const cHaz = document.getElementById('jsaCustomHaz').value;
+            const cEff = document.getElementById('jsaCustomEff').value;
+            const cCtrl = document.getElementById('jsaCustomCtrl').value;
+
+            // Gather PPE selections
+            const getPPE = (id) => document.getElementById(id).checked ? '&#9746;' : '&#9744;';
+            const ppeEye = getPPE('ppeEye');
+            const ppeBoots = getPPE('ppeBoots');
+            const ppeHead = getPPE('ppeHeadlamp');
+            const ppeHelm = getPPE('ppeHelmet');
+            const ppeGlove = getPPE('ppeGloves');
+            const ppeKnee = getPPE('ppeKnee');
+            const ppeDust = getPPE('ppeDust');
 
             let storedSigs = [];
             try { storedSigs = JSON.parse(localStorage.getItem('jsaSignaturesPayload')) || []; } catch(e) {}
@@ -1443,7 +1550,6 @@
                 if(l3Sig) l3NameDisplay = l3Sig.name;
 
                 storedSigs.forEach(sig => {
-                    // Populate Page 1 Work Team Table
                     teamRows += `
                     <tr>
                         <td style="border:1px solid #000; padding:6px; word-break:break-word;">${sig.role}</td>
@@ -1451,7 +1557,6 @@
                         <td style="border:1px solid #000; padding:6px; word-break:break-word;">${sig.training}</td>
                     </tr>`;
 
-                    // Populate Last Page Signature Table
                     rosterRows += `
                     <tr>
                         <td style="border:1px solid #000; padding:6px; word-break:break-word;"><strong>${sig.role}</strong></td>
@@ -1469,222 +1574,261 @@
                 rosterRows = `<tr><td colspan="6" style="border:1px solid #000; padding:6px; text-align:center; color:#888;">No signatures found.</td></tr>`;
             }
 
+            // Helper to draw checkboxes
             const getCheck = (val) => env === val ? '&#9746;' : '&#9744;';
 
-            // PDF WRAPPER WITH STRICT 7.5 INCH WIDTH
+            // PDF WRAPPER - LANDSCAPE (10 inches wide) - FONT SIZE INCREASED
             const wrapper = document.createElement('div');
             wrapper.style.fontFamily = 'Arial, sans-serif';
-            wrapper.style.color = '#000';
-            wrapper.style.fontSize = '11px';
-            wrapper.style.width = '7.5in'; 
+            wrapper.style.color = '#000000'; // Strict Black
+            wrapper.style.fontSize = '14px'; // Increased for readability
+            wrapper.style.width = '10in'; 
             wrapper.style.boxSizing = 'border-box';
             wrapper.style.padding = '0';
             wrapper.style.background = '#fff';
 
             wrapper.innerHTML = `
-                <h1 style="color:#000; border-bottom:2px solid #000; font-size:18px; font-weight:bold; margin-bottom:15px; padding-bottom:5px;">STRATA ACCESS GROUP - JOB SAFETY ANALYSIS (JSA)</h1>
+                <h1 style="color:#000; border-bottom:2px solid #000; font-size:22px; font-weight:bold; margin-bottom:15px; padding-bottom:5px;">STRATA ACCESS GROUP - JOB SAFETY ANALYSIS (JSA)</h1>
                 
-                <div style="background-color:#e0e0e0; font-weight:bold; font-size:12px; padding:4px; border:1px solid #000; border-bottom:none;">WORK METHOD</div>
-                <table style="width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:15px;">
+                <div style="background-color:#e0e0e0; font-weight:bold; font-size:16px; padding:6px; border:1px solid #000; border-bottom:none;">WORK METHOD</div>
+                <table style="width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:20px;">
                     <tr>
-                        <td style="border:1px solid #000; padding:6px; width:50%; vertical-align:top;">
+                        <td style="border:1px solid #000; padding:8px; width:50%; vertical-align:top;">
                             <strong>Prepared By:</strong> ${l3NameDisplay}<br><br>
                             <strong>Client:</strong> ${client}<br><br>
                             <strong>Site Name & Location:</strong> ${site}
                         </td>
-                        <td style="border:1px solid #000; padding:6px; width:50%; vertical-align:top;">
+                        <td style="border:1px solid #000; padding:8px; width:50%; vertical-align:top;">
                             <strong>Date:</strong> ${date}<br><br>
                             <strong>Start/Finish Times:</strong> ${time} to End of Shift<br><br>
                             <strong>Working Environment:</strong><br>
-                            <table style="width:100%; border:none; margin-top:5px; font-size:10px;">
+                            <table style="width:100%; border:none; margin-top:5px; font-size:12px;">
                                 <tr>
-                                    <td style="border:none; padding:2px;">${getCheck('Commercial Building')} Commercial Building</td>
-                                    <td style="border:none; padding:2px;">${getCheck('Residential Building')} Residential Building</td>
+                                    <td style="border:none; padding:4px;">${getCheck('Commercial Building')} Commercial Building</td>
+                                    <td style="border:none; padding:4px;">${getCheck('Residential Building')} Residential Building</td>
                                 </tr>
                                 <tr>
-                                    <td style="border:none; padding:2px;">${getCheck('Hotel')} Hotel</td>
-                                    <td style="border:none; padding:2px;">${getCheck('Industrial Facility')} Industrial Facility</td>
+                                    <td style="border:none; padding:4px;">${getCheck('Hotel')} Hotel</td>
+                                    <td style="border:none; padding:4px;">${getCheck('Industrial Facility')} Industrial Facility</td>
                                 </tr>
                                 <tr>
-                                    <td style="border:none; padding:2px;">${getCheck('Church/Cathedral')} Church/Cathedral</td>
-                                    <td style="border:none; padding:2px;">${getCheck('Amusement Park')} Amusement Park</td>
+                                    <td style="border:none; padding:4px;">${getCheck('Church/Cathedral')} Church/Cathedral</td>
+                                    <td style="border:none; padding:4px;">${getCheck('Amusement Park')} Amusement Park</td>
                                 </tr>
                                 <tr>
-                                    <td style="border:none; padding:2px;">&#9744; Wind Tower/Turbine</td>
-                                    <td style="border:none; padding:2px;">&#9744; Antenna/Cell Tower</td>
+                                    <td style="border:none; padding:4px;">${getCheck('Wind Tower/Turbine')} Wind Tower/Turbine</td>
+                                    <td style="border:none; padding:4px;">${getCheck('Antenna/Cell Tower')} Antenna/Cell Tower</td>
                                 </tr>
                                 <tr>
-                                    <td style="border:none; padding:2px;">&#9744; Bridge</td>
-                                    <td style="border:none; padding:2px;">&#9744; High Interior (Atrium, etc.)</td>
+                                    <td style="border:none; padding:4px;">${getCheck('Bridge')} Bridge</td>
+                                    <td style="border:none; padding:4px;">${getCheck('High Interior (Atrium)')} High Interior (Atrium)</td>
                                 </tr>
                             </table>
                         </td>
                     </tr>
                 </table>
 
-                <div style="background-color:#e0e0e0; font-weight:bold; font-size:12px; padding:4px; border:1px solid #000; border-bottom:none;">Work Team</div>
-                <table style="width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:15px; text-align:center;">
+                <div style="background-color:#e0e0e0; font-weight:bold; font-size:16px; padding:6px; border:1px solid #000; border-bottom:none;">Work Team</div>
+                <table style="width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:20px; text-align:left;">
                     <tr>
-                        <th style="border:1px solid #000; padding:4px; background:#f5f5f5;">Personnel Role</th>
-                        <th style="border:1px solid #000; padding:4px; background:#f5f5f5;">Name</th>
-                        <th style="border:1px solid #000; padding:4px; background:#f5f5f5;">Training</th>
+                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5;">Personnel Role</th>
+                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5;">Name</th>
+                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5;">Training</th>
                     </tr>
                     ${teamRows}
                 </table>
 
-                <table style="width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:15px;">
+                <table style="width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:20px;">
                     <tr>
-                        <td style="border:1px solid #000; padding:6px; width:33%; vertical-align:top;"><strong>Working Height:</strong> ${height} FT</td>
-                        <td style="border:1px solid #000; padding:6px; width:33%; vertical-align:top;"><strong>Start/Finish Dates:</strong><br>From: ${date}<br>To: ${date}</td>
-                        <td style="border:1px solid #000; padding:6px; width:33%; vertical-align:top;"><strong>Operation/Work Task:</strong><br>Facade Thermal Scan & Diagnostics</td>
+                        <td style="border:1px solid #000; padding:8px; width:33%; vertical-align:top;"><strong>Working Height:</strong> ${height} FT</td>
+                        <td style="border:1px solid #000; padding:8px; width:33%; vertical-align:top;"><strong>Start/Finish Dates:</strong><br>From: ${date}<br>To: ${date}</td>
+                        <td style="border:1px solid #000; padding:8px; width:33%; vertical-align:top;"><strong>Operation/Work Task:</strong><br>${task}</td>
                     </tr>
                     <tr>
-                        <td colspan="2" style="border:1px solid #000; padding:6px;"><strong>Main Site Contact:</strong><br>Name: On File<br>Phone Number: On File</td>
-                        <td colspan="1" style="border:1px solid #000; padding:6px;"><strong>Secondary Site Contact:</strong><br>Name:<br>Phone Number:</td>
+                        <td colspan="2" style="border:1px solid #000; padding:8px;"><strong>Main Site Contact:</strong><br>Name: ${mName}<br>Phone Number: ${mPhone}</td>
+                        <td colspan="1" style="border:1px solid #000; padding:8px;"><strong>Secondary Site Contact:</strong><br>Name: ${sName}<br>Phone Number: ${sPhone}</td>
                     </tr>
                 </table>
 
                 <div class="html2pdf__page-break"></div>
 
-                <div style="background-color:#e0e0e0; font-weight:bold; font-size:12px; padding:4px; border:1px solid #000; border-bottom:none;">INITIAL TASK ASSESSMENT</div>
-                <div style="border:1px solid #000; padding:8px; margin-bottom:15px;">
-                    <p style="margin:0 0 5px 0;"><strong>Industrial Rope Access is a preferred method for this Project due to the following conditions:</strong></p>
-                    <p style="margin:0 0 5px 0;">&#9746; There is no feasible access alternative (scaffolds, boom lift, or suspended platform (swing stage)) to perform the work, or using such alternative would create greater risk for workers, public, vehicular traffic, and/or property.</p>
-                    <p style="margin:0 0 5px 0;">&#9746; Relative short duration/scale of the project makes Industrial Rope Access a better choice due to the faster rigging and mobilization. That would reduce risk exposure to workers comparing to supported or suspended scaffolds.</p>
-                    <p style="margin:0 0 5px 0;">&#9746; Advanced rigging, positioning and rescue skills are required for safe work and potential rescue scenario.</p>
-                    <p style="margin:5px 0 0 0;">&#9744; Additional Notes:</p>
+                <div style="background-color:#e0e0e0; font-weight:bold; font-size:16px; padding:6px; border:1px solid #000; border-bottom:none;">INITIAL TASK ASSESSMENT</div>
+                <div style="border:1px solid #000; padding:10px; margin-bottom:20px; font-size:14px; line-height:1.5;">
+                    <p style="margin:0 0 10px 0;"><strong>Industrial Rope Access is a preferred method for this Project due to the following conditions:</strong></p>
+                    <p style="margin:0 0 10px 0;">&#9746; There is no feasible access alternative (scaffolds, boom lift, or suspended platform (swing stage)) to perform the work, or using such alternative would create greater risk for workers, public, vehicular traffic, and/or property.</p>
+                    <p style="margin:0 0 10px 0;">&#9746; Relative short duration/scale of the project makes Industrial Rope Access a better choice due to the faster rigging and mobilization. That would reduce risk exposure to workers comparing to supported or suspended scaffolds.</p>
+                    <p style="margin:0 0 10px 0;">&#9746; Advanced rigging, positioning and rescue skills are required for safe work and potential rescue scenario.</p>
+                    <p style="margin:10px 0 0 0;">&#9744; Additional Notes: N/A</p>
                 </div>
 
-                <div style="background-color:#e0e0e0; font-weight:bold; font-size:12px; padding:4px; border:1px solid #000; border-bottom:none;">COMMUNICATION PLAN</div>
-                <table style="width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:15px;">
+                <div style="background-color:#e0e0e0; font-weight:bold; font-size:16px; padding:6px; border:1px solid #000; border-bottom:none;">COMMUNICATION PLAN</div>
+                <table style="width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:20px;">
                     <tr>
-                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5; width:33%;">Mode of Communication</th>
-                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5; width:33%;">Hospital Information</th>
-                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5; width:33%;">EMERGENCY MEDICAL SERVICES INFORMATION</th>
+                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5; width:33%;">Mode of Communication</th>
+                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5; width:33%;">Hospital Information</th>
+                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5; width:33%;">EMERGENCY MEDICAL SERVICES INFORMATION</th>
                     </tr>
                     <tr>
-                        <td style="border:1px solid #000; padding:6px; vertical-align:top;">
-                            &#9746; Radio: Ch 1<br>
+                        <td style="border:1px solid #000; padding:8px; vertical-align:top; font-size:14px; line-height:1.5;">
+                            &#9746; Radio (Ch: ${radioCh})<br>
                             &#9746; Cell Phone<br>
                             &#9746; Hand Signals Reviewed
                         </td>
-                        <td style="border:1px solid #000; padding:6px; vertical-align:top;">
-                            <strong>Location:</strong><br>${hospitalText.split(' (~')[0] || hospitalText}<br><br>
-                            <strong>Drive Time:</strong><br>${hospitalText.includes('(~') ? '(~' + hospitalText.split('(~')[1] : '--'}
+                        <td style="border:1px solid #000; padding:8px; vertical-align:top; font-size:14px; line-height:1.5;">
+                            <strong>Location (ER):</strong><br>${hospitalText.split(' (~')[0] || hospitalText}<br><br>
+                            <strong>Drive Time & Dist:</strong><br>${hospitalText.includes('(~') ? '(~' + hospitalText.split('(~')[1] : '--'}
                         </td>
-                        <td style="border:1px solid #000; padding:6px; vertical-align:top;">
+                        <td style="border:1px solid #000; padding:8px; vertical-align:top; font-size:14px; line-height:1.5;">
                             <strong>EMS phone:</strong> 911<br><br>
-                            <strong>Life Flight?:</strong> NO<br><br>
-                            <strong>Emergency Gathering Location:</strong> Site Entrance
+                            <strong>Life Flight?:</strong> ${lifeFlight}<br><br>
+                            <strong>Emergency Gathering Location:</strong><br>${gatherLoc}
                         </td>
                     </tr>
                 </table>
 
-                <div style="background-color:#e0e0e0; font-weight:bold; font-size:12px; padding:4px; border:1px solid #000; border-bottom:none;">LOCK OUT/TAG OUT PROCEDURES</div>
-                <table style="width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:15px;">
+                <div style="background-color:#e0e0e0; font-weight:bold; font-size:16px; padding:6px; border:1px solid #000; border-bottom:none;">LOCK OUT/TAG OUT PROCEDURES</div>
+                <table style="width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:20px; font-size:13px;">
                     <tr>
-                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5; width:20%;">Isolation Component</th>
-                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5; width:15%;">Required? (Y/N)</th>
-                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5; width:25%;">Isolation point and LOTO tag replacement</th>
-                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5; width:25%;">NOTES</th>
-                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5; width:15%;">Contact Person for Clearance</th>
+                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5; width:15%;">Isolation Component</th>
+                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5; width:10%;">Required? (Y/N)</th>
+                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5; width:25%;">Isolation point and LOTO tag replacement</th>
+                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5; width:35%;">NOTES</th>
+                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5; width:15%;">Contact Person for Clearance</th>
                     </tr>
                     <tr>
-                        <td style="border:1px solid #000; padding:6px;">Roof Access</td>
-                        <td style="border:1px solid #000; padding:6px; text-align:center;"><strong>${loto}</strong></td>
-                        <td style="border:1px solid #000; padding:6px;">Roof Doors/Hatches</td>
-                        <td style="border:1px solid #000; padding:6px;">Access to Rigging zone shall be restricted for Public. Set barricades.</td>
-                        <td style="border:1px solid #000; padding:6px;">Bldg Eng.</td>
+                        <td style="border:1px solid #000; padding:8px;">Machinery, equipment</td>
+                        <td style="border:1px solid #000; padding:8px; text-align:center;"><strong>${lotoMach}</strong></td>
+                        <td style="border:1px solid #000; padding:8px;">Breaker Panels / BMU Controls</td>
+                        <td style="border:1px solid #000; padding:8px;">Avoid contact with moving BMU elements. LOTO if in fall zone.</td>
+                        <td style="border:1px solid #000; padding:8px;">Bldg Eng.</td>
                     </tr>
                     <tr>
-                        <td style="border:1px solid #000; padding:6px;">Cell Antennas</td>
-                        <td style="border:1px solid #000; padding:6px; text-align:center;"><strong>${rf}</strong></td>
-                        <td style="border:1px solid #000; padding:6px;">Antenna Power Supply</td>
-                        <td style="border:1px solid #000; padding:6px;">Maintain clearance from active antennas. Max exposure 10mW/cm2 for 6 mins.</td>
-                        <td style="border:1px solid #000; padding:6px;">Bldg Eng.</td>
-                    </tr>
-                </table>
-
-                <div class="html2pdf__page-break"></div>
-
-                <div style="background-color:#e0e0e0; font-weight:bold; font-size:12px; padding:4px; border:1px solid #000; border-bottom:none;">WORK PLAN</div>
-                <table style="width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:15px;">
-                    <tr>
-                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5; width:20%;">KEY JOB PROCESS</th>
-                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5; width:80%;">STEPS</th>
+                        <td style="border:1px solid #000; padding:8px;">Roof Access</td>
+                        <td style="border:1px solid #000; padding:8px; text-align:center;"><strong>${lotoRoof}</strong></td>
+                        <td style="border:1px solid #000; padding:8px;">Roof Doors/Hatches</td>
+                        <td style="border:1px solid #000; padding:8px;">Access to Rigging zone shall be restricted for Public. Set barricades.</td>
+                        <td style="border:1px solid #000; padding:8px;">Bldg Eng.</td>
                     </tr>
                     <tr>
-                        <td style="border:1px solid #000; padding:6px;"><strong>Briefing, Safety Meeting</strong></td>
-                        <td style="border:1px solid #000; padding:6px;">Equipment unloading, transportation and pre-use inspection.<br>Installing barricades around hazard zone.<br>Anchor points assessment.<br>Rigging rope access equipment.<br>Ascending, Descending, Positioning, Work Tasks.</td>
-                    </tr>
-                    <tr>
-                        <td style="border:1px solid #000; padding:6px;"><strong>Access/Fall Zone</strong></td>
-                        <td style="border:1px solid #000; padding:6px;">Whenever on ropes, 6 feet from the unprotected edge (parapet/railings lower than 42 inches). No one shall enter the fall zone without appropriate fall protection system.</td>
-                    </tr>
-                    <tr>
-                        <td style="border:1px solid #000; padding:6px;"><strong>Hazard Zone</strong></td>
-                        <td style="border:1px solid #000; padding:6px;">10 feet area around Access Zone projection. A hazard zone should be marked or blockaded to warn rope access technicians and others, including the public, of hazards.</td>
-                    </tr>
-                    <tr>
-                        <td style="border:1px solid #000; padding:6px;"><strong>Anchorage Description</strong></td>
-                        <td style="border:1px solid #000; padding:6px;">Engineered access anchors, roof shafts, structural building elements. Anchorage systems used as the primary support shall have a minimum strength of 12 kN (2700 lbf). <strong>(VERIFIED IN APP)</strong></td>
-                    </tr>
-                    <tr>
-                        <td style="border:1px solid #000; padding:6px;"><strong>Required Rope Access Equipment</strong></td>
-                        <td style="border:1px solid #000; padding:6px;">7/16" Kernmantle Static Ropes (MBS 22.2KN/5000 lbf), Rope Protectors, Connectors (locking type, MBS 22.2kN), Full-body Harness, Descenders, Backup Devices, Lanyards.</td>
-                    </tr>
-                </table>
-
-                <div style="background-color:#e0e0e0; font-weight:bold; font-size:12px; padding:4px; border:1px solid #000; border-bottom:none;">Required PPE</div>
-                <table style="width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:15px;">
-                    <tr>
-                        <td style="border:1px solid #000; padding:6px; width:33%;">&#9746; Eye Protection (goggles, shield)</td>
-                        <td style="border:1px solid #000; padding:6px; width:33%;">&#9744; Dust Respirator (N95)</td>
-                        <td style="border:1px solid #000; padding:6px; width:33%;">&#9746; Steel-toe boots</td>
-                    </tr>
-                    <tr>
-                        <td style="border:1px solid #000; padding:6px;">&#9746; Head Lamp (+spare batteries)</td>
-                        <td style="border:1px solid #000; padding:6px;">&#9746; Rope Access Helmet/Hard Hat</td>
-                        <td style="border:1px solid #000; padding:6px;">&#9746; Gloves</td>
-                    </tr>
-                    <tr>
-                        <td style="border:1px solid #000; padding:6px;">&#9744; Knee Pads</td>
-                        <td style="border:1px solid #000; padding:6px;">&#9744; Special Respirator Type:</td>
-                        <td style="border:1px solid #000; padding:6px;"></td>
+                        <td style="border:1px solid #000; padding:8px;">Cell Antennas</td>
+                        <td style="border:1px solid #000; padding:8px; text-align:center;"><strong>${lotoRf}</strong></td>
+                        <td style="border:1px solid #000; padding:8px;">Antenna Power Supply</td>
+                        <td style="border:1px solid #000; padding:8px;">Maintain clearance from active antennas. Max exposure 10mW/cm2 for 6 mins.</td>
+                        <td style="border:1px solid #000; padding:8px;">Bldg Eng.</td>
                     </tr>
                 </table>
 
                 <div class="html2pdf__page-break"></div>
 
-                <div style="background-color:#e0e0e0; font-weight:bold; font-size:12px; padding:4px; border:1px solid #000; border-bottom:none;">RESCUE PLAN</div>
-                <div style="border:1px solid #000; padding:8px; margin-bottom:15px;">
-                    <ol style="margin:0 0 0 15px; padding:0;">
-                        <li style="margin-bottom:4px;">Establish communication with a potential victim if it's possible.</li>
-                        <li style="margin-bottom:4px;">In any life threatening/or potential injury situation call 9-1-1 immediately.</li>
-                        <li style="margin-bottom:4px;">Assess the situation: casualty condition (ABC-airways), position, and rope access system condition.</li>
-                        <li style="margin-bottom:4px;">Implement rescue if it's possible or wait for a response. Be aware of suspension trauma. Implement rescue within 40 min.</li>
-                        <li style="margin-bottom:4px;">MID-ROPE RESCUE SCENARIO: rig independent rescue line, ascend, implement pick off rescue with guided lowering.</li>
-                        <li style="margin-bottom:4px;">PICK OFF RESCUE: only use equipment certified for 2 persons load.</li>
-                        <li style="margin-bottom:4px;">CHECK: Every technician could be rescued quickly from any potential position.</li>
+                <div style="background-color:#e0e0e0; font-weight:bold; font-size:16px; padding:6px; border:1px solid #000; border-bottom:none;">WORK PLAN</div>
+                <table style="width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:20px; font-size:14px; line-height:1.5;">
+                    <tr>
+                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5; width:20%;">KEY JOB PROCESS</th>
+                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5; width:80%;">STEPS</th>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid #000; padding:8px; vertical-align:top;"><strong>Briefing, Safety Meeting</strong></td>
+                        <td style="border:1px solid #000; padding:8px; vertical-align:top;">
+                            Equipment unloading, transportation and pre-use inspection.<br>
+                            Installing barricades around hazard zone.<br>
+                            Anchor points assessment.<br>
+                            Rigging rope access equipment.<br>
+                            Ascending, Descending, Rope-to-Rope, Positioning, Work Tasks.<br>
+                            Reposition (pulling ropes, rigging, reposition of barricades).<br>
+                            Equipment checking, packing, loading.<br>
+                            Post-briefing (project resume, possible improvements).
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid #000; padding:8px; vertical-align:top;"><strong>Access/Fall Zone</strong></td>
+                        <td style="border:1px solid #000; padding:8px; vertical-align:top;">Whenever on ropes, 6 feet from the unprotected edge (parapet/railings lower than 42 inches). No one shall enter the fall zone without appropriate fall protection system. Fall protection shall be used in a fall zone when rope access system is not in use.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid #000; padding:8px; vertical-align:top;"><strong>Hazard Zone</strong></td>
+                        <td style="border:1px solid #000; padding:8px; vertical-align:top;">
+                            10 feet area around Access Zone projection. A hazard zone should be marked or blockaded to warn rope access technicians and others, including the public, of hazards associated with the work being performed.<br><br>
+                            Appropriate personal protective equipment, including helmets, shall be used by anyone in the hazard zone.<br><br>
+                            <strong>Ground Control Required?:</strong> ${gcReq}<br>
+                            <strong>Ground control person:</strong> ${gcName}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid #000; padding:8px; vertical-align:top;"><strong>Anchorage Description</strong></td>
+                        <td style="border:1px solid #000; padding:8px; vertical-align:top;">
+                            1. Anchorage: Engineered access anchors, roof shafts, structural building elements, beam structures, etc. One anchorage may be used to establish multiple anchorage systems. Main and backup systems should utilize independent anchorage systems.<br><br>
+                            2. Anchorage systems used as the primary support within a main or backup system shall have a minimum strength of either 12 kN (2700 lbf), or two times the maximum arrest force of the backup system when used in accordance with manufacturer specifications, whichever is greater.<br><br>
+                            3. Any selected anchorage which strength is not verifiable, or has areas of concerns during pre-use inspection shall be load tested prior to use at 50% of maximum anticipated load in the direction of anticipated force under direction of Qualified Rope Access Person.
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid #000; padding:8px; vertical-align:top;"><strong>Required Rope Access Equipment</strong></td>
+                        <td style="border:1px solid #000; padding:8px; vertical-align:top;">7/16" Kernmantle Static Ropes (MBS 22.2KN/5000 lbf), Rope Protectors (canvas wraps, edge rollers), Connectors (Petzl Am'd, Oxan, Ok, must be locking type, with MBS 22.2kN, 5000Lbs), Full-body Rope Access Harness, Descenders (Petzl ID/ Rig), Backup Devices (Petzl ASAP, SafeTec Duck), Chest Ascender, Handle Ascender, Dynamic Lanyards, Energy Absorber Lanyard.</td>
+                    </tr>
+                </table>
+
+                <div class="html2pdf__page-break"></div>
+
+                <div style="background-color:#e0e0e0; font-weight:bold; font-size:16px; padding:6px; border:1px solid #000; border-bottom:none;">REQUIRED PPE</div>
+                <table style="width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:20px; font-size:14px;">
+                    <tr>
+                        <td style="border:1px solid #000; padding:8px; width:33%;">${ppeEye} Eye Protection (goggles, shield)</td>
+                        <td style="border:1px solid #000; padding:8px; width:33%;">${ppeDust} Dust Respirator (N95)</td>
+                        <td style="border:1px solid #000; padding:8px; width:33%;">${ppeBoots} Steel-toe boots</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid #000; padding:8px;">${ppeHead} Head Lamp (+spare batteries)</td>
+                        <td style="border:1px solid #000; padding:8px;">${ppeHelm} Rope Access Helmet/Hard Hat</td>
+                        <td style="border:1px solid #000; padding:8px;">${ppeGlove} Gloves</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid #000; padding:8px;">${ppeKnee} Knee Pads</td>
+                        <td style="border:1px solid #000; padding:8px;">&#9744; Special Respirator Type: ______</td>
+                        <td style="border:1px solid #000; padding:8px;"></td>
+                    </tr>
+                </table>
+
+                <div style="background-color:#e0e0e0; font-weight:bold; font-size:16px; padding:6px; border:1px solid #000; border-bottom:none;">RESCUE PLAN</div>
+                <div style="border:1px solid #000; padding:10px; margin-bottom:20px; font-size:14px; line-height:1.6;">
+                    <ol style="margin:0 0 0 20px; padding:0;">
+                        <li style="margin-bottom:6px;">Establish communication with a potential victim if it's possible.</li>
+                        <li style="margin-bottom:6px;">In any life threatening/or potential injury situation call 9-1-1 immediately.</li>
+                        <li style="margin-bottom:6px;">Assess the situation: casualty condition (conscious/unconscious, ABC-airways, breathing, circulation, injuries, bleeding, shock, etc.), casualty position (on ropes, on the ledge, etc.), rope access system condition.</li>
+                        <li style="margin-bottom:6px;">Implement rescue if it's possible or wait for a response. Be aware of suspension trauma. Keep horizontal position. Implement rescue within 40 min.</li>
+                        <li style="margin-bottom:6px;">MID-ROPE RESCUE SCENARIO: rig independent rescue line (if victim's ropes are damaged), ascend, implement pick off rescue with guided lowering to the ground.</li>
+                        <li style="margin-bottom:6px;">PICK OFF RESCUE: only use equipment certified for 2 persons load such as PETZL I'D with breaking carabiner, PETZL ASAP back-up device.</li>
+                        <li style="margin-bottom:6px;">CHECK: Every technician could be rescued quickly from any potential position in which they might find themselves.</li>
                     </ol>
+                    <table style="width:100%; border-collapse:collapse; margin-top:15px; text-align:left;">
+                        <tr>
+                            <th style="border:1px solid #000; padding:6px; background:#f5f5f5; width:33%;">AREA:</th>
+                            <th style="border:1px solid #000; padding:6px; background:#f5f5f5; width:33%;">RESCUE METHOD:</th>
+                            <th style="border:1px solid #000; padding:6px; background:#f5f5f5; width:33%;">SPECIAL EQUIPMENT NEEDED</th>
+                        </tr>
+                        <tr>
+                            <td style="border:1px solid #000; padding:6px;">ALL ROPE ACCESS AREA</td>
+                            <td style="border:1px solid #000; padding:6px;">PICK OFF RESCUE</td>
+                            <td style="border:1px solid #000; padding:6px;">Rescue Kit (150ft rope, 300ft rope, I'D, ASAP)</td>
+                        </tr>
+                    </table>
                 </div>
 
                 <div class="html2pdf__page-break"></div>
 
-                <div style="background-color:#e0e0e0; font-weight:bold; font-size:12px; padding:4px; border:1px solid #000; border-bottom:none;">RISK ASSESSMENT & JSA</div>
-                <div style="border:1px solid #000; padding:8px; margin-bottom:15px;">
+                <div style="background-color:#e0e0e0; font-weight:bold; font-size:16px; padding:6px; border:1px solid #000; border-bottom:none;">RISK ASSESSMENT & JSA</div>
+                <div style="border:1px solid #000; padding:10px; margin-bottom:15px; font-size:14px; line-height:1.5;">
                     <p style="margin:0 0 5px 0;"><strong>Stop work, notify supervisor and other technicians immediately if new hazard is identified or taken measures are inadequate.</strong></p>
+                    <p style="margin:0 0 5px 0;">Maintain regular communication with coworker(s) to periodically assess each individual's disposition.</p>
                     <p style="margin:0;">Resume work only after all hazards and risk mitigation controls have been appropriately addressed.</p>
                 </div>
 
-                <table style="width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:15px; font-size:10px;">
+                <table style="width:100%; table-layout:fixed; border-collapse:collapse; font-size:12px;">
                     <tr>
                         <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:15%;">Activity/Hazard</th>
-                        <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:20%;">Hazard Effect</th>
+                        <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:18%;">Hazard Effect</th>
                         <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:6%;">SEV (H/M/L)</th>
                         <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:6%;">PROB (H/M/L)</th>
                         <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:6%;">RISK LVL</th>
-                        <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:41%;">CONTROL MEASURES</th>
+                        <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:43%;">CONTROL MEASURES</th>
                         <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:6%;">RESID RISK</th>
                     </tr>
                     <tr>
@@ -1692,89 +1836,112 @@
                         <td style="border:1px solid #000; padding:4px;">Gravity-induced injury or death</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">H</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">H</td>
-                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold; background:#ffcccc;">H</td>
-                        <td style="border:1px solid #000; padding:4px;">Follow SPRAT/OSHA standards. Maintain 2-point attachments. Use 2 independent anchor points (22KN). Inspect equipment prior to each use.</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold;">H</td>
+                        <td style="border:1px solid #000; padding:4px;">1. Follow SPRAT/OSHA standards.<br>2. Maintain 2-point attachments.<br>3. Use 2 independent anchor points (22KN). Inspect equipment prior to each use.</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">L</td>
                     </tr>
                     <tr>
-                        <td style="border:1px solid #000; padding:4px;"><strong>Mental & Physical Fatigue</strong></td>
+                        <td style="border:1px solid #000; padding:4px;"><strong>Mental and Physical Fatigue</strong></td>
                         <td style="border:1px solid #000; padding:4px;">Rigging mistakes, poor judgement, limited awareness</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">H</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">H</td>
-                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold; background:#ffcccc;">H</td>
-                        <td style="border:1px solid #000; padding:4px;">Control exhaustion by taking breaks. Replenish with food/drink. Ask L2 or L3 to verify rigging if in doubt. Use "Buddy" check.</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold;">H</td>
+                        <td style="border:1px solid #000; padding:4px;">1. Control exhaustion by taking breaks. Replenish with food/drink.<br>2. Ask L2 or L3 to verify rigging if in doubt.<br>3. Use "Buddy" check. Check anchors, carabiners, knots, harness, helmet.</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center;">L</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid #000; padding:4px;"><strong>Sharp or Abrasive surfaces and edges</strong></td>
+                        <td style="border:1px solid #000; padding:4px;">Ropes or anchor damage/failure, cuts</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center;">M</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center;">H</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold;">H</td>
+                        <td style="border:1px solid #000; padding:4px;">1. Visually inspect anchor points and edges prior to setting ropes.<br>2. Install ropes to prevent movement along sharp edge.<br>3. Use proper rope, edge protection and padding.</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">L</td>
                     </tr>
                     <tr>
                         <td style="border:1px solid #000; padding:4px;"><strong>Dropped tools, gear, or materials</strong></td>
-                        <td style="border:1px solid #000; padding:4px;">Injury to personnel below, property damage</td>
+                        <td style="border:1px solid #000; padding:4px;">Injury to personnel working below, damage to property</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">M</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">H</td>
-                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold; background:#ffcccc;">H</td>
-                        <td style="border:1px solid #000; padding:4px;">Barricade Hazard Zone (10ft projection). Tether all tools. Helmets must be worn. Never place unsecured equipment on parapets.</td>
-                        <td style="border:1px solid #000; padding:4px; text-align:center;">L</td>
-                    </tr>
-                    <tr>
-                        <td style="border:1px solid #000; padding:4px;"><strong>Sharp or Abrasive edges</strong></td>
-                        <td style="border:1px solid #000; padding:4px;">Ropes or anchor damage/failure, severe cuts</td>
-                        <td style="border:1px solid #000; padding:4px; text-align:center;">M</td>
-                        <td style="border:1px solid #000; padding:4px; text-align:center;">H</td>
-                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold; background:#ffcccc;">H</td>
-                        <td style="border:1px solid #000; padding:4px;">Visually inspect edges. Install rope protection / edge rollers to prevent movement along sharp/abrasive surfaces.</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold;">H</td>
+                        <td style="border:1px solid #000; padding:4px;">1. Clearly mark and barricade Hazard Zone (10ft).<br>2. All tools and devices must be tethered or secured.<br>3. Helmets and hard hats must be always worn within Hazard Zone.</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">L</td>
                     </tr>
                     <tr>
                         <td style="border:1px solid #000; padding:4px;"><strong>Dislodged building substrate</strong></td>
-                        <td style="border:1px solid #000; padding:4px;">Injury from falling object, injury to public</td>
+                        <td style="border:1px solid #000; padding:4px;">Injury from falling object, damage to property</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">M</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">M</td>
-                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold; background:#ffffcc;">M</td>
-                        <td style="border:1px solid #000; padding:4px;">Visually inspect building features before applying pressure. Control rope positioning to prevent pressure on fragile elements.</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold;">M</td>
+                        <td style="border:1px solid #000; padding:4px;">1. Visually inspect building features before touching or applying pressure.<br>2. Control movement to minimize pressure on fragile elements.</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">L</td>
+                    </tr>
+                </table>
+
+                <div class="html2pdf__page-break"></div>
+
+                <table style="width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:20px; font-size:12px;">
+                    <tr>
+                        <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:15%;">Activity/Hazard</th>
+                        <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:18%;">Hazard Effect</th>
+                        <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:6%;">SEV (H/M/L)</th>
+                        <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:6%;">PROB (H/M/L)</th>
+                        <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:6%;">RISK LVL</th>
+                        <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:43%;">CONTROL MEASURES</th>
+                        <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:6%;">RESID RISK</th>
                     </tr>
                     <tr>
                         <td style="border:1px solid #000; padding:4px;"><strong>Tools Injury or Damage</strong></td>
                         <td style="border:1px solid #000; padding:4px;">Cuts, eye damage, gear damage</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">M</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">M</td>
-                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold; background:#ffffcc;">M</td>
-                        <td style="border:1px solid #000; padding:4px;">Follow manufacturer specs. Wear PPE (gloves, eyewear). Avoid clothing entanglement.</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold;">M</td>
+                        <td style="border:1px solid #000; padding:4px;">1. Follow manufacturer specs.<br>2. Wear PPE (gloves, eyewear). Avoid clothing entanglement.</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">L</td>
                     </tr>
                     <tr>
-                        <td style="border:1px solid #000; padding:4px;"><strong>Overhead Power Lines</strong></td>
+                        <td style="border:1px solid #000; padding:4px;"><strong>Chemicals Injury or Damage</strong></td>
+                        <td style="border:1px solid #000; padding:4px;">Skin/eye burn, ropes/harness damage</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center;">M</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center;">M</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold;">M</td>
+                        <td style="border:1px solid #000; padding:4px;">1. Read MSDS. Wear required PPE.<br>2. Avoid exposing ropes and lanyards to corrosive chemicals.</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center;">L</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid #000; padding:4px;"><strong>Overhead Electrical/Power Lines</strong></td>
                         <td style="border:1px solid #000; padding:4px;">Electrocution</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">H</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">M</td>
-                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold; background:#ffcccc;">H</td>
-                        <td style="border:1px solid #000; padding:4px;">Keep all equipment at least 10ft away. Manage ropes to prevent wind swing towards lines.</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold;">H</td>
+                        <td style="border:1px solid #000; padding:4px;">1. Keep all equipment at least 10ft away.<br>2. Manage ropes to prevent wind swing towards lines.</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">L</td>
                     </tr>
                     <tr>
-                        <td style="border:1px solid #000; padding:4px;"><strong>High RF / Antennas</strong></td>
+                        <td style="border:1px solid #000; padding:4px;"><strong>High RF exposure from antennas</strong></td>
                         <td style="border:1px solid #000; padding:4px;">Internal heating, organ damage</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">M</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">M</td>
-                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold; background:#ffffcc;">M</td>
-                        <td style="border:1px solid #000; padding:4px;">Avoid staying directly in front of active transmitters. Max exposure 10mW/cm2 for 6 mins.</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold;">M</td>
+                        <td style="border:1px solid #000; padding:4px;">1. Avoid staying directly in front of active transmitters.<br>2. CAL-OSHA: max exposure for no more than 6 minutes to not exceed 10mW/cm2.</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">L</td>
                     </tr>
                     <tr>
-                        <td style="border:1px solid #000; padding:4px;"><strong>Sun/Heat/Wind</strong></td>
-                        <td style="border:1px solid #000; padding:4px;">Heat stroke, swing hazards</td>
+                        <td style="border:1px solid #000; padding:4px;"><strong>Sun/Heat damage / Strong Wind</strong></td>
+                        <td style="border:1px solid #000; padding:4px;">Heat stroke, swing hazards, blown materials</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">M</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">M</td>
-                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold; background:#ffffcc;">M</td>
-                        <td style="border:1px solid #000; padding:4px;">Hydrate. Egress safely if dizzy. Avoid work on wind-exposed areas if gusts exceed 25 mph.</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold;">M</td>
+                        <td style="border:1px solid #000; padding:4px;">1. Hydrate. Egress safely if dizzy. Call 9-1-1 if symptoms worsen.<br>2. Avoid work on wind-exposed areas if gusts exceed 25 mph.</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">L</td>
                     </tr>
                     <tr>
-                        <td style="border:1px solid #000; padding:4px;"><strong>Passing Vehicles</strong></td>
+                        <td style="border:1px solid #000; padding:4px;"><strong>Passing by vehicles</strong></td>
                         <td style="border:1px solid #000; padding:4px;">Rope entanglement, fall hazard</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">L</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">H</td>
-                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold; background:#ffffcc;">M</td>
-                        <td style="border:1px solid #000; padding:4px;">Pre-coil end of ropes at least 15 feet off ground. Barricade drop zone below.</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold;">M</td>
+                        <td style="border:1px solid #000; padding:4px;">1. Pre-coil end of ropes at least 15 feet off ground.<br>2. Barricade drop zone below.</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">L</td>
                     </tr>
                     <tr>
@@ -1782,44 +1949,64 @@
                         <td style="border:1px solid #000; padding:4px;">Allergic reaction, distraction</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">L</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">M</td>
-                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold; background:#ccffcc;">L</td>
-                        <td style="border:1px solid #000; padding:4px;">Monitor recessed areas. Egress safely if stung. Keep 5ft clearance from active nests.</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold;">L</td>
+                        <td style="border:1px solid #000; padding:4px;">1. Monitor recessed areas. Egress safely if stung.<br>2. Keep 5ft clearance from active nests.</td>
                         <td style="border:1px solid #000; padding:4px; text-align:center;">L</td>
                     </tr>
+                    <tr>
+                        <td style="border:1px solid #000; padding:4px;"><strong>Communication Difficulty</strong></td>
+                        <td style="border:1px solid #000; padding:4px;">Inability to coordinate safety</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center;">M</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center;">H</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold;">H</td>
+                        <td style="border:1px solid #000; padding:4px;">1. Keep radios charged and tethered.<br>2. Identify alternative communication (Hand signals).</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center;">L</td>
+                    </tr>
+                    ${cHaz ? `
+                    <tr>
+                        <td style="border:1px solid #000; padding:4px;"><strong>${cHaz}</strong></td>
+                        <td style="border:1px solid #000; padding:4px;">${cEff}</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center;">--</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center;">--</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center; font-weight:bold;">--</td>
+                        <td style="border:1px solid #000; padding:4px;">${cCtrl}</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:center;">--</td>
+                    </tr>
+                    ` : ''}
                 </table>
 
                 <div class="html2pdf__page-break"></div>
 
-                <div style="background-color:#e0e0e0; font-weight:bold; font-size:12px; padding:4px; border:1px solid #000; border-bottom:none;">TECHNICIAN ACKNOWLEDGMENT & SIGNATURES</div>
-                <div style="border:1px solid #000; padding:8px; margin-bottom:15px;">
+                <div style="background-color:#e0e0e0; font-weight:bold; font-size:16px; padding:6px; border:1px solid #000; border-bottom:none;">TECHNICIAN ACKNOWLEDGMENT & SIGNATURES</div>
+                <div style="border:1px solid #000; padding:10px; margin-bottom:20px; font-size:14px;">
                     <p style="margin:0;">My signature states that I have been briefed and understand the content of this Access Work Plan. I understand my responsibilities, and I am competent to use the required equipment and to carry out the intended tasks Safely.</p>
                 </div>
                 
-                <table style="width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:15px; font-size: 11px;">
+                <table style="width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:20px; font-size: 13px;">
                     <tr>
-                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5; width:15%;">Personnel Roles</th>
-                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5; width:20%;">Name</th>
-                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5; width:15%;">Contact Phone #</th>
-                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5; width:20%;">Signature</th>
-                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5; width:12%;">Training</th>
-                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5; width:18%;">Emergency Contact</th>
+                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5; width:15%;">Personnel Roles</th>
+                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5; width:20%;">Name</th>
+                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5; width:15%;">Contact Phone #</th>
+                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5; width:20%;">Signature</th>
+                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5; width:12%;">Training</th>
+                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5; width:18%;">Emergency Contact</th>
                     </tr>
                     ${rosterRows}
                 </table>
 
-                <div style="margin-top:30px; font-size:10px; color:#666; text-align:center;">
+                <div style="margin-top:40px; font-size:11px; color:#333; text-align:center;">
                     Strata Access Group, Inc. &bull; Generated via Strata-Scan Pro Fleet &bull; Document Timestamp: ${date} ${time}
                 </div>
             `;
 
-            // Configuration for the PDF generation
+            // Configuration for the PDF generation - LANDSCAPE 11x8.5
             const fileName = `Strata_JSA_${client.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`;
             const opt = {
               margin:       0.5,
               filename:     fileName,
               image:        { type: 'jpeg', quality: 0.98 },
               html2canvas:  { scale: 2 },
-              jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+              jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' }
             };
 
             // Generate and handle the PDF Blob
