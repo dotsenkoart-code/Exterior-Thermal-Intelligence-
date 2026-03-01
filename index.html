@@ -82,6 +82,7 @@
         .btn-dark { background: #333; border: 1px solid #555; color: #aaa; }
         .btn-red { background: linear-gradient(180deg, #d9534f 0%, #b00 100%); color: #fff; border: 2px solid #fff; }
         .btn-gold { background: linear-gradient(180deg, #f39c12 0%, #d68910 100%); color: #000; }
+        .btn-purple { background: linear-gradient(180deg, #8e44ad 0%, #732d91 100%); color: #fff; }
         
         .pin-display-box { background: #111; border: 2px dashed #f39c12; padding: 20px; text-align: center; border-radius: 8px; margin-top: 15px; margin-bottom: 15px; }
         .pin-number { font-size: 3.5rem; font-weight: 900; color: #f39c12; letter-spacing: 5px; }
@@ -244,10 +245,16 @@
                         <input type="text" id="jsaRadio" placeholder="Radio Ch (e.g. 1)" style="flex:1;">
                         <input type="text" id="jsaGather" placeholder="Gathering Loc (e.g. Entrance)" value="Site Entrance" style="flex:1;">
                     </div>
+                    
                     <div style="display:flex; gap:8px; margin-bottom:8px;">
                         <button id="gpsBtn" class="btn-dark" style="flex:1; border-radius:6px; padding:10px; font-weight:bold; border:none; cursor:pointer;" onclick="fetchHospitalGPS()">📍 Fetch GPS (ER)</button>
-                        <input type="text" id="jsaHospital" placeholder="Nearest ER (Requires GPS)" disabled style="flex:2; font-size:0.8rem;">
+                        <input type="text" id="jsaHospital" placeholder="Nearest ER Name" style="flex:2; font-size:0.8rem;">
                     </div>
+                    <input type="text" id="jsaHospitalAddress" placeholder="ER Exact Address" style="margin-bottom:8px; font-size:0.8rem;" oninput="updateHospitalLink()">
+                    <a id="jsaHospitalAddressLink" href="#" target="_blank" style="display:none; background:linear-gradient(180deg, #d9534f 0%, #b00 100%); color:#fff; border:2px solid #fff; padding:12px; border-radius:6px; text-align:center; font-weight:900; text-decoration:none; font-size:1.1rem; margin-bottom:12px; letter-spacing:1px; box-shadow: 0 5px 15px rgba(200,0,0,0.5);">
+                        🚨 EMERGENCY: NAVIGATE TO ER
+                    </a>
+
                     <div style="display:flex; align-items:center; justify-content:space-between; background:#222; padding:10px; border-radius:6px; border:1px solid #444;">
                         <span style="font-size:0.8rem; color:#ccc;">Life Flight Required?</span>
                         <select id="jsaLifeFlight" style="width:100px; padding:8px; font-size:0.9rem;">
@@ -309,6 +316,9 @@
                         <option value="NO">NO - No Antennas in Area</option>
                         <option value="YES">YES - Maintain 10mW/cm2 Clearance</option>
                     </select>
+
+                    <label>LOTO Clearance Contact</label>
+                    <input type="text" id="jsaLotoContact" placeholder="e.g. Building Engineer" value="Building Engineer" style="margin-bottom:15px; font-size:0.9rem;">
 
                     <label>Site Specific Custom Hazard (Optional)</label>
                     <input type="text" id="jsaCustomHaz" placeholder="Hazard (e.g. Seagulls)" style="margin-bottom:4px; font-size:0.9rem;">
@@ -377,13 +387,19 @@
                     <span style="color:#888; font-size:0.75rem; display:block; margin-top:10px;">Provide this PIN to your Technicians to unlock their individual phones.</span>
                 </div>
                 
-                <button class="action-btn btn-blue" id="btnExportPdfPrimary" style="padding: 22px; margin-top: 0; margin-bottom: 15px;" onclick="exportJSAPDF()">
-                    📤 1. SEND PDF JSA TO OFFICE
-                </button>
-                <div id="pdfLoadingStatus" style="display:none; color:#0cf; font-weight:bold; margin-bottom:15px;">Generating Full PDF... This may take a moment.</div>
+                <div style="display:flex; gap:8px; margin-bottom:15px;">
+                    <button class="action-btn btn-purple" id="btnViewPdf" style="margin-top:0; padding:22px; flex:1;" onclick="viewJSAPDF()">
+                        👁️ VIEW JSA
+                    </button>
+                    <button class="action-btn btn-blue" id="btnExportPdfPrimary" style="margin-top:0; padding:22px; flex:1;" onclick="exportJSAPDF()">
+                        📤 SEND PDF
+                    </button>
+                </div>
+
+                <div id="pdfLoadingStatus" style="display:none; color:#0cf; font-weight:bold; margin-bottom:15px;">Generating Document... Please Wait.</div>
                 
                 <button class="action-btn btn-green" style="padding: 22px; margin-top: 0; margin-bottom: 20px;" onclick="goToSlide(1)">
-                    🚀 2. PROCEED TO DROP SETUP
+                    🚀 PROCEED TO DROP SETUP
                 </button>
 
                 <button class="action-btn btn-dark" style="margin-top:10px; font-size: 0.9rem;" onclick="resetJSA()">
@@ -552,11 +568,9 @@
                 </div>
             </div>
 
-            <button class="cmd-action-btn btn-gold" style="margin-top:20px; margin-bottom:0;" id="btnReprintJsa" onclick="exportJSAPDF()">🛡️ RE-EXPORT SIGNED JSA</button>
-
-            <div style="display:flex; gap:8px; margin-top:10px;">
+            <div style="display:flex; gap:8px; margin-top:20px;">
                 <button class="cmd-action-btn" style="background:#333; margin:0;" onclick="exportAndSend()">📤 EXPORT CSV DATA</button>
-                <button class="cmd-action-btn" style="background:#b00; margin:0;" onclick="openWipeModal()">WIPE</button>
+                <button class="cmd-action-btn" style="background:#b00; margin:0;" onclick="openWipeModal()">WIPE ALL</button>
             </div>
         </div>
     </div>
@@ -578,7 +592,7 @@
         let pendingLogType = null; 
         
         let isJsaSigned = false;
-        let activeComplianceMode = 'L3'; // 'L3' or 'TECH'
+        let activeComplianceMode = 'L3'; 
         
         // --- PASS & SIGN CAROUSEL STATE ---
         let totalCrewCount = 2;
@@ -594,10 +608,11 @@
             return pin.toString();
         }
 
-        // --- MATH-BASED GPS HOSPITAL FETCH (TRUE DISTANCE CALCULATION) ---
+        // --- DUAL API GPS FETCH (OVERPASS ER SEARCH -> NOMINATIM REVERSE GEOCODE) ---
         function fetchHospitalGPS() {
             const btn = document.getElementById('gpsBtn');
             const input = document.getElementById('jsaHospital');
+            const addrInput = document.getElementById('jsaHospitalAddress');
             btn.innerText = "Locating ER...";
             
             if (navigator.geolocation) {
@@ -605,6 +620,7 @@
                     const lat = position.coords.latitude;
                     const lon = position.coords.longitude;
                     
+                    // 1. Fetch nearest ER from OSM
                     const overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json][timeout:15];(node["amenity"="hospital"]["emergency"="yes"](around:20000,${lat},${lon});way["amenity"="hospital"]["emergency"="yes"](around:20000,${lat},${lon}););out center;`;
 
                     fetch(overpassUrl)
@@ -639,17 +655,33 @@
                                     const hName = closestHospital.tags.name || "Unnamed ER Facility";
                                     const finalDist = minDistance.toFixed(1);
                                     const estMins = Math.max(5, Math.round(minDistance * 2.4)); 
+                                    const hLat = closestHospital.lat || closestHospital.center.lat;
+                                    const hLon = closestHospital.lon || closestHospital.center.lon;
 
                                     input.value = `${hName} (~${estMins} mins, ${finalDist} mi)`;
                                     input.style.color = "#0cf";
                                     btn.innerText = "✅ ER Linked";
                                     btn.style.background = "#1e7e34";
+
+                                    // 2. Translate Coordinates to Exact Street Address using Nominatim
+                                    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${hLat}&lon=${hLon}&format=json`)
+                                        .then(res => res.json())
+                                        .then(geo => {
+                                            addrInput.value = geo.display_name || "Address not found - type manually";
+                                            updateHospitalLink(hLat, hLon);
+                                        })
+                                        .catch(err => {
+                                            addrInput.value = "Address fetch failed - type manually";
+                                            updateHospitalLink(hLat, hLon);
+                                        });
+
                                 } else {
                                     throw new Error("No coordinate data");
                                 }
                             } else {
                                 input.value = "No ER found within 12 miles";
                                 input.disabled = false;
+                                addrInput.disabled = false;
                                 btn.innerText = "No Data";
                                 btn.style.background = "#d9534f";
                             }
@@ -657,6 +689,7 @@
                         .catch(err => {
                             input.value = "Network timeout. Type manually.";
                             input.disabled = false;
+                            addrInput.disabled = false;
                             btn.innerText = "API Error";
                             btn.style.background = "#d9534f";
                         });
@@ -665,11 +698,29 @@
                     alert("GPS Access Denied. Please type hospital location manually.");
                     btn.innerText = "GPS Failed";
                     input.disabled = false;
+                    addrInput.disabled = false;
                     input.placeholder = "Type Hospital Name manually";
                 });
             } else {
                 alert("Geolocation is not supported by this browser.");
                 input.disabled = false;
+                addrInput.disabled = false;
+            }
+        }
+
+        // --- GOOGLE MAPS EMERGENCY LINK ---
+        function updateHospitalLink(lat = null, lon = null) {
+            const addr = document.getElementById('jsaHospitalAddress').value;
+            const link = document.getElementById('jsaHospitalAddressLink');
+            
+            if (lat && lon) {
+                link.href = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
+                link.style.display = 'block';
+            } else if (addr && addr.trim() !== "" && !addr.includes("failed")) {
+                link.href = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}`;
+                link.style.display = 'block';
+            } else {
+                link.style.display = 'none';
             }
         }
 
@@ -720,7 +771,6 @@
                 document.getElementById('jsaEnvironment').value = s.env || "Commercial Building";
                 document.getElementById('jsaHeight').value = s.height || "";
                 
-                // Load extended fields if they exist
                 if(s.task) document.getElementById('jsaTask').value = s.task;
                 if(s.mName) document.getElementById('jsaMainName').value = s.mName;
                 if(s.mPhone) document.getElementById('jsaMainPhone').value = s.mPhone;
@@ -728,6 +778,11 @@
                 if(s.sPhone) document.getElementById('jsaSecPhone').value = s.sPhone;
                 if(s.radio) document.getElementById('jsaRadio').value = s.radio;
                 if(s.gather) document.getElementById('jsaGather').value = s.gather;
+                if(s.hName) document.getElementById('jsaHospital').value = s.hName;
+                if(s.hAddr) {
+                    document.getElementById('jsaHospitalAddress').value = s.hAddr;
+                    updateHospitalLink();
+                }
             }
         }
 
@@ -743,7 +798,9 @@
                 sName: document.getElementById('jsaSecName').value,
                 sPhone: document.getElementById('jsaSecPhone').value,
                 radio: document.getElementById('jsaRadio').value,
-                gather: document.getElementById('jsaGather').value
+                gather: document.getElementById('jsaGather').value,
+                hName: document.getElementById('jsaHospital').value,
+                hAddr: document.getElementById('jsaHospitalAddress').value
             };
 
             if(siteData.client && siteData.site) {
@@ -927,9 +984,6 @@
                     document.querySelectorAll('#l3-view .card')[2].style.display = 'none'; 
                     document.getElementById('recentSitesDropdown').style.display = 'none';
                     document.getElementById('l3-signed-banner').style.display = 'block';
-                    document.getElementById('btnReprintJsa').style.display = 'block'; 
-                } else {
-                    document.getElementById('btnReprintJsa').style.display = 'none'; 
                 }
 
             } else {
@@ -1488,15 +1542,8 @@
             if (n === 2) hasVisitedDiagnose = true;
         }
 
-        // --- TRUE PDF EXPORT LOGIC (PIXEL-PERFECT REPLICA - LANDSCAPE) ---
-        async function exportJSAPDF() {
-            const btnPrimary = document.getElementById('btnExportPdfPrimary');
-            const loadingText = document.getElementById('pdfLoadingStatus');
-            
-            if(btnPrimary) btnPrimary.style.display = 'none';
-            if(loadingText) loadingText.style.display = 'block';
-
-            // Gather all UI inputs
+        // --- HTML WRAPPER GENERATOR FOR BOTH VIEW AND EXPORT ---
+        function generateJSAWrapper() {
             const client = document.getElementById('jsaClient').value || "--";
             const site = document.getElementById('jsaSiteName').value || "--";
             const date = new Date().toLocaleDateString();
@@ -1513,7 +1560,10 @@
             
             const radioCh = document.getElementById('jsaRadio').value || "1";
             const gatherLoc = document.getElementById('jsaGather').value || "Site Entrance";
+            
             const hospitalText = document.getElementById('jsaHospital').value || "Not Linked";
+            const hospitalAddr = document.getElementById('jsaHospitalAddress').value || "--";
+            
             const lifeFlight = document.getElementById('jsaLifeFlight').value;
             
             const gcReq = document.getElementById('jsaGroundReq').value;
@@ -1522,13 +1572,12 @@
             const lotoMach = document.getElementById('jsaMachinery').value;
             const lotoRoof = document.getElementById('jsaLoto').value;
             const lotoRf = document.getElementById('jsaRf').value;
+            const lotoContact = document.getElementById('jsaLotoContact').value || "Building Engineer";
             
-            // Custom Hazard
             const cHaz = document.getElementById('jsaCustomHaz').value;
             const cEff = document.getElementById('jsaCustomEff').value;
             const cCtrl = document.getElementById('jsaCustomCtrl').value;
 
-            // Gather PPE selections
             const getPPE = (id) => document.getElementById(id).checked ? '&#9746;' : '&#9744;';
             const ppeEye = getPPE('ppeEye');
             const ppeBoots = getPPE('ppeBoots');
@@ -1574,14 +1623,12 @@
                 rosterRows = `<tr><td colspan="6" style="border:1px solid #000; padding:6px; text-align:center; color:#888;">No signatures found.</td></tr>`;
             }
 
-            // Helper to draw checkboxes
             const getCheck = (val) => env === val ? '&#9746;' : '&#9744;';
 
-            // PDF WRAPPER - LANDSCAPE (10 inches wide) - FONT SIZE INCREASED
             const wrapper = document.createElement('div');
             wrapper.style.fontFamily = 'Arial, sans-serif';
-            wrapper.style.color = '#000000'; // Strict Black
-            wrapper.style.fontSize = '14px'; // Increased for readability
+            wrapper.style.color = '#000000'; 
+            wrapper.style.fontSize = '14px'; 
             wrapper.style.width = '10in'; 
             wrapper.style.boxSizing = 'border-box';
             wrapper.style.padding = '0';
@@ -1675,7 +1722,8 @@
                             &#9746; Hand Signals Reviewed
                         </td>
                         <td style="border:1px solid #000; padding:8px; vertical-align:top; font-size:14px; line-height:1.5;">
-                            <strong>Location (ER):</strong><br>${hospitalText.split(' (~')[0] || hospitalText}<br><br>
+                            <strong>Location (ER):</strong><br>${hospitalText.split(' (~')[0] || hospitalText}<br>
+                            <span style="font-size:12px; color:#333;">${hospitalAddr}</span><br><br>
                             <strong>Drive Time & Dist:</strong><br>${hospitalText.includes('(~') ? '(~' + hospitalText.split('(~')[1] : '--'}
                         </td>
                         <td style="border:1px solid #000; padding:8px; vertical-align:top; font-size:14px; line-height:1.5;">
@@ -1700,21 +1748,21 @@
                         <td style="border:1px solid #000; padding:8px; text-align:center;"><strong>${lotoMach}</strong></td>
                         <td style="border:1px solid #000; padding:8px;">Breaker Panels / BMU Controls</td>
                         <td style="border:1px solid #000; padding:8px;">Avoid contact with moving BMU elements. LOTO if in fall zone.</td>
-                        <td style="border:1px solid #000; padding:8px;">Bldg Eng.</td>
+                        <td style="border:1px solid #000; padding:8px;">${lotoContact}</td>
                     </tr>
                     <tr>
                         <td style="border:1px solid #000; padding:8px;">Roof Access</td>
                         <td style="border:1px solid #000; padding:8px; text-align:center;"><strong>${lotoRoof}</strong></td>
                         <td style="border:1px solid #000; padding:8px;">Roof Doors/Hatches</td>
                         <td style="border:1px solid #000; padding:8px;">Access to Rigging zone shall be restricted for Public. Set barricades.</td>
-                        <td style="border:1px solid #000; padding:8px;">Bldg Eng.</td>
+                        <td style="border:1px solid #000; padding:8px;">${lotoContact}</td>
                     </tr>
                     <tr>
                         <td style="border:1px solid #000; padding:8px;">Cell Antennas</td>
                         <td style="border:1px solid #000; padding:8px; text-align:center;"><strong>${lotoRf}</strong></td>
                         <td style="border:1px solid #000; padding:8px;">Antenna Power Supply</td>
                         <td style="border:1px solid #000; padding:8px;">Maintain clearance from active antennas. Max exposure 10mW/cm2 for 6 mins.</td>
-                        <td style="border:1px solid #000; padding:8px;">Bldg Eng.</td>
+                        <td style="border:1px solid #000; padding:8px;">${lotoContact}</td>
                     </tr>
                 </table>
 
@@ -1998,8 +2046,23 @@
                     Strata Access Group, Inc. &bull; Generated via Strata-Scan Pro Fleet &bull; Document Timestamp: ${date} ${time}
                 </div>
             `;
+            return wrapper;
+        }
 
-            // Configuration for the PDF generation - LANDSCAPE 11x8.5
+        // --- PDF EXPORT (DOWNLOAD/SHARE) ---
+        async function exportJSAPDF() {
+            const btnPrimary = document.getElementById('btnExportPdfPrimary');
+            const btnView = document.getElementById('btnViewPdf');
+            const loadingText = document.getElementById('pdfLoadingStatus');
+            
+            if(btnPrimary) btnPrimary.style.display = 'none';
+            if(btnView) btnView.style.display = 'none';
+            if(loadingText) loadingText.style.display = 'block';
+
+            const wrapper = generateJSAWrapper();
+            const client = document.getElementById('jsaClient').value || "Unknown_Client";
+            const site = document.getElementById('jsaSiteName').value || "Unknown_Location";
+
             const fileName = `Strata_JSA_${client.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`;
             const opt = {
               margin:       0.5,
@@ -2009,11 +2072,11 @@
               jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' }
             };
 
-            // Generate and handle the PDF Blob
             html2pdf().set(opt).from(wrapper).outputPdf('blob').then(async function(pdfBlob) {
                 const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
                 if(btnPrimary) btnPrimary.style.display = 'block';
+                if(btnView) btnView.style.display = 'block';
                 if(loadingText) loadingText.style.display = 'none';
 
                 if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -2033,7 +2096,49 @@
             }).catch(err => {
                 alert("Error generating PDF. Please check internet connection for PDF engine.");
                 if(btnPrimary) btnPrimary.style.display = 'block';
+                if(btnView) btnView.style.display = 'block';
                 if(loadingText) loadingText.style.display = 'none';
+            });
+        }
+
+        // --- PDF PREVIEW (VIEW IN BROWSER) ---
+        function viewJSAPDF() {
+            const btnPrimary = document.getElementById('btnExportPdfPrimary');
+            const btnView = document.getElementById('btnViewPdf');
+            const loadingText = document.getElementById('pdfLoadingStatus');
+            
+            if(btnPrimary) btnPrimary.style.display = 'none';
+            if(btnView) btnView.style.display = 'none';
+            if(loadingText) {
+                loadingText.innerText = "Generating Preview...";
+                loadingText.style.display = 'block';
+            }
+
+            const wrapper = generateJSAWrapper();
+            const opt = {
+              margin:       0.5,
+              filename:     'JSA_Preview.pdf',
+              image:        { type: 'jpeg', quality: 0.98 },
+              html2canvas:  { scale: 2 },
+              jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' }
+            };
+
+            html2pdf().set(opt).from(wrapper).outputPdf('bloburl').then(function(pdfUrl) {
+                if(btnPrimary) btnPrimary.style.display = 'block';
+                if(btnView) btnView.style.display = 'block';
+                if(loadingText) {
+                    loadingText.style.display = 'none';
+                    loadingText.innerText = "Generating Document... Please Wait.";
+                }
+                window.open(pdfUrl, '_blank');
+            }).catch(err => {
+                alert("Error generating PDF preview.");
+                if(btnPrimary) btnPrimary.style.display = 'block';
+                if(btnView) btnView.style.display = 'block';
+                if(loadingText) {
+                    loadingText.style.display = 'none';
+                    loadingText.innerText = "Generating Document... Please Wait.";
+                }
             });
         }
         
