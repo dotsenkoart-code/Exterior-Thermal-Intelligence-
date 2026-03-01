@@ -69,6 +69,8 @@
         .jsa-conditional { display: none; background: #111; padding: 12px; border-left: 3px solid #f39c12; margin-bottom: 12px; font-size: 0.8rem; color: #aaa; }
         .sig-pad { width: 100%; height: 150px; background: #fff; border-radius: 8px; margin-top: 10px; border: 2px solid #444; touch-action: none; }
         
+        .moisture-panel { background: #1a1a1a; border: 1px solid #d9534f; border-radius: 6px; padding: 10px; margin-top: 8px; display: none; }
+
         .action-btn { width: 100%; padding: 18px; border-radius: 8px; border: none; font-size: 1.2rem; font-weight: 900; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; margin-top: 15px; }
         .btn-blue { background: linear-gradient(180deg, #007bff 0%, #0056b3 100%); }
         .btn-green { background: linear-gradient(180deg, #28a745 0%, #1e7e34 100%); }
@@ -134,6 +136,57 @@
             
             <button class="modal-btn btn-green" onclick="lockInDrop()">🚀 YES, LOCK IT IN</button>
             <button class="modal-btn btn-dark" onclick="closePreFlight()">🔙 CANCEL</button>
+        </div>
+    </div>
+
+    <div id="safetyModal" class="modal-overlay">
+        <div class="modal-box">
+            <h2 style="color:#f39c12; margin-top:0; font-size: 2rem;">⚠️ DATA MISSING!</h2>
+            <p style="color:#ccc; font-size:1.1rem; margin-bottom:25px; line-height:1.4;">
+                You have not logged any findings for window <br><strong id="modalTargetID" style="color:#0cf; font-size: 1.5rem; display:inline-block; margin-top:5px;">A-12-L</strong>
+            </p>
+            <button class="modal-btn btn-blue" onclick="modalGoToDiagnose()">🔙 WAIT, TAKE ME TO DIAGNOSE</button>
+            <button class="modal-btn btn-green" onclick="modalQuickLogAndMove()">✅ WINDOW IS CLEAR: LOG & MOVE</button>
+            <button class="modal-btn btn-dark" onclick="modalForceSkip()">⚠️ FORCE SKIP (LEAVE BLANK)</button>
+        </div>
+    </div>
+
+    <div id="floorAuditModal" class="modal-overlay">
+        <div class="modal-box" style="border-color:#f39c12;">
+            <h2 style="color:#f39c12; margin-top:0; font-size: 2rem;">⚠️ INCOMPLETE FLOOR</h2>
+            <p style="color:#ccc; font-size:1.1rem; margin-bottom:25px; line-height:1.4;">
+                You missed the following position(s):<br>
+                <strong id="missingFloorWindows" style="color:#0cf; font-size: 2rem; display:inline-block; margin-top:10px;">C, R</strong><br><br>
+                Are you sure you want to leave this floor?
+            </p>
+            <button class="modal-btn btn-blue" onclick="modalCancelFloorChange()">🔙 CANCEL (STAY)</button>
+            <button class="modal-btn btn-dark" onclick="modalForceFloorChange()">⚠️ FORCE DESCEND</button>
+        </div>
+    </div>
+
+    <div id="photoModal" class="modal-overlay">
+        <div class="modal-box" style="border-color:#0cf;">
+            <h2 style="color:#0cf; margin-top:0; font-size: 2rem;">📸 SNAP PHOTO</h2>
+            <p style="color:#ccc; font-size:1.1rem; margin-bottom:15px; line-height:1.4;">
+                Match camera image for <strong id="modalConfirmID" style="color:#fff;">A-12-L</strong>:
+            </p>
+            <div style="display:flex; align-items:center; justify-content:center; gap: 10px; margin-bottom: 25px;">
+                <span style="font-size:1.5rem; font-weight:900; color:#666;">FLIR</span>
+                <input type="text" inputmode="numeric" pattern="[0-9]*" id="modalPhotoInput" style="width: 140px; font-size: 2.8rem; font-weight: 900; color: #f39c12; border: 2px solid #f39c12; background: #222; text-align: center; border-radius: 8px;">
+            </div>
+            <button class="modal-btn btn-green" onclick="finalizeLogEvidence()" style="font-size: 1.2rem; padding: 25px 10px;">✅ CONFIRM & SAVE</button>
+            <button class="modal-btn btn-dark" onclick="cancelLogEvidence()">🔙 CANCEL</button>
+        </div>
+    </div>
+
+    <div id="wipeModal" class="modal-overlay">
+        <div class="modal-box" style="border-color:#b00;">
+            <h2 style="color:#d9534f; margin-top:0; font-size: 2rem;">🚨 WIPE DATA?</h2>
+            <p style="color:#ccc; font-size:1.1rem; margin-bottom:25px; line-height:1.4;">
+                This will permanently delete all logged findings in the Data Vault.<br><br><strong>Have you exported the CSV?</strong>
+            </p>
+            <button class="modal-btn btn-dark" onclick="closeWipeModal()">🔙 CANCEL (KEEP DATA)</button>
+            <button class="modal-btn btn-red" onclick="confirmWipe()">🚨 YES, WIPE ALL DATA</button>
         </div>
     </div>
 
@@ -479,7 +532,7 @@
             return pin.toString();
         }
 
-        // --- GPS HOSPITAL FETCH SIMULATION ---
+        // --- GPS HOSPITAL FETCH INTEGRATION (OVERPASS API) ---
         function fetchHospitalGPS() {
             const btn = document.getElementById('gpsBtn');
             const input = document.getElementById('jsaHospital');
@@ -487,12 +540,52 @@
             
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition((position) => {
-                    setTimeout(() => {
-                        input.value = "GPS: Found Nearest ER (<15 Mins)";
-                        input.style.color = "#0cf";
-                        btn.innerText = "✅ Linked";
-                        btn.style.background = "#1e7e34";
-                    }, 800);
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    
+                    // Call OpenStreetMap's free Overpass API for nearest hospital within ~15km
+                    const overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json];node(around:15000,${lat},${lon})["amenity"="hospital"];out 1;`;
+
+                    fetch(overpassUrl)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.elements && data.elements.length > 0) {
+                                const hospital = data.elements[0];
+                                const hName = hospital.tags.name || "Unnamed Hospital";
+
+                                // Calculate straight-line distance using Haversine formula
+                                const hLat = hospital.lat;
+                                const hLon = hospital.lon;
+                                const R = 3958.8; // Earth radius in miles
+                                const dLat = (hLat - lat) * Math.PI / 180;
+                                const dLon = (hLon - lon) * Math.PI / 180;
+                                const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                                          Math.cos(lat * Math.PI / 180) * Math.cos(hLat * Math.PI / 180) *
+                                          Math.sin(dLon/2) * Math.sin(dLon/2);
+                                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                                const distance = (R * c).toFixed(1);
+
+                                // Estimate drive time (assuming 25mph city traffic = ~2.4 mins per mile)
+                                const estMins = Math.max(5, Math.round(distance * 2.4));
+
+                                input.value = `${hName} (~${estMins} mins, ${distance} mi)`;
+                                input.style.color = "#0cf";
+                                btn.innerText = "✅ Linked";
+                                btn.style.background = "#1e7e34";
+                            } else {
+                                input.value = "No hospital found within 15km";
+                                input.disabled = false;
+                                btn.innerText = "No Data";
+                                btn.style.background = "#d9534f";
+                            }
+                        })
+                        .catch(err => {
+                            input.value = "Network error. Type manually.";
+                            input.disabled = false;
+                            btn.innerText = "API Error";
+                            btn.style.background = "#d9534f";
+                        });
+
                 }, (error) => {
                     alert("GPS Access Denied. Please type hospital location manually.");
                     btn.innerText = "GPS Failed";
@@ -682,7 +775,7 @@
             document.getElementById('projectID').value = `${c} - ${s}`;
             
             let leadName = capturedSignatures[0].name;
-            const l3Sig = capturedSignatures.find(s => s.role.includes("L3"));
+            const l3Sig = capturedSignatures.find(sig => sig.role.includes("L3"));
             if(l3Sig) leadName = l3Sig.name;
             document.getElementById('techName').value = leadName;
 
@@ -1307,6 +1400,7 @@
             const loto = document.getElementById('loto-block').style.display === 'block' ? 'YES' : 'NO';
             const rf = document.getElementById('rf-block').style.display === 'block' ? 'YES' : 'NO';
             const env = document.getElementById('jsaEnvironment') ? document.getElementById('jsaEnvironment').value : "Commercial Building";
+            const hospitalText = document.getElementById('jsaHospital').value || "Not Linked";
 
             let storedSigs = [];
             try {
@@ -1360,61 +1454,60 @@
 <body>
     <h1>Strata Access Group - Job Safety Analysis (JSA)</h1>
     
-    [cite_start]<h2>WORK METHOD [cite: 1]</h2>
+    <h2>WORK METHOD</h2>
     <table>
         <tr>
             <td width="50%">
-                [cite_start]<strong>Client:</strong> ${client} [cite: 4]<br>
-                [cite_start]<strong>Site Name & Location:</strong> ${site} [cite: 5]
+                <strong>Client:</strong> ${client}<br>
+                <strong>Site Name & Location:</strong> ${site}
             </td>
-            [cite_start]<td width="50%"><strong>Date:</strong><br>${date} [cite: 3]</td>
+            <td width="50%"><strong>Date:</strong><br>${date}</td>
         </tr>
         <tr>
-            [cite_start]<td><strong>Start/Finish Times:</strong><br>${time} to End of Shift [cite: 45]</td>
-            [cite_start]<td><strong>Environment:</strong><br>${env} [cite: 6]</td>
+            <td><strong>Start/Finish Times:</strong><br>${time} to End of Shift</td>
+            <td><strong>Environment:</strong><br>${env}</td>
         </tr>
     </table>
 
     <table>
         <tr>
-            [cite_start]<th colspan="3">Work Team & Personnel Role [cite: 7]</th>
+            <th colspan="3">Work Team & Personnel Role</th>
         </tr>
         <tr>
-            [cite_start]<td width="33%"><strong>Rope Access Supervisor L3:</strong><br>${l3NameDisplay} [cite: 15]</td>
-            [cite_start]<td width="33%"><strong>Rope Access Technician L1/L2:</strong><br>See Signatures Below [cite: 19, 21]</td>
+            <td width="33%"><strong>Rope Access Supervisor L3:</strong><br>${l3NameDisplay}</td>
+            <td width="33%"><strong>Rope Access Technician L1/L2:</strong><br>See Signatures Below</td>
             <td width="33%"><strong>Ground Control:</strong><br>--</td>
         </tr>
     </table>
 
-    [cite_start]<h2>INITIAL TASK ASSESSMENT [cite: 55]</h2>
-    [cite_start]<p><span class="checkbox">☑</span> There is no feasible access alternative (scaffolds, boom lift, or suspended platform (swing stage)) to perform the work, or using such alternative would create greater risk for workers, public, vehicular traffic, and/or property. [cite: 57]</p>
-    [cite_start]<p><span class="checkbox">☑</span> Relative short duration/scale of the project makes Industrial Rope Access a better choice due to the faster rigging and mobilization. [cite: 58]</p>
+    <h2>INITIAL TASK ASSESSMENT</h2>
+    <p><span class="checkbox">☑</span> There is no feasible access alternative (scaffolds, boom lift, or suspended platform) to perform the work, or using such alternative would create greater risk for workers, public, vehicular traffic, and/or property.</p>
+    <p><span class="checkbox">☑</span> Relative short duration/scale of the project makes Industrial Rope Access a better choice due to the faster rigging and mobilization.</p>
 
-    [cite_start]<h2>COMMUNICATION PLAN & EMERGENCY SERVICES [cite: 64]</h2>
+    <h2>COMMUNICATION PLAN & EMERGENCY SERVICES</h2>
     <table>
         <tr>
-            [cite_start]<th width="33%">Mode of Communication [cite: 66]</th>
-            [cite_start]<th width="33%">Hospital Information [cite: 71]</th>
-            [cite_start]<th width="33%">Emergency Services [cite: 74]</th>
+            <th width="33%">Mode of Communication</th>
+            <th width="33%">Hospital Information</th>
+            <th width="33%">Emergency Services</th>
         </tr>
         <tr>
             <td>
-                [cite_start]☑ Radio [cite: 65]<br>
-                [cite_start]☑ Cell Phone [cite: 67]<br>
-                [cite_start]☑ Hand Signals Reviewed [cite: 68]
+                ☑ Radio<br>
+                ☑ Cell Phone<br>
+                ☑ Hand Signals Reviewed
             </td>
             <td>
-                [cite_start]<strong>Location:</strong> GPS Linked Nearest ER [cite: 72]<br>
-                [cite_start]<strong>Drive Time:</strong> < 15 Mins [cite: 73]
+                <strong>Status:</strong> ${hospitalText}
             </td>
             <td>
-                [cite_start]<strong>EMS Phone:</strong> 911 [cite: 74, 79]<br>
-                [cite_start]<strong>Life Flight?:</strong> NO [cite: 75]
+                <strong>EMS Phone:</strong> 911<br>
+                <strong>Life Flight?:</strong> NO
             </td>
         </tr>
     </table>
 
-    [cite_start]<h2>LOCK OUT/TAG OUT PROCEDURES [cite: 77]</h2>
+    <h2>LOCK OUT/TAG OUT PROCEDURES</h2>
     <table>
         <tr>
             <th>Isolation Component</th>
@@ -1424,7 +1517,7 @@
         <tr>
             <td>Roof Access</td>
             <td><strong>${loto}</strong></td>
-            <td>Access to Rigging zone shall be restricted for Public. [cite_start]Set barricades, send notices. [cite: 78]</td>
+            <td>Access to Rigging zone shall be restricted for Public. Set barricades, send notices.</td>
         </tr>
         <tr>
             <td>Cell Antennas</td>
@@ -1435,7 +1528,7 @@
 
     <div class="page-break"></div>
 
-    [cite_start]<h2>WORK PLAN & EQUIPMENT VERIFICATION [cite: 80]</h2>
+    <h2>WORK PLAN & EQUIPMENT VERIFICATION</h2>
     <table>
         <tr>
             <th width="20%">KEY JOB PROCESS</th>
@@ -1443,24 +1536,24 @@
         </tr>
         <tr>
             <td><strong>Briefing, Safety Meeting</strong></td>
-            <td>Equipment unloading, transportation and pre-use inspection.<br>Installing barricades around hazard zone. [cite_start]Anchor points assessment. [cite: 81]</td>
+            <td>Equipment unloading, transportation and pre-use inspection.<br>Installing barricades around hazard zone. Anchor points assessment.</td>
         </tr>
         <tr>
             <td><strong>Access/Fall Zone</strong></td>
-            <td>Whenever on ropes, 6 feet from the unprotected edge (parapet/railings lower than 42 inches). [cite_start]No one shall enter the fall zone without appropriate fall protection system. [cite: 81]</td>
+            <td>Whenever on ropes, 6 feet from the unprotected edge (parapet/railings lower than 42 inches). No one shall enter the fall zone without appropriate fall protection system.</td>
         </tr>
         <tr>
             <td><strong>Anchorage Description</strong></td>
-            <td>Engineered access anchors, roof shafts, structural building elements, beam structures, etc.. Anchorage systems used as the primary support within a main or backup system shall have a minimum strength of either 12 kN (2700 lbf), or two times the maximum arrest force of the backup system when used in accordance with manufacturer specifications, whichever is greater. [cite_start]<strong>(VERIFIED IN APP)</strong> [cite: 81]</td>
+            <td>Engineered access anchors, roof shafts, structural building elements, beam structures, etc.. Anchorage systems used as the primary support within a main or backup system shall have a minimum strength of either 12 kN (2700 lbf), or two times the maximum arrest force of the backup system when used in accordance with manufacturer specifications, whichever is greater. <strong>(VERIFIED IN APP)</strong></td>
         </tr>
         <tr>
             <td><strong>Required Rope Access Equipment</strong></td>
-            [cite_start]<td>7/16" Kernmantle Static Ropes (MBS 22.2KN/5000 lbf), Connectors (Petzl Am'd, Oxan, Ok, must be locking type, with MBS 22.2kN, 5000Lbs), Full-body Rope Access Harness, Descenders (Petzl ID/ Rig), Backup Devices (Petzl ASAP, SafeTec Duck), Energy Absorber Lanyard (Petzl ASAP'Sorber, ASAP'Sorber Axxess). <strong>(VERIFIED IN APP)</strong> [cite: 82]</td>
+            <td>7/16" Kernmantle Static Ropes (MBS 22.2KN/5000 lbf), Connectors (Petzl Am'd, Oxan, Ok, must be locking type, with MBS 22.2kN, 5000Lbs), Full-body Rope Access Harness, Descenders (Petzl ID/ Rig), Backup Devices (Petzl ASAP, SafeTec Duck), Energy Absorber Lanyard (Petzl ASAP'Sorber, ASAP'Sorber Axxess). <strong>(VERIFIED IN APP)</strong></td>
         </tr>
     </table>
 
-    [cite_start]<h2>RISK ASSESSMENT & JSA [cite: 98]</h2>
-    [cite_start]<p><em>Stop work, notify supervisor and other technicians immediately if new hazard is identified or taken measures are inadequate. [cite: 99]</em></p>
+    <h2>RISK ASSESSMENT & JSA</h2>
+    <p><em>Stop work, notify supervisor and other technicians immediately if new hazard is identified or taken measures are inadequate.</em></p>
     <table>
         <tr>
             <th width="20%">Activity/Hazard</th>
@@ -1469,38 +1562,38 @@
             <th width="45%">Control Measures</th>
         </tr>
         <tr>
-            [cite_start]<td><strong>Personal Falling [cite: 102]</strong></td>
-            [cite_start]<td>Gravity-induced injury or death [cite: 102]</td>
+            <td><strong>Personal Falling</strong></td>
+            <td>Gravity-induced injury or death</td>
             <td><strong>H</strong></td>
-            <td>All personnel must be properly trained, briefed and follow IRATA/SPRAT and OSHA Rope Access and Fall-Protection standards. Always maintain 2-point attachments while using Rope Access (main and safety line). [cite_start]Always use 2 independent anchor points capable to withstand 5000 lbs/22KN load. [cite: 102]</td>
+            <td>All personnel must be properly trained, briefed and follow IRATA/SPRAT and OSHA Rope Access and Fall-Protection standards. Always maintain 2-point attachments while using Rope Access (main and safety line). Always use 2 independent anchor points capable to withstand 5000 lbs/22KN load.</td>
         </tr>
         <tr>
-            [cite_start]<td><strong>Mental/Physical Fatigue [cite: 102]</strong></td>
-            [cite_start]<td>Rigging mistakes, poor judgement, limited awareness, movement, tools handling and balance issues [cite: 102]</td>
+            <td><strong>Mental/Physical Fatigue</strong></td>
+            <td>Rigging mistakes, poor judgement, limited awareness, movement, tools handling and balance issues</td>
             <td><strong>H</strong></td>
-            <td>Stay alert and Control physical and mental exhaustion by taking breaks. Replenish by having appropriate food and drink breaks. Use "Buddy" check: always help team member to identify mistake or issue if you notice it. [cite_start]Ask Level 2 or Level 3 Rope Access Technician for checking if you have any doubts in your rigging. [cite: 102, 124]</td>
+            <td>Stay alert and Control physical and mental exhaustion by taking breaks. Replenish by having appropriate food and drink breaks. Use "Buddy" check: always help team member to identify mistake or issue if you notice it. Ask Level 2 or Level 3 Rope Access Technician for checking if you have any doubts in your rigging.</td>
         </tr>
         <tr>
-            [cite_start]<td><strong>Dropped Tools / Materials [cite: 124]</strong></td>
-            [cite_start]<td>Injury to personnel working below, injury to public passersby, damage to property [cite: 124]</td>
+            <td><strong>Dropped Tools / Materials</strong></td>
+            <td>Injury to personnel working below, injury to public passersby, damage to property</td>
             <td><strong>H</strong></td>
-            <td>Clearly mark and barricade Hazard Zone (10ft around Access Zone projection). All tools and devices must be tethered or secured. Helmets and hard hats must be always worn within Hazard Zone. [cite_start]Keep clean and organized workplace. [cite: 124, 125]</td>
+            <td>Clearly mark and barricade Hazard Zone (10ft around Access Zone projection). All tools and devices must be tethered or secured. Helmets and hard hats must be always worn within Hazard Zone. Keep clean and organized workplace.</td>
         </tr>
     </table>
 
     <div class="page-break"></div>
 
     <h2>TECHNICIAN ACKNOWLEDGMENT & SIGNATURES</h2>
-    <p>My signature states that I have been briefed and understand the content of this Access Work Plan. [cite_start]I understand my responsibilities, and I am competent to use the required equipment and to carry out the intended tasks Safely. [cite: 129, 130]</p>
+    <p>My signature states that I have been briefed and understand the content of this Access Work Plan. I understand my responsibilities, and I am competent to use the required equipment and to carry out the intended tasks Safely.</p>
     
     <table>
         <tr>
-            [cite_start]<th width="15%">Personnel Roles [cite: 131]</th>
-            [cite_start]<th width="20%">Name [cite: 131]</th>
-            [cite_start]<th width="15%">Contact Phone # [cite: 131]</th>
-            [cite_start]<th width="25%">Signature [cite: 131]</th>
-            [cite_start]<th width="10%">Training [cite: 131]</th>
-            [cite_start]<th width="15%">Emergency Contact [cite: 131]</th>
+            <th width="15%">Personnel Roles</th>
+            <th width="20%">Name</th>
+            <th width="15%">Contact Phone #</th>
+            <th width="25%">Signature</th>
+            <th width="10%">Training</th>
+            <th width="15%">Emergency Contact</th>
         </tr>
         ${rosterRows}
     </table>
