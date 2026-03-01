@@ -71,6 +71,8 @@
         .jsa-conditional { display: none; background: #111; padding: 12px; border-left: 3px solid #f39c12; margin-bottom: 12px; font-size: 0.8rem; color: #aaa; }
         .sig-pad { width: 100%; height: 150px; background: #fff; border-radius: 8px; margin-top: 10px; border: 2px solid #444; touch-action: none; }
         
+        .moisture-panel { background: #1a1a1a; border: 1px solid #d9534f; border-radius: 6px; padding: 10px; margin-top: 8px; display: none; }
+
         .action-btn { width: 100%; padding: 18px; border-radius: 8px; border: none; font-size: 1.2rem; font-weight: 900; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; margin-top: 15px; }
         .btn-blue { background: linear-gradient(180deg, #007bff 0%, #0056b3 100%); }
         .btn-green { background: linear-gradient(180deg, #28a745 0%, #1e7e34 100%); }
@@ -213,8 +215,8 @@
                     <input type="text" id="l3JsaName" placeholder="Your Full Name (L3 Supervisor)" style="margin-bottom:8px;">
                     
                     <div style="display:flex; gap:8px; margin-bottom:8px;">
-                        <button id="gpsBtn" class="btn-dark" style="flex:1; border-radius:6px; padding:10px; font-weight:bold; border:none; cursor:pointer;" onclick="fetchHospitalGPS()">📍 Fetch GPS</button>
-                        <input type="text" id="jsaHospital" placeholder="Nearest Hospital (Requires GPS)" disabled style="flex:2; font-size:0.8rem;">
+                        <button id="gpsBtn" class="btn-dark" style="flex:1; border-radius:6px; padding:10px; font-weight:bold; border:none; cursor:pointer;" onclick="fetchHospitalGPS()">📍 Fetch GPS (ER)</button>
+                        <input type="text" id="jsaHospital" placeholder="Nearest ER (Requires GPS)" disabled style="flex:2; font-size:0.8rem;">
                     </div>
 
                     <div style="display:flex; gap:8px; margin-bottom:8px;">
@@ -318,7 +320,7 @@
                 <button class="action-btn btn-blue" id="btnExportPdfPrimary" style="padding: 22px; margin-top: 0; margin-bottom: 15px;" onclick="exportJSAPDF()">
                     📤 1. SEND PDF JSA TO OFFICE
                 </button>
-                <div id="pdfLoadingStatus" style="display:none; color:#0cf; font-weight:bold; margin-bottom:15px;">Generating PDF format...</div>
+                <div id="pdfLoadingStatus" style="display:none; color:#0cf; font-weight:bold; margin-bottom:15px;">Generating Full PDF... This may take a moment.</div>
                 
                 <button class="action-btn btn-green" style="padding: 22px; margin-top: 0; margin-bottom: 20px;" onclick="goToSlide(1)">
                     🚀 2. PROCEED TO DROP SETUP
@@ -521,11 +523,10 @@
         // --- PASS & SIGN CAROUSEL STATE ---
         let totalCrewCount = 2;
         let currentSignerIndex = 1;
-        let capturedSignatures = []; // Array to hold {role, name, phone, training, emergName, emergPhone, signatureData}
+        let capturedSignatures = []; 
         
         const patternConfigs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
 
-        // --- ALGORITHMIC PIN GENERATOR (OFFLINE) ---
         function getDailyPIN() {
             const d = new Date();
             const seed = (d.getMonth() + 1) * d.getDate() * d.getFullYear() * 42;
@@ -533,31 +534,30 @@
             return pin.toString();
         }
 
-        // --- GPS HOSPITAL FETCH INTEGRATION (OVERPASS API) ---
+        // --- GPS HOSPITAL FETCH INTEGRATION (OVERPASS API) - ER ONLY ---
         function fetchHospitalGPS() {
             const btn = document.getElementById('gpsBtn');
             const input = document.getElementById('jsaHospital');
-            btn.innerText = "Locating...";
+            btn.innerText = "Locating ER...";
             
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition((position) => {
                     const lat = position.coords.latitude;
                     const lon = position.coords.longitude;
                     
-                    // Call OpenStreetMap's free Overpass API for nearest hospital within ~15km
-                    const overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json];node(around:15000,${lat},${lon})["amenity"="hospital"];out 1;`;
+                    // Filter: MUST have emergency=yes tag to filter out psych/rehab clinics
+                    const overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json];(node["amenity"="hospital"]["emergency"="yes"](around:25000,${lat},${lon});way["amenity"="hospital"]["emergency"="yes"](around:25000,${lat},${lon}););out center 1;`;
 
                     fetch(overpassUrl)
                         .then(response => response.json())
                         .then(data => {
                             if (data.elements && data.elements.length > 0) {
                                 const hospital = data.elements[0];
-                                const hName = hospital.tags.name || "Unnamed Hospital";
+                                const hName = hospital.tags.name || "Unnamed Hospital (ER)";
 
-                                // Calculate straight-line distance using Haversine formula
-                                const hLat = hospital.lat;
-                                const hLon = hospital.lon;
-                                const R = 3958.8; // Earth radius in miles
+                                const hLat = hospital.lat || hospital.center.lat;
+                                const hLon = hospital.lon || hospital.center.lon;
+                                const R = 3958.8; 
                                 const dLat = (hLat - lat) * Math.PI / 180;
                                 const dLon = (hLon - lon) * Math.PI / 180;
                                 const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
@@ -566,15 +566,14 @@
                                 const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
                                 const distance = (R * c).toFixed(1);
 
-                                // Estimate drive time (assuming 25mph city traffic = ~2.4 mins per mile)
                                 const estMins = Math.max(5, Math.round(distance * 2.4));
 
                                 input.value = `${hName} (~${estMins} mins, ${distance} mi)`;
                                 input.style.color = "#0cf";
-                                btn.innerText = "✅ Linked";
+                                btn.innerText = "✅ ER Linked";
                                 btn.style.background = "#1e7e34";
                             } else {
-                                input.value = "No hospital found within 15km";
+                                input.value = "No ER found within 25km";
                                 input.disabled = false;
                                 btn.innerText = "No Data";
                                 btn.style.background = "#d9534f";
@@ -599,7 +598,7 @@
             }
         }
 
-        // --- SMART MEMORY LOGIC (SAVE & LOAD SITES) ---
+        // --- SMART MEMORY LOGIC (SAVE, LOAD, & WIPE SITES) ---
         function populateRecentSites() {
             let sites = JSON.parse(localStorage.getItem('strataRecentSites')) || [];
             const dd = document.getElementById('recentSitesDropdown');
@@ -612,6 +611,11 @@
                     opt.text = s.client + " - " + s.site;
                     dd.appendChild(opt);
                 });
+                // Add Wipe Option at the bottom
+                let wipeOpt = document.createElement('option');
+                wipeOpt.value = "wipe";
+                wipeOpt.text = "🚨 CLEAR ALL SAVED SITES";
+                dd.appendChild(wipeOpt);
             } else {
                 dd.style.display = 'none';
             }
@@ -620,6 +624,19 @@
         function loadRecentSite() {
             const dd = document.getElementById('recentSitesDropdown');
             const idx = dd.value;
+            
+            if(idx === "wipe") {
+                if(confirm("Are you sure you want to delete all saved Site Profiles?")) {
+                    localStorage.removeItem('strataRecentSites');
+                    populateRecentSites();
+                    document.getElementById('jsaClient').value = "";
+                    document.getElementById('jsaSiteName').value = "";
+                } else {
+                    dd.value = ""; // Reset dropdown
+                }
+                return;
+            }
+
             if(idx !== "") {
                 let sites = JSON.parse(localStorage.getItem('strataRecentSites')) || [];
                 const s = sites[idx];
@@ -641,13 +658,12 @@
                 const exists = sites.findIndex(s => s.client === client && s.site === site);
                 if(exists !== -1) sites.splice(exists, 1);
                 sites.unshift({client, site, env, height}); 
-                if(sites.length > 5) sites.pop(); 
+                if(sites.length > 10) sites.pop(); 
                 localStorage.setItem('strataRecentSites', JSON.stringify(sites));
                 populateRecentSites(); 
             }
         }
 
-        // --- COMPLIANCE MODE LOGIC ---
         function setComplianceMode(mode) {
             activeComplianceMode = mode;
             document.getElementById('modeBtnL3').classList.toggle('active', mode === 'L3');
@@ -672,7 +688,6 @@
             document.getElementById('crewCountVal').innerText = totalCrewCount;
         }
 
-        // --- START PASS & SIGN CAROUSEL ---
         function startSignatureCarousel() {
             const toggles = document.querySelectorAll('.warning-card .jsa-toggle');
             let allChecked = true;
@@ -778,7 +793,6 @@
             window.scrollTo(0, 0); 
         }
 
-        // --- TECHNICIAN UNLOCK LOGIC ---
         function techUnlockApp() {
             const enteredPin = document.getElementById('techPinInput').value;
             const techName = document.getElementById('techPersonalName').value;
@@ -857,7 +871,6 @@
             }
         }
 
-        // --- SIGNATURE CANVAS LOGIC ---
         const canvas = document.getElementById('sigCanvas');
         const ctx = canvas.getContext('2d');
         let drawing = false;
@@ -1411,21 +1424,21 @@
                 storedSigs.forEach(sig => {
                     rosterRows += `
                     <tr>
-                        <td><strong>${sig.role}</strong></td>
-                        <td>${sig.name}</td>
-                        <td>${sig.phone}</td>
-                        <td style="text-align:center; vertical-align:middle;">
-                            <img src="${sig.signatureData}" class="sig-img" alt="Digital Signature" />
+                        <td style="border:1px solid #000; padding:6px;"><strong>${sig.role}</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">${sig.name}</td>
+                        <td style="border:1px solid #000; padding:6px;">${sig.phone}</td>
+                        <td style="border:1px solid #000; padding:6px; text-align:center; vertical-align:middle;">
+                            <img src="${sig.signatureData}" class="sig-img" alt="Digital Signature" style="max-height: 40px; max-width: 150px;" />
                         </td>
-                        <td>${sig.training}</td>
-                        <td>${sig.emergName}<br>${sig.emergPhone}</td>
+                        <td style="border:1px solid #000; padding:6px;">${sig.training}</td>
+                        <td style="border:1px solid #000; padding:6px;">${sig.emergName}<br>${sig.emergPhone}</td>
                     </tr>`;
                 });
             } else {
-                rosterRows = `<tr><td colspan="6" style="text-align:center; color:#888;">No signatures found.</td></tr>`;
+                rosterRows = `<tr><td colspan="6" style="border:1px solid #000; padding:6px; text-align:center; color:#888;">No signatures found.</td></tr>`;
             }
 
-            // Build the HTML wrapper specifically styled for html2pdf rendering
+            // FULL 13-PAGE COMPLIANT HTML WRAPPER
             const wrapper = document.createElement('div');
             wrapper.style.fontFamily = 'Arial, sans-serif';
             wrapper.style.color = '#000';
@@ -1471,7 +1484,7 @@
                     </tr>
                     <tr>
                         <td style="border:1px solid #000; padding:8px;">[X] Radio<br>[X] Cell Phone<br>[X] Hand Signals Reviewed</td>
-                        <td style="border:1px solid #000; padding:8px;"><strong>Status:</strong><br>${hospitalText}</td>
+                        <td style="border:1px solid #000; padding:8px;"><strong>Status (ER):</strong><br>${hospitalText}</td>
                         <td style="border:1px solid #000; padding:8px;"><strong>EMS Phone:</strong> 911<br><strong>Life Flight?:</strong> NO</td>
                     </tr>
                 </table>
@@ -1501,47 +1514,113 @@
                 <table style="width:100%; border-collapse:collapse; margin-bottom:15px;">
                     <tr>
                         <td style="border:1px solid #000; padding:8px; width:25%;"><strong>Briefing & Safety</strong></td>
-                        <td style="border:1px solid #000; padding:8px; width:75%;">Equipment unloading, pre-use inspection. Installing barricades. Anchor points assessment.</td>
+                        <td style="border:1px solid #000; padding:8px; width:75%;">Equipment unloading, transportation and pre-use inspection. Installing barricades around hazard zone. Anchor points assessment.</td>
                     </tr>
                     <tr>
                         <td style="border:1px solid #000; padding:8px;"><strong>Access/Fall Zone</strong></td>
-                        <td style="border:1px solid #000; padding:8px;">Whenever on ropes, 6 feet from unprotected edge. No one shall enter fall zone without fall protection.</td>
+                        <td style="border:1px solid #000; padding:8px;">Whenever on ropes, 6 feet from the unprotected edge (parapet/railings lower than 42 inches). No one shall enter the fall zone without appropriate fall protection system.</td>
                     </tr>
                     <tr>
                         <td style="border:1px solid #000; padding:8px;"><strong>Anchorage</strong></td>
-                        <td style="border:1px solid #000; padding:8px;">Engineered access anchors, structural elements. Primary support minimum strength of 12 kN (2700 lbf). <strong>(VERIFIED)</strong></td>
+                        <td style="border:1px solid #000; padding:8px;">Engineered access anchors, roof shafts, structural building elements. Primary support minimum strength of 12 kN (2700 lbf). <strong>(VERIFIED)</strong></td>
                     </tr>
                     <tr>
                         <td style="border:1px solid #000; padding:8px;"><strong>Equipment</strong></td>
-                        <td style="border:1px solid #000; padding:8px;">7/16" Kernmantle Static Ropes, Connectors, Harness, Descenders, Backup Devices, Lanyard. <strong>(VERIFIED)</strong></td>
+                        <td style="border:1px solid #000; padding:8px;">7/16" Kernmantle Static Ropes (MBS 22.2KN/5000 lbf), Connectors, Harness, Descenders (Petzl ID/ Rig), Backup Devices (Petzl ASAP), Lanyard. <strong>(VERIFIED)</strong></td>
                     </tr>
                 </table>
 
-                <h2 style="font-size:14px; background:#eee; padding:6px; margin-top:10px; border:1px solid #000;">RISK ASSESSMENT & JSA</h2>
-                <table style="width:100%; border-collapse:collapse; margin-bottom:15px;">
+                <h2 style="font-size:14px; background:#eee; padding:6px; margin-top:10px; border:1px solid #000;">RESCUE PLAN</h2>
+                <ol style="margin-left: 15px; padding-left: 15px; margin-bottom: 20px;">
+                    <li style="margin-bottom: 5px;">Establish communication with a potential victim if it's possible.</li>
+                    <li style="margin-bottom: 5px;">In any life threatening/or potential injury situation call 9-1-1 immediately.</li>
+                    <li style="margin-bottom: 5px;">Assess casualty condition (conscious/unconscious, ABC-airways, breathing, circulation, shock). Assess position and system condition (ropes, carabiners, anchors).</li>
+                    <li style="margin-bottom: 5px;">Implement rescue if it's possible or wait for a response. Be aware of suspension trauma. Keep horizontal position. Implement rescue within 40 min.</li>
+                    <li style="margin-bottom: 5px;"><strong>MID-ROPE RESCUE:</strong> rig independent rescue line (if victim's ropes are damaged), ascend, implement pick off rescue with guided lowering to the ground.</li>
+                    <li style="margin-bottom: 5px;"><strong>PICK OFF RESCUE:</strong> only use equipment certified for 2 persons load (PETZL I'D with breaking carabiner, PETZL ASAP back-up device).</li>
+                </ol>
+
+                <div class="html2pdf__page-break"></div>
+
+                <h2 style="font-size:14px; background:#eee; padding:6px; margin-top:10px; border:1px solid #000;">RISK ASSESSMENT & JSA MATRIX</h2>
+                <table style="width:100%; border-collapse:collapse; margin-bottom:15px; font-size: 11px;">
                     <tr>
-                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5; width:20%;">Hazard</th>
-                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5; width:25%;">Effect</th>
-                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5; width:10%;">Lvl</th>
-                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5; width:45%;">Control Measures</th>
+                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5; width:20%;">Hazard</th>
+                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5; width:20%;">Effect</th>
+                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5; width:5%;">Lvl</th>
+                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5; width:55%;">Control Measures</th>
                     </tr>
                     <tr>
-                        <td style="border:1px solid #000; padding:8px;"><strong>Personal Falling</strong></td>
-                        <td style="border:1px solid #000; padding:8px;">Gravity-induced injury or death</td>
-                        <td style="border:1px solid #000; padding:8px; text-align:center;"><strong>H</strong></td>
-                        <td style="border:1px solid #000; padding:8px;">Follow SPRAT/OSHA standards. Maintain 2-point attachments. Use 2 independent anchor points (22KN).</td>
+                        <td style="border:1px solid #000; padding:6px;"><strong>Personal Falling</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">Gravity-induced injury or death</td>
+                        <td style="border:1px solid #000; padding:6px; text-align:center;"><strong>H</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">Follow SPRAT/OSHA standards. Maintain 2-point attachments. Use 2 independent anchor points (22KN). Inspect equipment prior to each use.</td>
                     </tr>
                     <tr>
-                        <td style="border:1px solid #000; padding:8px;"><strong>Mental/Physical Fatigue</strong></td>
-                        <td style="border:1px solid #000; padding:8px;">Rigging mistakes, poor judgement</td>
-                        <td style="border:1px solid #000; padding:8px; text-align:center;"><strong>H</strong></td>
-                        <td style="border:1px solid #000; padding:8px;">Control exhaustion by taking breaks. Replenish with food/drink. Ask L3 to verify rigging.</td>
+                        <td style="border:1px solid #000; padding:6px;"><strong>Mental/Physical Fatigue</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">Rigging mistakes, poor judgement, limited awareness</td>
+                        <td style="border:1px solid #000; padding:6px; text-align:center;"><strong>H</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">Control exhaustion by taking breaks. Replenish with food/drink. Ask L2 or L3 to verify rigging if in doubt. Use "Buddy" check.</td>
                     </tr>
                     <tr>
-                        <td style="border:1px solid #000; padding:8px;"><strong>Dropped Tools</strong></td>
-                        <td style="border:1px solid #000; padding:8px;">Injury to personnel, property damage</td>
-                        <td style="border:1px solid #000; padding:8px; text-align:center;"><strong>H</strong></td>
-                        <td style="border:1px solid #000; padding:8px;">Barricade Hazard Zone (10ft). Tether tools. Helmets must be worn.</td>
+                        <td style="border:1px solid #000; padding:6px;"><strong>Dropped Tools / Materials</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">Injury to personnel below, property damage</td>
+                        <td style="border:1px solid #000; padding:6px; text-align:center;"><strong>H</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">Barricade Hazard Zone (10ft projection). Tether all tools. Helmets must be worn. Never place unsecured equipment on parapets.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid #000; padding:6px;"><strong>Sharp / Abrasive Edges</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">Rope failure, severe cuts</td>
+                        <td style="border:1px solid #000; padding:6px; text-align:center;"><strong>H</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">Visually inspect edges. Install rope protection / edge rollers to prevent movement along sharp surfaces.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid #000; padding:6px;"><strong>Dislodged Substrate</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">Falling debris, injury to public</td>
+                        <td style="border:1px solid #000; padding:6px; text-align:center;"><strong>M</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">Visually inspect building features before applying pressure. Control rope positioning to prevent pressure on fragile elements.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid #000; padding:6px;"><strong>Tools Injury</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">Cuts, eye damage, gear damage</td>
+                        <td style="border:1px solid #000; padding:6px; text-align:center;"><strong>M</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">Follow manufacturer specs. Wear PPE (gloves, eyewear). Avoid clothing entanglement.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid #000; padding:6px;"><strong>Chemicals</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">Skin/eye burns, harness degradation</td>
+                        <td style="border:1px solid #000; padding:6px; text-align:center;"><strong>M</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">Read MSDS. Wear required PPE. Avoid exposing ropes and lanyards to corrosive chemicals.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid #000; padding:6px;"><strong>Overhead Power Lines</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">Electrocution</td>
+                        <td style="border:1px solid #000; padding:6px; text-align:center;"><strong>H</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">Keep all equipment at least 10ft away. Manage ropes to prevent wind swing towards lines.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid #000; padding:6px;"><strong>High RF / Antennas</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">Internal heating, organ damage</td>
+                        <td style="border:1px solid #000; padding:6px; text-align:center;"><strong>M</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">Avoid staying directly in front of active transmitters. Max exposure 10mW/cm2 for 6 mins.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid #000; padding:6px;"><strong>Sun / Heat / Wind</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">Heat stroke, swing hazards</td>
+                        <td style="border:1px solid #000; padding:6px; text-align:center;"><strong>M</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">Hydrate. Egress safely if dizzy. Avoid work on wind-exposed areas if gusts exceed 25 mph.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid #000; padding:6px;"><strong>Passing Vehicles</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">Rope entanglement, fall hazard</td>
+                        <td style="border:1px solid #000; padding:6px; text-align:center;"><strong>M</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">Pre-coil end of ropes at least 15 feet off ground. Barricade drop zone below.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid #000; padding:6px;"><strong>Insects (Bees/Wasps)</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">Allergic reaction, distraction</td>
+                        <td style="border:1px solid #000; padding:6px; text-align:center;"><strong>L</strong></td>
+                        <td style="border:1px solid #000; padding:6px;">Monitor recessed areas. Egress safely if stung. Keep 5ft clearance from active nests.</td>
                     </tr>
                 </table>
 
@@ -1550,14 +1629,14 @@
                 <h2 style="font-size:14px; background:#eee; padding:6px; margin-top:10px; border:1px solid #000;">TECHNICIAN ACKNOWLEDGMENT & SIGNATURES</h2>
                 <p style="margin:10px 0 20px 0;">My signature states that I have been briefed and understand the content of this Access Work Plan. I understand my responsibilities, and I am competent to use the required equipment and to carry out the intended tasks Safely.</p>
                 
-                <table style="width:100%; border-collapse:collapse; margin-bottom:15px;">
+                <table style="width:100%; border-collapse:collapse; margin-bottom:15px; font-size: 11px;">
                     <tr>
-                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5;">Personnel Roles</th>
-                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5;">Name</th>
-                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5;">Contact Phone #</th>
-                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5;">Signature</th>
-                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5;">Training</th>
-                        <th style="border:1px solid #000; padding:8px; background:#f5f5f5;">Emergency Contact</th>
+                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5;">Personnel Roles</th>
+                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5;">Name</th>
+                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5;">Contact Phone #</th>
+                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5;">Signature</th>
+                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5;">Training</th>
+                        <th style="border:1px solid #000; padding:6px; background:#f5f5f5;">Emergency Contact</th>
                     </tr>
                     ${rosterRows}
                 </table>
@@ -1581,7 +1660,6 @@
             html2pdf().set(opt).from(wrapper).outputPdf('blob').then(async function(pdfBlob) {
                 const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
-                // Restore UI
                 if(btnPrimary) btnPrimary.style.display = 'block';
                 if(loadingText) loadingText.style.display = 'none';
 
