@@ -1624,11 +1624,12 @@
 
             const getCheck = (val) => env === val ? '☒' : '☐';
 
+            // PDF WRAPPER - PORTRAIT (7.5 inches wide for content)
             const wrapper = document.createElement('div');
             wrapper.style.fontFamily = 'Arial, sans-serif';
             wrapper.style.color = '#000000'; 
             wrapper.style.fontSize = '14px'; 
-            wrapper.style.width = '10in'; 
+            wrapper.style.width = '7.5in'; 
             wrapper.style.boxSizing = 'border-box';
             wrapper.style.padding = '0';
             wrapper.style.background = '#fff';
@@ -1903,11 +1904,11 @@
                 <table style="width:100%; table-layout:fixed; border-collapse:collapse; font-size:12px;">
                     <tr style="page-break-inside: avoid;">
                         <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:15%;">Activity/Hazard</th>
-                        <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:18%;">Hazard Effect</th>
+                        <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:15%;">Hazard Effect</th>
                         <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:6%;">SEV</th>
                         <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:6%;">PROB</th>
                         <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:6%;">RISK LVL</th>
-                        <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:43%;">CONTROL MEASURES</th>
+                        <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:46%;">CONTROL MEASURES</th>
                         <th style="border:1px solid #000; padding:4px; background:#f5f5f5; width:6%;">RESID RISK</th>
                     </tr>
                     <tr style="page-break-inside: avoid;">
@@ -2058,7 +2059,7 @@
                 </table>
 
                 <div style="margin-top:40px; font-size:11px; color:#333; text-align:center;">
-                    Strata Access Group, Inc. &bull; Generated via Strata-Scan Pro Fleet &bull; Document Timestamp: ${date} ${time}
+                    Strata Access Group, Inc. • Generated via Strata-Scan Pro Fleet • Document Timestamp: ${date} ${time}
                 </div>
             `;
             return wrapper;
@@ -2084,7 +2085,7 @@
               filename:     fileName,
               image:        { type: 'jpeg', quality: 0.98 },
               html2canvas:  { scale: 2 },
-              jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' },
+              jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
               pagebreak:    { mode: ['css', 'legacy'], avoid: 'tr' }
             };
 
@@ -2136,7 +2137,7 @@
               filename:     'JSA_Preview.pdf',
               image:        { type: 'jpeg', quality: 0.98 },
               html2canvas:  { scale: 2 },
-              jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' },
+              jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
               pagebreak:    { mode: ['css', 'legacy'], avoid: 'tr' }
             };
 
