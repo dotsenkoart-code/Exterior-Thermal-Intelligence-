@@ -115,6 +115,20 @@
         <div id="cmdIDDisplay" class="fixed-id">A-12-L</div>
     </div>
 
+    <div id="handoffModal" class="modal-overlay">
+        <div class="modal-box" style="border-color:#0cf;">
+            <h2 style="color:#0cf; margin-top:0; font-size: 2rem;">🤝 TABLET HAND-OFF</h2>
+            <p style="color:#ccc; font-size:1.1rem; margin-bottom:15px; line-height:1.4;">
+                Rigging signed off by: <strong id="handoffL3Name" style="color:#fff;">--</strong><br><br>
+                Who is taking the tablet over the edge for this drop?
+            </p>
+            <select id="activeTechSelect" style="width: 100%; font-size: 1.5rem; padding: 15px; margin-bottom: 25px; background: #222; color: #fff; border: 2px solid #0cf; border-radius: 8px; text-align: center;">
+                </select>
+            <button class="modal-btn btn-green" onclick="startDropFromHandoff()" style="font-size: 1.2rem; padding: 25px 10px;">🚀 LOCK IN & START DROP</button>
+            <button class="modal-btn btn-dark" onclick="closeHandoffModal()">🔙 CANCEL</button>
+        </div>
+    </div>
+
     <div id="preFlightModal" class="modal-overlay">
         <div class="modal-box" style="border-color:#0cf;">
             <h2 style="color:#0cf; margin-top:0; font-size: 2rem;">⚠️ PRE-FLIGHT CHECK</h2>
@@ -398,7 +412,7 @@
 
                 <div id="pdfLoadingStatus" style="display:none; color:#0cf; font-weight:bold; margin-bottom:15px;">Generating Document... Please Wait.</div>
                 
-                <button class="action-btn btn-green" style="padding: 22px; margin-top: 0; margin-bottom: 20px;" onclick="goToSlide(1)">
+                <button class="action-btn btn-green" style="padding: 22px; margin-top: 0; margin-bottom: 20px;" onclick="openHandoffModal()">
                     🚀 PROCEED TO DROP SETUP
                 </button>
 
@@ -600,6 +614,63 @@
         let capturedSignatures = []; 
         
         const patternConfigs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
+
+        // --- HAND-OFF LOGIC ---
+        function openHandoffModal() {
+            // Get the L3 Name
+            let l3Name = "--";
+            const l3Sig = capturedSignatures.find(sig => sig.role.includes("L3"));
+            if(l3Sig) l3Name = l3Sig.name;
+            else if (capturedSignatures.length > 0) l3Name = capturedSignatures[0].name;
+            
+            document.getElementById('handoffL3Name').innerText = l3Name;
+
+            // Dynamically populate dropdown with the crew who signed the JSA
+            const select = document.getElementById('activeTechSelect');
+            select.innerHTML = '<option value="" disabled selected>Select Technician...</option>';
+            
+            capturedSignatures.forEach(sig => {
+                let opt = document.createElement('option');
+                opt.value = sig.name;
+                // Formats it so it looks like: "Art (Rope Access Supervisor L3)"
+                opt.text = sig.name + " (" + sig.role.split(' ')[0] + " " + sig.role.split(' ')[1] + ")"; 
+                select.appendChild(opt);
+            });
+            
+            // Add a manual override just in case
+            let optOther = document.createElement('option');
+            optOther.value = "OTHER";
+            optOther.text = "Other (Manual Entry)";
+            select.appendChild(optOther);
+
+            // Show Modal
+            document.getElementById('handoffModal').style.display = 'flex';
+        }
+
+        function closeHandoffModal() {
+            document.getElementById('handoffModal').style.display = 'none';
+        }
+
+        function startDropFromHandoff() {
+            const select = document.getElementById('activeTechSelect');
+            if (select.value === "") {
+                alert("Hold up! Select your name before going over the edge.");
+                return;
+            }
+
+            let finalName = select.value;
+            if (finalName === "OTHER") {
+                finalName = prompt("Enter Active Technician Name:");
+                if (!finalName) return; 
+            }
+
+            // Lock the active tech name into the Map Logistics!
+            document.getElementById('techName').value = finalName;
+            
+            // Close the handoff and go to the Map
+            document.getElementById('handoffModal').style.display = 'none';
+            goToSlide(1);
+        }
 
         function getDailyPIN() {
             const d = new Date();
@@ -1080,6 +1151,12 @@
         function initApp() {
             populateRecentSites();
             checkJsaState();
+            
+            // Rehydrate signatures if they exist so the Handoff screen works even if the app reloads!
+            if (localStorage.getItem('jsaSignaturesPayload')) {
+                try { capturedSignatures = JSON.parse(localStorage.getItem('jsaSignaturesPayload')); } catch(e){}
+            }
+
             if (localStorage.getItem('strataVault')) {
                 document.getElementById('logTable').querySelector('tbody').innerHTML = localStorage.getItem('strataVault');
             }
