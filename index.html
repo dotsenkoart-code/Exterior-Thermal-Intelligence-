@@ -58,7 +58,7 @@
         .check-item.active { background: #0cf; color: #000; border-color: #fff; }
         .check-item.sound-box.active { background: #28a745; color: #fff; border-color: #fff; }
         
-        .ppe-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+        .ppe-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 10px; }
         .ppe-item { background: #111; padding: 10px; border-radius: 4px; font-size: 0.75rem; border: 1px solid #333; color: #aaa; text-align: left; }
         .ppe-item input { margin-right: 8px; transform: scale(1.2); }
 
@@ -459,7 +459,7 @@
                     </div>
                     <div style="flex:1;">
                         <label>Cam ID</label>
-                        <input type="text" id="camID" class="setup-input" placeholder="e.g. C1">
+                        <input type="text" id="camID" class="setup-input" placeholder="e.g. 1">
                     </div>
                 </div>
             </div>
@@ -1376,7 +1376,7 @@
             const tech = document.getElementById('techName').value || "Tech";
             const id = document.getElementById('fullIDDisplay').innerText;
             const imgEl = document.getElementById('imgNum');
-            const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
+            const imgStr = cam + "-FLIR" + imgEl.value.toString().padStart(4, '0');
             
             const row = `<tr>
                 <td class="export-only">${proj}</td>
@@ -1400,7 +1400,7 @@
             const tech = document.getElementById('techName').value || "Tech";
             const id = document.getElementById('fullIDDisplay').innerText;
             const imgEl = document.getElementById('imgNum');
-            const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
+            const imgStr = cam + "-FLIR" + imgEl.value.toString().padStart(4, '0');
             
             let finds = [];
             document.querySelectorAll('.check-item.active').forEach(el => finds.push(el.innerText));
