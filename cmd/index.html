@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Strata Command Center | v6.2 Lean Digital Twin</title>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="manifest" href="manifest_cmd.json">
+    <meta name="theme-color" content="#0f111a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Strata CMD">
+    <meta name="mobile-web-app-capable" content="yes">
+
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background: #0f111a; color: #fff; margin: 0; padding: 20px; overflow-x: hidden; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0cf; padding-bottom: 15px; margin-bottom: 20px; }
+        .header h1 { margin: 0; font-size: 1.8rem; font-weight: 900; letter-spacing: 1px; color: #fff; }
+        .header span { color: #0cf; }
+        
+        /* --- MAPPING SCREEN --- */
+        #mapping-screen { background: #1a1d27; border-radius: 12px; padding: 25px; border: 1px solid #333; display: none; margin-bottom: 20px; }
+        .elevation-creator { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 20px; }
+        .elevation-creator input { flex: 1; padding: 12px; background: #111; border: 1px solid #444; color: #fff; border-radius: 6px; font-size: 1rem; }
+        .mapping-row { display: flex; justify-content: space-between; align-items: center; background: #111; padding: 15px; border-radius: 6px; margin-bottom: 10px; border: 1px solid #222; }
+        .mapping-row select { padding: 10px; background: #222; color: #0cf; border: 1px solid #444; border-radius: 4px; font-size: 1rem; font-weight: bold; width: 200px; }
+        .mapping-row select:disabled { color: #888; border-color: #333; cursor: not-allowed; }
+
+        /* --- DASHBOARD CONTROLS --- */
+        #dashboard-screen { display: none; }
+        .view-controls { display: flex; gap: 10px; margin-bottom: 20px; background: #1a1d27; padding: 10px; border-radius: 8px; border: 1px solid #333; align-items: center; }
+        .view-toggle-btn { flex: 1; padding: 12px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; background: #222; color: #888; transition: 0.2s; }
+        .view-toggle-btn.active { background: #0cf; color: #000; }
+        
+        #btn-true3d { background: #2b113d; color: #d080ff; border: 1px solid #5a2e7a; }
+        #btn-true3d.active { background: #b055ff; color: #fff; }
+
+        .stitch-mode-on { border-color: #f39c12 !important; background: rgba(243, 156, 18, 0.4) !important; color: #fff !important; box-shadow: 0 0 15px rgba(243, 156, 18, 0.8) !important; }
+        .tag-mode-on { border-color: #d080ff !important; background: rgba(176, 85, 255, 0.4) !important; color: #fff !important; box-shadow: 0 0 15px rgba(176, 85, 255, 0.8) !important; }
+        .node-selected { border-color: #0cf !important; transform: scale(1.1); box-shadow: 0 0 15px #0cf !important; z-index: 20 !important; }
+
+        .tabs-container { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 5px; border-bottom: 2px solid #333; margin-bottom: 20px; }
+        .tab { padding: 12px 25px; background: #1a1d27; color: #888; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: bold; font-size: 1rem; border: 1px solid #333; border-bottom: none; transition: 0.2s; white-space: nowrap; }
+        .tab:hover { background: #202430; color: #ccc; }
+        .tab.active { background: #0cf; color: #000; border-color: #0cf; }
+
+        /* --- STATS BAR & FILTERS --- */
+        .stats-bar { display: flex; gap: 10px; margin-bottom: 20px; }
+        .stat-card { flex: 1; background: #1a1d27; padding: 15px; border-radius: 8px; border-left: 4px solid #333; cursor: pointer; transition: transform 0.2s, opacity 0.2s; }
+        .stat-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        .stat-card.dimmed { opacity: 0.3; }
+        .stat-card.no-hover { cursor: default; }
+        .stat-card.no-hover:hover { transform: none; box-shadow: none; }
+        .stat-label { font-size: 0.75rem; color: #888; text-transform: uppercase; font-weight: bold; }
+        .stat-value { font-size: 2rem; font-weight: 900; margin-top: 5px; }
+
+        /* --- 2D GRID STYLES --- */
+        #building-container-2d { display: flex; gap: 15px; overflow-x: auto; padding-bottom: 20px; align-items: stretch; }
+        .drop-column { background: #161922; border: 1px solid #2a2d38; border-radius: 8px; padding: 10px; display: flex; flex-direction: column; min-width: max-content; box-sizing: border-box; }
+        
+        .drop-header { text-align: center; font-size: 1.2rem; font-weight: bold; color: #0cf; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 10px; height: 40px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
+        
+        .floor-axis-column { background: transparent; border: none; padding-right: 0; padding-left: 0; min-width: auto; margin-right: -5px; }
+        .floor-axis-header { border-bottom-color: transparent; color: transparent; height: 40px; margin-bottom: 10px; padding-bottom: 10px; box-sizing: border-box; }
+        
+        .floor-row { display: flex; align-items: center; margin-bottom: 4px; height: 50px; box-sizing: border-box; }
+        .floor-label { width: 35px; font-weight: bold; color: #888; font-size: 0.9rem; text-align: right; margin-right: 10px; height: 50px; display: flex; align-items: center; justify-content: flex-end; box-sizing: border-box; }
+        
+        .window-group { display: flex; gap: 4px; flex: 1; justify-content: center; width: 140px; height: 50px; box-sizing: border-box; } 
+        .window-node { flex: 1; height: 50px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: bold; color: rgba(255,255,255,0.9); border: 2px solid rgba(0,0,0,0.5); transition: transform 0.1s; position: relative; box-sizing: border-box; }
+        .window-node:hover { transform: scale(1.1); box-shadow: 0 5px 15px rgba(0,0,0,0.8); z-index: 10; }
+        
+        .node-filtered-out { opacity: 0.15 !important; filter: grayscale(1) !important; pointer-events: none; border-color: transparent !important; }
+
+        .stitch-bridge { position: absolute; top: -2px; bottom: -2px; right: -39px; width: 39px; z-index: -1; border-top: 2px solid rgba(0,0,0,0.5); border-bottom: 2px solid rgba(0,0,0,0.5); box-sizing: border-box; }
+
+        .status-clear { background: #28a745; } 
+        .status-flagged { background: #f1c40f; color: #000; } 
+        .status-confirmed { background: #d9534f; } 
+        .status-empty { background: #222; border: 2px dashed #444; color: #555; pointer-events: none; }
+        .status-void { background: transparent; border: 2px solid transparent; cursor: default; pointer-events: none; }
+
+        /* --- TRUE 3D TWIN VIEWER --- */
+        #arena-true3d { display: none; width: 100%; height: 80vh; min-height: 700px; background: radial-gradient(circle, #2a2d38 0%, #0f111a 100%); border: 1px solid #5a2e7a; border-radius: 12px; overflow: hidden; position: relative; margin-bottom: 20px; box-shadow: 0 0 30px rgba(176, 85, 255, 0.2); }
+        model-viewer { width: 100%; height: 100%; outline: none; }
+        
+        .btn-fullscreen { position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.7); color: #fff; border: 1px solid #555; z-index: 100; padding: 10px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; letter-spacing: 1px; }
+        .btn-fullscreen:hover { border-color: #fff; background: #000; }
+        
+        .floating-tools { position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 100; }
+        .float-btn { padding: 15px 30px; font-weight: bold; border-radius: 30px; border: 2px solid #555; cursor: pointer; background: rgba(0,0,0,0.8); color: #fff; transition: 0.2s; box-shadow: 0 10px 25px rgba(0,0,0,0.8); backdrop-filter: blur(5px); font-size: 1rem; }
+        .float-btn:hover { border-color: #0cf; }
+
+        /* 3D PIN HOTSPOTS */
+        .hotspot-dot { width: 18px; height: 18px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 15px rgba(0,0,0,0.8); cursor: pointer; padding: 0; margin: 0; transform: translate(-50%, -50%); transition: all 0.2s ease-in-out; }
+        .hotspot-dot:hover { transform: translate(-50%, -50%) scale(1.5); z-index: 100; }
+        .hotspot-dot.status-clear { background: #28a745; box-shadow: 0 0 15px #28a745; }
+        .hotspot-dot.status-flagged { background: #f1c40f; box-shadow: 0 0 15px #f1c40f; }
+        .hotspot-dot.status-confirmed { background: #d9534f; box-shadow: 0 0 15px #d9534f; }
+        
+        .hotspot-label { position: absolute; background: rgba(0,0,0,0.8); color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; top: -30px; left: 50%; transform: translateX(-50%); white-space: nowrap; pointer-events: none; border: 1px solid #555; }
+
+        /* --- NEW: INSTRUCTION OVERLAY FOR BULK TAGGING --- */
+        #tag-instruction-bar { display: none; position: fixed; top: 0; left: 0; width: 100%; background: #d080ff; color: #000; text-align: center; padding: 15px; font-weight: 900; font-size: 1.2rem; z-index: 9999; box-shadow: 0 5px 25px rgba(208, 128, 255, 0.5); }
+        #tag-instruction-bar button { margin-left: 20px; padding: 5px 15px; font-weight: bold; background: #000; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+
+        /* --- MODALS --- */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 2000; backdrop-filter: blur(3px); }
+        .modal-box { background: #1a1d27; border: 1px solid #0cf; border-radius: 12px; padding: 25px; width: 500px; max-height: 90vh; overflow-y: auto; box-shadow: 0 15px 35px rgba(0,0,0,0.9); }
+        .modal-title { font-size: 2rem; color: #0cf; margin: 0 0 5px 0; font-weight: 900; }
+        .modal-subtitle { color: #888; margin-bottom: 15px; font-size: 0.9rem; }
+        
+        .photo-gallery { display: flex; gap: 10px; overflow-x: auto; margin-bottom: 15px; padding-bottom: 5px; }
+        .photo-gallery img { flex: 1; width: 100%; min-width: 200px; border-radius: 8px; border: 2px solid #333; object-fit: cover; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        
+        .no-photo-banner { background: #222; color: #666; padding: 20px; text-align: center; border-radius: 8px; border: 1px dashed #444; margin-bottom: 15px; font-size: 0.9rem; font-weight: bold; }
+
+        .data-row { display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding: 10px 0; }
+        .data-label { color: #888; font-size: 0.8rem; text-transform: uppercase; }
+        .data-val { font-weight: bold; text-align: right; max-width: 65%; color: #fff; }
+        
+        .manager-section { margin-top: 20px; background: #111; padding: 15px; border-radius: 8px; border: 1px solid #333; }
+        .modal-notes { width: 100%; height: 80px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; padding: 10px; margin-top: 5px; font-family: inherit; resize: none; box-sizing: border-box; }
+        
+        .status-btns { display: flex; gap: 10px; margin-top: 15px; margin-bottom: 15px; }
+        .btn-status { flex: 1; padding: 10px; font-size: 0.8rem; border-radius: 4px; }
+        .btn-status-yellow { background: #f1c40f; color: #000; }
+        .btn-status-yellow:hover { background: #e2b607; }
+
+        .btn { padding: 12px 20px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; font-size: 1rem; text-transform: uppercase; letter-spacing: 1px; }
+        .btn-blue { background: #0cf; color: #000; }
+        .btn-blue:hover { background: #00aadd; }
+        .btn-dark { background: #333; color: #fff; border: 1px solid #555; }
+        .btn-dark:hover { background: #444; }
+        .btn-red { background: #d9534f; color: #fff; }
+        .btn-red:hover { background: #c9302c; }
+        .btn-green { background: #28a745; color: #fff; }
+        .btn-green:hover { background: #218838; }
+        .btn-block { width: 100%; margin-top: 10px; }
+        .header-btns { display: flex; gap: 10px; }
+    </style>
+</head>
+<body>
+
+    <div id="tag-instruction-bar">
+        <span id="tag-instruction-text">Double-Click the model...</span>
+        <button onclick="cancelBulkTag()">CANCEL</button>
+    </div>
+
+    <div class="header">
+        <div>
+            <h1>STRATA COMMAND <span>| v6.2 Lean Digital Twin</span></h1>
+            <div id="project-name" style="font-weight: bold; color: #888; margin-top: 5px;">Awaiting Data...</div>
+        </div>
+        <div class="header-btns">
+            <button class="btn btn-dark" id="btn-reset" style="display:none;" onclick="resetBoard()">🔄 CLEAR</button>
+            <button class="btn btn-dark" id="btn-edit-map" style="display:none;" onclick="editMapping()">🗺️ EDIT MAP</button>
+            <button class="btn btn-blue" id="btn-export" style="display:none;" onclick="exportReviewedCSV()">💾 EXPORT CSV</button>
+        </div>
+    </div>
+
+    <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+        <input type="file" id="csvInput" accept=".csv" style="display: none;" onchange="handleFiles(this.files)">
+        <button class="btn btn-dark" style="flex: 1; padding: 20px; font-size: 1.1rem; border: 2px dashed #0cf; background: #161922;" onclick="document.getElementById('csvInput').click()">
+            📄 1. LOAD CSV DATA
+        </button>
+
+        <input type="file" id="mediaInput" multiple accept=".jpg,.png,.glb,.gltf" style="display: none;" onchange="handleFiles(this.files)">
+        <button class="btn btn-dark" style="flex: 2; padding: 20px; font-size: 1.1rem; border: 2px dashed #d080ff; background: #161922;" onclick="document.getElementById('mediaInput').click()">
+            🖼️ 2. ADD PHOTOS & 3D MODEL
+        </button>
+    </div>
+    
+    <button id="btn-start-mapping" class="btn btn-green btn-block" style="display:none; padding: 20px; font-size: 1.2rem;" onclick="openMappingScreen()">🗺️ MAP BUILDING ELEVATIONS</button>
+
+    <div id="mapping-screen">
+        <h2 style="margin-top:0; color:#0cf;">Assign Drops to Walls</h2>
+        <p style="color:#888; margin-bottom: 20px;">Create your architectural structure below. Add your custom walls, then assign drops.</p>
+        
+        <div class="elevation-creator">
+            <input type="text" id="new-elevation-name" placeholder="e.g. North Face, Courtyard, Penthouse..." onkeypress="if(event.key === 'Enter') addElevation()">
+            <button class="btn btn-blue" onclick="addElevation()">➕ ADD WALL</button>
+        </div>
+        <div id="mapping-list"></div>
+        <button class="btn btn-green btn-block" style="padding: 20px; font-size: 1.2rem; margin-top: 20px;" onclick="generateDashboard()">✅ GENERATE DASHBOARD</button>
+    </div>
+
+    <div id="dashboard-screen">
+        
+        <div class="view-controls">
+            <span style="color:#888; font-weight:bold; font-size:0.9rem; margin-right: 10px;">MODE:</span>
+            <button class="view-toggle-btn active" id="btn-2d" onclick="switchView('2d')">2D TABS</button>
+            <button class="view-toggle-btn" id="btn-true3d" onclick="switchView('true3d')">✨ TRUE 3D TWIN</button>
+            <div style="flex:0.2;"></div>
+            <button class="view-toggle-btn stitch-toggle" style="border:1px solid #555;" onclick="toggleStitchMode()">🔗 STITCH 2D WIDE WINDOWS</button>
+            <button class="view-toggle-btn tag-toggle" style="border:1px solid #d080ff; display:none;" id="btn-tag3d-main" onclick="openMasterTagMenu()">📍 3D TAG MENU</button>
+        </div>
+
+        <div class="stats-bar" id="stats-bar">
+            <div class="stat-card" id="filter-card-all" style="border-color:#888;" onclick="setFilter('ALL')">
+                <div class="stat-label" style="color:#fff;">ALL WINDOWS</div>
+                <div class="stat-value" id="stat-total" style="color:#fff;">0</div>
+            </div>
+            <div class="stat-card" id="filter-card-clear" style="border-color:#28a745;" onclick="setFilter('status-clear')">
+                <div class="stat-label">CLEAR (GREEN)</div>
+                <div class="stat-value" id="stat-clear" style="color:#28a745;">0</div>
+            </div>
+            <div class="stat-card" id="filter-card-flagged" style="border-color:#f1c40f;" onclick="setFilter('status-flagged')">
+                <div class="stat-label">PENDING (YELLOW)</div>
+                <div class="stat-value" id="stat-flagged" style="color:#f1c40f;">0</div>
+            </div>
+            <div class="stat-card" id="filter-card-confirmed" style="border-color:#d9534f;" onclick="setFilter('status-confirmed')">
+                <div class="stat-label">DEFECTS (RED)</div>
+                <div class="stat-value" id="stat-confirmed" style="color:#d9534f;">0</div>
+            </div>
+            <div class="stat-card no-hover" style="border-color:#0cf;">
+                <div class="stat-label">IMAGES LINKED</div>
+                <div class="stat-value" id="stat-photos" style="color:#0cf;">0</div>
+            </div>
+        </div>
+
+        <div id="view-2d">
+            <div class="tabs-container" id="tabs-container"></div>
+            <div id="building-container-2d"></div>
+        </div>
+
+        <div id="arena-true3d">
+            <button class="btn-fullscreen" onclick="toggleFullScreen('arena-true3d')">⛶ FULL SCREEN</button>
+            
+            <model-viewer id="main-3d-viewer"
+                src="https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/LittlestTokyo.glb" 
+                alt="A 3D model of a building" 
+                auto-rotate 
+                camera-controls 
+                tone-mapping="neutral" 
+                shadow-intensity="1">
+            </model-viewer>
+            
+            <div style="position: absolute; top: 15px; left: 15px; color: #fff; font-size: 0.9rem; font-weight: bold; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; border: 1px solid #d080ff; pointer-events:none; z-index:100;">
+                <strong>Drone Photogrammetry Engine</strong><br>
+                <span id="model-status" style="font-weight:normal; color:#ccc;">Showing Default Test Model. Drop a custom .glb file above to replace.</span>
+            </div>
+
+            <div class="floating-tools">
+                <button class="float-btn tag-toggle" onclick="openMasterTagMenu()">📍 3D TAG MENU</button>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="modal-overlay" id="info-modal">
+        <div class="modal-box">
+            <h2 class="modal-title" id="m-id">A-12-L</h2>
+            <div class="modal-subtitle" id="m-tech">Logged by Tech at 14:30</div>
+            
+            <button class="btn btn-dark btn-block" id="btn-retag" style="display:none; margin-bottom:10px; border-color:#0cf; color:#0cf;" onclick="startReTag()">📍 RE-TAG POSITION</button>
+            <button class="btn btn-dark btn-block" id="btn-unpin" style="display:none; margin-bottom:10px; border-color:#d080ff; color:#d080ff;" onclick="unpinCurrent()">🗑️ REMOVE 3D PIN</button>
+            <button class="btn btn-dark btn-block" id="btn-unmerge" style="display:none; margin-bottom:15px; border-color:#f39c12; color:#f39c12;" onclick="unmergeCurrent()">✂️ UN-STITCH THESE WINDOWS</button>
+            
+            <div class="photo-gallery" id="m-photo-gallery"></div>
+            <div id="m-no-photo" class="no-photo-banner">IMAGE NOT UPLOADED TO DASHBOARD</div>
+            
+            <div class="data-row"><span class="data-label">Field Findings</span><span class="data-val" id="m-finds" style="color:#f1c40f;">--</span></div>
+            <div class="data-row"><span class="data-label">Meter Proved</span><span class="data-val" id="m-proved">--</span></div>
+            <div class="data-row"><span class="data-label">FLIR Image(s)</span><span class="data-val" id="m-flir" style="color:#0cf;">--</span></div>
+            
+            <div class="manager-section">
+                <span class="data-label" style="color:#fff;">Management Notes</span>
+                <textarea id="m-notes" class="modal-notes" placeholder="e.g. Schedule sealant replacement..."></textarea>
+                
+                <div style="margin-top: 15px; border-top: 1px solid #333; padding-top: 10px;">
+                    <span class="data-label" style="color:#888;">Office Override: Status</span>
+                    <div class="status-btns">
+                        <button class="btn btn-status btn-green" onclick="changeStatus('status-clear')">✅ MARK CLEAR</button>
+                        <button class="btn btn-status btn-status-yellow" onclick="changeStatus('status-flagged')">⚠️ FLAG (REVIEW)</button>
+                        <button class="btn btn-status btn-red" onclick="changeStatus('status-confirmed')">🚨 CONFIRM DEFECT</button>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="btn btn-dark btn-block" onclick="saveNotesOnly()">💾 SAVE NOTES & CLOSE</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="tag-master-modal">
+        <div class="modal-box" style="border-color:#d080ff;">
+            <h2 style="color:#d080ff; margin-top:0; font-size: 1.8rem; text-align:center;">📍 3D TAGGING ENGINE</h2>
+            <p style="color:#888; font-size:0.9rem; margin-bottom:20px; text-align:center;">Select your mapping resolution:</p>
+            
+            <div style="background:#111; padding:15px; border-radius:8px; border:1px solid #333; margin-bottom:15px;">
+                <label style="color:#0cf; font-size:0.8rem; font-weight:bold;">1. SINGLE WINDOW (1 CLICK)</label>
+                <select id="tag-single-select" style="width:100%; padding:10px; margin-top:5px; background:#222; color:#fff; border:1px solid #555; border-radius:4px; font-weight:bold;"></select>
+                <button class="btn btn-blue btn-block" onclick="startSingleTag()">🎯 TAG INDIVIDUAL</button>
+            </div>
+
+            <div style="background:#111; padding:15px; border-radius:8px; border:1px solid #333; margin-bottom:15px;">
+                <label style="color:#0cf; font-size:0.8rem; font-weight:bold;">2. ENTIRE DROP (2 CLICKS)</label>
+                <select id="tag-drop-select" style="width:100%; padding:10px; margin-top:5px; background:#222; color:#fff; border:1px solid #555; border-radius:4px; font-weight:bold;"></select>
+                <button class="btn btn-blue btn-block" onclick="startDropTag()">⬇️ AUTO-TAG DROP</button>
+            </div>
+
+            <div style="background:#111; padding:15px; border-radius:8px; border:1px solid #333; margin-bottom:20px;">
+                <label style="color:#0cf; font-size:0.8rem; font-weight:bold;">3. ENTIRE WALL (4 CLICKS)</label>
+                <select id="tag-wall-select" style="width:100%; padding:10px; margin-top:5px; background:#222; color:#fff; border:1px solid #555; border-radius:4px; font-weight:bold;"></select>
+                <button class="btn btn-blue btn-block" onclick="startWallTag()">🏢 AUTO-MAP WALL</button>
+            </div>
+
+            <button class="btn btn-dark btn-block" onclick="closeMasterTagMenu()">🔙 CANCEL</button>
+        </div>
+    </div>
+
+    <script>
+        let inspectionData = {};
+        let projectInfo = "Unknown Project";
+        
+        let activeNodeDataArray = []; 
+        let isStitchMode = false;
+        let stitchSelection = [];
+        let stitchedPairs = []; 
+        
+        let imageBank = {}; 
+        let linkedPhotosCount = 0;
+
+        let elevations = []; 
+        let dropAssignments = {}; 
+        let activeTab = "";
+        let globalStats = { t:0, clear:0, f:0, c:0, maxFloor: -Infinity, minFloor: Infinity };
+
+        let currentMode = '2d'; 
+        let activeFilter = 'ALL'; 
+
+        // --- NEW TAGGING ENGINE STATE ---
+        let bulkTagState = { mode: null, targetId: null, step: 0, anchors: [] };
+        let saved3DTags = {}; 
+
+        const viewer = document.querySelector('#main-3d-viewer');
+
+        // --- FILE HANDLING ---
+        async function handleFiles(files) {
+            if (!files || files.length === 0) return;
+            
+            const csvPromises = [];
+            let newPhotosAdded = 0;
+            let newCsvAdded = false;
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                
+                if (file.type.startsWith('image/') || file.name.toLowerCase().endsWith('.jpg') || file.name.toLowerCase().endsWith('.png')) {
+                    const cleanName = file.name.split('.')[0].toUpperCase();
+                    if (!imageBank[cleanName]) {
+                        imageBank[cleanName] = URL.createObjectURL(file);
+                        linkedPhotosCount++;
+                        newPhotosAdded++;
+                    }
+                } 
+                else if (file.name.toLowerCase().endsWith('.glb') || file.name.toLowerCase().endsWith('.gltf')) {
+                    const modelUrl = URL.createObjectURL(file);
+                    viewer.src = modelUrl;
+                    document.getElementById('model-status').innerHTML = `<span style="color:#0cf;">Loaded Custom Model:</span> ${file.name}`;
+                }
+                else if (file.name.toLowerCase().endsWith('.csv')) {
+                    newCsvAdded = true;
+                    csvPromises.push(new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (event) => { 
+                            parseCSV(event.target.result); 
+                            resolve(); 
+                        };
+                        reader.readAsText(file);
+                    }));
+                }
+            }
+
+            await Promise.all(csvPromises);
+
+            document.getElementById('project-name').innerText = "Project: " + projectInfo;
+            document.getElementById('stat-photos').innerText = linkedPhotosCount;
+            document.getElementById('btn-reset').style.display = 'inline-block';
+            
+            if (newCsvAdded && document.getElementById('dashboard-screen').style.display !== 'block') {
+                document.getElementById('btn-start-mapping').style.display = 'block';
+            }
+            
+            if (document.getElementById('dashboard-screen').style.display === 'block') {
+                if (newCsvAdded && activeTab !== "") {
+                    Object.keys(dropAssignments).forEach(d => {
+                        if (dropAssignments[d] === "") dropAssignments[d] = activeTab;
+                    });
+                }
+                calculateBuildingGeometry();
+                if (currentMode !== 'true3d') refreshCurrentView();
+                
+                if (newPhotosAdded > 0) alert(`✅ Successfully added ${newPhotosAdded} new photo(s) to the dashboard.`);
+            }
+
+            document.getElementById('csvInput').value = "";
+            document.getElementById('mediaInput').value = "";
+        }
+
+        function parseCSV(text) {
+            const rows = text.trim().split('\n');
+            for (let i = 1; i < rows.length; i++) {
+                if(!rows[i]) continue;
+                const cols = rows[i].replace(/"/g, '').split(',');
+                
+                if (cols.length >= 8) {
+                    if (projectInfo === "Unknown Project") projectInfo = cols[0];
+                    const fullId = cols[3]; 
+                    let flir = cols[4];
+                    const finds = cols[5];
+                    const proved = cols[6];
+                    
+                    let status = 'status-clear';
+                    if (!finds.includes('CLEAR')) status = 'status-flagged'; 
+
+                    const parts = fullId.split('-');
+                    if(parts.length === 3) {
+                        const drop = parts[0];
+                        const floor = parseInt(parts[1]);
+                        const pos = parts[2];
+
+                        if (!inspectionData[drop]) inspectionData[drop] = {};
+                        if (!inspectionData[drop][floor]) inspectionData[drop][floor] = {};
+                        
+                        let existingNotes = "";
+                        let existingStatus = status;
+                        if(inspectionData[drop][floor][pos]) {
+                            existingNotes = inspectionData[drop][floor][pos].notes;
+                            if(inspectionData[drop][floor][pos].status === 'status-confirmed') existingStatus = 'status-confirmed';
+                            if(inspectionData[drop][floor][pos].status === 'status-clear') existingStatus = 'status-clear';
+                            if(inspectionData[drop][floor][pos].status === 'status-flagged') existingStatus = 'status-flagged';
+                        }
+
+                        inspectionData[drop][floor][pos] = {
+                            id: fullId, flir: flir, finds: finds, proved: proved, 
+                            tech: cols[2], time: cols[7], status: existingStatus, notes: existingNotes
+                        };
+                        if(!dropAssignments[drop]) dropAssignments[drop] = "";
+                    }
+                }
+            }
+        }
+
+        // --- 3-TIER TAGGING ENGINE ---
+
+        function openMasterTagMenu() {
+            document.getElementById('tag-master-modal').style.display = 'flex';
+            
+            // Pop Single Select
+            const sSelect = document.getElementById('tag-single-select');
+            sSelect.innerHTML = "";
+            let allIds = [];
+            Object.keys(inspectionData).forEach(d => {
+                Object.keys(inspectionData[d]).forEach(f => {
+                    Object.keys(inspectionData[d][f]).forEach(p => allIds.push(inspectionData[d][f][p]));
+                });
+            });
+            allIds.sort((a,b) => a.id.localeCompare(b.id)).forEach(data => {
+                const opt = document.createElement('option');
+                opt.value = data.id;
+                opt.innerText = `${data.id} (${data.finds.split('|')[0]})`;
+                sSelect.appendChild(opt);
+            });
+
+            // Pop Drop Select
+            const dSelect = document.getElementById('tag-drop-select');
+            dSelect.innerHTML = "";
+            Object.keys(inspectionData).sort().forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d;
+                opt.innerText = `Drop ${d}`;
+                dSelect.appendChild(opt);
+            });
+
+            // Pop Wall Select
+            const wSelect = document.getElementById('tag-wall-select');
+            wSelect.innerHTML = "";
+            elevations.forEach(e => {
+                const opt = document.createElement('option');
+                opt.value = e;
+                opt.innerText = `Wall: ${e}`;
+                wSelect.appendChild(opt);
+            });
+        }
+
+        function closeMasterTagMenu() {
+            document.getElementById('tag-master-modal').style.display = 'none';
+        }
+
+        function activateTaggingUI(modeName, instructions) {
+            closeMasterTagMenu();
+            document.querySelectorAll('.tag-toggle').forEach(btn => btn.classList.add('tag-mode-on'));
+            viewer.autoRotate = false;
+            viewer.style.cursor = "crosshair";
+            
+            const bar = document.getElementById('tag-instruction-bar');
+            bar.style.display = 'block';
+            document.getElementById('tag-instruction-text').innerText = instructions;
+        }
+
+        function cancelBulkTag() {
+            bulkTagState = { mode: null, targetId: null, step: 0, anchors: [] };
+            document.querySelectorAll('.tag-toggle').forEach(btn => btn.classList.remove('tag-mode-on'));
+            viewer.autoRotate = true;
+            viewer.style.cursor = "default";
+            document.getElementById('tag-instruction-bar').style.display = 'none';
+        }
+
+        function startSingleTag() {
+            bulkTagState = { mode: 'single', targetId: document.getElementById('tag-single-select').value, step: 0, anchors: [] };
+            activateTaggingUI('single', `Double-Click exact location for ${bulkTagState.targetId}`);
+        }
+
+        function startDropTag() {
+            bulkTagState = { mode: 'drop', targetId: document.getElementById('tag-drop-select').value, step: 0, anchors: [] };
+            activateTaggingUI('drop', `Step 1 of 2: Double-Click TOP center of Drop ${bulkTagState.targetId}`);
+        }
+
+        function startWallTag() {
+            bulkTagState = { mode: 'wall', targetId: document.getElementById('tag-wall-select').value, step: 0, anchors: [] };
+            activateTaggingUI('wall', `Step 1 of 4: Double-Click TOP-LEFT corner of Wall: ${bulkTagState.targetId}`);
+        }
+
+        function startReTag() {
+            const id = activeNodeDataArray[0].id; // Retag the primary ID selected
+            closeModal();
+            bulkTagState = { mode: 'retag', targetId: id, step: 0, anchors: [] };
+            activateTaggingUI('retag', `Double-Click new location for ${id}`);
+        }
+
+        // --- VECTOR MATH PARSER ---
+        function parseCoord(coordObj) {
+            // Model Viewer hit.position is a Vector3
+            if (coordObj && coordObj.x !== undefined) return [coordObj.x, coordObj.y, coordObj.z];
+            return [0,0,0];
+        }
+
+        viewer.addEventListener('dblclick', (event) => {
+            if (!bulkTagState.mode) return;
+            
+            const hit = viewer.positionAndNormalFromPoint(event.clientX, event.clientY);
+            if (!hit) return;
+
+            // Single & Retag
+            if (bulkTagState.mode === 'single' || bulkTagState.mode === 'retag') {
+                saved3DTags[bulkTagState.targetId] = { 
+                    position: `${hit.position.x} ${hit.position.y} ${hit.position.z}`, 
+                    normal: `${hit.normal.x} ${hit.normal.y} ${hit.normal.z}` 
+                };
+                render3DHotspots();
+                cancelBulkTag();
+                return;
+            }
+
+            // Drop Map
+            if (bulkTagState.mode === 'drop') {
+                bulkTagState.anchors.push(hit);
+                bulkTagState.step++;
+                
+                if (bulkTagState.step === 1) {
+                    document.getElementById('tag-instruction-text').innerText = `Step 2 of 2: Double-Click BOTTOM center of Drop ${bulkTagState.targetId}`;
+                } else if (bulkTagState.step === 2) {
+                    processDropTagging(bulkTagState.targetId, bulkTagState.anchors);
+                    cancelBulkTag();
+                }
+                return;
+            }
+
+            // Wall Map
+            if (bulkTagState.mode === 'wall') {
+                bulkTagState.anchors.push(hit);
+                bulkTagState.step++;
+                
+                if (bulkTagState.step === 1) document.getElementById('tag-instruction-text').innerText = `Step 2 of 4: Double-Click TOP-RIGHT corner of Wall`;
+                else if (bulkTagState.step === 2) document.getElementById('tag-instruction-text').innerText = `Step 3 of 4: Double-Click BOTTOM-LEFT corner of Wall`;
+                else if (bulkTagState.step === 3) document.getElementById('tag-instruction-text').innerText = `Step 4 of 4: Double-Click BOTTOM-RIGHT corner of Wall`;
+                else if (bulkTagState.step === 4) {
+                    processWallTagging(bulkTagState.targetId, bulkTagState.anchors);
+                    cancelBulkTag();
+                }
+                return;
+            }
+        });
+
+        // Linear Interpolation for Drop
+        function processDropTagging(dropId, anchors) {
+            let floors = Object.keys(inspectionData[dropId]).map(Number).sort((a,b) => b-a); // Descending (Top to bottom)
+            if(floors.length === 0) return;
+            
+            let maxF = floors[0];
+            let minF = floors[floors.length - 1];
+            let fRange = maxF - minF;
+
+            let pT = parseCoord(anchors[0].position);
+            let pB = parseCoord(anchors[1].position);
+            let norm = `${anchors[0].normal.x} ${anchors[0].normal.y} ${anchors[0].normal.z}`;
+
+            floors.forEach(f => {
+                let t = (fRange === 0) ? 0 : (maxF - f) / fRange;
+                let x = pT[0] + (pB[0] - pT[0]) * t;
+                let y = pT[1] + (pB[1] - pT[1]) * t;
+                let z = pT[2] + (pB[2] - pT[2]) * t;
+
+                Object.keys(inspectionData[dropId][f]).forEach(pos => {
+                    let fullId = `${dropId}-${f}-${pos}`;
+                    saved3DTags[fullId] = { position: `${x} ${y} ${z}`, normal: norm };
+                });
+            });
+            render3DHotspots();
+        }
+
+        // Bilinear Interpolation for Wall
+        function processWallTagging(wallName, anchors) {
+            let drops = Object.keys(dropAssignments).filter(d => dropAssignments[d] === wallName).sort();
+            if(drops.length === 0) { alert("No drops assigned to this wall yet."); return; }
+
+            let allFloors = [];
+            drops.forEach(d => allFloors.push(...Object.keys(inspectionData[d]).map(Number)));
+            if(allFloors.length === 0) return;
+
+            let maxF = Math.max(...allFloors);
+            let minF = Math.min(...allFloors);
+            let fRange = maxF - minF;
+            let dRange = drops.length > 1 ? drops.length - 1 : 1;
+
+            let TL = parseCoord(anchors[0].position);
+            let TR = parseCoord(anchors[1].position);
+            let BL = parseCoord(anchors[2].position);
+            let BR = parseCoord(anchors[3].position);
+            let norm = `${anchors[0].normal.x} ${anchors[0].normal.y} ${anchors[0].normal.z}`;
+
+            drops.forEach((dropId, dIdx) => {
+                let u = (drops.length > 1) ? (dIdx / dRange) : 0.5;
+                let floors = Object.keys(inspectionData[dropId]).map(Number);
+                
+                floors.forEach(f => {
+                    let v = (fRange === 0) ? 0 : (maxF - f) / fRange;
+
+                    // Bilinear Engine
+                    let x = (1-u)*(1-v)*TL[0] + u*(1-v)*TR[0] + (1-u)*v*BL[0] + u*v*BR[0];
+                    let y = (1-u)*(1-v)*TL[1] + u*(1-v)*TR[1] + (1-u)*v*BL[1] + u*v*BR[1];
+                    let z = (1-u)*(1-v)*TL[2] + u*(1-v)*TR[2] + (1-u)*v*BL[2] + u*v*BR[2];
+
+                    Object.keys(inspectionData[dropId][f]).forEach(pos => {
+                         let fullId = `${dropId}-${f}-${pos}`;
+                         saved3DTags[fullId] = { position: `${x} ${y} ${z}`, normal: norm };
+                    });
+                });
+            });
+            render3DHotspots();
+        }
+
+        function render3DHotspots() {
+            viewer.querySelectorAll('.hotspot-dot').forEach(el => el.remove());
+            
+            Object.keys(saved3DTags).forEach(id => {
+                const data = getNodeData(id);
+                if(!data) return;
+                
+                let finalStatus = data.status;
+                let pair = stitchedPairs.find(p => p.includes(data.id));
+                if(pair) finalStatus = getCombinedStatus(pair[0], pair[1]);
+                
+                if (activeFilter !== 'ALL' && finalStatus !== activeFilter) return;
+
+                const btn = document.createElement('button');
+                btn.slot = `hotspot-${id}`;
+                btn.dataset.position = saved3DTags[id].position;
+                btn.dataset.normal = saved3DTags[id].normal;
+                
+                btn.className = `hotspot-dot ${finalStatus}`;
+                btn.onclick = () => openModal(id);
+                
+                const label = document.createElement('div');
+                label.className = 'hotspot-label';
+                label.innerText = id;
+                btn.appendChild(label);
+                
+                viewer.appendChild(btn);
+            });
+        }
+
+        // --- DASHBOARD UI / LOGIC ---
+
+        function toggleFullScreen(elementId) {
+            const elem = document.getElementById(elementId);
+            if (!document.fullscreenElement) {
+                if (elem.requestFullscreen) elem.requestFullscreen();
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        }
+
+        function setFilter(filterType) {
+            activeFilter = (activeFilter === filterType && filterType !== 'ALL') ? 'ALL' : filterType;
+            
+            document.getElementById('filter-card-all').classList.toggle('dimmed', activeFilter !== 'ALL');
+            document.getElementById('filter-card-clear').classList.toggle('dimmed', activeFilter !== 'ALL' && activeFilter !== 'status-clear');
+            document.getElementById('filter-card-flagged').classList.toggle('dimmed', activeFilter !== 'ALL' && activeFilter !== 'status-flagged');
+            document.getElementById('filter-card-confirmed').classList.toggle('dimmed', activeFilter !== 'ALL' && activeFilter !== 'status-confirmed');
+
+            refreshCurrentView();
+            render3DHotspots();
+        }
+
+        function toggleStitchMode() {
+            isStitchMode = !isStitchMode;
+            document.querySelectorAll('.stitch-toggle').forEach(btn => btn.classList.toggle('stitch-mode-on', isStitchMode));
+            stitchSelection = [];
+            if(isStitchMode) alert("STITCH MODE ACTIVE:\nClick the right half of the window, then click the left half.");
+            if (currentMode !== 'true3d') refreshCurrentView();
+        }
+
+        function getNodeData(fullId) {
+            const parts = fullId.split('-');
+            if(inspectionData[parts[0]] && inspectionData[parts[0]][parts[1]]) return inspectionData[parts[0]][parts[1]][parts[2]];
+            return null;
+        }
+
+        function getCombinedStatus(id1, id2) {
+            let d1 = getNodeData(id1);
+            let d2 = getNodeData(id2);
+            if(!d1 || !d2) return 'status-clear';
+            if(d1.status === 'status-confirmed' || d2.status === 'status-confirmed') return 'status-confirmed';
+            if(d1.status === 'status-flagged' || d2.status === 'status-flagged') return 'status-flagged';
+            return 'status-clear';
+        }
+
+        function handleNodeClick(data, nodeElement) {
+            if(isStitchMode) {
+                let existingPairIndex = stitchedPairs.findIndex(p => p.includes(data.id));
+                if (existingPairIndex !== -1) {
+                    if(confirm("This window is already stitched. Do you want to un-stitch it?")) {
+                        stitchedPairs.splice(existingPairIndex, 1);
+                        stitchSelection = [];
+                        isStitchMode = false;
+                        document.querySelectorAll('.stitch-toggle').forEach(btn => btn.classList.remove('stitch-mode-on'));
+                        calculateBuildingGeometry();
+                        refreshCurrentView();
+                    }
+                    return;
+                }
+                
+                stitchSelection.push(data.id);
+                nodeElement.classList.add('node-selected');
+                
+                if(stitchSelection.length === 2) {
+                    stitchSelection.sort(); 
+                    stitchedPairs.push([...stitchSelection]);
+                    isStitchMode = false;
+                    document.querySelectorAll('.stitch-toggle').forEach(btn => btn.classList.remove('stitch-mode-on'));
+                    stitchSelection = [];
+                    refreshCurrentView();
+                }
+                return;
+            }
+            openModal(data.id);
+        }
+
+        function openMappingScreen() {
+            document.getElementById('btn-start-mapping').style.display = 'none';
+            document.getElementById('mapping-screen').style.display = 'block';
+            renderMappingList();
+        }
+
+        function editMapping() {
+            document.getElementById('dashboard-screen').style.display = 'none';
+            document.getElementById('mapping-screen').style.display = 'block';
+            document.getElementById('btn-export').style.display = 'none';
+            document.getElementById('btn-edit-map').style.display = 'none';
+            renderMappingList();
+        }
+
+        function addElevation() {
+            const input = document.getElementById('new-elevation-name');
+            const val = input.value.trim();
+            if(val && !elevations.includes(val)) {
+                elevations.push(val);
+                if (elevations.length === 1) {
+                    activeTab = val;
+                    Object.keys(dropAssignments).forEach(d => { if (dropAssignments[d] === "") dropAssignments[d] = val; });
+                }
+                input.value = "";
+                renderMappingList();
+            }
+        }
+
+        function renderMappingList() {
+            const list = document.getElementById('mapping-list');
+            list.innerHTML = "";
+            const drops = Object.keys(inspectionData).sort();
+
+            if (elevations.length === 0 && drops.length > 0) {
+                const warning = document.createElement('div');
+                warning.style = "color: #f1c40f; margin-bottom: 15px; font-weight: bold;";
+                warning.innerText = "⚠️ Please add at least one wall above to map your drops.";
+                list.appendChild(warning);
+            }
+
+            drops.forEach(dropStr => {
+                const row = document.createElement('div');
+                row.className = 'mapping-row';
+                row.innerHTML = `<strong style="font-size:1.2rem; color:#0cf;">DROP ${dropStr}</strong>`;
+                
+                const select = document.createElement('select');
+                select.onchange = (e) => { dropAssignments[dropStr] = e.target.value; };
+                
+                if (elevations.length === 0) {
+                    const opt = document.createElement('option');
+                    opt.value = "";
+                    opt.innerText = "Awaiting Wall...";
+                    select.appendChild(opt);
+                    select.disabled = true;
+                } else {
+                    select.disabled = false;
+                    elevations.forEach(elev => {
+                        const opt = document.createElement('option');
+                        opt.value = elev;
+                        opt.innerText = elev;
+                        if(dropAssignments[dropStr] === elev) opt.selected = true;
+                        select.appendChild(opt);
+                    });
+                }
+                row.appendChild(select);
+                list.appendChild(row);
+            });
+        }
+
+        function generateDashboard() {
+            if (elevations.length === 0) { alert("⚠️ You must add at least one custom wall before generating the dashboard."); return; }
+            document.getElementById('mapping-screen').style.display = 'none';
+            document.getElementById('dashboard-screen').style.display = 'block';
+            document.getElementById('btn-export').style.display = 'inline-block';
+            document.getElementById('btn-edit-map').style.display = 'inline-block';
+            if(!elevations.includes(activeTab)) activeTab = elevations[0];
+            calculateBuildingGeometry();
+            if (currentMode !== 'true3d') refreshCurrentView();
+        }
+
+        function calculateBuildingGeometry() {
+            globalStats = { t:0, clear:0, f:0, c:0, maxFloor: -Infinity, minFloor: Infinity };
+            const drops = Object.keys(inspectionData);
+            
+            drops.forEach(dropStr => {
+                const floors = Object.keys(inspectionData[dropStr]).map(Number);
+                floors.forEach(f => {
+                    if (f > globalStats.maxFloor) globalStats.maxFloor = f;
+                    if (f < globalStats.minFloor) globalStats.minFloor = f;
+                    Object.keys(inspectionData[dropStr][f]).forEach(pos => {
+                        const d = inspectionData[dropStr][f][pos];
+                        globalStats.t++;
+                        if (d.status === 'status-flagged') globalStats.f++;
+                        else if (d.status === 'status-confirmed') globalStats.c++;
+                        else globalStats.clear++;
+                    });
+                });
+            });
+
+            if (globalStats.maxFloor === -Infinity) { globalStats.maxFloor = 0; globalStats.minFloor = 0; }
+            
+            stitchedPairs.forEach(pair => {
+                let d1 = getNodeData(pair[0]); let d2 = getNodeData(pair[1]);
+                if (d1 && d2) {
+                    if(d1.status === 'status-flagged' && d2.status === 'status-flagged') globalStats.f--;
+                    else if(d1.status === 'status-confirmed' && d2.status === 'status-confirmed') globalStats.c--;
+                    else if(d1.status === 'status-clear' && d2.status === 'status-clear') globalStats.clear--;
+                }
+            });
+            
+            document.getElementById('stat-total').innerText = globalStats.t;
+            document.getElementById('stat-clear').innerText = globalStats.clear;
+            document.getElementById('stat-flagged').innerText = globalStats.f;
+            document.getElementById('stat-confirmed').innerText = globalStats.c;
+            render3DHotspots();
+        }
+
+        function switchView(mode) {
+            currentMode = mode;
+            document.getElementById('btn-2d').classList.toggle('active', mode === '2d');
+            document.getElementById('btn-true3d').classList.toggle('active', mode === 'true3d');
+            document.getElementById('view-2d').style.display = (mode === '2d') ? 'block' : 'none';
+            document.getElementById('arena-true3d').style.display = (mode === 'true3d') ? 'block' : 'none';
+            if (mode !== 'true3d') refreshCurrentView();
+        }
+
+        function refreshCurrentView() {
+            if (currentMode === '2d') {
+                const container = document.getElementById('tabs-container');
+                container.innerHTML = "";
+                const usedElevations = new Set(Object.values(dropAssignments));
+                
+                elevations.forEach(elev => {
+                    if(usedElevations.has(elev)) {
+                        const tab = document.createElement('div');
+                        tab.className = `tab ${activeTab === elev ? 'active' : ''}`;
+                        tab.innerText = elev;
+                        tab.onclick = () => { activeTab = elev; refreshCurrentView(); };
+                        container.appendChild(tab);
+                    }
+                });
+                if(!usedElevations.has(activeTab) && usedElevations.size > 0) activeTab = Array.from(usedElevations)[0];
+                
+                const gridContainer = document.getElementById('building-container-2d');
+                gridContainer.innerHTML = '';
+                gridContainer.appendChild(generateWallDOM(activeTab, false));
+            }
+        }
+
+        function generateWallDOM(elevationName, useGlobalFloors = false) {
+            const fragment = document.createDocumentFragment();
+            const activeDrops = Object.keys(inspectionData).filter(d => dropAssignments[d] === elevationName).sort();
+
+            if(activeDrops.length === 0) {
+                const empty = document.createElement('div');
+                empty.style = "padding: 40px; color:#888; width:100%; text-align:center;";
+                empty.innerText = "No drops assigned.";
+                fragment.appendChild(empty);
+                return fragment;
+            }
+
+            let renderMaxFloor = -Infinity;
+            let renderMinFloor = Infinity;
+            
+            activeDrops.forEach(d => {
+                const floors = Object.keys(inspectionData[d]).map(Number);
+                renderMaxFloor = Math.max(renderMaxFloor, ...floors);
+                renderMinFloor = Math.min(renderMinFloor, ...floors);
+            });
+
+            const axisCol = document.createElement('div');
+            axisCol.className = 'drop-column floor-axis-column';
+            const axisHeader = document.createElement('div');
+            axisHeader.className = 'drop-header floor-axis-header';
+            axisHeader.innerText = 'FL';
+            axisCol.appendChild(axisHeader);
+
+            for (let f = renderMaxFloor; f >= renderMinFloor; f--) {
+                const fRow = document.createElement('div');
+                fRow.className = 'floor-row';
+                fRow.innerHTML = `<div class="floor-label">${f}F</div>`;
+                axisCol.appendChild(fRow);
+            }
+            fragment.appendChild(axisCol);
+            
+            activeDrops.forEach(dropStr => {
+                const dropDiv = document.createElement('div');
+                dropDiv.className = 'drop-column';
+                dropDiv.innerHTML = `<div class="drop-header">DROP ${dropStr}</div>`;
+
+                for (let f = renderMaxFloor; f >= renderMinFloor; f--) {
+                    const floorDiv = document.createElement('div');
+                    floorDiv.className = 'floor-row';
+                    
+                    const winGroup = document.createElement('div');
+                    winGroup.className = 'window-group';
+
+                    if (inspectionData[dropStr] && inspectionData[dropStr][f]) {
+                        const order = { 'L': 1, 'C': 2, 'R': 3 };
+                        const activeFloorPattern = Object.keys(inspectionData[dropStr][f]).sort((a, b) => order[a] - order[b]);
+                        
+                        activeFloorPattern.forEach(pos => {
+                            const data = inspectionData[dropStr][f][pos];
+                            const winNode = document.createElement('div');
+                            
+                            let isStitchedLeft = false;
+                            let isStitchedRight = false;
+                            let finalStatus = data.status;
+
+                            let pair = stitchedPairs.find(p => p.includes(data.id));
+                            if (pair) {
+                                finalStatus = getCombinedStatus(pair[0], pair[1]);
+                                if (pair[0] === data.id) isStitchedLeft = true;
+                                if (pair[1] === data.id) isStitchedRight = true;
+                            }
+
+                            winNode.className = `window-node ${finalStatus}`;
+                            if (activeFilter !== 'ALL' && finalStatus !== activeFilter) winNode.classList.add('node-filtered-out');
+
+                            winNode.innerText = pos;
+                            winNode.onclick = () => handleNodeClick(data, winNode);
+                            if (imageBank[data.flir]) winNode.style.border = "2px solid #fff";
+
+                            if (isStitchedLeft) {
+                                winNode.style.borderTopRightRadius = '0'; winNode.style.borderBottomRightRadius = '0';
+                                winNode.style.borderRight = "none"; winNode.style.zIndex = '5';
+                                const bridge = document.createElement('div'); bridge.className = `stitch-bridge ${finalStatus}`;
+                                if (imageBank[data.flir]) { bridge.style.borderTop = "2px solid #fff"; bridge.style.borderBottom = "2px solid #fff"; }
+                                winNode.appendChild(bridge);
+                            }
+                            if (isStitchedRight) {
+                                winNode.style.borderTopLeftRadius = '0'; winNode.style.borderBottomLeftRadius = '0';
+                                winNode.style.borderLeft = "none"; winNode.style.zIndex = '6'; 
+                            }
+                            winGroup.appendChild(winNode);
+                        });
+                    } else {
+                        const winNode = document.createElement('div');
+                        winNode.className = `window-node status-void`;
+                        winGroup.appendChild(winNode);
+                    }
+                    floorDiv.appendChild(winGroup);
+                    dropDiv.appendChild(floorDiv);
+                }
+                fragment.appendChild(dropDiv);
+            });
+            return fragment;
+        }
+
+        function openModal(nodeId) {
+            let pair = stitchedPairs.find(p => p.includes(nodeId));
+            activeNodeDataArray = [];
+            
+            if (pair) {
+                activeNodeDataArray.push(getNodeData(pair[0]));
+                activeNodeDataArray.push(getNodeData(pair[1]));
+                document.getElementById('btn-unmerge').style.display = 'block';
+            } else {
+                activeNodeDataArray.push(getNodeData(nodeId));
+                document.getElementById('btn-unmerge').style.display = 'none';
+            }
+            
+            if (saved3DTags[nodeId] || (pair && (saved3DTags[pair[0]] || saved3DTags[pair[1]]))) {
+                document.getElementById('btn-unpin').style.display = 'block';
+                document.getElementById('btn-retag').style.display = 'block';
+            } else {
+                document.getElementById('btn-unpin').style.display = 'none';
+                document.getElementById('btn-retag').style.display = 'none';
+            }
+
+            let ids = activeNodeDataArray.map(d => d.id).join(' + ');
+            let techs = [...new Set(activeNodeDataArray.map(d => d.tech))].join(', ');
+            
+            let allFinds = [];
+            activeNodeDataArray.forEach(d => allFinds.push(...d.finds.split(' | ')));
+            allFinds = [...new Set(allFinds)].filter(f => f !== 'CLEAR' && f !== '');
+            if(allFinds.length === 0) allFinds = ['CLEAR'];
+
+            let proved = activeNodeDataArray.some(d => d.proved === 'YES') ? 'YES' : 'NO';
+            let flirs = activeNodeDataArray.map(d => d.flir).filter(f => f !== '--');
+            let notes = activeNodeDataArray.map(d => d.notes).filter(n => n.trim() !== '').join('\n');
+
+            document.getElementById('m-id').innerText = ids;
+            document.getElementById('m-tech').innerText = `Logged by: ${techs}`;
+            document.getElementById('m-finds').innerText = allFinds.join(' | ');
+            document.getElementById('m-finds').style.color = allFinds.includes('CLEAR') ? '#28a745' : '#f1c40f';
+            
+            document.getElementById('m-proved').innerText = proved;
+            document.getElementById('m-flir').innerText = flirs.join(' & ') || '--';
+            document.getElementById('m-notes').value = notes;
+            
+            const gallery = document.getElementById('m-photo-gallery');
+            const noPhoto = document.getElementById('m-no-photo');
+            gallery.innerHTML = '';
+            let hasPhoto = false;
+
+            flirs.forEach(f => {
+                if(imageBank[f]) {
+                    hasPhoto = true;
+                    let img = document.createElement('img');
+                    img.src = imageBank[f];
+                    gallery.appendChild(img);
+                }
+            });
+
+            gallery.style.display = hasPhoto ? 'flex' : 'none';
+            noPhoto.style.display = hasPhoto ? 'none' : 'block';
+            
+            document.getElementById('info-modal').style.display = 'flex';
+        }
+
+        function unmergeCurrent() {
+            if (activeNodeDataArray.length === 2) {
+                const id1 = activeNodeDataArray[0].id;
+                const idx = stitchedPairs.findIndex(p => p.includes(id1));
+                if (idx !== -1) {
+                    stitchedPairs.splice(idx, 1);
+                    closeModal();
+                    calculateBuildingGeometry();
+                    refreshCurrentView();
+                }
+            }
+        }
+
+        function changeStatus(newStatus) {
+            if (activeNodeDataArray.length > 0) {
+                let note = document.getElementById('m-notes').value;
+                activeNodeDataArray.forEach(d => { d.notes = note; d.status = newStatus; });
+                calculateBuildingGeometry();
+                refreshCurrentView();
+                closeModal();
+            }
+        }
+
+        function saveNotesOnly() {
+            if (activeNodeDataArray.length > 0) {
+                let note = document.getElementById('m-notes').value;
+                activeNodeDataArray.forEach(d => d.notes = note);
+                calculateBuildingGeometry();
+                refreshCurrentView();
+                closeModal();
+            }
+        }
+
+        function unpinCurrent() {
+            if(confirm("Remove this pin from the 3D map? The underlying window data will remain safe in your vault.")) {
+                activeNodeDataArray.forEach(d => { if(saved3DTags[d.id]) delete saved3DTags[d.id]; });
+                render3DHotspots();
+                closeModal();
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('info-modal').style.display = 'none';
+            activeNodeDataArray = [];
+        }
+
+        function resetBoard() {
+            if(confirm("Are you sure you want to clear all data and start over?")) {
+                inspectionData = {}; imageBank = {}; stitchedPairs = []; linkedPhotosCount = 0; projectInfo = "Unknown Project";
+                elevations = []; dropAssignments = {}; saved3DTags = {};
+                
+                document.getElementById('project-name').innerText = "Awaiting Data...";
+                document.getElementById('stat-photos').innerText = "0";
+                document.getElementById('dashboard-screen').style.display = 'none';
+                document.getElementById('mapping-screen').style.display = 'none';
+                document.getElementById('btn-export').style.display = 'none';
+                document.getElementById('btn-edit-map').style.display = 'none';
+                document.getElementById('btn-reset').style.display = 'none';
+                document.getElementById('btn-start-mapping').style.display = 'none';
+                
+                document.getElementById('main-3d-viewer').src = "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/LittlestTokyo.glb";
+                document.getElementById('model-status').innerHTML = "Showing Default Test Model. Drop a custom .glb file above to replace.";
+            }
+        }
+
+        function exportReviewedCSV() {
+            let csv = "Project,Architectural Wall,Drop ID,FLIR Image,Findings,Meter Proved,Office Review Status,Management Notes\n";
+            const drops = Object.keys(inspectionData).sort();
+            drops.forEach(dropStr => {
+                const wall = dropAssignments[dropStr];
+                const floors = Object.keys(inspectionData[dropStr]).sort((a,b) => b-a); 
+                floors.forEach(f => {
+                    const order = { 'L': 1, 'C': 2, 'R': 3 };
+                    const activeFloorPattern = Object.keys(inspectionData[dropStr][f]).sort((a, b) => order[a] - order[b]);
+                    
+                    activeFloorPattern.forEach(pos => {
+                        if (inspectionData[dropStr][f] && inspectionData[dropStr][f][pos]) {
+                            const d = inspectionData[dropStr][f][pos];
+                            let textStatus = "Clear";
+                            if (d.status === 'status-flagged') textStatus = "Pending Review";
+                            if (d.status === 'status-confirmed') textStatus = "CONFIRMED DEFECT";
+
+                            const cleanNotes = `"${d.notes.replace(/"/g, '""')}"`;
+                            const cleanFinds = `"${d.finds}"`;
+                            csv += `"${projectInfo}","${wall}","${d.id}","${d.flir}",${cleanFinds},"${d.proved}","${textStatus}",${cleanNotes}\n`;
+                        }
+                    });
+                });
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const a = document.createElement('a'); 
+            a.href = URL.createObjectURL(blob); 
+            a.download = `Strata_Master_Review_${projectInfo.replace(/\s+/g, '_')}.csv`; 
+            a.click();
+        }
+    </script>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw_cmd.js')
+                    .then(reg => console.log('Service Worker Registered!'))
+                    .catch(err => console.log('Service Worker Failed', err));
+            });
+        }
+    </script>
+</body>
+</html>
