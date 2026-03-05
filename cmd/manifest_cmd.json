@@ -1,0 +1,21 @@
+{
+  "name": "Strata Command Center",
+  "short_name": "Strata CMD",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "background_color": "#0f111a",
+  "theme_color": "#0cf",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "icon-cmd192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-cmd512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
