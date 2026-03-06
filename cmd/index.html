@@ -161,12 +161,12 @@
     </div>
 
     <div style="display: flex; gap: 15px; margin-bottom: 20px;">
-        <input type="file" id="csvInput" accept="*/*" style="display: none;" onchange="handleFiles(this.files)">
+        <input type="file" id="csvInput" accept="*/*" style="display: none;" onchange="handleFiles(this.files, 'csv')">
         <button class="btn btn-dark" style="flex: 1; padding: 20px; font-size: 1.1rem; border: 2px dashed #0cf; background: #161922;" onclick="document.getElementById('csvInput').click()">
             📄 1. LOAD CSV DATA
         </button>
 
-        <input type="file" id="mediaInput" multiple accept="*/*" style="display: none;" onchange="handleFiles(this.files)">
+        <input type="file" id="mediaInput" multiple accept="*/*" style="display: none;" onchange="handleFiles(this.files, 'media')">
         <button class="btn btn-dark" style="flex: 2; padding: 20px; font-size: 1.1rem; border: 2px dashed #d080ff; background: #161922;" onclick="document.getElementById('mediaInput').click()">
             🖼️ 2. ADD PHOTOS & 3D MODEL
         </button>
@@ -337,7 +337,7 @@
         const viewer = document.querySelector('#main-3d-viewer');
 
         // --- UPDATED ANDROID FILE HANDLING ---
-        async function handleFiles(files) {
+        async function handleFiles(files, forcedType = null) {
             if (!files || files.length === 0) return;
             
             const csvPromises = [];
@@ -346,26 +346,12 @@
 
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
-                const fileName = file.name.toLowerCase();
-                const fileType = file.type.toLowerCase();
+                // Safely handle empty file types from Android/Google Drive
+                const fileName = (file.name || '').toLowerCase();
+                const fileType = (file.type || '').toLowerCase();
                 
-                // 1. Check for Images (Catches iOS and Android variants)
-                if (fileType.startsWith('image/') || fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || fileName.endsWith('.png')) {
-                    const cleanName = file.name.split('.')[0].toUpperCase();
-                    if (!imageBank[cleanName]) {
-                        imageBank[cleanName] = URL.createObjectURL(file);
-                        linkedPhotosCount++;
-                        newPhotosAdded++;
-                    }
-                } 
-                // 2. Check for 3D Models
-                else if (fileName.endsWith('.glb') || fileName.endsWith('.gltf') || fileType.includes('model/gltf')) {
-                    const modelUrl = URL.createObjectURL(file);
-                    viewer.src = modelUrl;
-                    document.getElementById('model-status').innerHTML = `<span style="color:#0cf;">Loaded Custom Model:</span> ${file.name}`;
-                }
-                // 3. Bulletproof CSV Check (Catches Android's weird Excel mapping)
-                else if (fileName.endsWith('.csv') || fileType.includes('csv') || fileType === 'application/vnd.ms-excel' || fileType === 'text/comma-separated-values') {
+                // 1. THE NUCLEAR CSV OVERRIDE: If it came from the CSV button, force parse it.
+                if (forcedType === 'csv' || fileName.endsWith('.csv') || fileType.includes('csv') || fileType === 'application/vnd.ms-excel') {
                     newCsvAdded = true;
                     csvPromises.push(new Promise((resolve) => {
                         const reader = new FileReader();
@@ -373,35 +359,69 @@
                             parseCSV(event.target.result); 
                             resolve(); 
                         };
+                        reader.onerror = () => {
+                            alert("⚠️ Error reading file. Ensure Google Drive has fully downloaded it to your device.");
+                            resolve();
+                        };
                         reader.readAsText(file);
                     }));
+                }
+                // 2. Check for Images
+                else if (fileType.startsWith('image/') || fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || fileName.endsWith('.png')) {
+                    const cleanName = file.name.split('.')[0].toUpperCase();
+                    if (!imageBank[cleanName]) {
+                        imageBank[cleanName] = URL.createObjectURL(file);
+                        linkedPhotosCount++;
+                        newPhotosAdded++;
+                    }
+                } 
+                // 3. Check for 3D Models
+                else if (fileName.endsWith('.glb') || fileName.endsWith('.gltf') || fileType.includes('model/gltf')) {
+                    const modelUrl = URL.createObjectURL(file);
+                    viewer.src = modelUrl;
+                    document.getElementById('model-status').innerHTML = `<span style="color:#0cf;">Loaded Custom Model:</span> ${file.name}`;
                 } else {
-                    console.log("Ignored unmapped file type:", fileName, fileType);
+                    console.log("Ignored unrecognized file:", fileName);
                 }
             }
 
             await Promise.all(csvPromises);
 
+            // Update UI Headers
             document.getElementById('project-name').innerText = "Project: " + projectInfo;
             document.getElementById('stat-photos').innerText = linkedPhotosCount;
             document.getElementById('btn-reset').style.display = 'inline-block';
             
-            if (newCsvAdded && document.getElementById('dashboard-screen').style.display !== 'block') {
-                document.getElementById('btn-start-mapping').style.display = 'block';
-            }
-            
-            if (document.getElementById('dashboard-screen').style.display === 'block') {
-                if (newCsvAdded && activeTab !== "") {
-                    Object.keys(dropAssignments).forEach(d => {
-                        if (dropAssignments[d] === "") dropAssignments[d] = activeTab;
-                    });
-                }
-                calculateBuildingGeometry();
-                if (currentMode !== 'true3d') refreshCurrentView();
-                
-                if (newPhotosAdded > 0) alert(`✅ Successfully added ${newPhotosAdded} new photo(s) to the dashboard.`);
+            // If photos were added, give immediate feedback regardless of dashboard state!
+            if (newPhotosAdded > 0) {
+                alert(`✅ Successfully cached ${newPhotosAdded} photo(s). They will link automatically to the grid.`);
             }
 
+            // Check if valid data was actually extracted from the CSV
+            const hasData = Object.keys(inspectionData).length > 0;
+
+            if (newCsvAdded) {
+                if (hasData) {
+                    if (document.getElementById('dashboard-screen').style.display !== 'block') {
+                        document.getElementById('btn-start-mapping').style.display = 'block';
+                        alert("✅ CSV Loaded Successfully! Click 'MAP BUILDING ELEVATIONS' to continue.");
+                    } else {
+                        // Dashboard is already open, just refresh it
+                        if (activeTab !== "") {
+                            Object.keys(dropAssignments).forEach(d => {
+                                if (dropAssignments[d] === "") dropAssignments[d] = activeTab;
+                            });
+                        }
+                        calculateBuildingGeometry();
+                        if (currentMode !== 'true3d') refreshCurrentView();
+                        alert("✅ Dashboard updated with new CSV data.");
+                    }
+                } else {
+                    alert("⚠️ File was loaded, but no valid data was found. Make sure this is a Strata-Scan exported CSV.");
+                }
+            }
+
+            // Clear inputs so you can upload the exact same file again if needed
             document.getElementById('csvInput').value = "";
             document.getElementById('mediaInput').value = "";
         }
