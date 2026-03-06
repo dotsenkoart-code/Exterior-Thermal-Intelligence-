@@ -161,12 +161,12 @@
     </div>
 
     <div style="display: flex; gap: 15px; margin-bottom: 20px;">
-        <input type="file" id="csvInput" accept=".csv, text/csv, application/csv, application/vnd.ms-excel, text/comma-separated-values, text/plain" style="display: none;" onchange="handleFiles(this.files)">
+        <input type="file" id="csvInput" accept="*/*" style="display: none;" onchange="handleFiles(this.files)">
         <button class="btn btn-dark" style="flex: 1; padding: 20px; font-size: 1.1rem; border: 2px dashed #0cf; background: #161922;" onclick="document.getElementById('csvInput').click()">
             📄 1. LOAD CSV DATA
         </button>
 
-        <input type="file" id="mediaInput" multiple accept=".jpg,.jpeg,.png,.glb,.gltf, image/jpeg, image/png, model/gltf-binary, model/gltf+json" style="display: none;" onchange="handleFiles(this.files)">
+        <input type="file" id="mediaInput" multiple accept="*/*" style="display: none;" onchange="handleFiles(this.files)">
         <button class="btn btn-dark" style="flex: 2; padding: 20px; font-size: 1.1rem; border: 2px dashed #d080ff; background: #161922;" onclick="document.getElementById('mediaInput').click()">
             🖼️ 2. ADD PHOTOS & 3D MODEL
         </button>
