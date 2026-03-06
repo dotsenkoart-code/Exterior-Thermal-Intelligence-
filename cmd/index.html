@@ -161,12 +161,12 @@
     </div>
 
     <div style="display: flex; gap: 15px; margin-bottom: 20px;">
-        <input type="file" id="csvInput" accept=".csv, text/csv, application/vnd.ms-excel" style="display: none;" onchange="handleFiles(this.files, 'csv')">
+        <input type="file" id="csvInput" style="display: none;" onchange="handleFiles(this.files, 'csv')">
         <button class="btn btn-dark" style="flex: 1; padding: 20px; font-size: 1.1rem; border: 2px dashed #0cf; background: #161922;" onclick="document.getElementById('csvInput').click()">
             📄 1. LOAD CSV DATA
         </button>
 
-        <input type="file" id="mediaInput" multiple accept="image/*, .glb, .gltf" style="display: none;" onchange="handleFiles(this.files, 'media')">
+        <input type="file" id="mediaInput" multiple style="display: none;" onchange="handleFiles(this.files, 'media')">
         <button class="btn btn-dark" style="flex: 2; padding: 20px; font-size: 1.1rem; border: 2px dashed #d080ff; background: #161922;" onclick="document.getElementById('mediaInput').click()">
             🖼️ 2. ADD PHOTOS & 3D MODEL
         </button>
@@ -336,34 +336,36 @@
 
         const viewer = document.querySelector('#main-3d-viewer');
 
-        // --- UPDATED JAVASCRIPT: WITH CLOUD-GHOST CATCHER ---
+        // --- UPDATED JAVASCRIPT: WITH UNIVERSAL PARSER AND CLOUD-GHOST CATCHER ---
         async function handleFiles(files, forcedType = null) {
             if (!files || files.length === 0) return;
             
             const csvPromises = [];
             let newPhotosAdded = 0;
             let newCsvAdded = false;
+            let rowsParsed = 0;
+            let filePreview = "";
 
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
 
-                // 🚨 CATCH GOOGLE DRIVE GHOST FILES 🚨
-                // If a file has 0 bytes, the browser physically cannot read it. 
+                // Catch Google Drive Ghost Files (0 bytes)
                 if (file.size === 0 || file.size === undefined) {
-                    alert(`⚠️ ERROR: "${file.name}" has 0 bytes. This means it is still in the cloud. Please open your Google Drive app, download the file to the tablet's local storage (My Files / Downloads), and try again.`);
+                    alert(`⚠️ ERROR: "${file.name}" has 0 bytes. It is a cloud placeholder. Please download it from Google Drive to your device first.`);
                     continue;
                 }
 
                 const fileName = (file.name || '').toLowerCase();
                 const fileType = (file.type || '').toLowerCase();
                 
-                // 1. Force parse CSV if it came from the left button, regardless of what Android thinks the file is
+                // 1. Force parse CSV if it came from the left button
                 if (forcedType === 'csv' || fileName.endsWith('.csv') || fileType.includes('csv') || fileType === 'application/vnd.ms-excel') {
                     newCsvAdded = true;
                     csvPromises.push(new Promise((resolve) => {
                         const reader = new FileReader();
                         reader.onload = (event) => { 
-                            parseCSV(event.target.result); 
+                            filePreview = event.target.result.substring(0, 200); // Save a snippet for debugging
+                            rowsParsed += parseCSV(event.target.result); 
                             resolve(); 
                         };
                         reader.onerror = () => {
@@ -403,14 +405,11 @@
                 alert(`✅ Successfully cached ${newPhotosAdded} photo(s). They will link automatically to the grid.`);
             }
 
-            // Verify if data was actually parsed
-            const hasData = Object.keys(inspectionData).length > 0;
-
             if (newCsvAdded) {
-                if (hasData) {
+                if (rowsParsed > 0) {
                     if (document.getElementById('dashboard-screen').style.display !== 'block') {
                         document.getElementById('btn-start-mapping').style.display = 'block';
-                        alert("✅ CSV Loaded Successfully! Click 'MAP BUILDING ELEVATIONS' to continue.");
+                        alert(`✅ Successfully loaded ${rowsParsed} windows from CSV! Click 'MAP BUILDING ELEVATIONS' to continue.`);
                     } else {
                         if (activeTab !== "") {
                             Object.keys(dropAssignments).forEach(d => {
@@ -419,10 +418,11 @@
                         }
                         calculateBuildingGeometry();
                         if (currentMode !== 'true3d') refreshCurrentView();
-                        alert("✅ Dashboard updated with new CSV data.");
+                        alert(`✅ Dashboard updated with ${rowsParsed} new window logs.`);
                     }
                 } else {
-                    alert("⚠️ File was loaded, but no valid data was found. Make sure this is a Strata-Scan exported CSV.");
+                    // If rowsParsed is 0, show the user exactly what text the tablet saw inside the file.
+                    alert("⚠️ The file was read, but no valid Strata data was found.\n\nHere is what the tablet saw inside the file:\n\n" + filePreview);
                 }
             }
 
@@ -430,12 +430,34 @@
             document.getElementById('mediaInput').value = "";
         }
 
+        // --- NEW BOMB-PROOF CSV PARSER ---
         function parseCSV(text) {
-            const rows = text.trim().split('\n');
+            // Universal split: Handles Windows (\r\n), Mac (\r), and Linux/Android (\n) perfectly
+            const rows = text.trim().split(/\r\n|\n|\r/);
+            let validRows = 0;
+
             for (let i = 1; i < rows.length; i++) {
-                if(!rows[i]) continue;
-                const cols = rows[i].replace(/"/g, '').split(',');
+                if(!rows[i].trim()) continue;
                 
+                // Advanced Column Splitter: Ignores commas that are inside double quotes
+                let cols = [];
+                let cur = '';
+                let inQuotes = false;
+                
+                for (let j = 0; j < rows[i].length; j++) {
+                    let c = rows[i][j];
+                    if (c === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (c === ',' && !inQuotes) {
+                        cols.push(cur.trim());
+                        cur = '';
+                    } else {
+                        cur += c;
+                    }
+                }
+                cols.push(cur.trim());
+                
+                // Standard Strata validation
                 if (cols.length >= 8) {
                     if (projectInfo === "Unknown Project") projectInfo = cols[0];
                     const fullId = cols[3]; 
@@ -469,9 +491,11 @@
                             tech: cols[2], time: cols[7], status: existingStatus, notes: existingNotes
                         };
                         if(!dropAssignments[drop]) dropAssignments[drop] = "";
+                        validRows++;
                     }
                 }
             }
+            return validRows;
         }
 
         // --- 3-TIER TAGGING ENGINE ---
