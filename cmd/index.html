@@ -161,12 +161,12 @@
     </div>
 
     <div style="display: flex; gap: 15px; margin-bottom: 20px;">
-        <input type="file" id="csvInput" accept=".csv" style="display: none;" onchange="handleFiles(this.files)">
+        <input type="file" id="csvInput" accept=".csv, text/csv, application/csv, application/vnd.ms-excel, text/comma-separated-values, text/plain" style="display: none;" onchange="handleFiles(this.files)">
         <button class="btn btn-dark" style="flex: 1; padding: 20px; font-size: 1.1rem; border: 2px dashed #0cf; background: #161922;" onclick="document.getElementById('csvInput').click()">
             📄 1. LOAD CSV DATA
         </button>
 
-        <input type="file" id="mediaInput" multiple accept=".jpg,.png,.glb,.gltf" style="display: none;" onchange="handleFiles(this.files)">
+        <input type="file" id="mediaInput" multiple accept=".jpg,.jpeg,.png,.glb,.gltf, image/jpeg, image/png, model/gltf-binary, model/gltf+json" style="display: none;" onchange="handleFiles(this.files)">
         <button class="btn btn-dark" style="flex: 2; padding: 20px; font-size: 1.1rem; border: 2px dashed #d080ff; background: #161922;" onclick="document.getElementById('mediaInput').click()">
             🖼️ 2. ADD PHOTOS & 3D MODEL
         </button>
@@ -336,7 +336,7 @@
 
         const viewer = document.querySelector('#main-3d-viewer');
 
-        // --- FILE HANDLING ---
+        // --- UPDATED ANDROID FILE HANDLING ---
         async function handleFiles(files) {
             if (!files || files.length === 0) return;
             
@@ -346,8 +346,11 @@
 
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
+                const fileName = file.name.toLowerCase();
+                const fileType = file.type.toLowerCase();
                 
-                if (file.type.startsWith('image/') || file.name.toLowerCase().endsWith('.jpg') || file.name.toLowerCase().endsWith('.png')) {
+                // 1. Check for Images (Catches iOS and Android variants)
+                if (fileType.startsWith('image/') || fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || fileName.endsWith('.png')) {
                     const cleanName = file.name.split('.')[0].toUpperCase();
                     if (!imageBank[cleanName]) {
                         imageBank[cleanName] = URL.createObjectURL(file);
@@ -355,12 +358,14 @@
                         newPhotosAdded++;
                     }
                 } 
-                else if (file.name.toLowerCase().endsWith('.glb') || file.name.toLowerCase().endsWith('.gltf')) {
+                // 2. Check for 3D Models
+                else if (fileName.endsWith('.glb') || fileName.endsWith('.gltf') || fileType.includes('model/gltf')) {
                     const modelUrl = URL.createObjectURL(file);
                     viewer.src = modelUrl;
                     document.getElementById('model-status').innerHTML = `<span style="color:#0cf;">Loaded Custom Model:</span> ${file.name}`;
                 }
-                else if (file.name.toLowerCase().endsWith('.csv')) {
+                // 3. Bulletproof CSV Check (Catches Android's weird Excel mapping)
+                else if (fileName.endsWith('.csv') || fileType.includes('csv') || fileType === 'application/vnd.ms-excel' || fileType === 'text/comma-separated-values') {
                     newCsvAdded = true;
                     csvPromises.push(new Promise((resolve) => {
                         const reader = new FileReader();
@@ -370,6 +375,8 @@
                         };
                         reader.readAsText(file);
                     }));
+                } else {
+                    console.log("Ignored unmapped file type:", fileName, fileType);
                 }
             }
 
