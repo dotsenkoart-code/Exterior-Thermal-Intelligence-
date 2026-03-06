@@ -1331,11 +1331,31 @@
 
         function openWipeModal() { document.getElementById('wipeModal').style.display = 'flex'; }
         function closeWipeModal() { document.getElementById('wipeModal').style.display = 'none'; }
+        
+        // --- NEW LIGHTNING FAST WIPE FUNCTION ---
         function confirmWipe() { 
+            // 1. Surgically wipe ONLY the drop data and map state (Protects JSA and Recent Sites)
             localStorage.removeItem('strataVault'); 
             localStorage.removeItem('strataState'); 
-            localStorage.setItem('isDropLocked', 'false');
-            location.reload(); 
+            localStorage.setItem('isDropLocked', 'false'); 
+
+            // 2. Instantly clear the Data Vault table UI without reloading the page
+            document.querySelector('#logTable tbody').innerHTML = '';
+
+            // 3. Unlock the Map Setup screen inputs for the next drop
+            document.querySelectorAll('.setup-input').forEach(el => el.disabled = false);
+            document.getElementById('btn-commit').style.display = 'block';
+            document.getElementById('btn-unlock').style.display = 'none';
+
+            // 4. Reset internal safety tripwires
+            isCurrentWindowLogged = false;
+            hasVisitedDiagnose = false;
+
+            // 5. Close the red warning modal
+            closeWipeModal();
+
+            // 6. Smoothly slide the user back to the Map to start the next drop
+            goToSlide(1); 
         }
 
         function openPhotoVerificationModal(logType) {
