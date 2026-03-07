@@ -113,7 +113,7 @@
         
         /* --- UPGRADED CAROUSEL GALLERY --- */
         .photo-gallery { display: flex; gap: 15px; overflow-x: auto; margin-bottom: 15px; padding-bottom: 10px; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
-        .photo-gallery img { flex: 0 0 100%; width: 100%; max-height: 280px; border-radius: 8px; border: 2px solid #555; object-fit: cover; background: #000; box-shadow: 0 5px 15px rgba(0,0,0,0.5); scroll-snap-align: center; }
+        .photo-gallery img { flex: 0 0 100%; width: 100%; max-height: 280px; border-radius: 8px; border: 2px solid #555; object-fit: cover; background: #000; box-shadow: 0 5px 15px rgba(0,0,0,0.5); scroll-snap-align: center; cursor: zoom-in; }
         .photo-gallery::-webkit-scrollbar { height: 8px; }
         .photo-gallery::-webkit-scrollbar-track { background: #111; border-radius: 4px; }
         .photo-gallery::-webkit-scrollbar-thumb { background: #0cf; border-radius: 4px; }
@@ -289,6 +289,21 @@
         </div>
     </div>
 
+    <div id="lightbox-modal" class="modal-overlay" style="z-index: 3000;">
+        <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column;">
+            
+            <button onclick="closeLightbox()" style="position: absolute; top: 20px; right: 20px; z-index: 3010; background: rgba(0,0,0,0.8); color: #fff; border: 2px solid #fff; border-radius: 50%; width: 50px; height: 50px; font-size: 1.5rem; font-weight: bold; cursor: pointer; transition: 0.2s;">X</button>
+            
+            <div id="lightbox-counter" style="position: absolute; top: 20px; left: 20px; z-index: 3010; background: rgba(0,0,0,0.8); color: #0cf; padding: 10px 20px; border-radius: 8px; font-weight: bold; font-size: 1.2rem; border: 1px solid #0cf;">1 / 3</div>
+
+            <button id="lightbox-prev" onclick="changeLightbox(-1)" style="position: absolute; left: 20px; top: 50%; transform: translateY(-50%); z-index: 3010; background: rgba(0,0,0,0.8); color: #fff; border: 2px solid #0cf; border-radius: 8px; padding: 25px 20px; font-size: 2rem; cursor: pointer; transition: 0.2s;">&#10094;</button>
+            
+            <img id="lightbox-img" src="" style="max-width: 95vw; max-height: 90vh; object-fit: contain; cursor: zoom-out;" onclick="changeLightbox(1)">
+            
+            <button id="lightbox-next" onclick="changeLightbox(1)" style="position: absolute; right: 20px; top: 50%; transform: translateY(-50%); z-index: 3010; background: rgba(0,0,0,0.8); color: #fff; border: 2px solid #0cf; border-radius: 8px; padding: 25px 20px; font-size: 2rem; cursor: pointer; transition: 0.2s;">&#10095;</button>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="tag-master-modal">
         <div class="modal-box" style="border-color:#d080ff;">
             <h2 style="color:#d080ff; margin-top:0; font-size: 1.8rem; text-align:center;">📍 3D TAGGING ENGINE</h2>
@@ -336,9 +351,12 @@
         let currentMode = '2d'; 
         let activeFilter = 'ALL'; 
 
-        // --- NEW TAGGING ENGINE STATE ---
         let bulkTagState = { mode: null, targetId: null, step: 0, anchors: [] };
         let saved3DTags = {}; 
+
+        // Lightbox State
+        let currentLightboxImages = [];
+        let currentLightboxIndex = 0;
 
         const viewer = document.querySelector('#main-3d-viewer');
 
@@ -429,7 +447,6 @@
             document.getElementById('mediaInput').value = "";
         }
 
-        // --- UPGRADED CSV PARSER: MERGES MULTIPLE LOGS FOR THE SAME WINDOW ---
         function parseCSV(text) {
             const rows = text.trim().split(/\r\n|\n|\r/);
             let validRows = 0;
@@ -479,28 +496,22 @@
                         let mergedFinds = finds !== '' ? finds.split(' | ') : [];
                         let mergedProved = proved;
                         
-                        // IF WE ALREADY LOGGED THIS WINDOW BEFORE: MERGE THE DATA
                         if(inspectionData[drop][floor][pos]) {
                             let prev = inspectionData[drop][floor][pos];
                             existingNotes = prev.notes;
                             
-                            // Merge all photos
                             if (prev.flir && prev.flir !== '--') {
                                 mergedFlir = [...prev.flir.split(' & '), ...mergedFlir];
                             }
-                            // Merge all findings
                             if (prev.finds && prev.finds !== 'CLEAR') {
                                  mergedFinds = [...prev.finds.split(' | '), ...mergedFinds];
                             }
-                            // Retain proved status
                             if (prev.proved === 'YES') mergedProved = 'YES';
                             
-                            // Elevate status priority
                             if (prev.status === 'status-confirmed') existingStatus = 'status-confirmed';
                             else if (prev.status === 'status-flagged' && existingStatus !== 'status-confirmed') existingStatus = 'status-flagged';
                         }
 
-                        // Remove duplicates from merging
                         mergedFlir = [...new Set(mergedFlir)]; 
                         mergedFinds = [...new Set(mergedFinds)].filter(f => f !== 'CLEAR');
                         if (mergedFinds.length === 0) mergedFinds = ['CLEAR'];
@@ -1046,7 +1057,6 @@
                             winNode.innerText = pos;
                             winNode.onclick = () => handleNodeClick(data, winNode);
                             
-                            // Check if ANY of the images linked to this window exist in the bank
                             let hasAnyImage = data.flir.split(' & ').some(imgId => imageBank[imgId]);
                             if (hasAnyImage) winNode.style.border = "2px solid #fff";
 
@@ -1076,7 +1086,34 @@
             return fragment;
         }
 
-        // --- UPGRADED MODAL: CAROUSEL PHOTO GALLERY ---
+        // --- FULLSCREEN LIGHTBOX LOGIC ---
+        function openLightbox(imgArray, startIndex) {
+            currentLightboxImages = imgArray;
+            currentLightboxIndex = startIndex;
+            updateLightboxUI();
+            document.getElementById('lightbox-modal').style.display = 'flex';
+        }
+
+        function updateLightboxUI() {
+            document.getElementById('lightbox-img').src = currentLightboxImages[currentLightboxIndex];
+            document.getElementById('lightbox-counter').innerText = `${currentLightboxIndex + 1} / ${currentLightboxImages.length}`;
+            
+            const isMulti = currentLightboxImages.length > 1;
+            document.getElementById('lightbox-prev').style.display = isMulti ? 'block' : 'none';
+            document.getElementById('lightbox-next').style.display = isMulti ? 'block' : 'none';
+        }
+
+        function changeLightbox(dir) {
+            currentLightboxIndex += dir;
+            if (currentLightboxIndex < 0) currentLightboxIndex = currentLightboxImages.length - 1;
+            if (currentLightboxIndex >= currentLightboxImages.length) currentLightboxIndex = 0;
+            updateLightboxUI();
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox-modal').style.display = 'none';
+        }
+
         function openModal(nodeId) {
             let pair = stitchedPairs.find(p => p.includes(nodeId));
             activeNodeDataArray = [];
@@ -1109,7 +1146,6 @@
             let proved = activeNodeDataArray.some(d => d.proved === 'YES') ? 'YES' : 'NO';
             let notes = activeNodeDataArray.map(d => d.notes).filter(n => n.trim() !== '').join('\n');
 
-            // Collect all unique FLIR image strings
             let allFlirs = [];
             activeNodeDataArray.forEach(d => {
                 if (d.flir && d.flir !== '--') {
@@ -1132,25 +1168,29 @@
             const carouselHint = document.getElementById('m-carousel-hint');
             gallery.innerHTML = '';
             
-            let loadedPhotos = 0;
-
+            let validImgUrls = [];
             flirs.forEach(f => {
-                if(imageBank[f]) {
-                    loadedPhotos++;
-                    let img = document.createElement('img');
-                    img.src = imageBank[f];
-                    gallery.appendChild(img);
-                }
+                if(imageBank[f]) validImgUrls.push(imageBank[f]);
             });
 
-            if (loadedPhotos > 0) {
+            if (validImgUrls.length > 0) {
+                validImgUrls.forEach((url, index) => {
+                    let img = document.createElement('img');
+                    img.src = url;
+                    // Trigger Lightbox on click
+                    img.onclick = () => openLightbox(validImgUrls, index);
+                    gallery.appendChild(img);
+                });
+
                 gallery.style.display = 'flex';
                 noPhoto.style.display = 'none';
-                if (loadedPhotos > 1) {
+                
+                if (validImgUrls.length > 1) {
                     carouselHint.style.display = 'block';
-                    carouselHint.innerText = `👉 SWIPE TO VIEW ${loadedPhotos} IMAGES 👈`;
+                    carouselHint.innerText = `👉 TAP TO ENLARGE & SWIPE (${validImgUrls.length} IMAGES) 👈`;
                 } else {
-                    carouselHint.style.display = 'none';
+                    carouselHint.style.display = 'block';
+                    carouselHint.innerText = `👉 TAP IMAGE TO ENLARGE 👈`;
                 }
             } else {
                 gallery.style.display = 'none';
