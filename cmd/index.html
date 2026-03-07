@@ -2,10 +2,16 @@
 <html>
 <head>
     <title>Strata Command Center | v6.2 Lean Digital Twin</title>
+    
     <link rel="icon" type="image/x-icon" href="favicon.ico">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
     <link rel="manifest" href="manifest_cmd.json">
+    
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-cmd192.png">
+    <link rel="apple-touch-icon" href="icon-cmd192.png">
+    
     <meta name="theme-color" content="#0f111a">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Strata CMD">
@@ -1276,6 +1282,7 @@
             document.getElementById('m-finds').innerText = allFinds.join(' | ');
             document.getElementById('m-finds').style.color = allFinds.includes('CLEAR') ? '#28a745' : '#f1c40f';
             
+            // DYNAMIC METER ROW LOGIC
             document.getElementById('m-row-proved').style.display = allFinds.includes('MOISTURE') ? 'flex' : 'none';
             document.getElementById('m-proved').innerText = proved;
             
