@@ -20,7 +20,7 @@
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
 
     <style>
-        /* --- ADDED OVERSCROLL-BEHAVIOR TO KILL PULL-TO-REFRESH --- */
+        /* --- KILLS THE PULL-TO-REFRESH CURSE --- */
         html, body { overscroll-behavior-y: none; }
         body { font-family: 'Segoe UI', Roboto, sans-serif; background: #0f111a; color: #fff; margin: 0; padding: 20px; overflow-x: hidden; }
         
@@ -186,8 +186,13 @@
         </button>
 
         <input type="file" id="mediaInput" multiple style="display: none;" onchange="handleFiles(this.files, 'media')">
-        <button class="btn btn-dark" style="flex: 2; padding: 20px; font-size: 1.1rem; border: 2px dashed #d080ff; background: #161922;" onclick="document.getElementById('mediaInput').click()">
-            🖼️ 2. ADD PHOTOS & 3D MODEL
+        <button class="btn btn-dark" style="flex: 1; padding: 20px; font-size: 1.1rem; border: 2px dashed #d080ff; background: #161922;" onclick="document.getElementById('mediaInput').click()">
+            🖼️ 2. ADD INDIVIDUAL FILES
+        </button>
+
+        <input type="file" id="folderInput" webkitdirectory directory multiple style="display: none;" onchange="handleFiles(this.files, 'media')">
+        <button class="btn btn-dark" style="flex: 1; padding: 20px; font-size: 1.1rem; border: 2px dashed #f39c12; background: #161922;" onclick="document.getElementById('folderInput').click()">
+            📁 3. ADD ENTIRE FOLDER
         </button>
     </div>
     
@@ -508,6 +513,7 @@
 
             document.getElementById('csvInput').value = "";
             document.getElementById('mediaInput').value = "";
+            document.getElementById('folderInput').value = "";
         }
 
         // --- HORIZONTAL 3D PIN SPACING UPGRADE ---
