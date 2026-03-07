@@ -205,7 +205,11 @@
     <div class="slide-container" id="mainSlider">
         
         <div class="slide" id="slide-compliance">
-            <h2 style="color:#f39c12; margin:0 0 15px 0; font-size:1.5rem;">DAILY COMPLIANCE & JSA</h2>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 style="color:#f39c12; margin:0; font-size:1.5rem;">DAILY COMPLIANCE & JSA</h2>
+                <button class="btn-dark" style="padding: 8px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; border-color: #f39c12; color: #f39c12; background: #222;" onclick="forceUpdateApp()">🔄 UPDATE APP</button>
+            </div>
             
             <div class="role-toggle-row">
                 <button id="modeBtnL3" class="role-btn active" onclick="setComplianceMode('L3')">L3 SUPERVISOR</button>
@@ -2291,6 +2295,21 @@
             a.download = fileName; 
             a.click();
         }
+
+        // --- INSTANT CACHE WIPE & UPDATE ---
+        function forceUpdateApp() {
+            if (confirm("Download the latest version of the app? (This will clear cache and reload the page)")) {
+                if ('caches' in window) {
+                    caches.keys().then(names => {
+                        names.forEach(name => {
+                            caches.delete(name);
+                        });
+                    });
+                }
+                window.location.reload(true);
+            }
+        }
+
     </script>
 </body>
 </html>
