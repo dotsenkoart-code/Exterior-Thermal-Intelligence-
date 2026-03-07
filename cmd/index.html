@@ -142,6 +142,8 @@
         .btn-red:hover { background: #c9302c; }
         .btn-green { background: #28a745; color: #fff; }
         .btn-green:hover { background: #218838; }
+        .btn-purple { background: #8e44ad; color: #fff; }
+        .btn-purple:hover { background: #732d91; }
         .btn-block { width: 100%; margin-top: 10px; }
         .header-btns { display: flex; gap: 10px; }
     </style>
@@ -161,6 +163,7 @@
         <div class="header-btns">
             <button class="btn btn-dark" id="btn-reset" style="display:none;" onclick="resetBoard()">🔄 CLEAR</button>
             <button class="btn btn-dark" id="btn-edit-map" style="display:none;" onclick="editMapping()">🗺️ EDIT MAP</button>
+            <button class="btn btn-purple" id="btn-save-project" style="display:none;" onclick="saveProject()">📦 SAVE PROJECT</button>
             <button class="btn btn-blue" id="btn-export" style="display:none;" onclick="exportReviewedCSV()">💾 EXPORT CSV</button>
         </div>
     </div>
@@ -168,7 +171,7 @@
     <div style="display: flex; gap: 15px; margin-bottom: 20px;">
         <input type="file" id="csvInput" style="display: none;" onchange="handleFiles(this.files, 'csv')">
         <button class="btn btn-dark" style="flex: 1; padding: 20px; font-size: 1.1rem; border: 2px dashed #0cf; background: #161922;" onclick="document.getElementById('csvInput').click()">
-            📄 1. LOAD CSV DATA
+            📄 1. LOAD CSV OR PROJECT
         </button>
 
         <input type="file" id="mediaInput" multiple style="display: none;" onchange="handleFiles(this.files, 'media')">
@@ -304,33 +307,6 @@
         </div>
     </div>
 
-    <div class="modal-overlay" id="tag-master-modal">
-        <div class="modal-box" style="border-color:#d080ff;">
-            <h2 style="color:#d080ff; margin-top:0; font-size: 1.8rem; text-align:center;">📍 3D TAGGING ENGINE</h2>
-            <p style="color:#888; font-size:0.9rem; margin-bottom:20px; text-align:center;">Select your mapping resolution:</p>
-            
-            <div style="background:#111; padding:15px; border-radius:8px; border:1px solid #333; margin-bottom:15px;">
-                <label style="color:#0cf; font-size:0.8rem; font-weight:bold;">1. SINGLE WINDOW (1 CLICK)</label>
-                <select id="tag-single-select" style="width:100%; padding:10px; margin-top:5px; background:#222; color:#fff; border:1px solid #555; border-radius:4px; font-weight:bold;"></select>
-                <button class="btn btn-blue btn-block" onclick="startSingleTag()">🎯 TAG INDIVIDUAL</button>
-            </div>
-
-            <div style="background:#111; padding:15px; border-radius:8px; border:1px solid #333; margin-bottom:15px;">
-                <label style="color:#0cf; font-size:0.8rem; font-weight:bold;">2. ENTIRE DROP (2 CLICKS)</label>
-                <select id="tag-drop-select" style="width:100%; padding:10px; margin-top:5px; background:#222; color:#fff; border:1px solid #555; border-radius:4px; font-weight:bold;"></select>
-                <button class="btn btn-blue btn-block" onclick="startDropTag()">⬇️ AUTO-TAG DROP</button>
-            </div>
-
-            <div style="background:#111; padding:15px; border-radius:8px; border:1px solid #333; margin-bottom:20px;">
-                <label style="color:#0cf; font-size:0.8rem; font-weight:bold;">3. ENTIRE WALL (4 CLICKS)</label>
-                <select id="tag-wall-select" style="width:100%; padding:10px; margin-top:5px; background:#222; color:#fff; border:1px solid #555; border-radius:4px; font-weight:bold;"></select>
-                <button class="btn btn-blue btn-block" onclick="startWallTag()">🏢 AUTO-MAP WALL</button>
-            </div>
-
-            <button class="btn btn-dark btn-block" onclick="closeMasterTagMenu()">🔙 CANCEL</button>
-        </div>
-    </div>
-
     <script>
         let inspectionData = {};
         let projectInfo = "Unknown Project";
@@ -366,6 +342,7 @@
             const csvPromises = [];
             let newPhotosAdded = 0;
             let newCsvAdded = false;
+            let isProjectLoaded = false; // Flag to check if we loaded a JSON file
             let rowsParsed = 0;
             let filePreview = "";
 
@@ -380,7 +357,35 @@
                 const fileName = (file.name || '').toLowerCase();
                 const fileType = (file.type || '').toLowerCase();
                 
-                if (forcedType === 'csv' || fileName.endsWith('.csv') || fileType.includes('csv') || fileType === 'application/vnd.ms-excel') {
+                // 1. JSON Master Project Loader
+                if (fileName.endsWith('.json')) {
+                    isProjectLoaded = true;
+                    csvPromises.push(new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                            try {
+                                const parsed = JSON.parse(event.target.result);
+                                projectInfo = parsed.projectInfo || "Unknown Project";
+                                inspectionData = parsed.inspectionData || {};
+                                elevations = parsed.elevations || [];
+                                dropAssignments = parsed.dropAssignments || {};
+                                stitchedPairs = parsed.stitchedPairs || [];
+                                saved3DTags = parsed.saved3DTags || {};
+                                resolve();
+                            } catch(e) {
+                                alert("⚠️ Error reading Project file. File might be corrupted.");
+                                resolve();
+                            }
+                        };
+                        reader.onerror = () => {
+                            alert("⚠️ Error reading file. Ensure it is fully downloaded to your device.");
+                            resolve();
+                        };
+                        reader.readAsText(file);
+                    }));
+                }
+                // 2. Standard CSV Loader
+                else if (forcedType === 'csv' || fileName.endsWith('.csv') || fileType.includes('csv') || fileType === 'application/vnd.ms-excel') {
                     newCsvAdded = true;
                     csvPromises.push(new Promise((resolve) => {
                         const reader = new FileReader();
@@ -396,6 +401,7 @@
                         reader.readAsText(file);
                     }));
                 }
+                // 3. Image Cache
                 else if (fileType.startsWith('image/') || fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || fileName.endsWith('.png')) {
                     const cleanName = file.name.split('.')[0].toUpperCase();
                     if (!imageBank[cleanName]) {
@@ -404,6 +410,7 @@
                         newPhotosAdded++;
                     }
                 } 
+                // 4. 3D Model Cache
                 else if (fileName.endsWith('.glb') || fileName.endsWith('.gltf') || fileType.includes('model/gltf')) {
                     const modelUrl = URL.createObjectURL(file);
                     viewer.src = modelUrl;
@@ -423,11 +430,15 @@
                 alert(`✅ Successfully cached ${newPhotosAdded} photo(s). They will link automatically to the grid.`);
             }
 
-            if (newCsvAdded) {
-                if (rowsParsed > 0) {
+            if (newCsvAdded || isProjectLoaded) {
+                if (rowsParsed > 0 || isProjectLoaded) {
                     if (document.getElementById('dashboard-screen').style.display !== 'block') {
                         document.getElementById('btn-start-mapping').style.display = 'block';
-                        alert(`✅ Successfully loaded ${rowsParsed} windows from CSV! Click 'MAP BUILDING ELEVATIONS' to continue.`);
+                        if (isProjectLoaded) {
+                            alert("✅ Project File Loaded Successfully! Click 'MAP BUILDING ELEVATIONS' to continue.");
+                        } else {
+                            alert(`✅ Successfully loaded ${rowsParsed} windows from CSV! Click 'MAP BUILDING ELEVATIONS' to continue.`);
+                        }
                     } else {
                         if (activeTab !== "") {
                             Object.keys(dropAssignments).forEach(d => {
@@ -436,7 +447,11 @@
                         }
                         calculateBuildingGeometry();
                         if (currentMode !== 'true3d') refreshCurrentView();
-                        alert(`✅ Dashboard updated with new window logs.`);
+                        if (isProjectLoaded) {
+                            alert("✅ Dashboard fully restored from Project File.");
+                        } else {
+                            alert(`✅ Dashboard updated with new window logs.`);
+                        }
                     }
                 } else {
                     alert("⚠️ The file was read, but no valid Strata data was found.\n\nHere is what the tablet saw inside the file:\n\n" + filePreview);
@@ -532,6 +547,24 @@
                 }
             }
             return validRows;
+        }
+
+        // --- NEW JSON SAVE FUNCTION ---
+        function saveProject() {
+            const projectData = {
+                projectInfo: projectInfo,
+                inspectionData: inspectionData,
+                elevations: elevations,
+                dropAssignments: dropAssignments,
+                stitchedPairs: stitchedPairs,
+                saved3DTags: saved3DTags
+            };
+            
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(projectData));
+            const a = document.createElement('a'); 
+            a.href = dataStr; 
+            a.download = `Strata_Project_${projectInfo.replace(/\s+/g, '_')}.json`; 
+            a.click();
         }
 
         function openMasterTagMenu() {
@@ -845,6 +878,7 @@
             document.getElementById('dashboard-screen').style.display = 'none';
             document.getElementById('mapping-screen').style.display = 'block';
             document.getElementById('btn-export').style.display = 'none';
+            document.getElementById('btn-save-project').style.display = 'none';
             document.getElementById('btn-edit-map').style.display = 'none';
             renderMappingList();
         }
@@ -908,8 +942,12 @@
             if (elevations.length === 0) { alert("⚠️ You must add at least one custom wall before generating the dashboard."); return; }
             document.getElementById('mapping-screen').style.display = 'none';
             document.getElementById('dashboard-screen').style.display = 'block';
+            
+            // SHOW EXPORT & SAVE PROJECT BUTTONS
             document.getElementById('btn-export').style.display = 'inline-block';
+            document.getElementById('btn-save-project').style.display = 'inline-block';
             document.getElementById('btn-edit-map').style.display = 'inline-block';
+            
             if(!elevations.includes(activeTab)) activeTab = elevations[0];
             calculateBuildingGeometry();
             if (currentMode !== 'true3d') refreshCurrentView();
@@ -1177,7 +1215,6 @@
                 validImgUrls.forEach((url, index) => {
                     let img = document.createElement('img');
                     img.src = url;
-                    // Trigger Lightbox on click
                     img.onclick = () => openLightbox(validImgUrls, index);
                     gallery.appendChild(img);
                 });
@@ -1257,6 +1294,7 @@
                 document.getElementById('dashboard-screen').style.display = 'none';
                 document.getElementById('mapping-screen').style.display = 'none';
                 document.getElementById('btn-export').style.display = 'none';
+                document.getElementById('btn-save-project').style.display = 'none';
                 document.getElementById('btn-edit-map').style.display = 'none';
                 document.getElementById('btn-reset').style.display = 'none';
                 document.getElementById('btn-start-mapping').style.display = 'none';
