@@ -1387,6 +1387,7 @@
                    now.getSeconds().toString().padStart(2,'0');
         }
 
+        // --- UPDATED LOGGING: NO LITERAL QUOTES IN THE HTML TABLE ---
         function executeQuickLog() {
             const time = getFormattedTime();
             const proj = document.getElementById('projectID').value || "No Project";
@@ -1397,9 +1398,9 @@
             const imgStr = cam + "-FLIR" + imgEl.value.toString().padStart(4, '0');
             
             const row = `<tr>
-                <td class="export-only">"${proj}"</td>
-                <td class="export-only">"${cam}"</td>
-                <td class="export-only">"${tech}"</td>
+                <td class="export-only">${proj}</td>
+                <td class="export-only">${cam}</td>
+                <td class="export-only">${tech}</td>
                 <td style="color:#0cf; font-weight:bold; white-space:nowrap;">${id}</td>
                 <td>${imgStr}</td>
                 <td style="color:#f39c12;">CLEAR (QUICK-LOG)</td>
@@ -1430,9 +1431,9 @@
             }
 
             const row = `<tr>
-                <td class="export-only">"${proj}"</td>
-                <td class="export-only">"${cam}"</td>
-                <td class="export-only">"${tech}"</td>
+                <td class="export-only">${proj}</td>
+                <td class="export-only">${cam}</td>
+                <td class="export-only">${tech}</td>
                 <td style="color:#0cf; font-weight:bold; white-space:nowrap;">${id}</td>
                 <td>${imgStr}</td>
                 <td>${finds.join(' | ')}</td>
@@ -2203,11 +2204,21 @@
             });
         }
         
+        // --- UPDATED EXPORT LOGIC: FIXES PREVIOUS BUGGED DATA ---
         async function exportAndSend() {
             let csv = "Project,Camera,Technician,Drop ID,FLIR Image,Findings,Meter Proved,Time\n";
             document.querySelectorAll("#logTable tbody tr").forEach(tr => {
                 const cols = Array.from(tr.querySelectorAll("td"));
-                csv += cols.map(td => `"${td.textContent}"`).join(",") + "\n";
+                csv += cols.map(td => {
+                    let text = td.textContent;
+                    // This secretly strips out the broken quotes from data you already saved!
+                    if (text.startsWith('"') && text.endsWith('"')) {
+                        text = text.substring(1, text.length - 1);
+                    }
+                    // Standard CSV escaping (protects against inner commas and quotes)
+                    text = text.replace(/"/g, '""');
+                    return `"${text}"`;
+                }).join(",") + "\n";
             });
             
             const proj = document.getElementById('projectID').value || "Unknown_Project";
