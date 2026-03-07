@@ -271,7 +271,7 @@
             <div id="m-no-photo" class="no-photo-banner">IMAGE NOT UPLOADED TO DASHBOARD</div>
             
             <div class="data-row"><span class="data-label">Field Findings</span><span class="data-val" id="m-finds" style="color:#f1c40f;">--</span></div>
-            <div class="data-row"><span class="data-label">Meter Proved</span><span class="data-val" id="m-proved">--</span></div>
+            <div class="data-row" id="m-row-proved"><span class="data-label">Meter Proved</span><span class="data-val" id="m-proved">--</span></div>
             <div class="data-row"><span class="data-label">FLIR Image(s)</span><span class="data-val" id="m-flir" style="color:#0cf;">--</span></div>
             
             <div class="manager-section">
@@ -304,6 +304,33 @@
             <img id="lightbox-img" src="" style="max-width: 95vw; max-height: 90vh; object-fit: contain; cursor: zoom-out;" onclick="changeLightbox(1)">
             
             <button id="lightbox-next" onclick="changeLightbox(1)" style="position: absolute; right: 20px; top: 50%; transform: translateY(-50%); z-index: 3010; background: rgba(0,0,0,0.8); color: #fff; border: 2px solid #0cf; border-radius: 8px; padding: 25px 20px; font-size: 2rem; cursor: pointer; transition: 0.2s;">&#10095;</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="tag-master-modal">
+        <div class="modal-box" style="border-color:#d080ff;">
+            <h2 style="color:#d080ff; margin-top:0; font-size: 1.8rem; text-align:center;">📍 3D TAGGING ENGINE</h2>
+            <p style="color:#888; font-size:0.9rem; margin-bottom:20px; text-align:center;">Select your mapping resolution:</p>
+            
+            <div style="background:#111; padding:15px; border-radius:8px; border:1px solid #333; margin-bottom:15px;">
+                <label style="color:#0cf; font-size:0.8rem; font-weight:bold;">1. SINGLE WINDOW (1 CLICK)</label>
+                <select id="tag-single-select" style="width:100%; padding:10px; margin-top:5px; background:#222; color:#fff; border:1px solid #555; border-radius:4px; font-weight:bold;"></select>
+                <button class="btn btn-blue btn-block" onclick="startSingleTag()">🎯 TAG INDIVIDUAL</button>
+            </div>
+
+            <div style="background:#111; padding:15px; border-radius:8px; border:1px solid #333; margin-bottom:15px;">
+                <label style="color:#0cf; font-size:0.8rem; font-weight:bold;">2. ENTIRE DROP (2 CLICKS)</label>
+                <select id="tag-drop-select" style="width:100%; padding:10px; margin-top:5px; background:#222; color:#fff; border:1px solid #555; border-radius:4px; font-weight:bold;"></select>
+                <button class="btn btn-blue btn-block" onclick="startDropTag()">⬇️ AUTO-TAG DROP</button>
+            </div>
+
+            <div style="background:#111; padding:15px; border-radius:8px; border:1px solid #333; margin-bottom:20px;">
+                <label style="color:#0cf; font-size:0.8rem; font-weight:bold;">3. ENTIRE WALL (4 CLICKS)</label>
+                <select id="tag-wall-select" style="width:100%; padding:10px; margin-top:5px; background:#222; color:#fff; border:1px solid #555; border-radius:4px; font-weight:bold;"></select>
+                <button class="btn btn-blue btn-block" onclick="startWallTag()">🏢 AUTO-MAP WALL</button>
+            </div>
+
+            <button class="btn btn-dark btn-block" onclick="closeMasterTagMenu()">🔙 CANCEL</button>
         </div>
     </div>
 
@@ -342,7 +369,7 @@
             const csvPromises = [];
             let newPhotosAdded = 0;
             let newCsvAdded = false;
-            let isProjectLoaded = false; // Flag to check if we loaded a JSON file
+            let isProjectLoaded = false;
             let rowsParsed = 0;
             let filePreview = "";
 
@@ -357,7 +384,6 @@
                 const fileName = (file.name || '').toLowerCase();
                 const fileType = (file.type || '').toLowerCase();
                 
-                // 1. JSON Master Project Loader
                 if (fileName.endsWith('.json')) {
                     isProjectLoaded = true;
                     csvPromises.push(new Promise((resolve) => {
@@ -384,7 +410,6 @@
                         reader.readAsText(file);
                     }));
                 }
-                // 2. Standard CSV Loader
                 else if (forcedType === 'csv' || fileName.endsWith('.csv') || fileType.includes('csv') || fileType === 'application/vnd.ms-excel') {
                     newCsvAdded = true;
                     csvPromises.push(new Promise((resolve) => {
@@ -401,7 +426,6 @@
                         reader.readAsText(file);
                     }));
                 }
-                // 3. Image Cache
                 else if (fileType.startsWith('image/') || fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || fileName.endsWith('.png')) {
                     const cleanName = file.name.split('.')[0].toUpperCase();
                     if (!imageBank[cleanName]) {
@@ -410,7 +434,6 @@
                         newPhotosAdded++;
                     }
                 } 
-                // 4. 3D Model Cache
                 else if (fileName.endsWith('.glb') || fileName.endsWith('.gltf') || fileType.includes('model/gltf')) {
                     const modelUrl = URL.createObjectURL(file);
                     viewer.src = modelUrl;
@@ -549,7 +572,6 @@
             return validRows;
         }
 
-        // --- NEW JSON SAVE FUNCTION ---
         function saveProject() {
             const projectData = {
                 projectInfo: projectInfo,
@@ -943,7 +965,6 @@
             document.getElementById('mapping-screen').style.display = 'none';
             document.getElementById('dashboard-screen').style.display = 'block';
             
-            // SHOW EXPORT & SAVE PROJECT BUTTONS
             document.getElementById('btn-export').style.display = 'inline-block';
             document.getElementById('btn-save-project').style.display = 'inline-block';
             document.getElementById('btn-edit-map').style.display = 'inline-block';
@@ -1197,7 +1218,10 @@
             document.getElementById('m-finds').innerText = allFinds.join(' | ');
             document.getElementById('m-finds').style.color = allFinds.includes('CLEAR') ? '#28a745' : '#f1c40f';
             
+            // --- UPDATED LOGIC: ONLY SHOW METER DATA IF MOISTURE IS FLAGGED ---
+            document.getElementById('m-row-proved').style.display = allFinds.includes('MOISTURE') ? 'flex' : 'none';
             document.getElementById('m-proved').innerText = proved;
+            
             document.getElementById('m-flir').innerText = flirs.join(' & ') || '--';
             document.getElementById('m-notes').value = notes;
             
