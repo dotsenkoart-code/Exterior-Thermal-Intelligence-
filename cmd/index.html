@@ -501,6 +501,7 @@
             document.getElementById('mediaInput').value = "";
         }
 
+        // --- HORIZONTAL 3D PIN SPACING UPGRADE ---
         function parseCSV(text) {
             const rows = text.trim().split(/\r\n|\n|\r/);
             let validRows = 0;
@@ -736,6 +737,7 @@
             }
         });
 
+        // --- UPDATED DROP TAGGING (WITH HORIZONTAL SPACING) ---
         function processDropTagging(dropId, anchors) {
             let floors = Object.keys(inspectionData[dropId]).map(Number).sort((a,b) => b-a); 
             if(floors.length === 0) return;
@@ -746,22 +748,41 @@
 
             let pT = parseCoord(anchors[0].position);
             let pB = parseCoord(anchors[1].position);
-            let norm = `${anchors[0].normal.x} ${anchors[0].normal.y} ${anchors[0].normal.z}`;
+            
+            let nX = anchors[0].normal.x, nY = anchors[0].normal.y, nZ = anchors[0].normal.z;
+            let norm = `${nX} ${nY} ${nZ}`;
+            
+            // MATH: Calculate the "Right" vector based on the wall's normal
+            let rLen = Math.sqrt(nZ*nZ + nX*nX);
+            let rX = rLen === 0 ? 1 : nZ/rLen;
+            let rY = 0;
+            let rZ = rLen === 0 ? 0 : -nX/rLen;
+            let spacing = 0.8; // Arbitrary distance between L, C, R windows in 3D units
+
+            let orderMap = { 'L': -1, 'C': 0, 'R': 1 };
 
             floors.forEach(f => {
                 let t = (fRange === 0) ? 0 : (maxF - f) / fRange;
-                let x = pT[0] + (pB[0] - pT[0]) * t;
-                let y = pT[1] + (pB[1] - pT[1]) * t;
-                let z = pT[2] + (pB[2] - pT[2]) * t;
+                let cx = pT[0] + (pB[0] - pT[0]) * t;
+                let cy = pT[1] + (pB[1] - pT[1]) * t;
+                let cz = pT[2] + (pB[2] - pT[2]) * t;
 
                 Object.keys(inspectionData[dropId][f]).forEach(pos => {
+                    let offset = orderMap[pos] !== undefined ? orderMap[pos] : 0;
+                    
+                    // Physically offset the pin horizontally
+                    let px = cx + (rX * offset * spacing);
+                    let py = cy + (rY * offset * spacing);
+                    let pz = cz + (rZ * offset * spacing);
+
                     let fullId = `${dropId}-${f}-${pos}`;
-                    saved3DTags[fullId] = { position: `${x} ${y} ${z}`, normal: norm };
+                    saved3DTags[fullId] = { position: `${px} ${py} ${pz}`, normal: norm };
                 });
             });
             render3DHotspots();
         }
 
+        // --- UPDATED WALL TAGGING (WITH HORIZONTAL SPACING) ---
         function processWallTagging(wallName, anchors) {
             let drops = Object.keys(dropAssignments).filter(d => dropAssignments[d] === wallName).sort();
             if(drops.length === 0) { alert("No drops assigned to this wall yet."); return; }
@@ -779,7 +800,22 @@
             let TR = parseCoord(anchors[1].position);
             let BL = parseCoord(anchors[2].position);
             let BR = parseCoord(anchors[3].position);
-            let norm = `${anchors[0].normal.x} ${anchors[0].normal.y} ${anchors[0].normal.z}`;
+            
+            let nX = anchors[0].normal.x, nY = anchors[0].normal.y, nZ = anchors[0].normal.z;
+            let norm = `${nX} ${nY} ${nZ}`;
+
+            // MATH: Calculate actual Right Vector along the Top edge
+            let vTopX = TR[0] - TL[0], vTopY = TR[1] - TL[1], vTopZ = TR[2] - TL[2];
+            let wallWidth = Math.sqrt(vTopX*vTopX + vTopY*vTopY + vTopZ*vTopZ);
+            let rX = wallWidth === 0 ? 1 : vTopX/wallWidth;
+            let rY = wallWidth === 0 ? 0 : vTopY/wallWidth;
+            let rZ = wallWidth === 0 ? 0 : vTopZ/wallWidth;
+            
+            // Dynamic spacing based on physical wall width
+            let dropWidth = wallWidth / (drops.length || 1);
+            let spacing = dropWidth * 0.3; // 30% of a drop width per window
+
+            let orderMap = { 'L': -1, 'C': 0, 'R': 1 };
 
             drops.forEach((dropId, dIdx) => {
                 let u = (drops.length > 1) ? (dIdx / dRange) : 0.5;
@@ -788,13 +824,19 @@
                 floors.forEach(f => {
                     let v = (fRange === 0) ? 0 : (maxF - f) / fRange;
 
-                    let x = (1-u)*(1-v)*TL[0] + u*(1-v)*TR[0] + (1-u)*v*BL[0] + u*v*BR[0];
-                    let y = (1-u)*(1-v)*TL[1] + u*(1-v)*TR[1] + (1-u)*v*BL[1] + u*v*BR[1];
-                    let z = (1-u)*(1-v)*TL[2] + u*(1-v)*TR[2] + (1-u)*v*BL[2] + u*v*BR[2];
+                    let cx = (1-u)*(1-v)*TL[0] + u*(1-v)*TR[0] + (1-u)*v*BL[0] + u*v*BR[0];
+                    let cy = (1-u)*(1-v)*TL[1] + u*(1-v)*TR[1] + (1-u)*v*BL[1] + u*v*BR[1];
+                    let cz = (1-u)*(1-v)*TL[2] + u*(1-v)*TR[2] + (1-u)*v*BL[2] + u*v*BR[2];
 
                     Object.keys(inspectionData[dropId][f]).forEach(pos => {
+                         let offset = orderMap[pos] !== undefined ? orderMap[pos] : 0;
+                         
+                         let px = cx + (rX * offset * spacing);
+                         let py = cy + (rY * offset * spacing);
+                         let pz = cz + (rZ * offset * spacing);
+
                          let fullId = `${dropId}-${f}-${pos}`;
-                         saved3DTags[fullId] = { position: `${x} ${y} ${z}`, normal: norm };
+                         saved3DTags[fullId] = { position: `${px} ${py} ${pz}`, normal: norm };
                     });
                 });
             });
@@ -1234,7 +1276,6 @@
             document.getElementById('m-finds').innerText = allFinds.join(' | ');
             document.getElementById('m-finds').style.color = allFinds.includes('CLEAR') ? '#28a745' : '#f1c40f';
             
-            // DYNAMIC METER ROW LOGIC
             document.getElementById('m-row-proved').style.display = allFinds.includes('MOISTURE') ? 'flex' : 'none';
             document.getElementById('m-proved').innerText = proved;
             
