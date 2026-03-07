@@ -111,8 +111,13 @@
         .modal-title { font-size: 2rem; color: #0cf; margin: 0 0 5px 0; font-weight: 900; }
         .modal-subtitle { color: #888; margin-bottom: 15px; font-size: 0.9rem; }
         
-        .photo-gallery { display: flex; gap: 10px; overflow-x: auto; margin-bottom: 15px; padding-bottom: 5px; }
-        .photo-gallery img { flex: 1; width: 100%; min-width: 200px; border-radius: 8px; border: 2px solid #333; object-fit: cover; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        /* --- UPGRADED CAROUSEL GALLERY --- */
+        .photo-gallery { display: flex; gap: 15px; overflow-x: auto; margin-bottom: 15px; padding-bottom: 10px; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
+        .photo-gallery img { flex: 0 0 100%; width: 100%; max-height: 280px; border-radius: 8px; border: 2px solid #555; object-fit: cover; background: #000; box-shadow: 0 5px 15px rgba(0,0,0,0.5); scroll-snap-align: center; }
+        .photo-gallery::-webkit-scrollbar { height: 8px; }
+        .photo-gallery::-webkit-scrollbar-track { background: #111; border-radius: 4px; }
+        .photo-gallery::-webkit-scrollbar-thumb { background: #0cf; border-radius: 4px; }
+        .carousel-hint { text-align: center; color: #0cf; font-size: 0.8rem; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; display: none; background: rgba(0, 204, 255, 0.1); padding: 5px; border-radius: 4px; }
         
         .no-photo-banner { background: #222; color: #666; padding: 20px; text-align: center; border-radius: 8px; border: 1px dashed #444; margin-bottom: 15px; font-size: 0.9rem; font-weight: bold; }
 
@@ -258,6 +263,7 @@
             <button class="btn btn-dark btn-block" id="btn-unpin" style="display:none; margin-bottom:10px; border-color:#d080ff; color:#d080ff;" onclick="unpinCurrent()">🗑️ REMOVE 3D PIN</button>
             <button class="btn btn-dark btn-block" id="btn-unmerge" style="display:none; margin-bottom:15px; border-color:#f39c12; color:#f39c12;" onclick="unmergeCurrent()">✂️ UN-STITCH THESE WINDOWS</button>
             
+            <div class="carousel-hint" id="m-carousel-hint"></div>
             <div class="photo-gallery" id="m-photo-gallery"></div>
             <div id="m-no-photo" class="no-photo-banner">IMAGE NOT UPLOADED TO DASHBOARD</div>
             
@@ -336,7 +342,6 @@
 
         const viewer = document.querySelector('#main-3d-viewer');
 
-        // --- UPDATED JAVASCRIPT: WITH UNIVERSAL PARSER AND CLOUD-GHOST CATCHER ---
         async function handleFiles(files, forcedType = null) {
             if (!files || files.length === 0) return;
             
@@ -349,7 +354,6 @@
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
 
-                // Catch Google Drive Ghost Files (0 bytes)
                 if (file.size === 0 || file.size === undefined) {
                     alert(`⚠️ ERROR: "${file.name}" has 0 bytes. It is a cloud placeholder. Please download it from Google Drive to your device first.`);
                     continue;
@@ -358,13 +362,12 @@
                 const fileName = (file.name || '').toLowerCase();
                 const fileType = (file.type || '').toLowerCase();
                 
-                // 1. Force parse CSV if it came from the left button
                 if (forcedType === 'csv' || fileName.endsWith('.csv') || fileType.includes('csv') || fileType === 'application/vnd.ms-excel') {
                     newCsvAdded = true;
                     csvPromises.push(new Promise((resolve) => {
                         const reader = new FileReader();
                         reader.onload = (event) => { 
-                            filePreview = event.target.result.substring(0, 200); // Save a snippet for debugging
+                            filePreview = event.target.result.substring(0, 200); 
                             rowsParsed += parseCSV(event.target.result); 
                             resolve(); 
                         };
@@ -375,7 +378,6 @@
                         reader.readAsText(file);
                     }));
                 }
-                // 2. Check for Images
                 else if (fileType.startsWith('image/') || fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || fileName.endsWith('.png')) {
                     const cleanName = file.name.split('.')[0].toUpperCase();
                     if (!imageBank[cleanName]) {
@@ -384,7 +386,6 @@
                         newPhotosAdded++;
                     }
                 } 
-                // 3. Check for 3D Models
                 else if (fileName.endsWith('.glb') || fileName.endsWith('.gltf') || fileType.includes('model/gltf')) {
                     const modelUrl = URL.createObjectURL(file);
                     viewer.src = modelUrl;
@@ -400,7 +401,6 @@
             document.getElementById('stat-photos').innerText = linkedPhotosCount;
             document.getElementById('btn-reset').style.display = 'inline-block';
             
-            // Show instant success if photos were loaded
             if (newPhotosAdded > 0) {
                 alert(`✅ Successfully cached ${newPhotosAdded} photo(s). They will link automatically to the grid.`);
             }
@@ -418,10 +418,9 @@
                         }
                         calculateBuildingGeometry();
                         if (currentMode !== 'true3d') refreshCurrentView();
-                        alert(`✅ Dashboard updated with ${rowsParsed} new window logs.`);
+                        alert(`✅ Dashboard updated with new window logs.`);
                     }
                 } else {
-                    // If rowsParsed is 0, show the user exactly what text the tablet saw inside the file.
                     alert("⚠️ The file was read, but no valid Strata data was found.\n\nHere is what the tablet saw inside the file:\n\n" + filePreview);
                 }
             }
@@ -430,16 +429,14 @@
             document.getElementById('mediaInput').value = "";
         }
 
-        // --- NEW BOMB-PROOF CSV PARSER ---
+        // --- UPGRADED CSV PARSER: MERGES MULTIPLE LOGS FOR THE SAME WINDOW ---
         function parseCSV(text) {
-            // Universal split: Handles Windows (\r\n), Mac (\r), and Linux/Android (\n) perfectly
             const rows = text.trim().split(/\r\n|\n|\r/);
             let validRows = 0;
 
             for (let i = 1; i < rows.length; i++) {
                 if(!rows[i].trim()) continue;
                 
-                // Advanced Column Splitter: Ignores commas that are inside double quotes
                 let cols = [];
                 let cur = '';
                 let inQuotes = false;
@@ -457,13 +454,12 @@
                 }
                 cols.push(cur.trim());
                 
-                // Standard Strata validation
                 if (cols.length >= 8) {
                     if (projectInfo === "Unknown Project") projectInfo = cols[0];
                     const fullId = cols[3]; 
                     let flir = cols[4];
-                    const finds = cols[5];
-                    const proved = cols[6];
+                    let finds = cols[5];
+                    let proved = cols[6];
                     
                     let status = 'status-clear';
                     if (!finds.includes('CLEAR')) status = 'status-flagged'; 
@@ -479,16 +475,45 @@
                         
                         let existingNotes = "";
                         let existingStatus = status;
+                        let mergedFlir = flir !== '--' && flir !== '' ? [flir] : [];
+                        let mergedFinds = finds !== '' ? finds.split(' | ') : [];
+                        let mergedProved = proved;
+                        
+                        // IF WE ALREADY LOGGED THIS WINDOW BEFORE: MERGE THE DATA
                         if(inspectionData[drop][floor][pos]) {
-                            existingNotes = inspectionData[drop][floor][pos].notes;
-                            if(inspectionData[drop][floor][pos].status === 'status-confirmed') existingStatus = 'status-confirmed';
-                            if(inspectionData[drop][floor][pos].status === 'status-clear') existingStatus = 'status-clear';
-                            if(inspectionData[drop][floor][pos].status === 'status-flagged') existingStatus = 'status-flagged';
+                            let prev = inspectionData[drop][floor][pos];
+                            existingNotes = prev.notes;
+                            
+                            // Merge all photos
+                            if (prev.flir && prev.flir !== '--') {
+                                mergedFlir = [...prev.flir.split(' & '), ...mergedFlir];
+                            }
+                            // Merge all findings
+                            if (prev.finds && prev.finds !== 'CLEAR') {
+                                 mergedFinds = [...prev.finds.split(' | '), ...mergedFinds];
+                            }
+                            // Retain proved status
+                            if (prev.proved === 'YES') mergedProved = 'YES';
+                            
+                            // Elevate status priority
+                            if (prev.status === 'status-confirmed') existingStatus = 'status-confirmed';
+                            else if (prev.status === 'status-flagged' && existingStatus !== 'status-confirmed') existingStatus = 'status-flagged';
                         }
 
+                        // Remove duplicates from merging
+                        mergedFlir = [...new Set(mergedFlir)]; 
+                        mergedFinds = [...new Set(mergedFinds)].filter(f => f !== 'CLEAR');
+                        if (mergedFinds.length === 0) mergedFinds = ['CLEAR'];
+
                         inspectionData[drop][floor][pos] = {
-                            id: fullId, flir: flir, finds: finds, proved: proved, 
-                            tech: cols[2], time: cols[7], status: existingStatus, notes: existingNotes
+                            id: fullId, 
+                            flir: mergedFlir.length > 0 ? mergedFlir.join(' & ') : '--', 
+                            finds: mergedFinds.join(' | '), 
+                            proved: mergedProved, 
+                            tech: cols[2], 
+                            time: cols[7], 
+                            status: existingStatus, 
+                            notes: existingNotes
                         };
                         if(!dropAssignments[drop]) dropAssignments[drop] = "";
                         validRows++;
@@ -498,12 +523,9 @@
             return validRows;
         }
 
-        // --- 3-TIER TAGGING ENGINE ---
-
         function openMasterTagMenu() {
             document.getElementById('tag-master-modal').style.display = 'flex';
             
-            // Pop Single Select
             const sSelect = document.getElementById('tag-single-select');
             sSelect.innerHTML = "";
             let allIds = [];
@@ -519,7 +541,6 @@
                 sSelect.appendChild(opt);
             });
 
-            // Pop Drop Select
             const dSelect = document.getElementById('tag-drop-select');
             dSelect.innerHTML = "";
             Object.keys(inspectionData).sort().forEach(d => {
@@ -529,7 +550,6 @@
                 dSelect.appendChild(opt);
             });
 
-            // Pop Wall Select
             const wSelect = document.getElementById('tag-wall-select');
             wSelect.innerHTML = "";
             elevations.forEach(e => {
@@ -579,15 +599,13 @@
         }
 
         function startReTag() {
-            const id = activeNodeDataArray[0].id; // Retag the primary ID selected
+            const id = activeNodeDataArray[0].id; 
             closeModal();
             bulkTagState = { mode: 'retag', targetId: id, step: 0, anchors: [] };
             activateTaggingUI('retag', `Double-Click new location for ${id}`);
         }
 
-        // --- VECTOR MATH PARSER ---
         function parseCoord(coordObj) {
-            // Model Viewer hit.position is a Vector3
             if (coordObj && coordObj.x !== undefined) return [coordObj.x, coordObj.y, coordObj.z];
             return [0,0,0];
         }
@@ -598,7 +616,6 @@
             const hit = viewer.positionAndNormalFromPoint(event.clientX, event.clientY);
             if (!hit) return;
 
-            // Single & Retag
             if (bulkTagState.mode === 'single' || bulkTagState.mode === 'retag') {
                 saved3DTags[bulkTagState.targetId] = { 
                     position: `${hit.position.x} ${hit.position.y} ${hit.position.z}`, 
@@ -609,7 +626,6 @@
                 return;
             }
 
-            // Drop Map
             if (bulkTagState.mode === 'drop') {
                 bulkTagState.anchors.push(hit);
                 bulkTagState.step++;
@@ -623,7 +639,6 @@
                 return;
             }
 
-            // Wall Map
             if (bulkTagState.mode === 'wall') {
                 bulkTagState.anchors.push(hit);
                 bulkTagState.step++;
@@ -639,9 +654,8 @@
             }
         });
 
-        // Linear Interpolation for Drop
         function processDropTagging(dropId, anchors) {
-            let floors = Object.keys(inspectionData[dropId]).map(Number).sort((a,b) => b-a); // Descending (Top to bottom)
+            let floors = Object.keys(inspectionData[dropId]).map(Number).sort((a,b) => b-a); 
             if(floors.length === 0) return;
             
             let maxF = floors[0];
@@ -666,7 +680,6 @@
             render3DHotspots();
         }
 
-        // Bilinear Interpolation for Wall
         function processWallTagging(wallName, anchors) {
             let drops = Object.keys(dropAssignments).filter(d => dropAssignments[d] === wallName).sort();
             if(drops.length === 0) { alert("No drops assigned to this wall yet."); return; }
@@ -693,7 +706,6 @@
                 floors.forEach(f => {
                     let v = (fRange === 0) ? 0 : (maxF - f) / fRange;
 
-                    // Bilinear Engine
                     let x = (1-u)*(1-v)*TL[0] + u*(1-v)*TR[0] + (1-u)*v*BL[0] + u*v*BR[0];
                     let y = (1-u)*(1-v)*TL[1] + u*(1-v)*TR[1] + (1-u)*v*BL[1] + u*v*BR[1];
                     let z = (1-u)*(1-v)*TL[2] + u*(1-v)*TR[2] + (1-u)*v*BL[2] + u*v*BR[2];
@@ -736,8 +748,6 @@
                 viewer.appendChild(btn);
             });
         }
-
-        // --- DASHBOARD UI / LOGIC ---
 
         function toggleFullScreen(elementId) {
             const elem = document.getElementById(elementId);
@@ -1035,13 +1045,16 @@
 
                             winNode.innerText = pos;
                             winNode.onclick = () => handleNodeClick(data, winNode);
-                            if (imageBank[data.flir]) winNode.style.border = "2px solid #fff";
+                            
+                            // Check if ANY of the images linked to this window exist in the bank
+                            let hasAnyImage = data.flir.split(' & ').some(imgId => imageBank[imgId]);
+                            if (hasAnyImage) winNode.style.border = "2px solid #fff";
 
                             if (isStitchedLeft) {
                                 winNode.style.borderTopRightRadius = '0'; winNode.style.borderBottomRightRadius = '0';
                                 winNode.style.borderRight = "none"; winNode.style.zIndex = '5';
                                 const bridge = document.createElement('div'); bridge.className = `stitch-bridge ${finalStatus}`;
-                                if (imageBank[data.flir]) { bridge.style.borderTop = "2px solid #fff"; bridge.style.borderBottom = "2px solid #fff"; }
+                                if (hasAnyImage) { bridge.style.borderTop = "2px solid #fff"; bridge.style.borderBottom = "2px solid #fff"; }
                                 winNode.appendChild(bridge);
                             }
                             if (isStitchedRight) {
@@ -1063,6 +1076,7 @@
             return fragment;
         }
 
+        // --- UPGRADED MODAL: CAROUSEL PHOTO GALLERY ---
         function openModal(nodeId) {
             let pair = stitchedPairs.find(p => p.includes(nodeId));
             activeNodeDataArray = [];
@@ -1093,8 +1107,16 @@
             if(allFinds.length === 0) allFinds = ['CLEAR'];
 
             let proved = activeNodeDataArray.some(d => d.proved === 'YES') ? 'YES' : 'NO';
-            let flirs = activeNodeDataArray.map(d => d.flir).filter(f => f !== '--');
             let notes = activeNodeDataArray.map(d => d.notes).filter(n => n.trim() !== '').join('\n');
+
+            // Collect all unique FLIR image strings
+            let allFlirs = [];
+            activeNodeDataArray.forEach(d => {
+                if (d.flir && d.flir !== '--') {
+                    allFlirs.push(...d.flir.split(' & '));
+                }
+            });
+            let flirs = [...new Set(allFlirs)];
 
             document.getElementById('m-id').innerText = ids;
             document.getElementById('m-tech').innerText = `Logged by: ${techs}`;
@@ -1107,20 +1129,34 @@
             
             const gallery = document.getElementById('m-photo-gallery');
             const noPhoto = document.getElementById('m-no-photo');
+            const carouselHint = document.getElementById('m-carousel-hint');
             gallery.innerHTML = '';
-            let hasPhoto = false;
+            
+            let loadedPhotos = 0;
 
             flirs.forEach(f => {
                 if(imageBank[f]) {
-                    hasPhoto = true;
+                    loadedPhotos++;
                     let img = document.createElement('img');
                     img.src = imageBank[f];
                     gallery.appendChild(img);
                 }
             });
 
-            gallery.style.display = hasPhoto ? 'flex' : 'none';
-            noPhoto.style.display = hasPhoto ? 'none' : 'block';
+            if (loadedPhotos > 0) {
+                gallery.style.display = 'flex';
+                noPhoto.style.display = 'none';
+                if (loadedPhotos > 1) {
+                    carouselHint.style.display = 'block';
+                    carouselHint.innerText = `👉 SWIPE TO VIEW ${loadedPhotos} IMAGES 👈`;
+                } else {
+                    carouselHint.style.display = 'none';
+                }
+            } else {
+                gallery.style.display = 'none';
+                noPhoto.style.display = 'block';
+                carouselHint.style.display = 'none';
+            }
             
             document.getElementById('info-modal').style.display = 'flex';
         }
