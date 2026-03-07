@@ -220,8 +220,10 @@
 
                 <div class="card">
                     <label style="color:#0cf;">Step 1: Site Logistics</label>
-                    <input type="text" id="jsaClient" placeholder="Client (e.g. Century 21)" style="margin-bottom:8px;">
-                    <input type="text" id="jsaSiteName" placeholder="Site Name & Location (e.g. Torrance HOA)" style="margin-bottom:8px;">
+                    <input type="text" id="jsaClient" placeholder="Client Name (e.g. HOA Board)" style="margin-bottom:8px;">
+                    
+                    <select id="jsaSiteName" style="margin-bottom:8px;"></select>
+                    
                     <input type="text" id="l3JsaName" placeholder="Your Full Name (L3 Supervisor)" style="margin-bottom:8px;">
                     <input type="text" id="jsaTask" placeholder="Operation / Task (e.g. Facade Inspection)" value="Facade Thermal Scan & Diagnostics" style="margin-bottom:8px;">
                     
@@ -435,7 +437,7 @@
 
                 <div class="card" style="margin-top:10px;">
                     <label>Project Name (From Tailgate Meeting)</label>
-                    <input type="text" id="techProjectName" placeholder="Client - Site Name">
+                    <select id="techProjectName"></select>
                 </div>
 
                 <button class="action-btn btn-green" style="padding: 25px; margin-top:20px;" onclick="techUnlockApp()">🔓 UNLOCK MY APP</button>
@@ -451,7 +453,8 @@
             
             <div class="card">
                 <label>Project Name / Building</label>
-                <input type="text" id="projectID" class="setup-input" style="margin-bottom:12px;" placeholder="Project Name">
+                <select id="projectID" class="setup-input" style="margin-bottom:12px;"></select>
+                
                 <div style="display:flex; gap:10px;">
                     <div style="flex:2;">
                         <label>Technician Name</label>
@@ -580,6 +583,15 @@
     </div>
 
     <script>
+        // 🏢 MASTER PROJECT LIST 🏢
+        // Update this list whenever you win a new job to ensure all your CSV files export with identical, perfect spelling!
+        const MASTER_PROJECTS = [
+            "Torrance HOA",
+            "Century Plaza",
+            "Marina Towers",
+            "Downtown Cathedral"
+        ];
+
         // --- GLOBAL STATE ---
         let currentPos = "L";
         let isCurrentWindowLogged = false;
@@ -597,6 +609,53 @@
         let capturedSignatures = []; 
         
         const patternConfigs = { "3": ['L', 'C', 'R'], "2": ['L', 'R'], "1": ['C'] };
+
+        // --- DYNAMIC PROJECT DROPDOWNS ---
+        function populateProjectDropdowns() {
+            const dropdowns = ['jsaSiteName', 'techProjectName', 'projectID'];
+            let optionsHTML = '<option value="" disabled selected>-- Select Active Project --</option>';
+            
+            MASTER_PROJECTS.forEach(proj => {
+                optionsHTML += `<option value="${proj}">${proj}</option>`;
+            });
+            optionsHTML += `<option value="CUSTOM">➕ Add Custom / New Project...</option>`;
+
+            dropdowns.forEach(id => {
+                const el = document.getElementById(id);
+                if(el) {
+                    el.innerHTML = optionsHTML;
+                    // Add event listener to handle the Custom escape hatch
+                    el.addEventListener('change', function() {
+                        if (this.value === 'CUSTOM') {
+                            let customName = prompt("Enter Custom Project Name:");
+                            if (customName && customName.trim() !== "") {
+                                let opt = document.createElement('option');
+                                opt.value = customName.trim();
+                                opt.text = customName.trim();
+                                this.insertBefore(opt, this.lastElementChild);
+                                this.value = customName.trim();
+                            } else {
+                                this.value = ""; 
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
+        // Helper to safely set dropdown values (even if they were custom typed earlier)
+        function setSelectValue(id, val) {
+            const el = document.getElementById(id);
+            if (!el || !val) return;
+            let exists = Array.from(el.options).some(opt => opt.value === val);
+            if (!exists) {
+                let opt = document.createElement('option');
+                opt.value = val;
+                opt.text = val;
+                el.insertBefore(opt, el.lastElementChild); 
+            }
+            el.value = val;
+        }
 
         // --- HAND-OFF LOGIC ---
         function openHandoffModal() {
@@ -654,7 +713,7 @@
             return pin.toString();
         }
 
-        // --- DUAL API GPS FETCH (OVERPASS ER SEARCH -> NOMINATIM REVERSE GEOCODE) ---
+        // --- DUAL API GPS FETCH ---
         function fetchHospitalGPS() {
             const btn = document.getElementById('gpsBtn');
             const input = document.getElementById('jsaHospital');
@@ -680,7 +739,7 @@
                                     const hLon = el.lon || (el.center && el.center.lon);
                                     
                                     if(hLat && hLon) {
-                                        const R = 3958.8; // Earth radius in miles
+                                        const R = 3958.8; 
                                         const dLat = (hLat - lat) * Math.PI / 180;
                                         const dLon = (hLon - lon) * Math.PI / 180;
                                         const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
@@ -752,7 +811,6 @@
             }
         }
 
-        // --- GOOGLE MAPS EMERGENCY LINK ---
         function updateHospitalLink(lat = null, lon = null) {
             const addr = document.getElementById('jsaHospitalAddress').value;
             const link = document.getElementById('jsaHospitalAddressLink');
@@ -768,7 +826,7 @@
             }
         }
 
-        // --- SMART MEMORY LOGIC (SAVE, LOAD, & WIPE SITES) ---
+        // --- SMART MEMORY LOGIC ---
         function populateRecentSites() {
             let sites = JSON.parse(localStorage.getItem('strataRecentSites')) || [];
             const dd = document.getElementById('recentSitesDropdown');
@@ -811,7 +869,9 @@
                 let sites = JSON.parse(localStorage.getItem('strataRecentSites')) || [];
                 const s = sites[idx];
                 document.getElementById('jsaClient').value = s.client || "";
-                document.getElementById('jsaSiteName').value = s.site || "";
+                
+                if(s.site) setSelectValue('jsaSiteName', s.site);
+                
                 document.getElementById('jsaEnvironment').value = s.env || "Commercial Building";
                 document.getElementById('jsaHeight').value = s.height || "";
                 
@@ -833,7 +893,7 @@
         function saveSiteToMemory() {
             const siteData = {
                 client: document.getElementById('jsaClient').value.trim(),
-                site: document.getElementById('jsaSiteName').value.trim(),
+                site: document.getElementById('jsaSiteName').value,
                 env: document.getElementById('jsaEnvironment').value,
                 height: document.getElementById('jsaHeight').value,
                 task: document.getElementById('jsaTask').value,
@@ -867,12 +927,6 @@
             
             document.getElementById('carousel-view').style.display = 'none';
             if(!isJsaSigned) document.getElementById('l3-signed-banner').style.display = 'none';
-        }
-
-        function toggleConditional(id, el) {
-            el.classList.toggle('active');
-            const block = document.getElementById(id);
-            block.style.display = block.style.display === 'block' ? 'none' : 'block';
         }
 
         function stepCrew(val) {
@@ -971,9 +1025,8 @@
             localStorage.setItem('jsaSigned', 'true');
             isJsaSigned = true;
 
-            const c = document.getElementById('jsaClient').value;
             const s = document.getElementById('jsaSiteName').value;
-            document.getElementById('projectID').value = `${c} - ${s}`;
+            setSelectValue('projectID', s);
             
             let leadName = capturedSignatures[0].name;
             const l3Sig = capturedSignatures.find(sig => sig.role.includes("L3"));
@@ -1006,7 +1059,7 @@
             localStorage.setItem('jsaSigned', 'true');
             isJsaSigned = true;
 
-            document.getElementById('projectID').value = projName;
+            setSelectValue('projectID', projName);
             document.getElementById('techName').value = techName;
             
             checkJsaState();
@@ -1123,6 +1176,7 @@
         }
 
         function initApp() {
+            populateProjectDropdowns();
             populateRecentSites();
             checkJsaState();
             
@@ -1136,7 +1190,7 @@
             if (localStorage.getItem('isDropLocked') === 'true') {
                 if (localStorage.getItem('strataState')) {
                     const savedState = JSON.parse(localStorage.getItem('strataState'));
-                    document.getElementById('projectID').value = savedState.project || document.getElementById('projectID').value;
+                    if (savedState.project) setSelectValue('projectID', savedState.project);
                     document.getElementById('techName').value = savedState.tech || document.getElementById('techName').value;
                     document.getElementById('camID').value = savedState.cam || "";
                     document.getElementById('floorNum').value = savedState.floor;
@@ -1145,7 +1199,7 @@
                     if(savedState.img) document.getElementById('imgNum').value = savedState.img;
                     setPattern(savedState.pattern, savedState.pos);
                 }
-                // Lock inputs, but setup-input class ensures they can be unlocked
+                
                 document.querySelectorAll('.setup-input').forEach(el => el.disabled = true);
                 document.getElementById('btn-commit').style.display = 'none';
                 document.getElementById('btn-unlock').style.display = 'block';
@@ -1168,8 +1222,8 @@
             const i = document.getElementById('imgNum').value;
             const f = document.getElementById('floorNum').value;
 
-            if(!p || !t || !c || !d || !i) {
-                alert("⚠️ ALL FIELDS REQUIRED: Please fill out Project, Tech, Cam ID, Drop ID, and Start Image before committing.");
+            if(!p || p === "CUSTOM" || !t || !c || !d || !i) {
+                alert("⚠️ ALL FIELDS REQUIRED: Please select a Project Name and fill out Tech, Cam ID, Drop ID, and Start Image before committing.");
                 return;
             }
             
@@ -1195,10 +1249,8 @@
             goToSlide(2); 
         }
 
-        // --- UPDATED EDIT BUTTON FIX ---
         function unlockSetup() {
             if(confirm("⚠️ Unlock setup? Be careful not to change the Drop ID or Image # unless necessary.")) {
-                // Ensure ALL setup inputs are unlocked, including Project and Tech Name
                 document.querySelectorAll('.setup-input').forEach(el => el.disabled = false);
                 document.getElementById('btn-commit').style.display = 'block';
                 document.getElementById('btn-unlock').style.display = 'none';
@@ -1333,22 +1385,17 @@
         function openWipeModal() { document.getElementById('wipeModal').style.display = 'flex'; }
         function closeWipeModal() { document.getElementById('wipeModal').style.display = 'none'; }
         
-        // --- INSTANT WIPE FUNCTION ---
         function confirmWipe() { 
-            // Surgically wipe ONLY the drop data and map state (Protects JSA and Recent Sites)
             localStorage.removeItem('strataVault'); 
             localStorage.removeItem('strataState'); 
             localStorage.setItem('isDropLocked', 'false'); 
 
-            // Instantly clear the Data Vault table UI without reloading the page
             document.querySelector('#logTable tbody').innerHTML = '';
 
-            // Unlock ALL Map Setup screen inputs for the next drop
             document.querySelectorAll('.setup-input').forEach(el => el.disabled = false);
             document.getElementById('btn-commit').style.display = 'block';
             document.getElementById('btn-unlock').style.display = 'none';
 
-            // Reset internal safety tripwires
             isCurrentWindowLogged = false;
             hasVisitedDiagnose = false;
 
@@ -1387,7 +1434,6 @@
                    now.getSeconds().toString().padStart(2,'0');
         }
 
-        // --- UPDATED LOGGING: NO LITERAL QUOTES IN THE HTML TABLE ---
         function executeQuickLog() {
             const time = getFormattedTime();
             const proj = document.getElementById('projectID').value || "No Project";
@@ -1585,7 +1631,6 @@
             if (n === 2) hasVisitedDiagnose = true;
         }
 
-        // --- HTML WRAPPER GENERATOR FOR BOTH VIEW AND EXPORT ---
         function generateJSAWrapper() {
             const client = document.getElementById('jsaClient').value || "--";
             const site = document.getElementById('jsaSiteName').value || "--";
@@ -1668,7 +1713,6 @@
 
             const getCheck = (val) => env === val ? '☒' : '☐';
 
-            // PDF WRAPPER - PORTRAIT (7.5 inches wide for content)
             const wrapper = document.createElement('div');
             wrapper.style.fontFamily = 'Arial, sans-serif';
             wrapper.style.color = '#000000'; 
@@ -2109,7 +2153,6 @@
             return wrapper;
         }
 
-        // --- PDF EXPORT (DOWNLOAD/SHARE) ---
         async function exportJSAPDF() {
             const btnPrimary = document.getElementById('btnExportPdfPrimary');
             const btnView = document.getElementById('btnViewPdf');
@@ -2162,7 +2205,6 @@
             });
         }
 
-        // --- PDF PREVIEW (VIEW IN BROWSER) ---
         function viewJSAPDF() {
             const btnPrimary = document.getElementById('btnExportPdfPrimary');
             const btnView = document.getElementById('btnViewPdf');
@@ -2204,18 +2246,15 @@
             });
         }
         
-        // --- UPDATED EXPORT LOGIC: FIXES PREVIOUS BUGGED DATA ---
         async function exportAndSend() {
             let csv = "Project,Camera,Technician,Drop ID,FLIR Image,Findings,Meter Proved,Time\n";
             document.querySelectorAll("#logTable tbody tr").forEach(tr => {
                 const cols = Array.from(tr.querySelectorAll("td"));
                 csv += cols.map(td => {
                     let text = td.textContent;
-                    // This secretly strips out the broken quotes from data you already saved!
                     if (text.startsWith('"') && text.endsWith('"')) {
                         text = text.substring(1, text.length - 1);
                     }
-                    // Standard CSV escaping (protects against inner commas and quotes)
                     text = text.replace(/"/g, '""');
                     return `"${text}"`;
                 }).join(",") + "\n";
