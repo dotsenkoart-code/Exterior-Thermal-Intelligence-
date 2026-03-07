@@ -451,11 +451,11 @@
             
             <div class="card">
                 <label>Project Name / Building</label>
-                <input type="text" id="projectID" class="setup-input" style="margin-bottom:12px;" placeholder="Auto-Filled" disabled>
+                <input type="text" id="projectID" class="setup-input" style="margin-bottom:12px;" placeholder="Project Name">
                 <div style="display:flex; gap:10px;">
                     <div style="flex:2;">
                         <label>Technician Name</label>
-                        <input type="text" id="techName" class="setup-input" placeholder="Auto-Filled" disabled>
+                        <input type="text" id="techName" class="setup-input" placeholder="Tech Name">
                     </div>
                     <div style="flex:1;">
                         <label>Cam ID</label>
@@ -1145,6 +1145,7 @@
                     if(savedState.img) document.getElementById('imgNum').value = savedState.img;
                     setPattern(savedState.pattern, savedState.pos);
                 }
+                // Lock inputs, but setup-input class ensures they can be unlocked
                 document.querySelectorAll('.setup-input').forEach(el => el.disabled = true);
                 document.getElementById('btn-commit').style.display = 'none';
                 document.getElementById('btn-unlock').style.display = 'block';
@@ -1194,11 +1195,11 @@
             goToSlide(2); 
         }
 
+        // --- UPDATED EDIT BUTTON FIX ---
         function unlockSetup() {
             if(confirm("⚠️ Unlock setup? Be careful not to change the Drop ID or Image # unless necessary.")) {
-                document.getElementById('camID').disabled = false;
-                document.getElementById('dropLetter').disabled = false;
-                document.getElementById('imgNum').disabled = false;
+                // Ensure ALL setup inputs are unlocked, including Project and Tech Name
+                document.querySelectorAll('.setup-input').forEach(el => el.disabled = false);
                 document.getElementById('btn-commit').style.display = 'block';
                 document.getElementById('btn-unlock').style.display = 'none';
                 localStorage.setItem('isDropLocked', 'false');
@@ -1332,29 +1333,26 @@
         function openWipeModal() { document.getElementById('wipeModal').style.display = 'flex'; }
         function closeWipeModal() { document.getElementById('wipeModal').style.display = 'none'; }
         
-        // --- NEW LIGHTNING FAST WIPE FUNCTION ---
+        // --- INSTANT WIPE FUNCTION ---
         function confirmWipe() { 
-            // 1. Surgically wipe ONLY the drop data and map state (Protects JSA and Recent Sites)
+            // Surgically wipe ONLY the drop data and map state (Protects JSA and Recent Sites)
             localStorage.removeItem('strataVault'); 
             localStorage.removeItem('strataState'); 
             localStorage.setItem('isDropLocked', 'false'); 
 
-            // 2. Instantly clear the Data Vault table UI without reloading the page
+            // Instantly clear the Data Vault table UI without reloading the page
             document.querySelector('#logTable tbody').innerHTML = '';
 
-            // 3. Unlock the Map Setup screen inputs for the next drop
+            // Unlock ALL Map Setup screen inputs for the next drop
             document.querySelectorAll('.setup-input').forEach(el => el.disabled = false);
             document.getElementById('btn-commit').style.display = 'block';
             document.getElementById('btn-unlock').style.display = 'none';
 
-            // 4. Reset internal safety tripwires
+            // Reset internal safety tripwires
             isCurrentWindowLogged = false;
             hasVisitedDiagnose = false;
 
-            // 5. Close the red warning modal
             closeWipeModal();
-
-            // 6. Smoothly slide the user back to the Map to start the next drop
             goToSlide(1); 
         }
 
@@ -1399,9 +1397,9 @@
             const imgStr = cam + "-FLIR" + imgEl.value.toString().padStart(4, '0');
             
             const row = `<tr>
-                <td class="export-only">${proj}</td>
-                <td class="export-only">${cam}</td>
-                <td class="export-only">${tech}</td>
+                <td class="export-only">"${proj}"</td>
+                <td class="export-only">"${cam}"</td>
+                <td class="export-only">"${tech}"</td>
                 <td style="color:#0cf; font-weight:bold; white-space:nowrap;">${id}</td>
                 <td>${imgStr}</td>
                 <td style="color:#f39c12;">CLEAR (QUICK-LOG)</td>
@@ -1432,9 +1430,9 @@
             }
 
             const row = `<tr>
-                <td class="export-only">${proj}</td>
-                <td class="export-only">${cam}</td>
-                <td class="export-only">${tech}</td>
+                <td class="export-only">"${proj}"</td>
+                <td class="export-only">"${cam}"</td>
+                <td class="export-only">"${tech}"</td>
                 <td style="color:#0cf; font-weight:bold; white-space:nowrap;">${id}</td>
                 <td>${imgStr}</td>
                 <td>${finds.join(' | ')}</td>
