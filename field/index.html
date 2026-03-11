@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata-Scan Pro: Compliance & Thermal Master</title>
+    <title>Field-Scan Pro: Compliance & Thermal Master</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
     
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Strata-Scan">
+    <meta name="apple-mobile-web-app-title" content="Field-Scan">
     <meta name="mobile-web-app-capable" content="yes">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -1712,7 +1712,7 @@
             wrapper.style.background = '#fff';
 
             wrapper.innerHTML = `
-                <h1 style="color:#000; border-bottom:2px solid #000; font-size:22px; font-weight:bold; margin-bottom:15px; padding-bottom:5px;">STRATA ACCESS GROUP - JOB SAFETY ANALYSIS (JSA)</h1>
+                <h1 style="color:#000; border-bottom:2px solid #000; font-size:22px; font-weight:bold; margin-bottom:15px; padding-bottom:5px;">[YOUR COMPANY NAME] - JOB SAFETY ANALYSIS (JSA)</h1>
                 
                 <div style="background-color:#e0e0e0; font-weight:bold; font-size:16px; padding:6px; border:1px solid #000; border-bottom:none;">WORK METHOD</div>
                 <table style="width:100%; table-layout:fixed; border-collapse:collapse; margin-bottom:20px;">
@@ -2142,7 +2142,7 @@
                 </table>
 
                 <div style="margin-top:40px; font-size:11px; color:#333; text-align:center;">
-                    Strata Access Group, Inc. • Generated via Strata-Scan Pro Fleet • Document Timestamp: ${date} ${time}
+                    [YOUR COMPANY NAME] • Generated via Field-Scan Pro Fleet • Document Timestamp: ${date} ${time}
                 </div>
             `;
             return wrapper;
@@ -2161,7 +2161,7 @@
             const client = document.getElementById('jsaClient').value || "Unknown_Client";
             const site = document.getElementById('jsaSiteName').value || "Unknown_Location";
 
-            const fileName = `Strata_JSA_${client.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`;
+            const fileName = `JSA_${client.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`;
             const opt = {
               margin:       [0.5, 0.5, 0.5, 0.5],
               filename:     fileName,
@@ -2259,7 +2259,7 @@
             const tech = document.getElementById('techName').value || "Tech";
             const drop = document.getElementById('dropLetter').value.toUpperCase() || "Drop";
             
-            const fileName = `Strata_${proj}_Drop${drop}_${tech}.csv`.replace(/\s+/g, '_');
+            const fileName = `DropReport_${proj}_Drop${drop}_${tech}.csv`.replace(/\s+/g, '_');
 
             const blob = new Blob([csv], { type: 'text/csv' });
             const file = new File([blob], fileName, { type: 'text/csv' });
@@ -2267,7 +2267,7 @@
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
                 try {
                     await navigator.share({
-                        title: `Strata Report: ${proj} - Drop ${drop}`,
+                        title: `Drop Report: ${proj} - Drop ${drop}`,
                         text: `Attached is the latest drop report for ${proj}, Drop ${drop}. Completed by ${tech}.`,
                         files: [file]
                     });
