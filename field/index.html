@@ -283,6 +283,7 @@
 
                 <div class="warning-card">
                     <label style="color:#f39c12;">Step 3: Pre-Drop & PPE</label>
+                    
                     <div class="jsa-toggle" onclick="this.classList.toggle('active')">
                         <span style="font-size:0.9rem; font-weight:bold;">12kN Anchors Verified</span>
                         <span>✔️</span>
@@ -291,8 +292,28 @@
                         <span style="font-size:0.9rem; font-weight:bold;">Ropes/Gear Inspected</span>
                         <span>✔️</span>
                     </div>
+                    <div class="jsa-toggle" onclick="this.classList.toggle('active')">
+                        <span style="font-size:0.9rem; font-weight:bold;">Edge Protection Deployed</span>
+                        <span>✔️</span>
+                    </div>
+
+                    <label style="margin-top:15px; color:#f39c12;">Anchor Strategy (Mandatory)</label>
+                    <select id="jsaAnchorType" style="margin-bottom:15px; font-size: 0.9rem;">
+                        <option value="" disabled selected>-- Select Anchor Type --</option>
+                        <option value="Certified Roof Davit (12kN)">Certified Roof Davit (12kN)</option>
+                        <option value="Improvised Structural Wrap (Beam/Pillar)">Improvised Structural Wrap (Beam/Pillar)</option>
+                        <option value="Engineered Parapet Clamp">Engineered Parapet Clamp</option>
+                        <option value="Deadweight System / Rig">Deadweight System / Rig</option>
+                        <option value="Other / Site Specific">Other / Site Specific</option>
+                    </select>
+
+                    <label>Drop Zone Barricades Deployed?</label>
+                    <select id="jsaBarricades" style="margin-bottom:15px; font-size: 0.9rem;">
+                        <option value="NO" selected>NO (STOP WORK)</option>
+                        <option value="YES">YES - Caution Tape/Cones Active</option>
+                    </select>
                     
-                    <label style="margin-top:15px;">Ground Control Required?</label>
+                    <label>Ground Control Required?</label>
                     <div style="display:flex; gap:8px; margin-bottom:15px;">
                         <select id="jsaGroundReq" style="flex:1;" onchange="document.getElementById('jsaGroundName').style.display = this.value === 'YES' ? 'block' : 'none'">
                             <option value="NO">NO</option>
@@ -588,7 +609,6 @@
 
     <script>
         // 🏢 MASTER PROJECT LIST 🏢
-        // Update this list whenever you win a new job to ensure all your CSV files export with identical, perfect spelling!
         const MASTER_PROJECTS = [
             "Torrance HOA",
             "Century Plaza",
@@ -647,7 +667,6 @@
             });
         }
 
-        // Helper to safely set dropdown values (even if they were custom typed earlier)
         function setSelectValue(id, val) {
             const el = document.getElementById(id);
             if (!el || !val) return;
@@ -688,9 +707,7 @@
             document.getElementById('handoffModal').style.display = 'flex';
         }
 
-        function closeHandoffModal() {
-            document.getElementById('handoffModal').style.display = 'none';
-        }
+        function closeHandoffModal() { document.getElementById('handoffModal').style.display = 'none'; }
 
         function startDropFromHandoff() {
             const select = document.getElementById('activeTechSelect');
@@ -873,12 +890,9 @@
                 let sites = JSON.parse(localStorage.getItem('strataRecentSites')) || [];
                 const s = sites[idx];
                 document.getElementById('jsaClient').value = s.client || "";
-                
                 if(s.site) setSelectValue('jsaSiteName', s.site);
-                
                 document.getElementById('jsaEnvironment').value = s.env || "Commercial Building";
                 document.getElementById('jsaHeight').value = s.height || "";
-                
                 if(s.task) document.getElementById('jsaTask').value = s.task;
                 if(s.mName) document.getElementById('jsaMainName').value = s.mName;
                 if(s.mPhone) document.getElementById('jsaMainPhone').value = s.mPhone;
@@ -949,8 +963,22 @@
                 alert("⚠️ Please enter both the Client and Site Name before starting signatures.");
                 return;
             }
+
+            // --- NEW HARD GATES ---
+            const anchorType = document.getElementById('jsaAnchorType');
+            if (!anchorType || anchorType.value === "") {
+                alert("⚠️ MANDATORY: You must select an Anchor Strategy before proceeding.");
+                return;
+            }
+
+            const barricades = document.getElementById('jsaBarricades');
+            if (barricades && barricades.value === "NO") {
+                alert("⚠️ CRITICAL: You cannot proceed without deploying Drop Zone Barricades. Stop work and secure the perimeter.");
+                return;
+            }
+
             if (!allChecked) {
-                alert("⚠️ Please verify both Pre-Drop Equipment checks first.");
+                alert("⚠️ Please verify all Pre-Drop equipment checks (Anchors, Ropes, Edge Protection) first.");
                 return;
             }
 
@@ -1144,28 +1172,9 @@
             return { x: clientX - rect.left, y: clientY - rect.top };
         }
 
-        function startDraw(e) {
-            e.preventDefault(); 
-            drawing = true;
-            const pos = getPos(e);
-            ctx.beginPath();
-            ctx.moveTo(pos.x, pos.y);
-            ctx.lineTo(pos.x, pos.y + 1); 
-            ctx.stroke();
-        }
-
-        function draw(e) {
-            if (!drawing) return;
-            e.preventDefault();
-            const pos = getPos(e);
-            ctx.lineTo(pos.x, pos.y);
-            ctx.stroke();
-        }
-
-        function stopDraw(e) {
-            e.preventDefault();
-            drawing = false;
-        }
+        function startDraw(e) { e.preventDefault(); drawing = true; const pos = getPos(e); ctx.beginPath(); ctx.moveTo(pos.x, pos.y); ctx.lineTo(pos.x, pos.y + 1); ctx.stroke(); }
+        function draw(e) { if (!drawing) return; e.preventDefault(); const pos = getPos(e); ctx.lineTo(pos.x, pos.y); ctx.stroke(); }
+        function stopDraw(e) { e.preventDefault(); drawing = false; }
 
         canvas.addEventListener('mousedown', startDraw);
         canvas.addEventListener('mousemove', draw);
@@ -1175,9 +1184,7 @@
         canvas.addEventListener('touchmove', draw, {passive: false});
         canvas.addEventListener('touchend', stopDraw, {passive: false});
 
-        function clearSignature() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-        }
+        function clearSignature() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
 
         function initApp() {
             populateProjectDropdowns();
@@ -1276,12 +1283,7 @@
             localStorage.setItem('strataState', JSON.stringify(s));
         }
         
-        function handleDropChange() {
-            hasVisitedDiagnose = false;
-            isCurrentWindowLogged = false;
-            updatePreview();
-            saveLocationState();
-        }
+        function handleDropChange() { hasVisitedDiagnose = false; isCurrentWindowLogged = false; updatePreview(); saveLocationState(); }
 
         function updateFixedHeaders(slideIndex) {
             document.getElementById('header-diagnose').style.display = (slideIndex === 2) ? 'block' : 'none';
@@ -1297,9 +1299,7 @@
             
             document.querySelectorAll("#logTable tbody tr").forEach(tr => {
                 const tds = tr.querySelectorAll("td");
-                if (tds.length >= 4) {
-                    if (tds[3].textContent === currentTarget) alreadyInVault = true;
-                }
+                if (tds.length >= 4 && tds[3].textContent === currentTarget) alreadyInVault = true;
             });
 
             if (alreadyInVault) {
@@ -1311,16 +1311,8 @@
             }
         }
 
-        function modalGoToDiagnose() {
-            document.getElementById('safetyModal').style.display = 'none';
-            goToSlide(2); 
-        }
-
-        function modalQuickLogAndMove() {
-            document.getElementById('safetyModal').style.display = 'none';
-            openPhotoVerificationModal('quick');
-        }
-
+        function modalGoToDiagnose() { document.getElementById('safetyModal').style.display = 'none'; goToSlide(2); }
+        function modalQuickLogAndMove() { document.getElementById('safetyModal').style.display = 'none'; openPhotoVerificationModal('quick'); }
         function modalForceSkip() {
             document.getElementById('safetyModal').style.display = 'none';
             if(pendingMoveCallback) pendingMoveCallback();
@@ -1330,7 +1322,6 @@
         function checkFloorCompletion() {
             const pat = document.getElementById('dropPattern').value;
             const required = patternConfigs[pat]; 
-            
             const currentFloor = document.getElementById('floorNum').value;
             const currentDrop = document.getElementById('dropLetter').value.toUpperCase();
             
@@ -1415,10 +1406,7 @@
             document.getElementById('photoModal').style.display = 'flex';
         }
 
-        function cancelLogEvidence() {
-            document.getElementById('photoModal').style.display = 'none';
-            pendingLogType = null;
-        }
+        function cancelLogEvidence() { document.getElementById('photoModal').style.display = 'none'; pendingLogType = null; }
 
         function finalizeLogEvidence() {
             const finalImageNum = parseInt(document.getElementById('modalPhotoInput').value, 10);
@@ -1642,22 +1630,16 @@
             const time = new Date().toLocaleTimeString();
             const task = document.getElementById('jsaTask').value || "Facade Thermal Scan & Diagnostics";
             const height = document.getElementById('jsaHeight').value || "--";
-            
             const env = document.getElementById('jsaEnvironment') ? document.getElementById('jsaEnvironment').value : "Commercial Building";
-            
             const mName = document.getElementById('jsaMainName').value || "On File";
             const mPhone = document.getElementById('jsaMainPhone').value || "On File";
             const sName = document.getElementById('jsaSecName').value || "--";
             const sPhone = document.getElementById('jsaSecPhone').value || "--";
-            
             const radioCh = document.getElementById('jsaRadio').value || "1";
             const gatherLoc = document.getElementById('jsaGather').value || "Site Entrance";
-            
             const hospitalText = document.getElementById('jsaHospital').value || "Not Linked";
             const hospitalAddr = document.getElementById('jsaHospitalAddress').value || "--";
-            
             const lifeFlight = document.getElementById('jsaLifeFlight').value;
-            
             const gcReq = document.getElementById('jsaGroundReq').value;
             const gcName = document.getElementById('jsaGroundName').value || "--";
             
@@ -1665,10 +1647,13 @@
             const lotoRoof = document.getElementById('jsaLoto').value;
             const lotoRf = document.getElementById('jsaRf').value;
             const lotoContact = document.getElementById('jsaLotoContact').value || "Building Engineer";
-            
             const cHaz = document.getElementById('jsaCustomHaz').value;
             const cEff = document.getElementById('jsaCustomEff').value;
             const cCtrl = document.getElementById('jsaCustomCtrl').value;
+
+            // --- NEW SAFETY DATA CAPTURE ---
+            const anchorType = document.getElementById('jsaAnchorType') ? document.getElementById('jsaAnchorType').value : "--";
+            const barricades = document.getElementById('jsaBarricades') ? document.getElementById('jsaBarricades').value : "NO";
 
             const getPPE = (id) => document.getElementById(id).checked ? '☒' : '☐';
             const ppeEye = getPPE('ppeEye');
@@ -1884,16 +1869,22 @@
                         <td style="border:1px solid #000; padding:8px; vertical-align:top;">
                             10 feet area around Access Zone projection. A hazard zone should be marked or blockaded to warn rope access technicians and others, including the public, of hazards associated with the work being performed.<br><br>
                             Appropriate personal protective equipment, including helmets, shall be used by anyone in the hazard zone.<br><br>
+                            <strong>Barricades/Tape Deployed?:</strong> ${barricades}<br>
                             <strong>Ground Control Required?:</strong> ${gcReq}<br>
                             <strong>Ground control person:</strong> ${gcName}
                         </td>
                     </tr>
                     <tr style="page-break-inside: avoid;">
-                        <td style="border:1px solid #000; padding:8px; vertical-align:top;"><strong>Anchorage Description</strong></td>
                         <td style="border:1px solid #000; padding:8px; vertical-align:top;">
+                            <strong>Anchorage Description</strong><br><br>
+                            <span style="color:#d9534f; font-weight:bold;">Primary Anchor Strategy:</span><br>
+                            ${anchorType}
+                        </td>
+                        <td style="border:1px solid #000; padding:8px; vertical-align:top;">
+                            <strong>Edge Protection Verified:</strong> YES<br><br>
                             1. Anchorage: Engineered access anchors, roof shafts, structural building elements, beam structures, etc.. One anchorage may be used to establish multiple anchorage systems. Main and backup systems should utilize independent anchorage systems<br><br>
                             2. Anchorage systems used as the primary support within a main or backup system shall have a minimum strength of either 12 kN (2700 lbf), or two times the maximum arrest force of the backup system when used in accordance with manufacturer specifications, whichever is greater<br><br>
-                            3. Any selected anchorage which strength is not verifiable, or has areas of concerns during pre-use inspection (such as signs of corrosion, deformation etc.) shall be load tested prior to use at 50% of maximum anticipated load (of at least of 1500 lbs, not to exceed 2500 lbs) in the direction of anticipated force under direction of Qualified Rope Access Person. The force shall be applied for at least 30 sec during which anchorage must not show any sigh of deformation or decrease in force measurements on a load cell.
+                            3. Any selected anchorage which strength is not verifiable, or has areas of concerns during pre-use inspection shall be load tested prior to use at 50% of maximum anticipated load in the direction of anticipated force under direction of Qualified Rope Access Person.
                         </td>
                     </tr>
                     <tr style="page-break-inside: avoid;">
