@@ -1186,6 +1186,9 @@
             populateRecentSites();
             checkJsaState();
             
+            // --- LOAD CAMERA ID FROM MEMORY ---
+            document.getElementById('camID').value = localStorage.getItem('strataCamID') || "";
+
             if (localStorage.getItem('jsaSignaturesPayload')) {
                 try { capturedSignatures = JSON.parse(localStorage.getItem('jsaSignaturesPayload')); } catch(e){}
             }
@@ -1198,7 +1201,7 @@
                     const savedState = JSON.parse(localStorage.getItem('strataState'));
                     if (savedState.project) setSelectValue('projectID', savedState.project);
                     document.getElementById('techName').value = savedState.tech || document.getElementById('techName').value;
-                    document.getElementById('camID').value = savedState.cam || "";
+                    document.getElementById('camID').value = savedState.cam || document.getElementById('camID').value;
                     document.getElementById('floorNum').value = savedState.floor;
                     document.getElementById('floorNumVal').innerText = savedState.floor;
                     document.getElementById('dropLetter').value = savedState.drop;
@@ -1233,6 +1236,9 @@
                 return;
             }
             
+            // --- SAVE CAMERA ID PERMANENTLY ---
+            localStorage.setItem('strataCamID', c);
+
             document.getElementById('pf-proj').innerText = p;
             document.getElementById('pf-tech').innerText = t;
             document.getElementById('pf-cam').innerText = c;
@@ -1428,7 +1434,9 @@
             const tech = document.getElementById('techName').value || "Tech";
             const id = document.getElementById('fullIDDisplay').innerText;
             const imgEl = document.getElementById('imgNum');
-            const imgStr = cam + "-FLIR" + imgEl.value.toString().padStart(4, '0');
+            
+            // SIMPLIFIED FOR 1 CAMERA: Just logs "FLIR0045" instead of "1-FLIR0045"
+            const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
             
             const row = `<tr>
                 <td class="export-only">${proj}</td>
@@ -1452,7 +1460,9 @@
             const tech = document.getElementById('techName').value || "Tech";
             const id = document.getElementById('fullIDDisplay').innerText;
             const imgEl = document.getElementById('imgNum');
-            const imgStr = cam + "-FLIR" + imgEl.value.toString().padStart(4, '0');
+            
+            // SIMPLIFIED FOR 1 CAMERA: Just logs "FLIR0045" instead of "1-FLIR0045"
+            const imgStr = "FLIR" + imgEl.value.toString().padStart(4, '0');
             
             let finds = [];
             document.querySelectorAll('.check-item.active').forEach(el => finds.push(el.innerText));
