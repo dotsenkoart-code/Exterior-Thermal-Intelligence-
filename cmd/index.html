@@ -529,6 +529,7 @@
             document.getElementById('folderInput').value = "";
         }
 
+        // --- UPDATED parseCSV WITH 5-COLUMN LOGIC AND RED FAIL FIX ---
         function parseCSV(text) {
             const rows = text.trim().split(/\r\n|\n|\r/);
             let validRows = 0;
@@ -1287,6 +1288,7 @@
         function buildProcedural3D() {
             const container = document.getElementById('procedural-3d-container');
             
+            // 1. Initialize the 3D Engine & Interactive Events (Only happens once)
             if (!auto3dRenderer) {
                 auto3dRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
                 container.appendChild(auto3dRenderer.domElement);
@@ -1298,7 +1300,17 @@
                 
                 const raycaster = new THREE.Raycaster();
                 const mouse = new THREE.Vector2();
-                container.addEventListener('click', (event) => {
+                
+                let startX, startY;
+
+                // Track where the mouse started
+                container.addEventListener('pointerdown', (e) => {
+                    startX = e.clientX;
+                    startY = e.clientY;
+                });
+
+                // Check hover states to change cursor
+                container.addEventListener('pointermove', (event) => {
                     const rect = auto3dRenderer.domElement.getBoundingClientRect();
                     mouse.x = ( (event.clientX - rect.left) / rect.width ) * 2 - 1;
                     mouse.y = - ( (event.clientY - rect.top) / rect.height ) * 2 + 1;
@@ -1306,9 +1318,26 @@
                     raycaster.setFromCamera(mouse, auto3dCamera);
                     if (auto3dScene) {
                         const intersects = raycaster.intersectObjects(auto3dScene.children);
-                        if (intersects.length > 0) {
-                            const obj = intersects[0].object;
-                            if(obj.userData.id) openModal(obj.userData.id);
+                        const hitWindow = intersects.find(hit => hit.object.userData.id);
+                        container.style.cursor = hitWindow ? 'pointer' : 'grab';
+                    }
+                });
+
+                // Detect pure clicks vs drags
+                container.addEventListener('pointerup', (event) => {
+                    const dist = Math.abs(event.clientX - startX) + Math.abs(event.clientY - startY);
+                    if (dist > 5) return; // If mouse moved more than 5px, it was a drag, abort click.
+
+                    const rect = auto3dRenderer.domElement.getBoundingClientRect();
+                    mouse.x = ( (event.clientX - rect.left) / rect.width ) * 2 - 1;
+                    mouse.y = - ( (event.clientY - rect.top) / rect.height ) * 2 + 1;
+
+                    raycaster.setFromCamera(mouse, auto3dCamera);
+                    if (auto3dScene) {
+                        const intersects = raycaster.intersectObjects(auto3dScene.children);
+                        const hitWindow = intersects.find(hit => hit.object.userData.id);
+                        if (hitWindow) {
+                            openModal(hitWindow.object.userData.id);
                         }
                     }
                 });
@@ -1398,7 +1427,7 @@
 
                             const mesh = new THREE.Mesh(geom, mat);
                             mesh.position.set(xPos, f * floorSpacing, 0);
-                            mesh.userData = { id: data.id };
+                            mesh.userData = { id: data.id }; // Vital for making it clickable
 
                             let hasAnyImage = data.flir.split(' & ').some(imgId => imageBank[imgId]);
                             if (hasAnyImage) {
@@ -1417,6 +1446,7 @@
                                     const bridgeGeom = new THREE.BoxGeometry(dist, windowHeight - 0.1, 0.15);
                                     const bridgeMesh = new THREE.Mesh(bridgeGeom, mat); 
                                     bridgeMesh.position.set(xPos + dist/2, f * floorSpacing, 0);
+                                    bridgeMesh.userData = { id: data.id }; // Makes the bridge clickable
                                     auto3dScene.add(bridgeMesh);
                                 }
                             }
@@ -1442,6 +1472,7 @@
             function animate() {
                 auto3dAnimationId = requestAnimationFrame(animate);
                 auto3dRenderer.render(auto3dScene, auto3dCamera);
+                auto3dControls.update(); 
             }
             animate();
         }
