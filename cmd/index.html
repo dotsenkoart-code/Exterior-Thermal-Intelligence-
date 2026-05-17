@@ -783,37 +783,45 @@ async function handleFiles(files, forcedType=null) {
                     // Collect all tasks first, then run with limited concurrency.
                     // Running 1000+ heavy ArrayBuffer ops simultaneously crashes
                     // the browser — process 8 at a time.
-                    const csvTasks=[], imgTasks=[];
+                    // Start decompressing all image entries immediately inside forEach
+                    // so JSZip entry references are captured while still valid.
+                    // Each entry.async() returns a Promise we store directly —
+                    // lazy closures over entry can fail once forEach finishes.
+                    const csvTasks=[];
+                    const imgPromises=[]; // { promise, clean, path }
                     zip.forEach((rel,entry)=>{
                         if (entry.dir||rel.includes('__MACOSX')||rel.includes('.DS_Store')) return;
                         const en=entry.name.toLowerCase();
                         if (en.endsWith('.csv')) {
                             newCsvAdded=true;
-                            csvTasks.push(()=>entry.async('text').then(t=>{rowsParsed+=parseCSV(t);}));
+                            csvTasks.push(entry.async('text').then(t=>{rowsParsed+=parseCSV(t);}));
                         } else if (en.endsWith('.jpg')||en.endsWith('.jpeg')||en.endsWith('.png')) {
                             const clean=entry.name.split('/').pop().replace(/\.[^.]+$/,'').toUpperCase();
-                            imgTasks.push(()=>entry.async('uint8array').then(async bytes=>{
-                                await processBytes(bytes, clean, entry.name);
-                            }));
+                            const path=entry.name;
+                            // Kick off decompression immediately, store the promise
+                            const p=entry.async('uint8array');
+                            imgPromises.push({p, clean, path});
                         }
                     });
 
-                    // Run CSV tasks immediately (they're fast)
-                    await Promise.all(csvTasks.map(t=>t()));
+                    // Wait for all CSVs first (fast)
+                    await Promise.all(csvTasks);
 
-                    // Run image tasks with concurrency cap of 6
-                    // Lower concurrency reduces memory pressure on large ZIPs
+                    // Process images with concurrency cap — each worker awaits
+                    // the already-started decompression promise then ingests
                     const CONCURRENCY = 6;
                     let taskIdx = 0;
                     let done = 0;
-                    const total = imgTasks.length;
+                    const total = imgPromises.length;
                     async function runNextTask() {
                         while (taskIdx < total) {
                             const myIdx = taskIdx++;
+                            const {p, clean, path} = imgPromises[myIdx];
                             try {
-                                await imgTasks[myIdx]();
+                                const bytes = await p;
+                                await processBytes(bytes, clean, path);
                             } catch(e) {
-                                console.warn(`[Zipline] Image task ${myIdx} failed:`, e);
+                                console.warn('[ZIP] failed:', clean, e.message||e);
                             }
                             done++;
                             if (done % 20 === 0 || done === total) {
