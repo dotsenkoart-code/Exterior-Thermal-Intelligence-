@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata Command Center | v8.1 True Bucket Engine</title>
+    <title>Strata Command Center | v8.2 Nearest Match Engine</title>
     
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="manifest" href="manifest_cmd.json">
@@ -123,8 +123,6 @@
         .modal-subtitle { color: #888; margin-bottom: 15px; font-size: 0.9rem; }
         
         .photo-gallery { display: flex; gap: 15px; overflow-x: auto; margin-bottom: 15px; padding-bottom: 10px; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
-        
-        /* NEW: Display Item format to show filename below image */
         .photo-gallery-item { flex: 0 0 100%; display: flex; flex-direction: column; align-items: center; scroll-snap-align: center; }
         .photo-gallery-item img { width: 100%; max-height: 280px; border-radius: 8px; border: 2px solid #555; object-fit: cover; background: #000; box-shadow: 0 5px 15px rgba(0,0,0,0.5); cursor: pointer; transition: 0.2s; }
         .photo-gallery-item img:hover { border-color: #0cf; }
@@ -184,7 +182,7 @@
 
     <div class="header">
         <div>
-            <h1>STRATA COMMAND <span>| v8.1 True Bucket Engine</span></h1>
+            <h1>STRATA COMMAND <span>| v8.2 Nearest Match Engine</span></h1>
             <div id="project-name" style="font-weight: bold; color: #888; margin-top: 5px;">Awaiting Data...</div>
         </div>
         <div class="header-btns">
@@ -586,7 +584,7 @@
 
             await Promise.all(filePromises);
             
-            // --- STRICT PER-DROP BUCKET AUTO-LINKER ---
+            // --- V8.2: NEAREST MATCH ENGINE (MIDPOINT SNAPPING) ---
             let dropNodes = {};
             Object.keys(inspectionData).forEach(drop => {
                 dropNodes[drop] = [];
@@ -603,8 +601,6 @@
                         }
                     });
                 });
-                // Sort chronologically (earliest to latest in the day)
-                dropNodes[drop].sort((a,b) => a.timeSec - b.timeSec);
             });
 
             let dropImages = {};
@@ -618,55 +614,38 @@
 
             let successfullyLinked = 0;
 
+            // Process linking strictly Drop by Drop
             Object.keys(dropImages).forEach(drop => {
                 let images = dropImages[drop];
                 let nodes = dropNodes[drop];
 
                 if (!nodes || nodes.length === 0 || images.length === 0) return;
 
-                // Sort images by time. If times are identical, explicitly sort by filename to guarantee order
-                images.sort((a, b) => {
-                    if (a.time === b.time) return a.id.localeCompare(b.id, undefined, {numeric: true});
-                    return a.time - b.time;
-                });
+                // 1. Sort images entirely by FILENAME to guarantee chronological display order in the gallery
+                images.sort((a, b) => a.id.localeCompare(b.id, undefined, {numeric: true}));
 
                 images.forEach(img => {
                     let targetNode = null;
                     
-                    // 1. Check exact explicit filename match first (e.g. R-12-L.jpg)
+                    // Direct Filename Match Check
                     let exact = nodes.find(n => n.id === img.id);
                     if (exact) {
                         targetNode = exact;
                     } else {
-                        // 2. Strict Bucket Mapping (Forward-Looking)
-                        for (let i = 0; i < nodes.length; i++) {
-                            let nTime = nodes[i].timeSec;
-                            
-                            // The end of the bucket is the time the NEXT window is logged. 
-                            let nextTime = (i + 1 < nodes.length) ? nodes[i+1].timeSec : (nTime + 1800);
-                            
-                            if (nextTime < nTime) nextTime += 86400; // Handle midnight crossover
-                            let imgTime = img.time;
-                            if (imgTime < nTime && (nTime - imgTime) > 43200) imgTime += 86400;
-
-                            // A photo belongs to a window if taken AT the log time (or up to 60s before),
-                            // and BEFORE the NEXT window is logged.
-                            if (imgTime >= (nTime - 60) && imgTime < nextTime) {
-                                targetNode = nodes[i];
-                                break;
+                        // Nearest Neighbor Match (Snaps to the closest log)
+                        let minDiff = Infinity;
+                        nodes.forEach(node => {
+                            let diff = Math.abs(node.timeSec - img.time);
+                            if (diff > 43200) diff = 86400 - diff; // Handle midnight crossover
+                            if (diff < minDiff) { 
+                                minDiff = diff; 
+                                targetNode = node; 
                             }
-                        }
+                        });
                         
-                        // 3. Fallback: If it fell out of a bucket, assign it to the closest window (within 15 mins)
-                        if (!targetNode) {
-                            let minDiff = Infinity;
-                            nodes.forEach(node => {
-                                let diff = Math.abs(node.timeSec - img.time);
-                                if (diff > 43200) diff = 86400 - diff;
-                                if (diff < minDiff) { minDiff = diff; targetNode = node; }
-                            });
-                            if (minDiff > 900) targetNode = null;
-                        }
+                        // Safety threshold: 3 Hours (10800 seconds). 
+                        // Prevents rejection if camera clock is slightly drifted or user took a break.
+                        if (minDiff > 10800) targetNode = null;
                     }
 
                     if (targetNode) {
@@ -677,7 +656,7 @@
                 });
             });
             
-            // Fallback for manually uploaded files NOT in a Drop folder
+            // Fallback for manually uploaded files NOT inside a Drop folder
             Object.keys(imageBank).forEach(imgKey => {
                 let imgData = imageBank[imgKey];
                 if (!imgData.drop) {
@@ -694,8 +673,8 @@
             document.getElementById('loading-overlay').style.display = 'none';
 
             if (newPhotosAdded > 0) {
-                if (successfullyLinked === 0) alert(`⚠️ ${newPhotosAdded} photos unpacked, but 0 could be linked. Ensure they were taken within the logged time periods.`);
-                else alert(`✅ Bucket Engine securely linked ${successfullyLinked} photo(s) to the grid.`);
+                if (successfullyLinked === 0) alert(`⚠️ ${newPhotosAdded} photos unpacked, but 0 could be linked. Ensure they were taken within 3 hours of the logged time periods.`);
+                else alert(`✅ Engine securely linked ${successfullyLinked} photo(s) to the grid.`);
             }
 
             document.getElementById('project-name').innerText = "Project: " + projectInfo;
@@ -1190,7 +1169,7 @@
                     img.onclick = () => openLightbox(validImgUrls, flirs, index); 
                     
                     let label = document.createElement('span');
-                    label.innerText = flirs[index]; // Display the chronological Filename 
+                    label.innerText = flirs[index]; 
                     
                     wrapper.appendChild(img);
                     wrapper.appendChild(label);
