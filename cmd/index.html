@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata Command Center | v8.0 True Bucket Engine</title>
+    <title>Strata Command Center | v8.1 True Bucket Engine</title>
     
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="manifest" href="manifest_cmd.json">
@@ -33,6 +33,7 @@
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0cf; padding: 15px 20px; flex-shrink: 0; }
         .header h1 { margin: 0; font-size: 1.6rem; font-weight: 900; letter-spacing: 1px; color: #fff; }
         .header span { color: #0cf; }
+        
         .main-content { display: flex; flex-direction: column; flex-grow: 1; padding: 15px 20px; overflow-y: auto; overflow-x: hidden; }
 
         /* --- DASHBOARD CONTROLS --- */
@@ -122,7 +123,13 @@
         .modal-subtitle { color: #888; margin-bottom: 15px; font-size: 0.9rem; }
         
         .photo-gallery { display: flex; gap: 15px; overflow-x: auto; margin-bottom: 15px; padding-bottom: 10px; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
-        .photo-gallery img { flex: 0 0 100%; width: 100%; max-height: 280px; border-radius: 8px; border: 2px solid #555; object-fit: cover; background: #000; box-shadow: 0 5px 15px rgba(0,0,0,0.5); scroll-snap-align: center; cursor: pointer; }
+        
+        /* NEW: Display Item format to show filename below image */
+        .photo-gallery-item { flex: 0 0 100%; display: flex; flex-direction: column; align-items: center; scroll-snap-align: center; }
+        .photo-gallery-item img { width: 100%; max-height: 280px; border-radius: 8px; border: 2px solid #555; object-fit: cover; background: #000; box-shadow: 0 5px 15px rgba(0,0,0,0.5); cursor: pointer; transition: 0.2s; }
+        .photo-gallery-item img:hover { border-color: #0cf; }
+        .photo-gallery-item span { margin-top: 8px; font-size: 0.8rem; color: #0cf; font-weight: bold; letter-spacing: 1px; }
+        
         .photo-gallery::-webkit-scrollbar { height: 8px; }
         .photo-gallery::-webkit-scrollbar-track { background: #111; border-radius: 4px; }
         .photo-gallery::-webkit-scrollbar-thumb { background: #0cf; border-radius: 4px; }
@@ -154,6 +161,7 @@
             max-width: 100%; max-height: 100%; object-fit: contain; cursor: grab; transition: transform 0.05s linear; transform-origin: center center; will-change: transform;
         }
         #lightbox-img:active { cursor: grabbing; }
+
         .lightbox-nav-btn {
             position: absolute; top: 50%; transform: translateY(-50%); z-index: 3010;
             background: rgba(0,0,0,0.8); color: #fff; border: 2px solid #0cf; border-radius: 8px;
@@ -176,7 +184,7 @@
 
     <div class="header">
         <div>
-            <h1>STRATA COMMAND <span>| v8.0 True Bucket Engine</span></h1>
+            <h1>STRATA COMMAND <span>| v8.1 True Bucket Engine</span></h1>
             <div id="project-name" style="font-weight: bold; color: #888; margin-top: 5px;">Awaiting Data...</div>
         </div>
         <div class="header-btns">
@@ -294,7 +302,6 @@
             
             <div class="data-row"><span class="data-label">Field Findings</span><span class="data-val" id="m-finds" style="color:#f1c40f;">--</span></div>
             <div class="data-row" id="m-row-proved"><span class="data-label">Meter Proved</span><span class="data-val" id="m-proved">--</span></div>
-            <div class="data-row"><span class="data-label">FLIR Image(s)</span><span class="data-val" id="m-flir" style="color:#0cf;">--</span></div>
             
             <div class="manager-section">
                 <span class="data-label" style="color:#fff;">Management Notes</span>
@@ -315,15 +322,20 @@
 
     <div id="lightbox-modal" class="modal-overlay" style="z-index: 3000;">
         <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column;">
+            
             <button onclick="closeLightbox()" style="position: absolute; top: 20px; right: 20px; z-index: 3020; background: rgba(0,0,0,0.8); color: #fff; border: 2px solid #fff; border-radius: 50%; width: 50px; height: 50px; font-size: 1.5rem; font-weight: bold; cursor: pointer;">X</button>
             <div id="lightbox-counter" style="position: absolute; top: 20px; left: 20px; z-index: 3020; background: rgba(0,0,0,0.8); color: #0cf; padding: 10px 20px; border-radius: 8px; font-weight: bold; font-size: 1.2rem; border: 1px solid #0cf;">1 / 3</div>
+            
             <button id="lightbox-prev" class="lightbox-nav-btn" onclick="changeLightbox(-1)" style="left: 20px;">&#10094;</button>
+            
             <div id="lightbox-container">
                 <img id="lightbox-img" src="" draggable="false">
             </div>
+            
             <div style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 3020; background: rgba(0,0,0,0.8); color: #0cf; padding: 8px 15px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; border: 1px solid #0cf; pointer-events: none;">
                 Mouse Wheel or Pinch to Zoom • Click & Drag to Pan
             </div>
+
             <button id="lightbox-next" class="lightbox-nav-btn" onclick="changeLightbox(1)" style="right: 20px;">&#10095;</button>
         </div>
     </div>
@@ -374,6 +386,7 @@
         let saved3DTags = {}; 
 
         let currentLightboxImages = [];
+        let currentLightboxNames = [];
         let currentLightboxIndex = 0;
         let wakeLock = null;
 
@@ -440,7 +453,6 @@
 
         // --- CORE FUNCTIONS ---
 
-        // NEW FIX: Scans the ENTIRE path string to find the Drop letter safely
         function extractDropIdFromPath(pathString) {
             if(!pathString) return null;
             try { pathString = decodeURIComponent(pathString); } catch(e){}
@@ -606,12 +618,17 @@
 
             let successfullyLinked = 0;
 
-            // Process linking strictly Drop by Drop using Time Buckets
             Object.keys(dropImages).forEach(drop => {
                 let images = dropImages[drop];
                 let nodes = dropNodes[drop];
 
                 if (!nodes || nodes.length === 0 || images.length === 0) return;
+
+                // Sort images by time. If times are identical, explicitly sort by filename to guarantee order
+                images.sort((a, b) => {
+                    if (a.time === b.time) return a.id.localeCompare(b.id, undefined, {numeric: true});
+                    return a.time - b.time;
+                });
 
                 images.forEach(img => {
                     let targetNode = null;
@@ -621,21 +638,20 @@
                     if (exact) {
                         targetNode = exact;
                     } else {
-                        // 2. Strict Bucket Mapping
+                        // 2. Strict Bucket Mapping (Forward-Looking)
                         for (let i = 0; i < nodes.length; i++) {
                             let nTime = nodes[i].timeSec;
                             
-                            // The start of the bucket is the time the PREVIOUS window was logged. 
-                            // (If it's the first window of the drop, we allow 30 minutes before it).
-                            let prevTime = (i === 0) ? (nTime - 1800) : nodes[i-1].timeSec;
+                            // The end of the bucket is the time the NEXT window is logged. 
+                            let nextTime = (i + 1 < nodes.length) ? nodes[i+1].timeSec : (nTime + 1800);
                             
-                            if (nTime < prevTime) prevTime -= 86400; // Handle midnight crossover
+                            if (nextTime < nTime) nextTime += 86400; // Handle midnight crossover
                             let imgTime = img.time;
-                            if (imgTime < prevTime && (prevTime - imgTime) > 43200) imgTime += 86400;
+                            if (imgTime < nTime && (nTime - imgTime) > 43200) imgTime += 86400;
 
-                            // If the photo was taken AFTER the previous window was submitted, 
-                            // but BEFORE (or right as) this window is submitted (plus a generous 60s grace period)
-                            if (imgTime > prevTime && imgTime <= (nTime + 60)) {
+                            // A photo belongs to a window if taken AT the log time (or up to 60s before),
+                            // and BEFORE the NEXT window is logged.
+                            if (imgTime >= (nTime - 60) && imgTime < nextTime) {
                                 targetNode = nodes[i];
                                 break;
                             }
@@ -674,7 +690,6 @@
                     }
                 }
             });
-            // --- END STRICT PER-DROP BUCKET AUTO-LINKER ---
 
             document.getElementById('loading-overlay').style.display = 'none';
 
@@ -1118,9 +1133,30 @@
         function setLbTransform() { lbImg.style.transform = `translate(${lbPointX}px, ${lbPointY}px) scale(${lbScale})`; }
         function resetLightboxZoom() { lbScale = 1; lbPointX = 0; lbPointY = 0; setLbTransform(); }
 
-        function openLightbox(imgArray, startIndex) { currentLightboxImages = imgArray; currentLightboxIndex = startIndex; updateLightboxUI(); document.getElementById('lightbox-modal').style.display = 'flex'; }
-        function updateLightboxUI() { resetLightboxZoom(); document.getElementById('lightbox-img').src = currentLightboxImages[currentLightboxIndex]; document.getElementById('lightbox-counter').innerText = `${currentLightboxIndex + 1} / ${currentLightboxImages.length}`; const isMulti = currentLightboxImages.length > 1; document.getElementById('lightbox-prev').style.display = isMulti ? 'block' : 'none'; document.getElementById('lightbox-next').style.display = isMulti ? 'block' : 'none'; }
-        function changeLightbox(dir) { currentLightboxIndex += dir; if (currentLightboxIndex < 0) currentLightboxIndex = currentLightboxImages.length - 1; if (currentLightboxIndex >= currentLightboxImages.length) currentLightboxIndex = 0; updateLightboxUI(); }
+        function openLightbox(imgArray, nameArray, startIndex) { 
+            currentLightboxImages = imgArray; 
+            currentLightboxNames = nameArray;
+            currentLightboxIndex = startIndex; 
+            updateLightboxUI(); 
+            document.getElementById('lightbox-modal').style.display = 'flex'; 
+        }
+        
+        function updateLightboxUI() { 
+            resetLightboxZoom(); 
+            document.getElementById('lightbox-img').src = currentLightboxImages[currentLightboxIndex]; 
+            document.getElementById('lightbox-counter').innerText = `${currentLightboxIndex + 1} / ${currentLightboxImages.length}  —  ${currentLightboxNames[currentLightboxIndex]}`; 
+            const isMulti = currentLightboxImages.length > 1; 
+            document.getElementById('lightbox-prev').style.display = isMulti ? 'block' : 'none'; 
+            document.getElementById('lightbox-next').style.display = isMulti ? 'block' : 'none'; 
+        }
+        
+        function changeLightbox(dir) { 
+            currentLightboxIndex += dir; 
+            if (currentLightboxIndex < 0) currentLightboxIndex = currentLightboxImages.length - 1; 
+            if (currentLightboxIndex >= currentLightboxImages.length) currentLightboxIndex = 0; 
+            updateLightboxUI(); 
+        }
+        
         function closeLightbox() { document.getElementById('lightbox-modal').style.display = 'none'; resetLightboxZoom(); }
 
         function openModal(nodeId) {
@@ -1138,7 +1174,6 @@
 
             document.getElementById('m-id').innerText = ids; document.getElementById('m-tech').innerText = `Logged by: ${techs}`; document.getElementById('m-finds').innerText = allFinds.join(' | '); document.getElementById('m-finds').style.color = allFinds.includes('CLEAR') ? '#28a745' : '#f1c40f';
             document.getElementById('m-row-proved').style.display = allFinds.includes('MOISTURE') ? 'flex' : 'none'; document.getElementById('m-proved').innerText = proved;
-            document.getElementById('m-flir').innerText = flirs.join(' & ') || '--'; document.getElementById('m-notes').value = notes;
             
             const gallery = document.getElementById('m-photo-gallery'), noPhoto = document.getElementById('m-no-photo'), carouselHint = document.getElementById('m-carousel-hint'); gallery.innerHTML = '';
             
@@ -1146,7 +1181,22 @@
             flirs.forEach(f => { if(imageBank[f]) validImgUrls.push(imageBank[f].url); });
 
             if (validImgUrls.length > 0) {
-                validImgUrls.forEach((url, index) => { let img = document.createElement('img'); img.src = url; img.onclick = () => openLightbox(validImgUrls, index); gallery.appendChild(img); });
+                validImgUrls.forEach((url, index) => { 
+                    let wrapper = document.createElement('div');
+                    wrapper.className = 'photo-gallery-item';
+                    
+                    let img = document.createElement('img'); 
+                    img.src = url; 
+                    img.onclick = () => openLightbox(validImgUrls, flirs, index); 
+                    
+                    let label = document.createElement('span');
+                    label.innerText = flirs[index]; // Display the chronological Filename 
+                    
+                    wrapper.appendChild(img);
+                    wrapper.appendChild(label);
+                    gallery.appendChild(wrapper); 
+                });
+                
                 gallery.style.display = 'flex'; noPhoto.style.display = 'none';
                 if (validImgUrls.length > 1) { carouselHint.style.display = 'block'; carouselHint.innerText = `👉 TAP TO ENLARGE & SWIPE (${validImgUrls.length} IMAGES) 👈`; } 
                 else { carouselHint.style.display = 'block'; carouselHint.innerText = `👉 TAP IMAGE TO ENLARGE 👈`; }
