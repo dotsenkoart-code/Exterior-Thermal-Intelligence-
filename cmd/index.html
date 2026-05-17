@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata Command Center | v6.5 Lean Digital Twin</title>
+    <title>Strata Command Center | v6.6 Lean Digital Twin</title>
     
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="manifest" href="manifest_cmd.json">
@@ -92,8 +92,23 @@
         .status-empty { background: #222; border: 2px dashed #444; color: #555; pointer-events: none; }
         .status-void { background: transparent; border: 2px solid transparent; cursor: default; pointer-events: none; }
 
-        /* --- TRUE 3D TWIN VIEWER --- */
-        #arena-true3d { display: none; width: 100%; height: 80vh; min-height: 700px; background: radial-gradient(circle, #2a2d38 0%, #0f111a 100%); border: 1px solid #5a2e7a; border-radius: 12px; overflow: hidden; position: relative; margin-bottom: 20px; box-shadow: 0 0 30px rgba(176, 85, 255, 0.2); }
+        /* --- BUTTONS --- */
+        .btn { padding: 12px 20px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; font-size: 1rem; text-transform: uppercase; letter-spacing: 1px; }
+        .btn-blue { background: #0cf; color: #000; }
+        .btn-blue:hover { background: #00aadd; }
+        .btn-dark { background: #333; color: #fff; border: 1px solid #555; }
+        .btn-dark:hover { background: #444; }
+        .btn-red { background: #d9534f; color: #fff; }
+        .btn-red:hover { background: #c9302c; }
+        .btn-green { background: #28a745; color: #fff; }
+        .btn-green:hover { background: #218838; }
+        .btn-purple { background: #8e44ad; color: #fff; }
+        .btn-purple:hover { background: #732d91; }
+        .btn-block { width: 100%; margin-top: 10px; }
+        .header-btns { display: flex; gap: 10px; }
+
+        /* --- AUTO 3D AND TRUE 3D VIEWS --- */
+        #arena-auto3d, #arena-true3d { display: none; width: 100%; height: 80vh; min-height: 700px; background: #0f111a; border: 1px solid #0cf; border-radius: 12px; overflow: hidden; position: relative; margin-bottom: 20px; box-shadow: 0 0 30px rgba(0, 204, 255, 0.1); }
         model-viewer { width: 100%; height: 100%; outline: none; }
         
         .btn-fullscreen { position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.7); color: #fff; border: 1px solid #555; z-index: 100; padding: 10px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; letter-spacing: 1px; }
@@ -144,20 +159,6 @@
         .btn-status-yellow { background: #f1c40f; color: #000; }
         .btn-status-yellow:hover { background: #e2b607; }
 
-        .btn { padding: 12px 20px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; font-size: 1rem; text-transform: uppercase; letter-spacing: 1px; }
-        .btn-blue { background: #0cf; color: #000; }
-        .btn-blue:hover { background: #00aadd; }
-        .btn-dark { background: #333; color: #fff; border: 1px solid #555; }
-        .btn-dark:hover { background: #444; }
-        .btn-red { background: #d9534f; color: #fff; }
-        .btn-red:hover { background: #c9302c; }
-        .btn-green { background: #28a745; color: #fff; }
-        .btn-green:hover { background: #218838; }
-        .btn-purple { background: #8e44ad; color: #fff; }
-        .btn-purple:hover { background: #732d91; }
-        .btn-block { width: 100%; margin-top: 10px; }
-        .header-btns { display: flex; gap: 10px; }
-        
         /* ZIP LOADING SPINNER */
         #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999; display: none; align-items: center; justify-content: center; flex-direction: column; }
         .spinner { border: 8px solid #222; border-top: 8px solid #0cf; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin-bottom: 20px; }
@@ -168,7 +169,7 @@
 
     <div id="loading-overlay">
         <div class="spinner"></div>
-        <h2 style="color: #0cf; font-weight: bold;">Unpacking ZIP & Processing Files...</h2>
+        <h2 style="color: #0cf; font-weight: bold;">Unpacking & Syncing Files...</h2>
         <p style="color: #888;" id="loading-text">Please wait.</p>
     </div>
 
@@ -179,12 +180,11 @@
 
     <div class="header">
         <div>
-            <h1>STRATA COMMAND <span>| v6.5 Lean Digital Twin</span></h1>
+            <h1>STRATA COMMAND <span>| v6.6 Lean Digital Twin</span></h1>
             <div id="project-name" style="font-weight: bold; color: #888; margin-top: 5px;">Awaiting Data...</div>
         </div>
         <div class="header-btns">
             <button class="btn btn-dark" style="border-color: #f39c12; color: #f39c12;" onclick="forceUpdateApp()">🔄 UPDATE APP</button>
-            
             <button class="btn btn-dark" id="btn-reset" style="display:none;" onclick="resetBoard()">🔄 CLEAR</button>
             <button class="btn btn-dark" id="btn-edit-map" style="display:none;" onclick="editMapping()">🗺️ EDIT MAP</button>
             <button class="btn btn-purple" id="btn-save-project" style="display:none;" onclick="saveProject()">📦 SAVE PROJECT</button>
@@ -264,7 +264,7 @@
             <div id="building-container-2d"></div>
         </div>
 
-        <div id="arena-auto3d" style="display: none; width: 100%; height: 80vh; min-height: 700px; background: #0f111a; border: 1px solid #0cf; border-radius: 12px; overflow: hidden; position: relative; margin-bottom: 20px; box-shadow: 0 0 30px rgba(0, 204, 255, 0.1);">
+        <div id="arena-auto3d">
             <button class="btn-fullscreen" onclick="toggleFullScreen('arena-auto3d')">⛶ FULL SCREEN</button>
             <div id="procedural-3d-container" style="width:100%; height:100%; cursor: grab;"></div>
             <div style="position: absolute; top: 15px; left: 15px; color: #fff; font-size: 0.9rem; font-weight: bold; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; border: 1px solid #0cf; pointer-events:none; z-index:100;">
@@ -375,6 +375,7 @@
     </div>
 
     <script>
+        // --- GLOBAL VARIABLES ---
         let inspectionData = {};
         let projectInfo = "Unknown Project";
         
@@ -384,6 +385,7 @@
         let stitchedPairs = []; 
         
         let imageBank = {}; 
+        let imageTimestamps = {}; // Stores precise timestamps of images
         let linkedPhotosCount = 0;
 
         let elevations = []; 
@@ -397,13 +399,12 @@
         let bulkTagState = { mode: null, targetId: null, step: 0, anchors: [] };
         let saved3DTags = {}; 
 
-        // Lightbox State
         let currentLightboxImages = [];
         let currentLightboxIndex = 0;
 
         const viewer = document.querySelector('#main-3d-viewer');
 
-        // --- INSTANT CACHE WIPE & UPDATE ---
+        // --- CORE FUNCTIONS ---
         function forceUpdateApp() {
             if (confirm("Download the latest version of the app? (This will clear cache and reload the page)")) {
                 if ('caches' in window) {
@@ -421,7 +422,7 @@
             if (!files || files.length === 0) return;
             
             document.getElementById('loading-overlay').style.display = 'flex';
-            document.getElementById('loading-text').innerText = `Processing ${files.length} file(s)...`;
+            document.getElementById('loading-text').innerText = `Processing file(s)...`;
             
             const filePromises = [];
             let newPhotosAdded = 0;
@@ -462,6 +463,9 @@
                                         const cleanName = zipEntry.name.split('/').pop().split('.')[0].toUpperCase();
                                         if (!imageBank[cleanName]) {
                                             imageBank[cleanName] = URL.createObjectURL(blob);
+                                            // Store timestamp for smart linking
+                                            let d = zipEntry.date;
+                                            imageTimestamps[cleanName] = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
                                             linkedPhotosCount++;
                                             newPhotosAdded++;
                                         }
@@ -519,6 +523,9 @@
                     const cleanName = file.name.split('.')[0].toUpperCase();
                     if (!imageBank[cleanName]) {
                         imageBank[cleanName] = URL.createObjectURL(file);
+                        // Store timestamp for smart linking
+                        let d = new Date(file.lastModified);
+                        imageTimestamps[cleanName] = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
                         linkedPhotosCount++;
                         newPhotosAdded++;
                     }
@@ -534,6 +541,53 @@
 
             await Promise.all(filePromises);
             
+            // --- SMART TIMESTAMP AUTO-LINKER ---
+            let allNodes = [];
+            Object.keys(inspectionData).forEach(drop => {
+                Object.keys(inspectionData[drop]).forEach(floor => {
+                    Object.keys(inspectionData[drop][floor]).forEach(pos => {
+                        const node = inspectionData[drop][floor][pos];
+                        if (node.time && node.time !== '--') {
+                            let parts = node.time.split(':');
+                            if (parts.length === 3) {
+                                node.timeSec = parseInt(parts[0])*3600 + parseInt(parts[1])*60 + parseInt(parts[2]);
+                                allNodes.push(node);
+                            }
+                        }
+                    });
+                });
+            });
+
+            Object.keys(imageBank).forEach(imgKey => {
+                let matchedNode = allNodes.find(n => n.id === imgKey); // 1. Check exact string match first
+                
+                if (!matchedNode) {
+                    let imgTime = imageTimestamps[imgKey];
+                    if (imgTime !== undefined) {
+                        let minDiff = Infinity;
+                        allNodes.forEach(node => {
+                            let diff = Math.abs(node.timeSec - imgTime);
+                            if (diff > 43200) diff = 86400 - diff; // Handle midnight crossover
+                            if (diff < minDiff) {
+                                minDiff = diff;
+                                matchedNode = node;
+                            }
+                        });
+                        // Only auto-link if the picture was taken within 1 hour of the window log
+                        if (minDiff > 3600) matchedNode = null; 
+                    }
+                }
+                
+                if (matchedNode) {
+                    if (matchedNode.flir === '--' || matchedNode.flir === '') {
+                        matchedNode.flir = imgKey; 
+                    } else if (!matchedNode.flir.split(' & ').includes(imgKey)) {
+                        matchedNode.flir += ' & ' + imgKey;
+                    }
+                }
+            });
+            // --- END SMART TIMESTAMP AUTO-LINKER ---
+
             document.getElementById('loading-overlay').style.display = 'none';
 
             document.getElementById('project-name').innerText = "Project: " + projectInfo;
@@ -541,7 +595,7 @@
             document.getElementById('btn-reset').style.display = 'inline-block';
             
             if (newPhotosAdded > 0) {
-                alert(`✅ Successfully unpacked ${newPhotosAdded} photo(s). They will link automatically to the grid.`);
+                alert(`✅ Successfully unpacked and synced ${newPhotosAdded} photo(s). They are now linked to the grid.`);
             }
 
             if (newCsvAdded || isProjectLoaded) {
@@ -1680,7 +1734,7 @@
 
         function resetBoard() {
             if(confirm("Are you sure you want to clear all data and start over?")) {
-                inspectionData = {}; imageBank = {}; stitchedPairs = []; linkedPhotosCount = 0; projectInfo = "Unknown Project";
+                inspectionData = {}; imageBank = {}; imageTimestamps = {}; stitchedPairs = []; linkedPhotosCount = 0; projectInfo = "Unknown Project";
                 elevations = []; dropAssignments = {}; saved3DTags = {};
                 
                 document.getElementById('project-name').innerText = "Awaiting Data...";
