@@ -1,209 +1,165 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata Command Center | v9.4</title>
-
+    <title>Strata Command Center | v9.5</title>
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="manifest" href="manifest_cmd.json">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-cmd192.png">
     <link rel="apple-touch-icon" href="icon-cmd192.png">
-
     <meta name="theme-color" content="#0f111a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Strata CMD">
     <meta name="mobile-web-app-capable" content="yes">
-
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/exifr/dist/lite.umd.js"></script>
-
     <style>
         * { box-sizing: border-box; }
-        html, body {
-            margin: 0; padding: 0; width: 100vw; height: 100vh;
-            overflow: hidden; display: flex; flex-direction: column;
-            background: #0f111a; color: #fff;
-            font-family: 'Segoe UI', Roboto, sans-serif;
-        }
+        html, body { margin:0;padding:0;width:100vw;height:100vh;overflow:hidden;display:flex;flex-direction:column;background:#0f111a;color:#fff;font-family:'Segoe UI',Roboto,sans-serif; }
 
-        /* ── HEADER ─────────────────────────────────── */
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0cf; padding: 15px 20px; flex-shrink: 0; }
-        .header h1 { margin: 0; font-size: 1.6rem; font-weight: 900; letter-spacing: 1px; }
-        .header span { color: #0cf; }
-        .header-btns { display: flex; gap: 10px; }
+        .header { display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #0cf;padding:15px 20px;flex-shrink:0; }
+        .header h1 { margin:0;font-size:1.6rem;font-weight:900;letter-spacing:1px; }
+        .header span { color:#0cf; }
+        .header-btns { display:flex;gap:10px; }
 
-        /* ── TOP RELOAD BANNER ──────────────────────── */
-        .top-banner { background: #1a1400; color: #f1c40f; padding: 10px 20px; font-size: 0.85rem; font-weight: bold; border-bottom: 1px solid #f1c40f44; display: none; text-align: center; flex-shrink: 0; }
+        .top-banner { background:#1a1400;color:#f1c40f;padding:10px 20px;font-size:0.85rem;font-weight:bold;border-bottom:1px solid #f1c40f44;display:none;text-align:center;flex-shrink:0; }
 
-        /* ── MAIN LAYOUT ────────────────────────────── */
-        .main-content { display: flex; flex-direction: column; flex-grow: 1; padding: 15px 20px; overflow-y: auto; overflow-x: hidden; }
+        .main-content { display:flex;flex-direction:column;flex-grow:1;padding:15px 20px;overflow-y:auto;overflow-x:hidden; }
 
-        /* ── BUTTONS ────────────────────────────────── */
-        .btn { padding: 12px 20px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; font-size: 1rem; text-transform: uppercase; letter-spacing: 1px; }
-        .btn-blue   { background: #0cf;    color: #000; }
-        .btn-dark   { background: #333;    color: #fff; border: 1px solid #555; }
-        .btn-red    { background: #d9534f; color: #fff; }
-        .btn-green  { background: #28a745; color: #fff; }
-        .btn-purple { background: #8e44ad; color: #fff; }
-        .btn-block  { width: 100%; margin-top: 10px; }
-        .btn-status { flex: 1; padding: 10px; font-size: 0.8rem; border-radius: 4px; }
-        .btn-status-yellow { background: #f1c40f; color: #000; }
+        .btn { padding:12px 20px;font-weight:bold;border-radius:6px;border:none;cursor:pointer;font-size:1rem;text-transform:uppercase;letter-spacing:1px; }
+        .btn-blue   { background:#0cf;color:#000; }
+        .btn-dark   { background:#333;color:#fff;border:1px solid #555; }
+        .btn-red    { background:#d9534f;color:#fff; }
+        .btn-green  { background:#28a745;color:#fff; }
+        .btn-purple { background:#8e44ad;color:#fff; }
+        .btn-block  { width:100%;margin-top:10px; }
+        .btn-status { flex:1;padding:10px;font-size:0.8rem;border-radius:4px; }
+        .btn-status-yellow { background:#f1c40f;color:#000; }
 
-        /* ── MAPPING SCREEN ─────────────────────────── */
-        #mapping-screen { background: #1a1d27; border-radius: 12px; padding: 25px; border: 1px solid #333; display: none; width: 100%; }
-        .elevation-creator { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 20px; }
-        .elevation-creator input { flex: 1; padding: 12px; background: #111; border: 1px solid #444; color: #fff; border-radius: 6px; font-size: 1rem; }
-        .mapping-row { display: flex; justify-content: space-between; align-items: center; background: #111; padding: 15px; border-radius: 6px; margin-bottom: 10px; border: 1px solid #222; }
-        .mapping-row select { padding: 10px; background: #222; color: #0cf; border: 1px solid #444; border-radius: 4px; font-size: 1rem; font-weight: bold; width: 200px; }
+        #mapping-screen { background:#1a1d27;border-radius:12px;padding:25px;border:1px solid #333;display:none;width:100%; }
+        .elevation-creator { display:flex;gap:10px;margin-bottom:20px;border-bottom:1px solid #333;padding-bottom:20px; }
+        .elevation-creator input { flex:1;padding:12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:1rem; }
+        .mapping-row { display:flex;justify-content:space-between;align-items:center;background:#111;padding:15px;border-radius:6px;margin-bottom:10px;border:1px solid #222; }
+        .mapping-row select { padding:10px;background:#222;color:#0cf;border:1px solid #444;border-radius:4px;font-size:1rem;font-weight:bold;width:200px; }
 
-        /* ── DASHBOARD ──────────────────────────────── */
-        #dashboard-screen { display: none; flex-direction: column; height: 100%; width: 100%; }
-        .view-controls { display: flex; gap: 10px; margin-bottom: 15px; background: #1a1d27; padding: 10px; border-radius: 8px; border: 1px solid #333; align-items: center; flex-shrink: 0; }
-        .view-toggle-btn { flex: 1; padding: 12px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; background: #222; color: #888; transition: 0.2s; }
-        .view-toggle-btn.active { background: #0cf; color: #000; }
-        #btn-true3d { background: #2b113d; color: #d080ff; border: 1px solid #5a2e7a; }
-        #btn-true3d.active { background: #b055ff; color: #fff; }
-        .stitch-mode-on { border-color: #f39c12 !important; background: rgba(243,156,18,0.4) !important; color: #fff !important; box-shadow: 0 0 15px rgba(243,156,18,0.8) !important; }
-        .tag-mode-on    { border-color: #d080ff !important; background: rgba(176,85,255,0.4)  !important; color: #fff !important; box-shadow: 0 0 15px rgba(176,85,255,0.8) !important; }
+        #dashboard-screen { display:none;flex-direction:column;height:100%;width:100%; }
+        .view-controls { display:flex;gap:10px;margin-bottom:15px;background:#1a1d27;padding:10px;border-radius:8px;border:1px solid #333;align-items:center;flex-shrink:0; }
+        .view-toggle-btn { flex:1;padding:12px;font-weight:bold;border-radius:6px;border:none;cursor:pointer;background:#222;color:#888;transition:0.2s; }
+        .view-toggle-btn.active { background:#0cf;color:#000; }
+        #btn-true3d { background:#2b113d;color:#d080ff;border:1px solid #5a2e7a; }
+        #btn-true3d.active { background:#b055ff;color:#fff; }
+        .stitch-mode-on { border-color:#f39c12!important;background:rgba(243,156,18,0.4)!important;color:#fff!important;box-shadow:0 0 15px rgba(243,156,18,0.8)!important; }
+        .tag-mode-on    { border-color:#d080ff!important;background:rgba(176,85,255,0.4)!important;color:#fff!important;box-shadow:0 0 15px rgba(176,85,255,0.8)!important; }
 
-        /* ── TABS ───────────────────────────────────── */
-        .tabs-container { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 5px; border-bottom: 2px solid #333; margin-bottom: 15px; flex-shrink: 0; }
-        .tab { padding: 12px 25px; background: #1a1d27; color: #888; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: bold; font-size: 1rem; border: 1px solid #333; border-bottom: none; transition: 0.2s; white-space: nowrap; }
-        .tab.active { background: #0cf; color: #000; border-color: #0cf; }
+        .tabs-container { display:flex;gap:5px;overflow-x:auto;padding-bottom:5px;border-bottom:2px solid #333;margin-bottom:15px;flex-shrink:0; }
+        .tab { padding:12px 25px;background:#1a1d27;color:#888;border-radius:8px 8px 0 0;cursor:pointer;font-weight:bold;font-size:1rem;border:1px solid #333;border-bottom:none;transition:0.2s;white-space:nowrap; }
+        .tab.active { background:#0cf;color:#000;border-color:#0cf; }
 
-        /* ── STATS BAR ──────────────────────────────── */
-        .stats-bar { display: flex; gap: 10px; margin-bottom: 15px; flex-shrink: 0; }
-        .stat-card { flex: 1; background: #1a1d27; padding: 15px; border-radius: 8px; border-left: 4px solid #333; cursor: pointer; transition: opacity 0.2s; }
-        .stat-card.dimmed { opacity: 0.3; }
-        .stat-label { font-size: 0.75rem; color: #888; text-transform: uppercase; font-weight: bold; }
-        .stat-value { font-size: 2rem; font-weight: 900; margin-top: 5px; }
+        .stats-bar { display:flex;gap:10px;margin-bottom:15px;flex-shrink:0; }
+        .stat-card { flex:1;background:#1a1d27;padding:15px;border-radius:8px;border-left:4px solid #333;cursor:pointer;transition:opacity 0.2s; }
+        .stat-card.dimmed { opacity:0.3; }
+        .stat-label { font-size:0.75rem;color:#888;text-transform:uppercase;font-weight:bold; }
+        .stat-value { font-size:2rem;font-weight:900;margin-top:5px; }
 
-        /* ── 2D GRID ────────────────────────────────── */
-        #view-2d { flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; }
-        #building-container-2d { flex-grow: 1; overflow: auto; display: flex; gap: 15px; align-items: flex-start; padding-bottom: 20px; }
+        #view-2d { flex-grow:1;overflow:hidden;display:flex;flex-direction:column; }
+        #building-container-2d { flex-grow:1;overflow:auto;display:flex;gap:15px;align-items:flex-start;padding-bottom:20px; }
 
-        .drop-column { background: #161922; border: 1px solid #2a2d38; border-radius: 8px; padding: 10px; display: flex; flex-direction: column; min-width: max-content; }
-        .drop-header { text-align: center; font-size: 1.2rem; font-weight: bold; color: #0cf; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 10px; height: 40px; display: flex; align-items: center; justify-content: center; }
-        .floor-axis-column { background: transparent; border: none; padding-right: 0; padding-left: 0; min-width: auto; margin-right: -5px; }
-        .floor-axis-header { border-bottom-color: transparent; color: transparent; height: 40px; margin-bottom: 10px; padding-bottom: 10px; }
-        .floor-row  { display: flex; align-items: center; margin-bottom: 4px; height: 54px; }
-        .floor-label { width: 35px; font-weight: bold; color: #888; font-size: 0.9rem; text-align: right; margin-right: 10px; height: 54px; display: flex; align-items: center; justify-content: flex-end; }
+        .drop-column { background:#161922;border:1px solid #2a2d38;border-radius:8px;padding:10px;display:flex;flex-direction:column;min-width:max-content; }
+        .drop-header { text-align:center;font-size:1.2rem;font-weight:bold;color:#0cf;margin-bottom:10px;border-bottom:1px solid #333;padding-bottom:10px;height:40px;display:flex;align-items:center;justify-content:center; }
+        .floor-axis-column { background:transparent;border:none;padding-right:0;padding-left:0;min-width:auto;margin-right:-5px; }
+        .floor-axis-header { border-bottom-color:transparent;color:transparent;height:40px;margin-bottom:10px;padding-bottom:10px; }
+        .floor-row  { display:flex;align-items:center;margin-bottom:4px;height:54px; }
+        .floor-label { width:35px;font-weight:bold;color:#888;font-size:0.9rem;text-align:right;margin-right:10px;height:54px;display:flex;align-items:center;justify-content:flex-end; }
 
-        .window-group { display: flex; gap: 4px; flex: 1; justify-content: center; width: 140px; height: 54px; }
-        .window-node  { flex: 1; height: 54px; border-radius: 4px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: bold; color: rgba(255,255,255,0.9); border: 2px solid rgba(0,0,0,0.5); transition: transform 0.1s; position: relative; gap: 3px; }
-        .window-node:hover { transform: scale(1.08); box-shadow: 0 5px 15px rgba(0,0,0,0.8); z-index: 10; }
-        .node-filtered-out { opacity: 0.15 !important; filter: grayscale(1) !important; pointer-events: none; border-color: transparent !important; }
-        .stitch-bridge { position: absolute; top: -2px; bottom: -2px; right: -39px; width: 39px; z-index: -1; border-top: 2px solid rgba(0,0,0,0.5); border-bottom: 2px solid rgba(0,0,0,0.5); }
+        .window-group { display:flex;gap:4px;flex:1;justify-content:center;width:140px;height:54px; }
+        .window-node  { flex:1;height:54px;border-radius:4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:0.65rem;font-weight:bold;color:rgba(255,255,255,0.9);border:2px solid rgba(0,0,0,0.5);transition:transform 0.1s;position:relative;gap:3px; }
+        .window-node:hover { transform:scale(1.08);box-shadow:0 5px 15px rgba(0,0,0,0.8);z-index:10; }
+        .node-filtered-out { opacity:0.15!important;filter:grayscale(1)!important;pointer-events:none;border-color:transparent!important; }
+        .stitch-bridge { position:absolute;top:-2px;bottom:-2px;right:-39px;width:39px;z-index:-1;border-top:2px solid rgba(0,0,0,0.5);border-bottom:2px solid rgba(0,0,0,0.5); }
 
-        /* Photo dot indicator on node */
-        .photo-dot-ir { width: 7px; height: 7px; border-radius: 50%; background: #ff6b35; border: 1px solid rgba(255,255,255,0.4); flex-shrink: 0; }
-        .photo-dot-ir.missing { background: transparent; border: 1px dashed #ff6b35; }
+        /* Photo count badge on node */
+        .photo-badge { font-size:0.55rem;font-weight:900;background:rgba(0,0,0,0.45);border-radius:3px;padding:1px 4px;color:#ff6b35;letter-spacing:0; }
+        .photo-badge.missing { color:#555; }
 
-        .status-clear     { background: #28a745; }
-        .status-flagged   { background: #f1c40f; color: #000; }
-        .status-confirmed { background: #d9534f; }
-        .status-void      { background: transparent; border: 2px solid transparent; cursor: default; pointer-events: none; }
+        .status-clear     { background:#28a745; }
+        .status-flagged   { background:#f1c40f;color:#000; }
+        .status-confirmed { background:#d9534f; }
+        .status-void      { background:transparent;border:2px solid transparent;cursor:default;pointer-events:none; }
 
-        /* ── 3D ARENAS ──────────────────────────────── */
-        #arena-auto3d, #arena-true3d { display: none; flex-grow: 1; width: 100%; background: #0f111a; border: 1px solid #0cf; border-radius: 12px; overflow: hidden; position: relative; box-shadow: 0 0 30px rgba(0,204,255,0.1); }
-        #arena-true3d { background: radial-gradient(circle, #2a2d38 0%, #0f111a 100%); border-color: #5a2e7a; box-shadow: 0 0 30px rgba(176,85,255,0.2); }
-        model-viewer { width: 100%; height: 100%; outline: none; }
-        .btn-fullscreen { position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.7); color: #fff; border: 1px solid #555; z-index: 100; padding: 10px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; }
-        .floating-tools { position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 100; }
-        .float-btn { padding: 15px 30px; font-weight: bold; border-radius: 30px; border: 2px solid #555; cursor: pointer; background: rgba(0,0,0,0.8); color: #fff; }
+        #arena-auto3d, #arena-true3d { display:none;flex-grow:1;width:100%;background:#0f111a;border:1px solid #0cf;border-radius:12px;overflow:hidden;position:relative;box-shadow:0 0 30px rgba(0,204,255,0.1); }
+        #arena-true3d { background:radial-gradient(circle,#2a2d38 0%,#0f111a 100%);border-color:#5a2e7a;box-shadow:0 0 30px rgba(176,85,255,0.2); }
+        model-viewer { width:100%;height:100%;outline:none; }
+        .btn-fullscreen { position:absolute;top:15px;right:15px;background:rgba(0,0,0,0.7);color:#fff;border:1px solid #555;z-index:100;padding:10px 15px;border-radius:6px;font-weight:bold;cursor:pointer; }
+        .floating-tools { position:absolute;bottom:25px;left:50%;transform:translateX(-50%);display:flex;gap:15px;z-index:100; }
+        .float-btn { padding:15px 30px;font-weight:bold;border-radius:30px;border:2px solid #555;cursor:pointer;background:rgba(0,0,0,0.8);color:#fff; }
 
-        /* ── 3D HOTSPOTS ────────────────────────────── */
-        .hotspot-dot { width: 18px; height: 18px; border-radius: 50%; border: 3px solid #fff; cursor: pointer; padding: 0; margin: 0; transform: translate(-50%,-50%); transition: all 0.2s; }
-        .hotspot-dot:hover { transform: translate(-50%,-50%) scale(1.5); z-index: 100; }
-        .hotspot-dot.status-clear     { background: #28a745; box-shadow: 0 0 15px #28a745; }
-        .hotspot-dot.status-flagged   { background: #f1c40f; box-shadow: 0 0 15px #f1c40f; }
-        .hotspot-dot.status-confirmed { background: #d9534f; box-shadow: 0 0 15px #d9534f; }
-        .hotspot-label { position: absolute; background: rgba(0,0,0,0.8); color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; top: -30px; left: 50%; transform: translateX(-50%); white-space: nowrap; pointer-events: none; border: 1px solid #555; }
+        .hotspot-dot { width:18px;height:18px;border-radius:50%;border:3px solid #fff;cursor:pointer;padding:0;margin:0;transform:translate(-50%,-50%);transition:all 0.2s; }
+        .hotspot-dot:hover { transform:translate(-50%,-50%) scale(1.5);z-index:100; }
+        .hotspot-dot.status-clear     { background:#28a745;box-shadow:0 0 15px #28a745; }
+        .hotspot-dot.status-flagged   { background:#f1c40f;box-shadow:0 0 15px #f1c40f; }
+        .hotspot-dot.status-confirmed { background:#d9534f;box-shadow:0 0 15px #d9534f; }
+        .hotspot-label { position:absolute;background:rgba(0,0,0,0.8);color:#fff;padding:4px 8px;border-radius:4px;font-size:0.7rem;font-weight:bold;top:-30px;left:50%;transform:translateX(-50%);white-space:nowrap;pointer-events:none;border:1px solid #555; }
 
-        /* ── TAG INSTRUCTION BAR ────────────────────── */
-        #tag-instruction-bar { display: none; position: fixed; top: 0; left: 0; width: 100%; background: #d080ff; color: #000; text-align: center; padding: 15px; font-weight: 900; font-size: 1.2rem; z-index: 9999; }
-        #tag-instruction-bar button { margin-left: 20px; padding: 5px 15px; font-weight: bold; background: #000; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+        #tag-instruction-bar { display:none;position:fixed;top:0;left:0;width:100%;background:#d080ff;color:#000;text-align:center;padding:15px;font-weight:900;font-size:1.2rem;z-index:9999; }
+        #tag-instruction-bar button { margin-left:20px;padding:5px 15px;font-weight:bold;background:#000;color:#fff;border:none;border-radius:4px;cursor:pointer; }
 
-        /* ── LOADING OVERLAY ────────────────────────── */
-        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.92); z-index: 9999; display: none; align-items: center; justify-content: center; flex-direction: column; }
-        .spinner { border: 8px solid #222; border-top: 8px solid #0cf; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin-bottom: 20px; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        #loading-text  { color: #888; margin: 0; }
-        #loading-detail { color: #555; font-size: 0.85rem; margin-top: 8px; }
+        #loading-overlay { position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:9999;display:none;align-items:center;justify-content:center;flex-direction:column; }
+        .spinner { border:8px solid #222;border-top:8px solid #0cf;border-radius:50%;width:60px;height:60px;animation:spin 1s linear infinite;margin-bottom:20px; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        #loading-text   { color:#aaa;margin:0; }
+        #loading-detail { color:#555;font-size:0.85rem;margin-top:8px; }
 
-        /* ── MODALS ─────────────────────────────────── */
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 2000; backdrop-filter: blur(3px); }
-        .modal-box { background: #1a1d27; border: 1px solid #0cf; border-radius: 12px; padding: 25px; width: 520px; max-height: 90vh; overflow-y: auto; box-shadow: 0 15px 35px rgba(0,0,0,0.9); }
-        .modal-title    { font-size: 2rem; color: #0cf; margin: 0 0 5px 0; font-weight: 900; }
-        .modal-subtitle { color: #888; margin-bottom: 15px; font-size: 0.9rem; }
-        .modal-notes    { width: 100%; height: 80px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; padding: 10px; margin-top: 5px; font-family: inherit; resize: none; }
-        .data-row   { display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding: 10px 0; }
-        .data-label { color: #888; font-size: 0.8rem; text-transform: uppercase; }
-        .data-val   { font-weight: bold; text-align: right; max-width: 65%; }
-        .manager-section { margin-top: 20px; background: #111; padding: 15px; border-radius: 8px; border: 1px solid #333; }
-        .status-btns { display: flex; gap: 10px; margin-top: 15px; margin-bottom: 15px; }
+        .modal-overlay { position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);display:none;align-items:center;justify-content:center;z-index:2000;backdrop-filter:blur(3px); }
+        .modal-box { background:#1a1d27;border:1px solid #0cf;border-radius:12px;padding:25px;width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 15px 35px rgba(0,0,0,0.9); }
+        .modal-title    { font-size:2rem;color:#0cf;margin:0 0 5px 0;font-weight:900; }
+        .modal-subtitle { color:#888;margin-bottom:15px;font-size:0.9rem; }
+        .modal-notes    { width:100%;height:80px;background:#222;color:#fff;border:1px solid #444;border-radius:4px;padding:10px;margin-top:5px;font-family:inherit;resize:none; }
+        .data-row   { display:flex;justify-content:space-between;border-bottom:1px solid #333;padding:10px 0; }
+        .data-label { color:#888;font-size:0.8rem;text-transform:uppercase; }
+        .data-val   { font-weight:bold;text-align:right;max-width:65%; }
+        .manager-section { margin-top:20px;background:#111;padding:15px;border-radius:8px;border:1px solid #333; }
+        .status-btns { display:flex;gap:10px;margin-top:15px;margin-bottom:15px; }
 
-        /* ── PHOTO VIEWER (inside modal) ────────────── */
-        .photo-viewer-wrap {
-            position: relative; border-radius: 8px; overflow: hidden;
-            background: #000; margin-bottom: 12px;
-            border: 2px solid #333;
-        }
-        .photo-viewer-wrap img {
-            width: 100%; display: block; border-radius: 6px;
-            cursor: pointer;
-        }
-        /* IR/DC toggle pill */
-        .photo-toggle-bar {
-            display: flex; align-items: center; justify-content: space-between;
-            margin-bottom: 8px;
-        }
-        .photo-name-label { font-size: 0.75rem; color: #888; font-weight: bold; letter-spacing: 1px; }
-        .toggle-pill {
-            display: flex; border-radius: 20px; overflow: hidden;
-            border: 1px solid #444; cursor: pointer;
-        }
-        .toggle-pill span {
-            padding: 4px 12px; font-size: 0.7rem; font-weight: bold;
-            text-transform: uppercase; letter-spacing: 1px; transition: 0.15s;
-            user-select: none;
-        }
-        .toggle-pill .pill-ir { background: #ff6b35; color: #fff; }
-        .toggle-pill .pill-dc { background: #222; color: #666; }
-        .toggle-pill.showing-dc .pill-ir { background: #222; color: #666; }
-        .toggle-pill.showing-dc .pill-dc { background: #e0e0e0; color: #000; }
-        /* DC not available state */
-        .toggle-pill.no-dc { opacity: 0.4; cursor: default; pointer-events: none; }
-        .no-photo-banner { background: #111; color: #555; padding: 20px; text-align: center; border-radius: 8px; border: 2px dashed #333; margin-bottom: 12px; font-size: 0.9rem; font-weight: bold; }
-        .stale-banner    { background: #1a1400; color: #f1c40f; padding: 8px 12px; border-radius: 6px; border: 1px solid #f1c40f44; font-size: 0.8rem; font-weight: bold; margin-bottom: 10px; display: none; }
+        /* Photo gallery in modal */
+        .photo-entry { margin-bottom:16px; }
+        .photo-toggle-bar { display:flex;align-items:center;justify-content:space-between;margin-bottom:6px; }
+        .photo-name-label { font-size:0.75rem;color:#888;font-weight:bold;letter-spacing:1px; }
+        .toggle-pill { display:flex;border-radius:20px;overflow:hidden;border:1px solid #444;cursor:pointer; }
+        .toggle-pill span { padding:4px 12px;font-size:0.7rem;font-weight:bold;text-transform:uppercase;letter-spacing:1px;transition:0.15s;user-select:none; }
+        .toggle-pill .pill-ir { background:#ff6b35;color:#fff; }
+        .toggle-pill .pill-dc { background:#222;color:#555; }
+        .toggle-pill.showing-dc .pill-ir { background:#222;color:#555; }
+        .toggle-pill.showing-dc .pill-dc { background:#e0e0e0;color:#000; }
+        .toggle-pill.no-dc { opacity:0.4;cursor:default;pointer-events:none; }
+        .photo-viewer-wrap { border-radius:8px;overflow:hidden;background:#000;border:2px solid #333; }
+        .photo-viewer-wrap img { width:100%;display:block;cursor:pointer; }
 
-        /* Drop slot for manual assignment */
-        .drop-slot { min-height: 70px; border: 2px dashed #333; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 10px; color: #444; font-size: 0.8rem; font-weight: bold; cursor: pointer; transition: 0.2s; margin-bottom: 12px; padding: 12px; text-align: center; }
-        .drop-slot:hover, .drop-slot.drag-over { border-color: #0cf; color: #0cf; background: rgba(0,204,255,0.05); }
+        .no-photo-banner { background:#111;color:#555;padding:20px;text-align:center;border-radius:8px;border:2px dashed #333;margin-bottom:12px;font-size:0.9rem;font-weight:bold; }
+        .stale-banner { background:#1a1400;color:#f1c40f;padding:8px 12px;border-radius:6px;border:1px solid #f1c40f44;font-size:0.8rem;font-weight:bold;margin-bottom:10px;display:none; }
+        .drop-slot { min-height:70px;border:2px dashed #333;border-radius:8px;display:flex;align-items:center;justify-content:center;gap:10px;color:#444;font-size:0.8rem;font-weight:bold;cursor:pointer;transition:0.2s;margin-top:10px;padding:12px;text-align:center; }
+        .drop-slot:hover, .drop-slot.drag-over { border-color:#0cf;color:#0cf;background:rgba(0,204,255,0.05); }
 
-        /* ── LIGHTBOX ───────────────────────────────── */
-        #lightbox-modal { z-index: 3000; }
-        #lightbox-container { width: 95vw; height: 90vh; overflow: hidden; display: flex; align-items: center; justify-content: center; touch-action: none; }
-        #lightbox-img { max-width: 100%; max-height: 100%; object-fit: contain; cursor: grab; transition: transform 0.05s linear; transform-origin: center center; will-change: transform; }
-        #lightbox-img:active { cursor: grabbing; }
-        .lightbox-nav-btn { position: absolute; top: 50%; transform: translateY(-50%); z-index: 3010; background: rgba(0,0,0,0.8); color: #fff; border: 2px solid #0cf; border-radius: 8px; padding: 25px 20px; font-size: 2rem; cursor: pointer; }
-        /* Lightbox IR/DC toggle */
-        #lightbox-toggle { position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%); z-index: 3020; display: flex; border-radius: 20px; overflow: hidden; border: 2px solid #555; cursor: pointer; }
-        #lightbox-toggle span { padding: 8px 20px; font-size: 0.8rem; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; transition: 0.15s; user-select: none; }
-        #lightbox-toggle .lb-ir { background: #ff6b35; color: #fff; }
-        #lightbox-toggle .lb-dc { background: #1a1d27; color: #555; }
-        #lightbox-toggle.showing-dc .lb-ir { background: #1a1d27; color: #555; }
-        #lightbox-toggle.showing-dc .lb-dc { background: #e0e0e0; color: #000; }
-        #lightbox-toggle.no-dc { opacity: 0.35; pointer-events: none; }
+        /* Lightbox */
+        #lightbox-modal { z-index:3000; }
+        #lightbox-container { width:95vw;height:90vh;overflow:hidden;display:flex;align-items:center;justify-content:center;touch-action:none; }
+        #lightbox-img { max-width:100%;max-height:100%;object-fit:contain;cursor:grab;transition:transform 0.05s linear;transform-origin:center center;will-change:transform; }
+        #lightbox-img:active { cursor:grabbing; }
+        .lightbox-nav-btn { position:absolute;top:50%;transform:translateY(-50%);z-index:3010;background:rgba(0,0,0,0.8);color:#fff;border:2px solid #0cf;border-radius:8px;padding:25px 20px;font-size:2rem;cursor:pointer; }
+        #lightbox-toggle { position:absolute;bottom:60px;left:50%;transform:translateX(-50%);z-index:3020;display:flex;border-radius:20px;overflow:hidden;border:2px solid #555;cursor:pointer; }
+        #lightbox-toggle span { padding:8px 20px;font-size:0.8rem;font-weight:bold;text-transform:uppercase;letter-spacing:1px;transition:0.15s;user-select:none; }
+        #lightbox-toggle .lb-ir { background:#ff6b35;color:#fff; }
+        #lightbox-toggle .lb-dc { background:#1a1d27;color:#555; }
+        #lightbox-toggle.showing-dc .lb-ir { background:#1a1d27;color:#555; }
+        #lightbox-toggle.showing-dc .lb-dc { background:#e0e0e0;color:#000; }
+        #lightbox-toggle.no-dc { opacity:0.35;pointer-events:none; }
     </style>
 </head>
 <body onload="initApp()">
 
-<!-- ── LOADING ──────────────────────────────────────────── -->
 <div id="loading-overlay">
     <div class="spinner"></div>
     <h2 style="color:#0cf;font-weight:bold;margin:0 0 10px;">Processing Files...</h2>
@@ -211,52 +167,39 @@
     <p id="loading-detail" style="color:#555;font-size:0.85rem;margin-top:8px;"></p>
 </div>
 
-<!-- ── TAG INSTRUCTION BAR ──────────────────────────────── -->
 <div id="tag-instruction-bar">
     <span id="tag-instruction-text">Double-click the model...</span>
     <button onclick="cancelBulkTag()">CANCEL</button>
 </div>
 
-<!-- ── RELOAD BANNER ────────────────────────────────────── -->
 <div id="top-reload-banner" class="top-banner">
-    ⚠️ Photos are session-only — not saved in the project file. Re-upload your ZIP or folder to restore image links.
+    ⚠️ Photos are session-only. Re-upload your ZIP or folder to restore image links.
 </div>
 
-<!-- ── HEADER ────────────────────────────────────────────── -->
 <div class="header">
     <div>
-        <h1>STRATA COMMAND <span>| v9.4</span></h1>
+        <h1>STRATA COMMAND <span>| v9.5</span></h1>
         <div id="project-name" style="font-weight:bold;color:#888;margin-top:5px;">Awaiting Data...</div>
     </div>
     <div class="header-btns">
-        <button class="btn btn-dark" id="btn-reset"        style="display:none;" onclick="resetBoard()">🔄 CLEAR DATA</button>
-        <button class="btn btn-dark" id="btn-edit-map"     style="display:none;" onclick="editMapping()">🗺️ EDIT MAP</button>
+        <button class="btn btn-dark"   id="btn-reset"        style="display:none;" onclick="resetBoard()">🔄 CLEAR DATA</button>
+        <button class="btn btn-dark"   id="btn-edit-map"     style="display:none;" onclick="editMapping()">🗺️ EDIT MAP</button>
         <button class="btn btn-purple" id="btn-save-project" style="display:none;" onclick="saveProject()">📦 SAVE PROJECT</button>
     </div>
 </div>
 
-<!-- ── MAIN CONTENT ──────────────────────────────────────── -->
 <div class="main-content">
-
-    <!-- File load buttons -->
     <div style="display:flex;gap:15px;margin-bottom:20px;flex-shrink:0;">
         <input type="file" id="csvInput"    multiple style="display:none;" onchange="handleFiles(this.files,'csv')">
-        <button class="btn btn-dark" style="flex:1;padding:20px;font-size:1.1rem;border:2px dashed #0cf;background:#161922;" onclick="document.getElementById('csvInput').click()">
-            📄 1. LOAD CSV OR PROJECT
-        </button>
+        <button class="btn btn-dark" style="flex:1;padding:20px;font-size:1.1rem;border:2px dashed #0cf;background:#161922;" onclick="document.getElementById('csvInput').click()">📄 1. LOAD CSV OR PROJECT</button>
         <input type="file" id="mediaInput"  multiple style="display:none;" onchange="handleFiles(this.files,'media')">
-        <button class="btn btn-dark" style="flex:1;padding:20px;font-size:1.1rem;border:2px dashed #d080ff;background:#161922;" onclick="document.getElementById('mediaInput').click()">
-            🖼️ 2. ADD INDIVIDUAL FILES
-        </button>
+        <button class="btn btn-dark" style="flex:1;padding:20px;font-size:1.1rem;border:2px dashed #d080ff;background:#161922;" onclick="document.getElementById('mediaInput').click()">🖼️ 2. ADD INDIVIDUAL FILES</button>
         <input type="file" id="folderInput" webkitdirectory directory multiple style="display:none;" onchange="handleFiles(this.files,'media')">
-        <button class="btn btn-dark" style="flex:1;padding:20px;font-size:1.1rem;border:2px dashed #f39c12;background:#161922;" onclick="document.getElementById('folderInput').click()">
-            📁 3. ADD ZIP OR FOLDER
-        </button>
+        <button class="btn btn-dark" style="flex:1;padding:20px;font-size:1.1rem;border:2px dashed #f39c12;background:#161922;" onclick="document.getElementById('folderInput').click()">📁 3. ADD ZIP OR FOLDER</button>
     </div>
 
     <button id="btn-start-mapping" class="btn btn-green btn-block" style="display:none;padding:20px;font-size:1.2rem;flex-shrink:0;" onclick="openMappingScreen()">🗺️ MAP BUILDING ELEVATIONS</button>
 
-    <!-- Mapping screen -->
     <div id="mapping-screen">
         <h2 style="margin-top:0;color:#0cf;">Assign Drops to Walls</h2>
         <p style="color:#888;margin-bottom:20px;">Add custom walls then assign drops.</p>
@@ -268,7 +211,6 @@
         <button class="btn btn-green btn-block" style="padding:20px;font-size:1.2rem;margin-top:20px;" onclick="generateDashboard()">✅ GENERATE DASHBOARD</button>
     </div>
 
-    <!-- Dashboard -->
     <div id="dashboard-screen">
         <div class="view-controls">
             <span style="color:#888;font-weight:bold;font-size:0.9rem;margin-right:10px;">MODE:</span>
@@ -277,7 +219,7 @@
             <button class="view-toggle-btn"         id="btn-true3d" onclick="switchView('true3d')">✨ TRUE 3D TWIN</button>
             <div style="flex:0.2;"></div>
             <button class="view-toggle-btn stitch-toggle" style="border:1px solid #555;" onclick="toggleStitchMode()">🔗 STITCH WINDOWS</button>
-            <button class="view-toggle-btn tag-toggle"    style="border:1px solid #d080ff;display:none;" id="btn-tag3d-main" onclick="openMasterTagMenu()">📍 3D TAG MENU</button>
+            <button class="view-toggle-btn tag-toggle" style="border:1px solid #d080ff;display:none;" id="btn-tag3d-main" onclick="openMasterTagMenu()">📍 3D TAG MENU</button>
         </div>
 
         <div class="stats-bar">
@@ -297,14 +239,13 @@
                 <div class="stat-label">DEFECTS</div>
                 <div class="stat-value" id="stat-confirmed" style="color:#d9534f;">0</div>
             </div>
-            <div class="stat-card" style="border-color:#ff6b35;cursor:default;" title="IR photos loaded (DC auto-extracted from each IR file)">
+            <div class="stat-card" style="border-color:#ff6b35;cursor:default;" title="IR photos currently loaded in memory">
                 <div class="stat-label" style="color:#ff6b35;">IR LOADED</div>
                 <div class="stat-value" id="stat-ir"        style="color:#ff6b35;">0</div>
             </div>
         </div>
 
         <div class="tabs-container" id="tabs-container"></div>
-
         <div id="view-2d"><div id="building-container-2d"></div></div>
 
         <div id="arena-auto3d">
@@ -318,47 +259,34 @@
 
         <div id="arena-true3d">
             <button class="btn-fullscreen" onclick="toggleFullScreen('arena-true3d')">⛶ FULL SCREEN</button>
-            <model-viewer id="main-3d-viewer"
-                src="https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/LittlestTokyo.glb"
-                alt="3D model" auto-rotate camera-controls tone-mapping="neutral" shadow-intensity="1">
-            </model-viewer>
+            <model-viewer id="main-3d-viewer" src="https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/LittlestTokyo.glb" alt="3D model" auto-rotate camera-controls tone-mapping="neutral" shadow-intensity="1"></model-viewer>
             <div style="position:absolute;top:15px;left:15px;color:#fff;font-size:0.9rem;font-weight:bold;background:rgba(0,0,0,0.7);padding:12px;border-radius:8px;border:1px solid #d080ff;pointer-events:none;z-index:100;">
                 <strong>Drone Photogrammetry Engine</strong><br>
                 <span id="model-status" style="font-weight:normal;color:#ccc;">Showing Default Test Model.</span>
             </div>
-            <div class="floating-tools">
-                <button class="float-btn tag-toggle" onclick="openMasterTagMenu()">📍 3D TAG MENU</button>
-            </div>
+            <div class="floating-tools"><button class="float-btn tag-toggle" onclick="openMasterTagMenu()">📍 3D TAG MENU</button></div>
         </div>
     </div>
 </div>
 
-<!-- ── WINDOW MODAL ──────────────────────────────────────── -->
+<!-- WINDOW MODAL -->
 <div class="modal-overlay" id="info-modal">
     <div class="modal-box">
         <h2 class="modal-title"    id="m-id">A-12-L</h2>
         <div class="modal-subtitle" id="m-tech">Logged by Tech</div>
-
         <button class="btn btn-dark btn-block" id="btn-retag"   style="display:none;margin-bottom:10px;border-color:#0cf;color:#0cf;"       onclick="startReTag()">📍 RE-TAG POSITION</button>
         <button class="btn btn-dark btn-block" id="btn-unpin"   style="display:none;margin-bottom:10px;border-color:#d080ff;color:#d080ff;"  onclick="unpinCurrent()">🗑️ REMOVE 3D PIN</button>
         <button class="btn btn-dark btn-block" id="btn-unmerge" style="display:none;margin-bottom:15px;border-color:#f39c12;color:#f39c12;" onclick="unmergeCurrent()">✂️ UN-STITCH WINDOWS</button>
-
-        <div id="m-stale-banner" class="stale-banner">
-            📷 Photo references exist but images are not loaded. Re-upload your ZIP to view them.
-        </div>
-
-        <!-- Photo area — built dynamically -->
+        <div id="m-stale-banner" class="stale-banner">📷 Photo references exist but images not loaded. Re-upload your ZIP.</div>
         <div id="m-photo-area"></div>
-
         <div class="data-row">
             <span class="data-label">Field Findings</span>
-            <span class="data-val"  id="m-finds" style="color:#f1c40f;">--</span>
+            <span class="data-val" id="m-finds" style="color:#f1c40f;">--</span>
         </div>
         <div class="data-row" id="m-row-proved">
             <span class="data-label">Meter Proved</span>
-            <span class="data-val"  id="m-proved">--</span>
+            <span class="data-val" id="m-proved">--</span>
         </div>
-
         <div class="manager-section">
             <span class="data-label" style="color:#fff;">Management Notes</span>
             <textarea id="m-notes" class="modal-notes" placeholder="e.g. Schedule sealant replacement..."></textarea>
@@ -375,7 +303,7 @@
     </div>
 </div>
 
-<!-- ── LIGHTBOX ──────────────────────────────────────────── -->
+<!-- LIGHTBOX -->
 <div id="lightbox-modal" class="modal-overlay">
     <div style="position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
         <button onclick="closeLightbox()" style="position:absolute;top:20px;right:20px;z-index:3020;background:rgba(0,0,0,0.8);color:#fff;border:2px solid #fff;border-radius:50%;width:50px;height:50px;font-size:1.5rem;font-weight:bold;cursor:pointer;">✕</button>
@@ -383,18 +311,15 @@
         <button id="lightbox-prev" class="lightbox-nav-btn" onclick="changeLightbox(-1)" style="left:20px;">&#10094;</button>
         <div id="lightbox-container"><img id="lightbox-img" src="" draggable="false"></div>
         <button id="lightbox-next" class="lightbox-nav-btn" onclick="changeLightbox(1)"  style="right:20px;">&#10095;</button>
-        <!-- IR/DC toggle in lightbox -->
         <div id="lightbox-toggle" onclick="toggleLightboxView()">
             <span class="lb-ir">🌡 IR</span>
             <span class="lb-dc">📷 DC</span>
         </div>
-        <div style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:3020;background:rgba(0,0,0,0.7);color:#888;padding:6px 14px;border-radius:6px;font-size:0.75rem;pointer-events:none;">
-            Scroll / pinch to zoom • drag to pan
-        </div>
+        <div style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:3020;background:rgba(0,0,0,0.7);color:#888;padding:6px 14px;border-radius:6px;font-size:0.75rem;pointer-events:none;">Scroll/pinch to zoom · drag to pan</div>
     </div>
 </div>
 
-<!-- ── 3D TAG MODAL ──────────────────────────────────────── -->
+<!-- 3D TAG MODAL -->
 <div class="modal-overlay" id="tag-master-modal">
     <div class="modal-box" style="border-color:#d080ff;">
         <h2 style="color:#d080ff;margin-top:0;font-size:1.8rem;text-align:center;">📍 3D TAGGING ENGINE</h2>
@@ -418,9 +343,9 @@
 </div>
 
 <script>
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // STATE
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 let inspectionData      = {};
 let projectInfo         = 'Unknown Project';
 let activeNodeDataArray = [];
@@ -430,1101 +355,1057 @@ let stitchedPairs       = [];
 let elevations          = [];
 let dropAssignments     = {};
 let activeTab           = '';
-let globalStats         = { t:0, clear:0, f:0, c:0, maxFloor:-Infinity, minFloor:Infinity };
+let globalStats         = { t:0,clear:0,f:0,c:0,maxFloor:-Infinity,minFloor:Infinity };
 let currentMode         = '2d';
 let activeFilter        = 'ALL';
-let bulkTagState        = { mode:null, targetId:null, step:0, anchors:[] };
+let bulkTagState        = { mode:null,targetId:null,step:0,anchors:[] };
 let saved3DTags         = {};
-let manualLinks         = {};   // { nodeId: cleanName } manager overrides
+let manualLinks         = {};   // { nodeId: [cleanName, ...] } manager overrides (additive)
 let wakeLock            = null;
 let modalNodeId         = null;
 
 /*
- * imageBank: { CLEAN_UPPER_NAME: { url, time, drop, dcUrl } }
- * url   = IR blob URL (the outer JPEG as-is)
- * dcUrl = DC blob URL extracted from embedded stream (null if DC-only file)
- * A file with dcUrl === undefined is a DC-only file; dcUrl === null means
- * we tried to extract but found nothing (shouldn't happen for valid IR files).
+ * imageBank: { CLEAN_UPPER_NAME: { url, dcUrl, time, drop } }
+ *   url   = blob URL of the file as stored (IR palette or DC-only)
+ *   dcUrl = blob URL of embedded DC extracted from IR file, or null
+ *           undefined means the file was DC-only (no FLIR segments ≥ 3)
+ *   time  = seconds-since-midnight from EXIF (or file date fallback)
+ *   drop  = detected drop ID from folder path, or null
+ *
+ * node.photos = [ cleanName, ... ]  — assigned by Bracket Zipline
+ *   All photos whose EXIF timestamp falls in the bracket
+ *   [stamp[n], stamp[n+1]) are assigned to node n.
  */
 let imageBank = {};
 
+// Per-photo toggle state (modal + lightbox): cleanName → 'ir'|'dc'
+const photoViewState = {};
+
 const viewer = document.querySelector('#main-3d-viewer');
 
-// ═══════════════════════════════════════════════════════════════════
-// FLIR FILE ANALYSIS
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// FLIR BINARY HELPERS
+// ═══════════════════════════════════════════════════════
 
-/*
- * Count FLIR APP1 segments in a JPEG ArrayBuffer.
- * IR files  → 3 segments (FFF header + radiometric + embedded visual)
- * DC files  → 1 segment  (FFF header only)
- * Non-FLIR  → 0 segments
- */
-function countFlirSegments(buffer) {
-    const data = new Uint8Array(buffer);
+// Count FLIR APP1 segments: IR=3, DC-only=1, non-FLIR=0
+function countFlirSegments(buf) {
+    const d = new Uint8Array(buf);
     let count = 0, i = 0;
-    while (i < data.length - 3) {
-        if (data[i] === 0xFF && data[i+1] === 0xE1) {
-            const len = (data[i+2] << 8) | data[i+3];
-            if (i+4+3 < data.length &&
-                data[i+4] === 0x46 && data[i+5] === 0x4C &&
-                data[i+6] === 0x49 && data[i+7] === 0x52) {
-                count++;
-            }
+    while (i < d.length - 3) {
+        if (d[i] === 0xFF && d[i+1] === 0xE1) {
+            const len = (d[i+2] << 8) | d[i+3];
+            if (i+7 < d.length &&
+                d[i+4]===0x46 && d[i+5]===0x4C &&
+                d[i+6]===0x49 && d[i+7]===0x52) count++;
             i += 2 + len;
-        } else {
-            i++;
-        }
+        } else { i++; }
     }
     return count;
 }
 
-/*
- * Extract the embedded DC JPEG from a FLIR IR file.
- * Strategy: scan for every FF D8 FF marker after offset 1,
- * walk each JPEG to determine its dimensions and true endpoint,
- * return the largest full-resolution one as a Blob.
- *
- * Returns a Blob (DC image) or null if not found.
- */
-function extractEmbeddedDC(buffer) {
-    const data = new Uint8Array(buffer);
-
-    function readU16BE(pos) { return (data[pos] << 8) | data[pos+1]; }
+// Extract the embedded DC JPEG from a FLIR IR file.
+// Scans for all inner JPEG streams (FF D8 FF after offset 1),
+// returns the largest full-resolution one as a Blob, or null.
+function extractEmbeddedDC(buf) {
+    const d = new Uint8Array(buf);
+    function u16be(p) { return (d[p]<<8)|d[p+1]; }
 
     function walkJpeg(start) {
-        // Returns { width, height, end } or null
-        if (data[start] !== 0xFF || data[start+1] !== 0xD8) return null;
-        let i = start + 2;
-        let width = 0, height = 0, end = start + 4;
-
-        while (i < data.length - 1) {
-            if (data[i] !== 0xFF) { i++; continue; }
-            // Skip fill bytes
-            while (i < data.length && data[i] === 0xFF) i++;
-            if (i >= data.length) break;
-            const marker = data[i++];
-
-            if (marker === 0xD9) { end = i; break; }          // EOI
-            if (marker === 0xD8) continue;                     // nested SOI
-            if (marker >= 0xD0 && marker <= 0xD7) continue;   // RST
-            if (marker === 0x01) continue;                     // TEM
-
-            if (marker === 0xDA) { // SOS — scan entropy data
-                if (i + 2 > data.length) break;
-                const sosLen = readU16BE(i); i += sosLen;
-                while (i < data.length - 1) {
-                    if (data[i] === 0xFF) {
-                        const nb = data[i+1];
-                        if (nb === 0x00) { i += 2; continue; }  // stuffed
-                        if (nb === 0xD9) { end = i + 2; break; } // EOI
-                        if (nb >= 0xD0 && nb <= 0xD7) { i += 2; continue; } // RST
-                        break; // other marker
+        if (d[start]!==0xFF||d[start+1]!==0xD8) return null;
+        let i=start+2, w=0, h=0, end=start+4;
+        while (i < d.length-1) {
+            if (d[i]!==0xFF) { i++; continue; }
+            while (i<d.length && d[i]===0xFF) i++;
+            if (i>=d.length) break;
+            const mk=d[i++];
+            if (mk===0xD9) { end=i; break; }
+            if (mk===0xD8||mk===0x01||(mk>=0xD0&&mk<=0xD7)) continue;
+            if (mk===0xDA) {
+                if (i+2>d.length) break;
+                i+=u16be(i);
+                while (i<d.length-1) {
+                    if (d[i]===0xFF) {
+                        const nb=d[i+1];
+                        if (nb===0x00){i+=2;continue;}
+                        if (nb===0xD9){end=i+2;break;}
+                        if (nb>=0xD0&&nb<=0xD7){i+=2;continue;}
+                        break;
                     }
                     i++;
                 }
                 break;
             }
-
-            if (marker >= 0xC0 && marker <= 0xC3) { // SOF
-                if (i + 7 < data.length) {
-                    height = readU16BE(i+3);
-                    width  = readU16BE(i+5);
-                }
-            }
-
-            if (i + 2 > data.length) break;
-            const segLen = readU16BE(i); i += segLen;
+            if (mk>=0xC0&&mk<=0xC3&&i+7<d.length) { h=u16be(i+3); w=u16be(i+5); }
+            if (i+2>d.length) break;
+            i+=u16be(i);
         }
-        return (width > 0 && height > 0) ? { width, height, end } : null;
+        return (w>0&&h>0)?{w,h,start,end}:null;
     }
 
-    // Scan from offset 1 (skip the outer JPEG at 0)
-    let best = null;
-    let pos = 1;
-    while (pos < data.length - 2) {
-        // Find FF D8 FF
-        let idx = -1;
-        for (let j = pos; j < data.length - 2; j++) {
-            if (data[j] === 0xFF && data[j+1] === 0xD8 && data[j+2] === 0xFF) { idx = j; break; }
+    let best=null, pos=1;
+    while (pos<d.length-2) {
+        let idx=-1;
+        for (let j=pos;j<d.length-2;j++) {
+            if (d[j]===0xFF&&d[j+1]===0xD8&&d[j+2]===0xFF){idx=j;break;}
         }
-        if (idx === -1) break;
-
-        const info = walkJpeg(idx);
-        if (info && info.width >= 320 && info.height >= 240) {
-            const size = info.end - idx;
-            if (!best || size > best.size) {
-                best = { start: idx, end: info.end, size, width: info.width, height: info.height };
-            }
+        if (idx===-1) break;
+        const info=walkJpeg(idx);
+        if (info&&info.w>=320&&info.h>=240) {
+            const sz=info.end-info.start;
+            if (!best||sz>best.sz) best={...info,sz};
         }
-        pos = idx + 1;
+        pos=idx+1;
     }
-
     if (!best) return null;
-    return new Blob([data.slice(best.start, best.end)], { type: 'image/jpeg' });
+    return new Blob([d.slice(best.start,best.end)],{type:'image/jpeg'});
 }
 
-/*
- * Ingest a single image file (Blob/File + metadata).
- * Determines if it is IR (3 FLIR segments) or DC (1 segment / 0 segments).
- * For IR files, extracts the embedded DC JPEG and stores both URLs.
- * Returns true if this is an IR file, false otherwise.
- */
-async function ingestImage(blob, cleanName, dropId, timestamp) {
-    const buffer = await blob.arrayBuffer();
-    const flirCount = countFlirSegments(buffer);
-    const isIR = flirCount >= 3;
+// Ingest one IR image blob into imageBank.
+// DC-only files (FLIR segment count < 3) are silently ignored —
+// all DC content is already embedded inside the IR file.
+// Returns true if ingested as IR, false if skipped.
+async function ingestImage(blob, cleanName, dropId, timeSec) {
+    const buf   = await blob.arrayBuffer();
+    const flirN = countFlirSegments(buf);
+    const isIR  = flirN >= 3;
 
-    const irUrl  = URL.createObjectURL(blob);
-    let   dcUrl  = null;
+    // Silently discard DC-only files — nothing useful to store
+    if (!isIR) return false;
 
-    if (isIR) {
-        const dcBlob = extractEmbeddedDC(buffer);
-        if (dcBlob) dcUrl = URL.createObjectURL(dcBlob);
+    // Revoke stale blob URLs to avoid memory leak on re-upload
+    const prev = imageBank[cleanName];
+    if (prev) {
+        if (prev.url)   URL.revokeObjectURL(prev.url);
+        if (prev.dcUrl) URL.revokeObjectURL(prev.dcUrl);
     }
 
-    imageBank[cleanName] = {
-        url:   irUrl,
-        dcUrl: isIR ? dcUrl : undefined,  // undefined = file is DC-only
-        time:  timestamp,
-        drop:  dropId
-    };
+    const url    = URL.createObjectURL(blob);
+    const dcBlob = extractEmbeddedDC(buf);
+    const dcUrl  = dcBlob ? URL.createObjectURL(dcBlob) : null;
 
-    return isIR;
+    imageBank[cleanName] = { url, dcUrl, time: timeSec, drop: dropId };
+    return true;
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// EXIF HELPERS
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// EXIF / PATH HELPERS
+// ═══════════════════════════════════════════════════════
 function parseExifDate(eDate, fallback) {
     if (!eDate) return fallback;
     if (eDate instanceof Date && !isNaN(eDate)) return eDate;
     if (typeof eDate === 'string') {
-        const s = eDate.trim().replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3').replace(' ', 'T');
+        const s = eDate.trim().replace(/^(\d{4}):(\d{2}):(\d{2})/,'$1-$2-$3').replace(' ','T');
         const d = new Date(s);
         if (!isNaN(d)) return d;
     }
     return fallback;
 }
 
-function extractDropIdFromPath(p) {
+function extractDropFromPath(p) {
     if (!p) return null;
-    try { p = decodeURIComponent(p); } catch(e) {}
-    const m = p.match(/Drop[\s_-]?([A-Za-z0-9\-]+)/i);
-    return m ? m[1].toUpperCase() : null;
+    try { p=decodeURIComponent(p); } catch(e){}
+    const m=p.match(/Drop[\s_-]?([A-Za-z0-9\-]+)/i);
+    return m?m[1].toUpperCase():null;
 }
 
-function blobToSeconds(d) {
-    return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
-}
+function dateToSec(d) { return d.getHours()*3600+d.getMinutes()*60+d.getSeconds(); }
 
-// ═══════════════════════════════════════════════════════════════════
-// HELPERS
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// NODE HELPERS
+// ═══════════════════════════════════════════════════════
 function getNodeData(id) {
-    if (!id || typeof id !== 'string') return null;
-    const p = id.split('-');
-    if (p.length !== 3) return null;
-    return inspectionData[p[0]]?.[p[1]]?.[p[2]] ?? null;
+    if (!id||typeof id!=='string') return null;
+    const p=id.split('-');
+    if (p.length!==3) return null;
+    return inspectionData[p[0]]?.[p[1]]?.[p[2]]??null;
 }
 
-function getCombinedStatus(id1, id2) {
-    const d1 = getNodeData(id1), d2 = getNodeData(id2);
-    if (!d1 || !d2) return 'status-clear';
-    if (d1.status === 'status-confirmed' || d2.status === 'status-confirmed') return 'status-confirmed';
-    if (d1.status === 'status-flagged'   || d2.status === 'status-flagged')   return 'status-flagged';
+function getCombinedStatus(id1,id2) {
+    const d1=getNodeData(id1),d2=getNodeData(id2);
+    if (!d1||!d2) return 'status-clear';
+    if (d1.status==='status-confirmed'||d2.status==='status-confirmed') return 'status-confirmed';
+    if (d1.status==='status-flagged'  ||d2.status==='status-flagged')   return 'status-flagged';
     return 'status-clear';
 }
 
-function nodeIRName(node) {
-    // Returns the clean image name linked to this node, or null
-    return manualLinks[node.id] || node.flirIR || null;
+// All photo names for a node: Zipline assignments + manual overrides
+function nodePhotoNames(node) {
+    const base  = node.photos || [];
+    const extra = manualLinks[node.id] || [];
+    return [...new Set([...base, ...extra])].filter(n => imageBank[n]);
 }
 
-function nodeHasPhoto(node) {
-    const name = nodeIRName(node);
-    return !!(name && imageBank[name]);
-}
+function nodeHasPhoto(node) { return nodePhotoNames(node).length > 0; }
 
 function getOrbitControls() {
-    return (typeof THREE !== 'undefined' && typeof THREE.OrbitControls === 'function')
-        ? THREE.OrbitControls : null;
+    return (typeof THREE!=='undefined'&&typeof THREE.OrbitControls==='function')?THREE.OrbitControls:null;
 }
 
 function updatePhotoStat() {
-    const irCount = Object.values(imageBank).filter(v => v.dcUrl !== undefined).length;
-    document.getElementById('stat-ir').innerText = irCount;
+    document.getElementById('stat-ir').innerText = Object.keys(imageBank).length;
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // INIT
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 function initApp() {
     requestWakeLock();
     loadCommandState();
     initLightboxZoom();
     initGlobalDragDrop();
 }
-
 async function requestWakeLock() {
-    try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); }
-    catch(e) {}
+    try { if ('wakeLock' in navigator) wakeLock=await navigator.wakeLock.request('screen'); } catch(e){}
 }
-document.addEventListener('visibilitychange', () => {
-    if (wakeLock && document.visibilityState === 'visible') requestWakeLock();
+document.addEventListener('visibilitychange',()=>{
+    if (wakeLock&&document.visibilityState==='visible') requestWakeLock();
 });
 
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // PERSISTENCE
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 function saveCommandState() {
-    localStorage.setItem('strataCommandState', JSON.stringify({
-        projectInfo, inspectionData, elevations, dropAssignments,
-        stitchedPairs, saved3DTags, manualLinks
+    localStorage.setItem('strataCommandState',JSON.stringify({
+        projectInfo,inspectionData,elevations,dropAssignments,
+        stitchedPairs,saved3DTags,manualLinks
     }));
 }
 
 function loadCommandState() {
-    const raw = localStorage.getItem('strataCommandState');
-    if (!raw) { updatePhotoStat(); return; }
+    const raw=localStorage.getItem('strataCommandState');
+    if (!raw){updatePhotoStat();return;}
     try {
-        const s = JSON.parse(raw);
-        projectInfo     = s.projectInfo     || 'Unknown Project';
-        inspectionData  = s.inspectionData  || {};
-        elevations      = s.elevations      || [];
-        dropAssignments = s.dropAssignments || {};
-        stitchedPairs   = s.stitchedPairs   || [];
-        saved3DTags     = s.saved3DTags     || {};
-        manualLinks     = s.manualLinks     || {};
-
-        if (Object.keys(inspectionData).length > 0) {
-            document.getElementById('project-name').innerText = 'Project: ' + projectInfo;
-            document.getElementById('btn-reset').style.display        = 'inline-block';
-            document.getElementById('btn-save-project').style.display = 'inline-block';
-
-            if (elevations.length > 0) {
-                document.getElementById('dashboard-screen').style.display = 'flex';
-                document.getElementById('btn-edit-map').style.display     = 'inline-block';
-                if (!elevations.includes(activeTab)) activeTab = elevations[0];
+        const s=JSON.parse(raw);
+        projectInfo    =s.projectInfo    ||'Unknown Project';
+        inspectionData =s.inspectionData ||{};
+        elevations     =s.elevations     ||[];
+        dropAssignments=s.dropAssignments||{};
+        stitchedPairs  =s.stitchedPairs  ||[];
+        saved3DTags    =s.saved3DTags    ||{};
+        manualLinks    =s.manualLinks    ||{};
+        if (Object.keys(inspectionData).length>0) {
+            document.getElementById('project-name').innerText='Project: '+projectInfo;
+            document.getElementById('btn-reset').style.display        ='inline-block';
+            document.getElementById('btn-save-project').style.display ='inline-block';
+            if (elevations.length>0) {
+                document.getElementById('dashboard-screen').style.display='flex';
+                document.getElementById('btn-edit-map').style.display    ='inline-block';
+                if (!elevations.includes(activeTab)) activeTab=elevations[0];
                 calculateBuildingGeometry();
                 switchView('2d');
             } else {
-                document.getElementById('btn-start-mapping').style.display = 'block';
+                document.getElementById('btn-start-mapping').style.display='block';
             }
         }
-    } catch(e) { console.error('State load error', e); }
+    } catch(e){console.error('State load error',e);}
     updatePhotoStat();
 }
 
 function saveProject() {
-    const a = document.createElement('a');
-    a.href = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify({
-        projectInfo, inspectionData, elevations, dropAssignments,
-        stitchedPairs, saved3DTags, manualLinks
+    const a=document.createElement('a');
+    a.href='data:text/json;charset=utf-8,'+encodeURIComponent(JSON.stringify({
+        projectInfo,inspectionData,elevations,dropAssignments,
+        stitchedPairs,saved3DTags,manualLinks
     }));
-    a.download = `Strata_Project_${projectInfo.replace(/\s+/g,'_')}.json`;
+    a.download=`Strata_Project_${projectInfo.replace(/\s+/g,'_')}.json`;
     a.click();
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // FILE HANDLING
-// ═══════════════════════════════════════════════════════════════════
-function setLoading(on, text='', detail='') {
-    document.getElementById('loading-overlay').style.display = on ? 'flex' : 'none';
-    document.getElementById('loading-text').innerText   = text;
-    document.getElementById('loading-detail').innerText = detail;
+// ═══════════════════════════════════════════════════════
+function setLoading(on,text='',detail='') {
+    document.getElementById('loading-overlay').style.display=on?'flex':'none';
+    document.getElementById('loading-text').innerText  =text;
+    document.getElementById('loading-detail').innerText=detail;
 }
 
-async function handleFiles(files, forcedType = null) {
-    if (!files || !files.length) return;
-    setLoading(true, 'Processing files...', '');
+async function handleFiles(files, forcedType=null) {
+    if (!files||!files.length) return;
+    setLoading(true,'Processing files...','');
 
-    const promises = [];
-    let newIR = 0, newCsvAdded = false, isProjectLoaded = false, rowsParsed = 0;
+    const promises=[];
+    let newIR=0, newCsvAdded=false, isProjectLoaded=false, rowsParsed=0;
 
-    async function processImageBlob(blob, cleanName, pathHint, dateHint) {
-        let drop = extractDropIdFromPath(pathHint);
-        let d    = dateHint || new Date();
+    // Process one image blob: EXIF → ingest → count
+    async function processBlob(blob, cleanName, pathHint, dateHint) {
+        let drop=extractDropFromPath(pathHint);
+        let d=dateHint||new Date();
         try {
-            const exif = await exifr.parse(blob);
-            if (exif) d = parseExifDate(exif.DateTimeOriginal || exif.CreateDate || exif.ModifyDate, d);
-        } catch(e) {}
-        const t  = blobToSeconds(d);
-        const ir = await ingestImage(blob, cleanName, drop, t);
+            const exif=await exifr.parse(blob);
+            if (exif) d=parseExifDate(exif.DateTimeOriginal||exif.CreateDate||exif.ModifyDate,d);
+        } catch(e){}
+        const ir=await ingestImage(blob,cleanName,drop,dateToSec(d));
         if (ir) newIR++;
     }
 
-    for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+    for (let i=0;i<files.length;i++) {
+        const file=files[i];
         if (!file.size) continue;
-        const name = (file.name || '').toLowerCase();
-        const type = (file.type || '').toLowerCase();
+        const nm=(file.name||'').toLowerCase();
+        const ty=(file.type||'').toLowerCase();
 
-        if (name.endsWith('.zip') || type.includes('zip')) {
-            promises.push(new Promise(res => {
-                JSZip.loadAsync(file).then(async zip => {
-                    const inner = [];
-                    zip.forEach((rel, entry) => {
-                        if (entry.dir || rel.includes('__MACOSX') || rel.includes('.DS_Store')) return;
-                        const en = entry.name.toLowerCase();
+        if (nm.endsWith('.zip')||ty.includes('zip')) {
+            promises.push(new Promise(res=>{
+                JSZip.loadAsync(file).then(async zip=>{
+                    const inner=[];
+                    zip.forEach((rel,entry)=>{
+                        if (entry.dir||rel.includes('__MACOSX')||rel.includes('.DS_Store')) return;
+                        const en=entry.name.toLowerCase();
                         if (en.endsWith('.csv')) {
-                            newCsvAdded = true;
-                            inner.push(entry.async('text').then(t => { rowsParsed += parseCSV(t); }));
-                        } else if (en.endsWith('.jpg') || en.endsWith('.jpeg') || en.endsWith('.png')) {
-                            inner.push(entry.async('blob').then(async blob => {
-                                const clean = entry.name.split('/').pop().replace(/\.[^.]+$/, '').toUpperCase();
-                                setLoading(true, 'Analysing FLIR files...', clean);
-                                await processImageBlob(blob, clean, entry.name, entry.date || new Date());
+                            newCsvAdded=true;
+                            inner.push(entry.async('text').then(t=>{rowsParsed+=parseCSV(t);}));
+                        } else if (en.endsWith('.jpg')||en.endsWith('.jpeg')||en.endsWith('.png')) {
+                            inner.push(entry.async('blob').then(async blob=>{
+                                const clean=entry.name.split('/').pop().replace(/\.[^.]+$/,'').toUpperCase();
+                                await processBlob(blob,clean,entry.name,entry.date||new Date());
                             }));
                         }
                     });
                     await Promise.all(inner);
                     res();
-                }).catch(err => { alert('ZIP error: ' + err.message); res(); });
+                }).catch(err=>{alert('ZIP error: '+err.message);res();});
             }));
-
-        } else if (name.endsWith('.json')) {
-            isProjectLoaded = true;
-            promises.push(new Promise(res => {
-                const r = new FileReader();
-                r.onload = ev => {
+        } else if (nm.endsWith('.json')) {
+            isProjectLoaded=true;
+            promises.push(new Promise(res=>{
+                const r=new FileReader();
+                r.onload=ev=>{
                     try {
-                        const p = JSON.parse(ev.target.result);
-                        projectInfo     = p.projectInfo     || 'Unknown Project';
-                        inspectionData  = p.inspectionData  || {};
-                        elevations      = p.elevations      || [];
-                        dropAssignments = p.dropAssignments || {};
-                        stitchedPairs   = p.stitchedPairs   || [];
-                        saved3DTags     = p.saved3DTags     || {};
-                        manualLinks     = p.manualLinks     || {};
-                        document.getElementById('top-reload-banner').style.display = 'block';
-                    } catch(e) {}
+                        const p=JSON.parse(ev.target.result);
+                        projectInfo    =p.projectInfo    ||'Unknown Project';
+                        inspectionData =p.inspectionData ||{};
+                        elevations     =p.elevations     ||[];
+                        dropAssignments=p.dropAssignments||{};
+                        stitchedPairs  =p.stitchedPairs  ||[];
+                        saved3DTags    =p.saved3DTags    ||{};
+                        manualLinks    =p.manualLinks    ||{};
+                        document.getElementById('top-reload-banner').style.display='block';
+                    } catch(e){}
                     res();
                 };
                 r.readAsText(file);
             }));
-
-        } else if (forcedType === 'csv' || name.endsWith('.csv') || type.includes('csv') || type === 'application/vnd.ms-excel') {
-            newCsvAdded = true;
-            promises.push(new Promise(res => {
-                const r = new FileReader();
-                r.onload = ev => { rowsParsed += parseCSV(ev.target.result); res(); };
+        } else if (forcedType==='csv'||nm.endsWith('.csv')||ty.includes('csv')||ty==='application/vnd.ms-excel') {
+            newCsvAdded=true;
+            promises.push(new Promise(res=>{
+                const r=new FileReader();
+                r.onload=ev=>{rowsParsed+=parseCSV(ev.target.result);res();};
                 r.readAsText(file);
             }));
-
-        } else if (type.startsWith('image/') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png')) {
-            const clean = file.name.replace(/\.[^.]+$/, '').toUpperCase();
-            promises.push(processImageBlob(file, clean, file.webkitRelativePath, new Date(file.lastModified)));
-
-        } else if (name.endsWith('.glb') || name.endsWith('.gltf') || type.includes('model/gltf')) {
-            viewer.src = URL.createObjectURL(file);
-            document.getElementById('model-status').innerHTML = `<span style="color:#0cf;">Loaded:</span> ${file.name}`;
+        } else if (ty.startsWith('image/')||nm.endsWith('.jpg')||nm.endsWith('.jpeg')||nm.endsWith('.png')) {
+            const clean=file.name.replace(/\.[^.]+$/,'').toUpperCase();
+            promises.push(processBlob(file,clean,file.webkitRelativePath,new Date(file.lastModified)));
+        } else if (nm.endsWith('.glb')||nm.endsWith('.gltf')||ty.includes('model/gltf')) {
+            viewer.src=URL.createObjectURL(file);
+            document.getElementById('model-status').innerHTML=`<span style="color:#0cf;">Loaded:</span> ${file.name}`;
         }
     }
 
     await Promise.all(promises);
 
-    // ── ZIPLINE ──────────────────────────────────────────────────
-    const linked = runZipline();
+    // Assign loose images to the only drop if there is exactly one
+    const dropNames=Object.keys(inspectionData);
+    if (dropNames.length===1) {
+        Object.values(imageBank).forEach(img=>{ if (!img.drop) img.drop=dropNames[0]; });
+    }
+
+    // ── RUN BRACKET ZIPLINE ─────────────────────────────
+    const linked=runBracketZipline();
 
     setLoading(false);
 
-    if (newIR > 0) {
-        if (linked === 0)
-            alert(`⚠️ ${newIR} IR photo(s) loaded but none could be linked to CSV nodes.\nCheck that photos were taken during logged time periods.`);
+    if (newIR>0) {
+        if (linked===0)
+            alert(`⚠️ ${newIR} IR photo(s) loaded but none could be bracketed.\nCheck that photos were taken after the CSV timestamps.`);
         else
-            alert(`✅ Zipline linked ${linked} window(s) to IR photos.\nDC views auto-extracted from each IR file.`);
+            alert(`✅ Bracket Engine linked ${linked} photo(s) across windows.\nDC view available via toggle on each IR image.`);
     }
 
-    document.getElementById('project-name').innerText = 'Project: ' + projectInfo;
-    document.getElementById('btn-reset').style.display = 'inline-block';
+    document.getElementById('project-name').innerText='Project: '+projectInfo;
+    document.getElementById('btn-reset').style.display='inline-block';
     updatePhotoStat();
 
-    if (newCsvAdded || isProjectLoaded) {
-        if (rowsParsed > 0 || isProjectLoaded) {
-            if (document.getElementById('dashboard-screen').style.display !== 'flex') {
-                document.getElementById('btn-start-mapping').style.display = 'block';
+    if (newCsvAdded||isProjectLoaded) {
+        if (rowsParsed>0||isProjectLoaded) {
+            if (document.getElementById('dashboard-screen').style.display!=='flex') {
+                document.getElementById('btn-start-mapping').style.display='block';
             } else {
-                if (activeTab) Object.keys(dropAssignments).forEach(d => { if (!dropAssignments[d]) dropAssignments[d] = activeTab; });
+                if (activeTab) Object.keys(dropAssignments).forEach(d=>{if(!dropAssignments[d])dropAssignments[d]=activeTab;});
                 calculateBuildingGeometry();
-                if (currentMode === '2d' || currentMode === 'auto3d') refreshCurrentView();
-                if (currentMode === 'auto3d') buildProcedural3D();
+                if (currentMode==='2d'||currentMode==='auto3d') refreshCurrentView();
+                if (currentMode==='auto3d') buildProcedural3D();
             }
         } else { alert('⚠️ File read but no valid Strata data found.'); }
     }
 
     saveCommandState();
-    ['csvInput','mediaInput','folderInput'].forEach(id => { document.getElementById(id).value = ''; });
+    ['csvInput','mediaInput','folderInput'].forEach(id=>{document.getElementById(id).value='';});
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// ZIPLINE ENGINE
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// BRACKET ZIPLINE ENGINE
+// ═══════════════════════════════════════════════════════
 /*
- * Links IR images from imageBank to CSV nodes using forward-only
- * time-based matching with a median clock-offset correction.
+ * THE BRACKET RULE
+ * ─────────────────
+ * The tech stamps the time for window N, THEN takes photos.
+ * So photo timestamps always satisfy:
  *
- * The roof sync photo is the first image that doesn't fall within
- * 3 hours of any node — the forward anchor skips it automatically.
+ *   stamp[n]  ≤  photo.time  <  stamp[n+1]
  *
- * We only link IR files (dcUrl !== undefined) to nodes.
- * DC-only files (dcUrl === undefined) are ignored by the Zipline
- * since they carry no additional information beyond what's already
- * embedded in the corresponding IR file.
+ * For the LAST node in a drop, the upper bound is end-of-day (86400s).
  *
- * Node storage: node.flirIR = cleanName (IR file name)
- * The DC is always derived on-the-fly from imageBank[name].dcUrl.
+ * MISSING STAMPS ('--')
+ * ──────────────────────
+ * If a node has no timestamp, it cannot define a bracket.
+ * Its slot is skipped — photos that would have fallen there
+ * are absorbed into the previous node's bracket, which simply
+ * extends further (matching the real-world situation where
+ * the tech forgot to stamp and just kept shooting).
+ *
+ * SYNC PHOTO
+ * ───────────
+ * Taken before stamp[0]. Falls before all brackets → no match → ignored.
+ *
+ * MULTIPLE PHOTOS PER BRACKET
+ * ────────────────────────────
+ * All IR photos whose timestamp falls within a bracket are appended
+ * to node.photos[]. The modal shows them all as a scrollable gallery.
+ *
+ * CAMERA CLOCK OFFSET
+ * ────────────────────
+ * The camera clock may differ from the phone clock (which drives the
+ * CSV timestamps). We calculate a global offset per drop as:
+ *
+ *   offset = median(photo.time - stamp of the node it belongs to)
+ *
+ * We estimate this by comparing the first few photos to the first few
+ * stamps. This single offset is then applied to ALL photo times before
+ * bracket matching.
+ *
+ * DC-ONLY FILES
+ * ─────────────
+ * Ignored by the engine. DC is always extracted from the IR file.
+ * A DC-only file means the camera was in Mode 2 but the toggle will
+ * still work because the IR file contains the embedded DC.
+ * If someone uploads a DC-only file directly, it is stored in imageBank
+ * with dcUrl=undefined and will never be linked to a node.
  */
-function runZipline() {
-    // Build per-drop sorted node lists (nodes with a time stamp)
-    const dropNodes = {};
-    Object.keys(inspectionData).forEach(drop => {
-        dropNodes[drop] = [];
-        Object.keys(inspectionData[drop]).forEach(floor => {
-            Object.keys(inspectionData[drop][floor]).forEach(pos => {
-                const node = inspectionData[drop][floor][pos];
-                if (node.time && node.time !== '--') {
-                    const p = node.time.split(':');
-                    if (p.length === 3) {
-                        node.timeSec    = +p[0]*3600 + +p[1]*60 + +p[2];
-                        node.parentDrop = drop;
-                        dropNodes[drop].push(node);
-                    }
-                }
-            });
-        });
-        dropNodes[drop].sort((a, b) => a.timeSec - b.timeSec);
-    });
-
-    // Assign loose images to a single drop when only one exists
-    const dropNames = Object.keys(dropNodes);
-    Object.values(imageBank).forEach(img => {
-        if (!img.drop && dropNames.length === 1) img.drop = dropNames[0];
-    });
-
-    // Group IR-only images by drop (ignore DC-only files in Zipline)
-    const dropImages = {};
-    Object.keys(imageBank).forEach(k => {
-        const img = imageBank[k];
-        if (img.dcUrl === undefined) return; // DC-only file — skip
-        if (!img.drop) return;
-        if (!dropImages[img.drop]) dropImages[img.drop] = [];
-        dropImages[img.drop].push({ id: k, time: img.time });
-    });
-
+function runBracketZipline() {
     let totalLinked = 0;
 
-    Object.keys(dropImages).forEach(drop => {
-        const images = dropImages[drop];
-        const nodes  = dropNodes[drop];
-        if (!nodes || !nodes.length || !images.length) return;
-
-        // Sort images by filename (numeric-aware)
-        images.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
-
-        // Detect Google Drive timestamp-strip bug
-        const isZipBug = images.length > 1 && images.every(i => i.time === images[0].time);
-
-        if (isZipBug) {
-            // Sequential fallback: skip first image (sync shot), map rest 1:1
-            images.slice(1).forEach((img, idx) => {
-                if (idx < nodes.length) {
-                    nodes[idx].flirIR = img.id;
-                    totalLinked++;
-                }
+    Object.keys(inspectionData).forEach(drop => {
+        // ── 1. Build time-ordered list of stamped nodes ──────────
+        // node.times[] holds all stamps for a node (duplicate stamps allowed).
+        // Each stamp creates its own bracket entry pointing to the same node,
+        // so photos taken after any re-stamp still link to the correct window.
+        // Nodes with no valid stamp (times=[]) are included with timeSec=null.
+        const allNodes = [];
+        Object.keys(inspectionData[drop]).map(Number).sort((a,b)=>a-b)
+            .forEach(floor => {
+                const posOrder = {L:1,C:2,R:3};
+                Object.keys(inspectionData[drop][floor])
+                    .sort((a,b)=>(posOrder[a]||9)-(posOrder[b]||9))
+                    .forEach(pos => {
+                        const node = inspectionData[drop][floor][pos];
+                        // node.times may have 0, 1 or many entries
+                        const stamps = (node.times || (node.time && node.time !== '--' ? [node.time] : []));
+                        if (stamps.length === 0) {
+                            allNodes.push({ node, timeSec: null });
+                        } else {
+                            // Each stamp gets its own entry; they are already sorted
+                            stamps.forEach(t => {
+                                const p = t.split(':');
+                                const sec = p.length === 3 ? +p[0]*3600 + +p[1]*60 + +p[2] : null;
+                                allNodes.push({ node, timeSec: sec });
+                            });
+                        }
+                    });
             });
-            setTimeout(() => alert(
-                '⚠️ TIMESTAMP WARNING:\n\nGoogle Drive stripped photo timestamps. ' +
-                'The first photo was skipped as the roof sync shot, the rest were ' +
-                'mapped by filename order. Upload inside a .ZIP to preserve timestamps.'
-            ), 500);
-            return;
+        // Sort the combined list by timeSec (nulls treated as "very early" → before all brackets)
+        allNodes.sort((a,b) => {
+            if (a.timeSec === null && b.timeSec === null) return 0;
+            if (a.timeSec === null) return -1;
+            if (b.timeSec === null) return 1;
+            return a.timeSec - b.timeSec;
+        });
+
+        if (!allNodes.length) return;
+
+        // ── 2. Collect all IR images for this drop ───────────────
+        // imageBank now contains only IR files (DC-only files are discarded on ingest)
+        const images = Object.keys(imageBank)
+            .filter(k => imageBank[k].drop === drop)
+            .map(k => ({ name: k, time: imageBank[k].time }))
+            .sort((a,b) => a.name.localeCompare(b.name, undefined, {numeric:true}));
+
+        if (!images.length) return;
+
+        // ── 3. Build bracket list from stamped nodes only ────────
+        // A bracket is [startSec, endSec) with the node it belongs to.
+        // We walk allNodes and collect only those with a timestamp.
+        // The bracket for node[i] ends at the timestamp of node[i+1]
+        // (the next stamped node), or 86400 for the last.
+        const brackets = [];
+        for (let i = 0; i < allNodes.length; i++) {
+            if (allNodes[i].timeSec === null) continue; // no stamp → skip
+
+            // Find the next stamped node's time as the upper bound
+            let endSec = 86400;
+            for (let j = i+1; j < allNodes.length; j++) {
+                if (allNodes[j].timeSec !== null) {
+                    endSec = allNodes[j].timeSec;
+                    break;
+                }
+            }
+            brackets.push({ node: allNodes[i].node, start: allNodes[i].timeSec, end: endSec });
         }
 
-        // Smart Zipline: calculate median clock offset to neutralise wrong camera clocks
-        const diffs = [];
-        const minLen = Math.min(nodes.length, images.length);
-        for (let i = 0; i < minLen; i++) {
-            let diff = images[i].time - nodes[i].timeSec;
+        if (!brackets.length) return;
+
+        // ── 4. Estimate camera clock offset ──────────────────────
+        // Compare the first min(5, brackets.length, images.length)
+        // image times to the first bracket starts (skipping the sync
+        // photo if it's before bracket[0].start).
+        //
+        // We take the median difference (image.time - bracket.start)
+        // from the first few pairs, then use that offset globally.
+        const nonSyncImages = images.filter(img => img.time >= brackets[0].start - 7200);
+        // (7200s = 2hr tolerance for a camera that's slightly ahead)
+
+        const sampleSize = Math.min(5, brackets.length, nonSyncImages.length);
+        const rawDiffs   = [];
+        for (let i = 0; i < sampleSize; i++) {
+            let diff = nonSyncImages[i].time - brackets[i].start;
+            // Wrap midnight
             if (diff >  43200) diff -= 86400;
             if (diff < -43200) diff += 86400;
-            diffs.push(diff);
+            rawDiffs.push(diff);
         }
-        diffs.sort((a, b) => a - b);
-        const offset = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 0;
+        rawDiffs.sort((a,b)=>a-b);
+        const offset = rawDiffs.length ? rawDiffs[Math.floor(rawDiffs.length/2)] : 0;
 
-        let lastNodeIndex = 0; // forward-only anchor — naturally skips sync shot
+        // ── 5. Clear existing Zipline assignments for this drop ──
+        // This prevents double-linking when photos are re-uploaded.
+        // Manual links are preserved.
+        allNodes.forEach(({node}) => { node.photos = []; });
 
+        // ── 6. Bracket-match every IR image ─────────────────────
         images.forEach(img => {
-            // 1. Direct filename match
-            const exactIdx = nodes.findIndex(n => n.id === img.id);
-            if (exactIdx !== -1 && exactIdx >= lastNodeIndex) {
-                lastNodeIndex = exactIdx;
-                nodes[exactIdx].flirIR = img.id;
-                totalLinked++;
-                return;
-            }
+            // Adjust for camera clock offset
+            let t = img.time - offset;
+            if (t <  0)     t += 86400;
+            if (t >= 86400) t -= 86400;
 
-            // 2. Time-based forward match
-            let adjusted = img.time - offset;
-            if (adjusted <  0)     adjusted += 86400;
-            if (adjusted >= 86400) adjusted -= 86400;
-
-            let bestIndex = -1, minScore = Infinity;
-            for (let j = lastNodeIndex; j < nodes.length; j++) {
-                let diff = Math.abs(nodes[j].timeSec - adjusted);
-                if (diff > 43200) diff = 86400 - diff;
-                const score = diff + (j - lastNodeIndex) * 30;
-                if (score < minScore) { minScore = score; bestIndex = j; }
+            // Find the bracket that contains this adjusted time
+            // bracket.start ≤ t < bracket.end
+            // If t < brackets[0].start it's the sync photo → skip
+            for (const bracket of brackets) {
+                if (t >= bracket.start && t < bracket.end) {
+                    if (!bracket.node.photos) bracket.node.photos = [];
+                    bracket.node.photos.push(img.name);
+                    totalLinked++;
+                    break;
+                }
             }
-
-            // Accept if within 3 hours — otherwise it's the sync shot or an orphan
-            if (bestIndex !== -1 && minScore < 10800) {
-                lastNodeIndex = bestIndex;
-                nodes[bestIndex].flirIR = img.id;
-                totalLinked++;
-            }
+            // If no bracket matched: sync photo or out-of-range → silently ignored
         });
     });
 
     return totalLinked;
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // CSV PARSER
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 function parseCSV(text) {
-    const rows = text.trim().split(/\r\n|\n|\r/);
-    let valid  = 0;
-    for (let i = 1; i < rows.length; i++) {
+    const rows=text.trim().split(/\r\n|\n|\r/);
+    let valid=0;
+    for (let i=1;i<rows.length;i++) {
         if (!rows[i].trim()) continue;
-        const cols = []; let cur = '', inQ = false;
+        const cols=[]; let cur='',inQ=false;
         for (const c of rows[i]) {
-            if (c === '"') inQ = !inQ;
-            else if (c === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
-            else cur += c;
+            if (c==='"') inQ=!inQ;
+            else if (c===','&&!inQ){cols.push(cur.trim());cur='';}
+            else cur+=c;
         }
         cols.push(cur.trim());
-        if (cols.length < 5) continue;
+        if (cols.length<5) continue;
 
-        const proj = cols[0].replace(/^"|"$/g, '');
-        if (projectInfo === 'Unknown Project') projectInfo = proj;
+        const proj=cols[0].replace(/^"|"$/g,'');
+        if (projectInfo==='Unknown Project') projectInfo=proj;
 
-        let fullId, finds, proved, tech, time;
-        if (cols.length === 5) {
-            tech = cols[1].replace(/^"|"$/g,''); fullId = cols[2].replace(/^"|"$/g,'');
-            finds = cols[3].replace(/^"|"$/g,''); time = cols[4].replace(/^"|"$/g,'');
-            proved = 'NO';
+        let fullId,finds,proved,tech,time;
+        if (cols.length===5) {
+            tech=cols[1].replace(/^"|"$/g,''); fullId=cols[2].replace(/^"|"$/g,'');
+            finds=cols[3].replace(/^"|"$/g,''); time=cols[4].replace(/^"|"$/g,'');
+            proved='NO';
         } else {
-            tech = 'Unknown'; fullId = cols[2].replace(/^"|"$/g,'');
-            finds = cols[4].replace(/^"|"$/g,''); proved = cols[5].replace(/^"|"$/g,''); time = '--';
+            tech='Unknown'; fullId=cols[2].replace(/^"|"$/g,'');
+            finds=cols[4].replace(/^"|"$/g,''); proved=cols[5].replace(/^"|"$/g,''); time='--';
         }
 
-        let status = 'status-clear';
-        const uf = finds.toUpperCase();
-        if (uf.includes('FAIL') || uf.includes('DEFECT') || uf.includes('CONFIRM')) status = 'status-confirmed';
-        else if (!uf.includes('CLEAR')) status = 'status-flagged';
+        let status='status-clear';
+        const uf=finds.toUpperCase();
+        if (uf.includes('FAIL')||uf.includes('DEFECT')||uf.includes('CONFIRM')) status='status-confirmed';
+        else if (!uf.includes('CLEAR')) status='status-flagged';
 
-        const parts = fullId.split('-');
-        if (parts.length !== 3) continue;
-        const drop = parts[0], floor = parseInt(parts[1], 10), pos = parts[2];
+        const parts=fullId.split('-');
+        if (parts.length!==3) continue;
+        const drop=parts[0],floor=parseInt(parts[1],10),pos=parts[2];
 
-        if (!inspectionData[drop]) inspectionData[drop] = {};
-        if (!inspectionData[drop][floor]) inspectionData[drop][floor] = {};
+        if (!inspectionData[drop]) inspectionData[drop]={};
+        if (!inspectionData[drop][floor]) inspectionData[drop][floor]={};
 
-        let notes = '', existingStatus = status;
-        if (cols.length >= 8) {
-            notes = cols[7].replace(/^"|"$/g, '');
-            const rs = cols[6].toUpperCase().trim();
-            if      (rs === 'CONFIRMED DEFECT' || rs === 'CONFIRMED') existingStatus = 'status-confirmed';
-            else if (rs === 'PENDING'           || rs === 'PENDING REVIEW') existingStatus = 'status-flagged';
-            else if (rs === 'CLEAR') existingStatus = 'status-clear';
+        let notes='',existingStatus=status;
+        if (cols.length>=8) {
+            notes=cols[7].replace(/^"|"$/g,'');
+            const rs=cols[6].toUpperCase().trim();
+            if      (rs==='CONFIRMED DEFECT'||rs==='CONFIRMED') existingStatus='status-confirmed';
+            else if (rs==='PENDING'         ||rs==='PENDING REVIEW') existingStatus='status-flagged';
+            else if (rs==='CLEAR') existingStatus='status-clear';
         }
 
-        let mFinds = finds ? finds.split(' | ') : [];
-        let mProved = proved;
+        let mFinds=finds?finds.split(' | '):[];
+        let mProved=proved;
 
-        if (inspectionData[drop][floor][pos]) {
-            const prev = inspectionData[drop][floor][pos];
-            if (!notes) notes = prev.notes || '';
-            if (prev.finds && prev.finds !== 'CLEAR') mFinds = [...prev.finds.split(' | '), ...mFinds];
-            if (prev.proved === 'YES') mProved = 'YES';
-            if (prev.status === 'status-confirmed') existingStatus = 'status-confirmed';
-            else if (prev.status === 'status-flagged' && existingStatus !== 'status-confirmed') existingStatus = 'status-flagged';
+        // Preserve existing photos and notes on re-load
+        const prev=inspectionData[drop][floor][pos];
+        if (prev) {
+            if (!notes) notes=prev.notes||'';
+            if (prev.finds&&prev.finds!=='CLEAR') mFinds=[...prev.finds.split(' | '),...mFinds];
+            if (prev.proved==='YES') mProved='YES';
+            if (prev.status==='status-confirmed') existingStatus='status-confirmed';
+            else if (prev.status==='status-flagged'&&existingStatus!=='status-confirmed') existingStatus='status-flagged';
         }
 
-        mFinds = [...new Set(mFinds)].filter(f => f !== 'CLEAR' && f !== '');
-        if (!mFinds.length) mFinds = ['CLEAR'];
+        mFinds=[...new Set(mFinds)].filter(f=>f!=='CLEAR'&&f!=='');
+        if (!mFinds.length) mFinds=['CLEAR'];
 
-        inspectionData[drop][floor][pos] = {
-            id: fullId, flirIR: null,
-            finds: mFinds.join(' | '), proved: mProved,
-            tech, time, status: existingStatus, notes
+        // Accumulate all timestamps for duplicate stamps on the same window.
+        // node.times is a sorted deduped array of all HH:MM:SS strings seen.
+        // node.time is kept as the earliest stamp (for display / backward compat).
+        let prevTimes = prev?.times || [];
+        if (time && time !== '--' && !prevTimes.includes(time)) {
+            prevTimes = [...prevTimes, time].sort();
+        }
+        const earliestTime = prevTimes.length ? prevTimes[0] : (time || '--');
+
+        inspectionData[drop][floor][pos]={
+            id: fullId,
+            photos: prev?.photos||[],  // preserve Zipline results across CSV reloads
+            times: prevTimes,          // all stamps for this window (may be >1)
+            time:  earliestTime,       // display field: earliest stamp
+            finds: mFinds.join(' | '),
+            proved: mProved,
+            tech,
+            status: existingStatus,
+            notes
         };
-        if (!dropAssignments[drop]) dropAssignments[drop] = cols.length >= 8 ? cols[1].replace(/^"|"$/g,'') : '';
+        if (!dropAssignments[drop]) dropAssignments[drop]=cols.length>=8?cols[1].replace(/^"|"$/g,''):'';
         valid++;
     }
     return valid;
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// DRAG-DROP (global + manual slot)
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// DRAG-DROP
+// ═══════════════════════════════════════════════════════
 function initGlobalDragDrop() {
-    document.body.addEventListener('dragover', e => e.preventDefault());
-    document.body.addEventListener('drop', async e => {
+    document.body.addEventListener('dragover',e=>e.preventDefault());
+    document.body.addEventListener('drop',async e=>{
         e.preventDefault();
         if (!e.dataTransfer.files.length) return;
-        await handleFiles(e.dataTransfer.files, 'media');
-        if (modalNodeId && document.getElementById('info-modal').style.display === 'flex') {
-            openModal(modalNodeId);
-        }
+        await handleFiles(e.dataTransfer.files,'media');
+        if (modalNodeId&&document.getElementById('info-modal').style.display==='flex') openModal(modalNodeId);
     });
 }
 
 function setupDropSlot(slotEl, nodeId) {
-    slotEl.addEventListener('dragover', e => { e.preventDefault(); slotEl.classList.add('drag-over'); });
-    slotEl.addEventListener('dragleave', () => slotEl.classList.remove('drag-over'));
-    slotEl.addEventListener('drop', async e => {
-        e.preventDefault(); e.stopPropagation();
+    slotEl.addEventListener('dragover',e=>{e.preventDefault();slotEl.classList.add('drag-over');});
+    slotEl.addEventListener('dragleave',()=>slotEl.classList.remove('drag-over'));
+    slotEl.addEventListener('drop',async e=>{
+        e.preventDefault();e.stopPropagation();
         slotEl.classList.remove('drag-over');
         if (!e.dataTransfer.files.length) return;
-        await handleFiles(e.dataTransfer.files, 'media');
-        // Assign the most recently added IR image to this node
-        assignLatestToNode(nodeId);
+        await handleFiles(e.dataTransfer.files,'media');
+        manualAssignLatest(nodeId);
     });
-    slotEl.addEventListener('click', () => {
-        const inp = document.createElement('input');
-        inp.type = 'file'; inp.accept = 'image/*';
-        inp.onchange = async () => {
+    slotEl.addEventListener('click',()=>{
+        const inp=document.createElement('input');
+        inp.type='file';inp.accept='image/*';
+        inp.onchange=async()=>{
             if (!inp.files.length) return;
-            await handleFiles(inp.files, 'media');
-            assignLatestToNode(nodeId);
+            await handleFiles(inp.files,'media');
+            manualAssignLatest(nodeId);
         };
         inp.click();
     });
 }
 
-function assignLatestToNode(nodeId) {
-    // Find the most recently added IR image for this node's drop
-    const drop = nodeId.split('-')[0];
-    const candidates = Object.entries(imageBank)
-        .filter(([, v]) => v.dcUrl !== undefined && (v.drop === drop || !v.drop))
-        .sort(([a], [b]) => b.localeCompare(a, undefined, { numeric: true }));
+// After a manual drop, assign the most recently loaded IR image to this node
+function manualAssignLatest(nodeId) {
+    const drop=nodeId.split('-')[0];
+    const candidates=Object.entries(imageBank)
+        .filter(([,v])=>(v.drop===drop||!v.drop))
+        .sort(([a],[b])=>b.localeCompare(a,undefined,{numeric:true}));
     if (!candidates.length) return;
-    const [name] = candidates[0];
-    manualLinks[nodeId] = name;
-    const node = getNodeData(nodeId);
-    if (node) node.flirIR = name;
+    const name=candidates[0][0];
+    if (!manualLinks[nodeId]) manualLinks[nodeId]=[];
+    if (!manualLinks[nodeId].includes(name)) manualLinks[nodeId].push(name);
+    const node=getNodeData(nodeId);
+    if (node&&(!node.photos||!node.photos.includes(name))) {
+        if (!node.photos) node.photos=[];
+        node.photos.push(name);
+    }
     saveCommandState();
-    if (currentMode === '2d') refreshCurrentView();
+    if (currentMode==='2d') refreshCurrentView();
     openModal(nodeId);
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // STATS
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 function calculateBuildingGeometry() {
-    globalStats = { t:0, clear:0, f:0, c:0, maxFloor:-Infinity, minFloor:Infinity };
-    Object.keys(inspectionData).forEach(drop => {
-        Object.keys(inspectionData[drop]).map(Number).forEach(f => {
-            if (f > globalStats.maxFloor) globalStats.maxFloor = f;
-            if (f < globalStats.minFloor) globalStats.minFloor = f;
-            Object.keys(inspectionData[drop][f]).forEach(pos => {
-                const d = inspectionData[drop][f][pos]; globalStats.t++;
-                if      (d.status === 'status-flagged')   globalStats.f++;
-                else if (d.status === 'status-confirmed') globalStats.c++;
+    globalStats={t:0,clear:0,f:0,c:0,maxFloor:-Infinity,minFloor:Infinity};
+    Object.keys(inspectionData).forEach(drop=>{
+        Object.keys(inspectionData[drop]).map(Number).forEach(f=>{
+            if (f>globalStats.maxFloor) globalStats.maxFloor=f;
+            if (f<globalStats.minFloor) globalStats.minFloor=f;
+            Object.keys(inspectionData[drop][f]).forEach(pos=>{
+                const d=inspectionData[drop][f][pos]; globalStats.t++;
+                if      (d.status==='status-flagged')   globalStats.f++;
+                else if (d.status==='status-confirmed') globalStats.c++;
                 else globalStats.clear++;
             });
         });
     });
-    if (globalStats.maxFloor === -Infinity) { globalStats.maxFloor = 0; globalStats.minFloor = 0; }
-
-    stitchedPairs.forEach(pair => {
-        const d1 = getNodeData(pair[0]), d2 = getNodeData(pair[1]);
-        if (!d1 || !d2) return;
+    if (globalStats.maxFloor===-Infinity){globalStats.maxFloor=0;globalStats.minFloor=0;}
+    stitchedPairs.forEach(pair=>{
+        const d1=getNodeData(pair[0]),d2=getNodeData(pair[1]);
+        if (!d1||!d2) return;
         globalStats.t--;
-        [d1, d2].forEach(d => {
-            if (d.status === 'status-flagged') globalStats.f--;
-            else if (d.status === 'status-confirmed') globalStats.c--;
+        [d1,d2].forEach(d=>{
+            if (d.status==='status-flagged') globalStats.f--;
+            else if (d.status==='status-confirmed') globalStats.c--;
             else globalStats.clear--;
         });
-        const c = getCombinedStatus(pair[0], pair[1]);
-        if (c === 'status-flagged') globalStats.f++;
-        else if (c === 'status-confirmed') globalStats.c++;
+        const c=getCombinedStatus(pair[0],pair[1]);
+        if (c==='status-flagged') globalStats.f++;
+        else if (c==='status-confirmed') globalStats.c++;
         else globalStats.clear++;
     });
-
-    document.getElementById('stat-total').innerText     = globalStats.t;
-    document.getElementById('stat-clear').innerText     = globalStats.clear;
-    document.getElementById('stat-flagged').innerText   = globalStats.f;
-    document.getElementById('stat-confirmed').innerText = globalStats.c;
+    document.getElementById('stat-total').innerText    =globalStats.t;
+    document.getElementById('stat-clear').innerText    =globalStats.clear;
+    document.getElementById('stat-flagged').innerText  =globalStats.f;
+    document.getElementById('stat-confirmed').innerText=globalStats.c;
     render3DHotspots();
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// FILTER / STITCH
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// FILTER / STITCH / VIEWS
+// ═══════════════════════════════════════════════════════
 function setFilter(f) {
-    activeFilter = (activeFilter === f && f !== 'ALL') ? 'ALL' : f;
-    ['all','clear','flagged','confirmed'].forEach(k => {
-        const el = document.getElementById('filter-card-' + k);
-        if (el) el.classList.toggle('dimmed', activeFilter !== 'ALL' && (k === 'all' || activeFilter !== 'status-' + k));
+    activeFilter=(activeFilter===f&&f!=='ALL')?'ALL':f;
+    ['all','clear','flagged','confirmed'].forEach(k=>{
+        const el=document.getElementById('filter-card-'+k);
+        if (el) el.classList.toggle('dimmed',activeFilter!=='ALL'&&(k==='all'||activeFilter!=='status-'+k));
     });
-    if (currentMode === '2d' || currentMode === 'auto3d') refreshCurrentView();
-    if (currentMode === 'auto3d') buildProcedural3D();
+    if (currentMode==='2d'||currentMode==='auto3d') refreshCurrentView();
+    if (currentMode==='auto3d') buildProcedural3D();
     render3DHotspots();
 }
 
 function toggleStitchMode() {
-    isStitchMode = !isStitchMode;
-    document.querySelectorAll('.stitch-toggle').forEach(b => b.classList.toggle('stitch-mode-on', isStitchMode));
-    stitchSelection = [];
+    isStitchMode=!isStitchMode;
+    document.querySelectorAll('.stitch-toggle').forEach(b=>b.classList.toggle('stitch-mode-on',isStitchMode));
+    stitchSelection=[];
     if (isStitchMode) alert('STITCH MODE: Click right window then left window to join them.');
-    if (currentMode === '2d') refreshCurrentView();
+    if (currentMode==='2d') refreshCurrentView();
 }
 
-function handleNodeClick(data, el) {
+function handleNodeClick(data,el) {
     if (isStitchMode) {
-        const idx = stitchedPairs.findIndex(p => p.includes(data.id));
-        if (idx !== -1) {
+        const idx=stitchedPairs.findIndex(p=>p.includes(data.id));
+        if (idx!==-1) {
             if (confirm('Already stitched — un-stitch?')) {
-                stitchedPairs.splice(idx, 1); stitchSelection = []; isStitchMode = false;
-                document.querySelectorAll('.stitch-toggle').forEach(b => b.classList.remove('stitch-mode-on'));
-                calculateBuildingGeometry(); saveCommandState();
-                if (currentMode === '2d') refreshCurrentView();
-                if (currentMode === 'auto3d') buildProcedural3D();
+                stitchedPairs.splice(idx,1);stitchSelection=[];isStitchMode=false;
+                document.querySelectorAll('.stitch-toggle').forEach(b=>b.classList.remove('stitch-mode-on'));
+                calculateBuildingGeometry();saveCommandState();
+                if (currentMode==='2d') refreshCurrentView();
+                if (currentMode==='auto3d') buildProcedural3D();
             }
             return;
         }
-        stitchSelection.push(data.id);
-        el.style.outline = '3px solid #f39c12';
-        if (stitchSelection.length === 2) {
-            stitchSelection.sort(); stitchedPairs.push([...stitchSelection]);
-            isStitchMode = false;
-            document.querySelectorAll('.stitch-toggle').forEach(b => b.classList.remove('stitch-mode-on'));
-            stitchSelection = [];
-            saveCommandState();
-            if (currentMode === '2d') refreshCurrentView();
-            if (currentMode === 'auto3d') buildProcedural3D();
+        stitchSelection.push(data.id);el.style.outline='3px solid #f39c12';
+        if (stitchSelection.length===2) {
+            stitchSelection.sort();stitchedPairs.push([...stitchSelection]);
+            isStitchMode=false;
+            document.querySelectorAll('.stitch-toggle').forEach(b=>b.classList.remove('stitch-mode-on'));
+            stitchSelection=[];saveCommandState();
+            if (currentMode==='2d') refreshCurrentView();
+            if (currentMode==='auto3d') buildProcedural3D();
         }
         return;
     }
     openModal(data.id);
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// VIEW SWITCHING
-// ═══════════════════════════════════════════════════════════════════
 function switchView(mode) {
-    currentMode = mode;
-    document.getElementById('btn-2d').classList.toggle('active', mode === '2d');
-    const ba = document.getElementById('btn-auto3d');
-    ba.style.background = mode === 'auto3d' ? '#0cf' : '#1d212f';
-    ba.style.color       = mode === 'auto3d' ? '#000' : '#0cf';
-    document.getElementById('btn-true3d').classList.toggle('active', mode === 'true3d');
-    document.getElementById('view-2d').style.display        = mode === '2d'     ? 'flex'  : 'none';
-    document.getElementById('arena-auto3d').style.display   = mode === 'auto3d' ? 'block' : 'none';
-    document.getElementById('arena-true3d').style.display   = mode === 'true3d' ? 'block' : 'none';
-    document.getElementById('tabs-container').style.display = mode === 'true3d' ? 'none'  : 'flex';
-    if (mode === '2d' || mode === 'auto3d') refreshCurrentView();
-    if (mode === 'auto3d') setTimeout(buildProcedural3D, 100);
+    currentMode=mode;
+    document.getElementById('btn-2d').classList.toggle('active',mode==='2d');
+    const ba=document.getElementById('btn-auto3d');
+    ba.style.background=mode==='auto3d'?'#0cf':'#1d212f';
+    ba.style.color      =mode==='auto3d'?'#000':'#0cf';
+    document.getElementById('btn-true3d').classList.toggle('active',mode==='true3d');
+    document.getElementById('view-2d').style.display       =mode==='2d'    ?'flex' :'none';
+    document.getElementById('arena-auto3d').style.display  =mode==='auto3d'?'block':'none';
+    document.getElementById('arena-true3d').style.display  =mode==='true3d'?'block':'none';
+    document.getElementById('tabs-container').style.display=mode==='true3d'?'none' :'flex';
+    if (mode==='2d'||mode==='auto3d') refreshCurrentView();
+    if (mode==='auto3d') setTimeout(buildProcedural3D,100);
 }
 
 function refreshCurrentView() {
-    if (currentMode !== '2d' && currentMode !== 'auto3d') return;
-    const container      = document.getElementById('tabs-container');
-    container.innerHTML  = '';
-    const used = new Set(Object.values(dropAssignments));
-    elevations.forEach(elev => {
+    if (currentMode!=='2d'&&currentMode!=='auto3d') return;
+    const cont=document.getElementById('tabs-container');
+    cont.innerHTML='';
+    const used=new Set(Object.values(dropAssignments));
+    elevations.forEach(elev=>{
         if (!used.has(elev)) return;
-        const tab = document.createElement('div');
-        tab.className = `tab ${activeTab === elev ? 'active' : ''}`;
-        tab.innerText = elev;
-        tab.onclick   = () => { activeTab = elev; refreshCurrentView(); if (currentMode === 'auto3d') buildProcedural3D(); };
-        container.appendChild(tab);
+        const tab=document.createElement('div');
+        tab.className=`tab ${activeTab===elev?'active':''}`;
+        tab.innerText=elev;
+        tab.onclick=()=>{activeTab=elev;refreshCurrentView();if(currentMode==='auto3d')buildProcedural3D();};
+        cont.appendChild(tab);
     });
-    if (!used.has(activeTab)) activeTab = used.size ? Array.from(used)[0] : '';
-    const grid = document.getElementById('building-container-2d');
-    grid.innerHTML = '';
-    if (currentMode === '2d') {
+    if (!used.has(activeTab)) activeTab=used.size?Array.from(used)[0]:'';
+    const grid=document.getElementById('building-container-2d');
+    grid.innerHTML='';
+    if (currentMode==='2d') {
         if (activeTab) grid.appendChild(generateWallDOM(activeTab));
-        else { const m = document.createElement('div'); m.style='padding:40px;color:#888;'; m.innerText='No wall selected.'; grid.appendChild(m); }
+        else {const m=document.createElement('div');m.style='padding:40px;color:#888;';m.innerText='No wall selected.';grid.appendChild(m);}
     }
 }
 
-function generateWallDOM(elevationName) {
-    const frag  = document.createDocumentFragment();
-    const drops = Object.keys(inspectionData).filter(d => dropAssignments[d] === elevationName).sort();
-    if (!drops.length) {
-        const e = document.createElement('div'); e.style='padding:40px;color:#888;'; e.innerText='No drops assigned.'; frag.appendChild(e); return frag;
-    }
-    let maxF = -Infinity, minF = Infinity;
-    drops.forEach(d => Object.keys(inspectionData[d]).map(Number).forEach(f => { maxF=Math.max(maxF,f); minF=Math.min(minF,f); }));
+function generateWallDOM(elevName) {
+    const frag=document.createDocumentFragment();
+    const drops=Object.keys(inspectionData).filter(d=>dropAssignments[d]===elevName).sort();
+    if (!drops.length){const e=document.createElement('div');e.style='padding:40px;color:#888;';e.innerText='No drops assigned.';frag.appendChild(e);return frag;}
+    let maxF=-Infinity,minF=Infinity;
+    drops.forEach(d=>Object.keys(inspectionData[d]).map(Number).forEach(f=>{maxF=Math.max(maxF,f);minF=Math.min(minF,f);}));
 
-    // Axis
-    const ax = document.createElement('div'); ax.className = 'drop-column floor-axis-column';
-    const axH = document.createElement('div'); axH.className = 'drop-header floor-axis-header'; axH.innerText='FL'; ax.appendChild(axH);
-    for (let f = maxF; f >= minF; f--) {
-        const r = document.createElement('div'); r.className='floor-row'; r.innerHTML=`<div class="floor-label">${f}F</div>`; ax.appendChild(r);
-    }
+    const ax=document.createElement('div');ax.className='drop-column floor-axis-column';
+    const axH=document.createElement('div');axH.className='drop-header floor-axis-header';axH.innerText='FL';ax.appendChild(axH);
+    for (let f=maxF;f>=minF;f--){const r=document.createElement('div');r.className='floor-row';r.innerHTML=`<div class="floor-label">${f}F</div>`;ax.appendChild(r);}
     frag.appendChild(ax);
 
-    const order = { L:1, C:2, R:3 };
-    drops.forEach(dropStr => {
-        const col = document.createElement('div'); col.className='drop-column';
-        col.innerHTML = `<div class="drop-header">DROP ${dropStr}</div>`;
-        for (let f = maxF; f >= minF; f--) {
-            const row = document.createElement('div'); row.className='floor-row';
-            const grp = document.createElement('div'); grp.className='window-group';
+    const order={L:1,C:2,R:3};
+    drops.forEach(dropStr=>{
+        const col=document.createElement('div');col.className='drop-column';
+        col.innerHTML=`<div class="drop-header">DROP ${dropStr}</div>`;
+        for (let f=maxF;f>=minF;f--) {
+            const row=document.createElement('div');row.className='floor-row';
+            const grp=document.createElement('div');grp.className='window-group';
             if (inspectionData[dropStr]?.[f]) {
-                Object.keys(inspectionData[dropStr][f]).sort((a,b)=>(order[a]||9)-(order[b]||9)).forEach(pos => {
-                    const data = inspectionData[dropStr][f][pos];
-                    const node = document.createElement('div');
-                    let isSL=false, isSR=false, fs=data.status;
-                    const pair = stitchedPairs.find(p=>p.includes(data.id));
-                    if (pair) { fs=getCombinedStatus(pair[0],pair[1]); isSL=pair[0]===data.id; isSR=pair[1]===data.id; }
+                Object.keys(inspectionData[dropStr][f]).sort((a,b)=>(order[a]||9)-(order[b]||9)).forEach(pos=>{
+                    const data=inspectionData[dropStr][f][pos];
+                    const node=document.createElement('div');
+                    let isSL=false,isSR=false,fs=data.status;
+                    const pair=stitchedPairs.find(p=>p.includes(data.id));
+                    if (pair){fs=getCombinedStatus(pair[0],pair[1]);isSL=pair[0]===data.id;isSR=pair[1]===data.id;}
                     node.className=`window-node ${fs}`;
                     if (activeFilter!=='ALL'&&fs!==activeFilter) node.classList.add('node-filtered-out');
                     node.onclick=()=>handleNodeClick(data,node);
 
                     // Position label
-                    const posLbl = document.createElement('div'); posLbl.innerText=pos; node.appendChild(posLbl);
+                    const lbl=document.createElement('div');lbl.innerText=pos;node.appendChild(lbl);
 
-                    // IR dot indicator
-                    const irName = nodeIRName(data);
-                    const hasPhoto = !!(irName && imageBank[irName]);
-                    const hasRef   = !!(data.flirIR || manualLinks[data.id]);
-                    if (hasRef || hasPhoto) {
-                        const dot = document.createElement('div');
-                        dot.className = 'photo-dot-ir' + (hasPhoto ? '' : ' missing');
-                        dot.title = hasPhoto ? '🌡 IR loaded (DC embedded)' : 'IR ref — re-upload ZIP';
-                        node.appendChild(dot);
+                    // Photo count badge
+                    const names=nodePhotoNames(data);
+                    if (names.length>0||data.flirIR) {
+                        const badge=document.createElement('div');
+                        badge.className='photo-badge'+(names.length===0?' missing':'');
+                        badge.innerText=names.length>0?`📷 ${names.length}`:'📷 ?';
+                        badge.title=names.length>0?`${names.length} photo(s) linked`:'Reference exists — re-upload ZIP';
+                        node.appendChild(badge);
                     }
 
-                    if (nodeHasPhoto(data)) node.style.border = '2px solid rgba(255,255,255,0.7)';
+                    if (nodeHasPhoto(data)) node.style.border='2px solid rgba(255,255,255,0.7)';
 
-                    if (isSL) {
-                        node.style.borderTopRightRadius='0'; node.style.borderBottomRightRadius='0'; node.style.borderRight='none'; node.style.zIndex='5';
-                        const bridge=document.createElement('div'); bridge.className=`stitch-bridge ${fs}`; node.appendChild(bridge);
-                    }
-                    if (isSR) { node.style.borderTopLeftRadius='0'; node.style.borderBottomLeftRadius='0'; node.style.borderLeft='none'; node.style.zIndex='6'; }
+                    if (isSL){node.style.borderTopRightRadius='0';node.style.borderBottomRightRadius='0';node.style.borderRight='none';node.style.zIndex='5';const bridge=document.createElement('div');bridge.className=`stitch-bridge ${fs}`;node.appendChild(bridge);}
+                    if (isSR){node.style.borderTopLeftRadius='0';node.style.borderBottomLeftRadius='0';node.style.borderLeft='none';node.style.zIndex='6';}
                     grp.appendChild(node);
                 });
-            } else { const v=document.createElement('div'); v.className='window-node status-void'; grp.appendChild(v); }
-            row.appendChild(grp); col.appendChild(row);
+            } else {const v=document.createElement('div');v.className='window-node status-void';grp.appendChild(v);}
+            row.appendChild(grp);col.appendChild(row);
         }
         frag.appendChild(col);
     });
     return frag;
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // MODAL
-// ═══════════════════════════════════════════════════════════════════
-
-// Per-photo toggle state: { [cleanName]: 'ir' | 'dc' }
-const photoViewState = {};
-
+// ═══════════════════════════════════════════════════════
 function buildPhotoArea(nodes) {
-    const area = document.getElementById('m-photo-area');
-    area.innerHTML = '';
-    const stale = document.getElementById('m-stale-banner');
-    let anyStale = false, anyPhoto = false;
+    const area=document.getElementById('m-photo-area');
+    area.innerHTML='';
+    document.getElementById('m-stale-banner').style.display='none';
 
-    nodes.forEach(node => {
+    let anyPhoto=false, anyStale=false;
+
+    nodes.forEach(node=>{
         if (!node) return;
-        const irName = nodeIRName(node);
-        if (!irName) return; // no ref at all — show drop slot
+        const names=nodePhotoNames(node);
 
-        const entry = imageBank[irName];
-        if (!entry) { anyStale = true; return; }
+        // Check for stale refs (name in node.photos but not in imageBank)
+        const allRefs=[...(node.photos||[]),...(manualLinks[node.id]||[])];
+        const stale=allRefs.filter(n=>!imageBank[n]);
+        if (stale.length) anyStale=true;
 
-        anyPhoto = true;
-        if (!photoViewState[irName]) photoViewState[irName] = 'ir';
-        const hasDC = !!entry.dcUrl;
+        names.forEach(irName=>{
+            const entry=imageBank[irName];
+            if (!entry) return;
+            anyPhoto=true;
+            if (!photoViewState[irName]) photoViewState[irName]='ir';
+            const hasDC=!!entry.dcUrl;
 
-        // Toggle bar
-        const toggleBar = document.createElement('div');
-        toggleBar.className = 'photo-toggle-bar';
+            const wrap=document.createElement('div');wrap.className='photo-entry';
 
-        const nameLbl = document.createElement('div');
-        nameLbl.className = 'photo-name-label';
-        nameLbl.innerText = irName;
+            // Toggle bar
+            const bar=document.createElement('div');bar.className='photo-toggle-bar';
+            const nl=document.createElement('div');nl.className='photo-name-label';nl.innerText=irName;
+            const pill=document.createElement('div');
+            pill.className=`toggle-pill${hasDC?'':' no-dc'}${photoViewState[irName]==='dc'?' showing-dc':''}`;
+            pill.innerHTML='<span class="pill-ir">🌡 IR</span><span class="pill-dc">📷 DC</span>';
+            pill.title=hasDC?'Toggle IR / DC view':'DC not extracted (camera setting)';
+            pill.onclick=()=>{
+                if (!hasDC) return;
+                photoViewState[irName]=photoViewState[irName]==='ir'?'dc':'ir';
+                pill.classList.toggle('showing-dc',photoViewState[irName]==='dc');
+                img.src=photoViewState[irName]==='dc'?entry.dcUrl:entry.url;
+            };
+            bar.appendChild(nl);bar.appendChild(pill);wrap.appendChild(bar);
 
-        const pill = document.createElement('div');
-        pill.className = `toggle-pill${hasDC ? '' : ' no-dc'}${photoViewState[irName]==='dc'?' showing-dc':''}`;
-        pill.innerHTML = '<span class="pill-ir">🌡 IR</span><span class="pill-dc">📷 DC</span>';
-        pill.title = hasDC ? 'Toggle between thermal and visual' : 'DC not available for this file';
-        pill.onclick = () => {
-            if (!hasDC) return;
-            photoViewState[irName] = photoViewState[irName] === 'ir' ? 'dc' : 'ir';
-            pill.classList.toggle('showing-dc', photoViewState[irName] === 'dc');
-            img.src = photoViewState[irName] === 'dc' ? entry.dcUrl : entry.url;
-        };
-
-        toggleBar.appendChild(nameLbl);
-        toggleBar.appendChild(pill);
-        area.appendChild(toggleBar);
-
-        // Photo
-        const wrap = document.createElement('div'); wrap.className='photo-viewer-wrap';
-        const img  = document.createElement('img');
-        img.src = photoViewState[irName] === 'dc' && hasDC ? entry.dcUrl : entry.url;
-
-        // Click → lightbox
-        img.onclick = () => {
-            // Collect all IR names across all nodes in this modal
-            const allNames = nodes.flatMap(n => n ? [nodeIRName(n)].filter(Boolean) : []).filter(nm => imageBank[nm]);
-            const currentShowingDC = photoViewState[irName] === 'dc';
-            openLightbox(allNames, allNames.indexOf(irName), currentShowingDC);
-        };
-        wrap.appendChild(img);
-        area.appendChild(wrap);
+            // Image
+            const vw=document.createElement('div');vw.className='photo-viewer-wrap';
+            const img=document.createElement('img');
+            img.src=photoViewState[irName]==='dc'&&hasDC?entry.dcUrl:entry.url;
+            img.onclick=()=>{
+                const allNames=nodes.flatMap(n=>n?nodePhotoNames(n):[]);
+                openLightbox(allNames,allNames.indexOf(irName),photoViewState[irName]==='dc');
+            };
+            vw.appendChild(img);wrap.appendChild(vw);
+            area.appendChild(wrap);
+        });
     });
 
-    stale.style.display = (anyStale && !anyPhoto) ? 'block' : 'none';
+    if (anyStale) document.getElementById('m-stale-banner').style.display='block';
+    if (!anyPhoto) {
+        const nb=document.createElement('div');nb.className='no-photo-banner';
+        nb.innerText='No photos linked to this window.';
+        area.appendChild(nb);
+    }
 
-    // Drop slot — always shown if no photo or as an "add more" option
-    const slot = document.createElement('div');
-    slot.className = 'drop-slot';
-    slot.innerHTML = '<span>🌡</span><span>Drop IR photo here or click to browse</span>';
+    // Manual drop slot
+    const slot=document.createElement('div');slot.className='drop-slot';
+    slot.innerHTML='<span>🌡</span><span>Drop or click to manually add an IR photo</span>';
     setupDropSlot(slot, nodes[0]?.id);
     area.appendChild(slot);
 }
 
 function openModal(nodeId) {
-    const primary = getNodeData(nodeId);
-    if (!primary) { console.warn('openModal: no data for', nodeId); return; }
-    modalNodeId = nodeId;
+    const primary=getNodeData(nodeId);
+    if (!primary){console.warn('openModal: no data for',nodeId);return;}
+    modalNodeId=nodeId;
 
-    const pair = stitchedPairs.find(p=>p.includes(nodeId));
-    activeNodeDataArray = [];
-    if (pair) {
-        const d0=getNodeData(pair[0]), d1=getNodeData(pair[1]);
+    const pair=stitchedPairs.find(p=>p.includes(nodeId));
+    activeNodeDataArray=[];
+    if (pair){
+        const d0=getNodeData(pair[0]),d1=getNodeData(pair[1]);
         if (d0) activeNodeDataArray.push(d0);
         if (d1) activeNodeDataArray.push(d1);
-        document.getElementById('btn-unmerge').style.display = 'block';
+        document.getElementById('btn-unmerge').style.display='block';
     } else {
         activeNodeDataArray.push(primary);
-        document.getElementById('btn-unmerge').style.display = 'none';
+        document.getElementById('btn-unmerge').style.display='none';
     }
 
-    const hasTag = saved3DTags[nodeId] || (pair && (saved3DTags[pair[0]] || saved3DTags[pair[1]]));
-    document.getElementById('btn-unpin').style.display  = hasTag ? 'block' : 'none';
-    document.getElementById('btn-retag').style.display  = hasTag ? 'block' : 'none';
+    const hasTag=saved3DTags[nodeId]||(pair&&(saved3DTags[pair[0]]||saved3DTags[pair[1]]));
+    document.getElementById('btn-unpin').style.display =hasTag?'block':'none';
+    document.getElementById('btn-retag').style.display =hasTag?'block':'none';
 
-    document.getElementById('m-id').innerText    = activeNodeDataArray.map(d=>d.id).join(' + ');
-    document.getElementById('m-tech').innerText  = 'Logged by: ' + [...new Set(activeNodeDataArray.map(d=>d.tech).filter(Boolean))].join(', ');
-    const allFinds = [...new Set(activeNodeDataArray.flatMap(d=>d.finds.split(' | ')))].filter(f=>f!=='CLEAR'&&f!=='');
-    const finds = allFinds.length ? allFinds : ['CLEAR'];
-    document.getElementById('m-finds').innerText   = finds.join(' | ');
-    document.getElementById('m-finds').style.color = finds.includes('CLEAR') ? '#28a745' : '#f1c40f';
-    document.getElementById('m-row-proved').style.display = finds.includes('MOISTURE') ? 'flex' : 'none';
-    document.getElementById('m-proved').innerText  = activeNodeDataArray.some(d=>d.proved==='YES') ? 'YES' : 'NO';
-    document.getElementById('m-notes').value       = activeNodeDataArray.map(d=>d.notes||'').filter(n=>n.trim()).join('\n');
+    document.getElementById('m-id').innerText   =activeNodeDataArray.map(d=>d.id).join(' + ');
+    document.getElementById('m-tech').innerText ='Logged by: '+[...new Set(activeNodeDataArray.map(d=>d.tech).filter(Boolean))].join(', ');
+    const allFinds=[...new Set(activeNodeDataArray.flatMap(d=>d.finds.split(' | ')))].filter(f=>f!=='CLEAR'&&f!=='');
+    const finds=allFinds.length?allFinds:['CLEAR'];
+    document.getElementById('m-finds').innerText   =finds.join(' | ');
+    document.getElementById('m-finds').style.color =finds.includes('CLEAR')?'#28a745':'#f1c40f';
+    document.getElementById('m-row-proved').style.display=finds.includes('MOISTURE')?'flex':'none';
+    document.getElementById('m-proved').innerText  =activeNodeDataArray.some(d=>d.proved==='YES')?'YES':'NO';
+    document.getElementById('m-notes').value       =activeNodeDataArray.map(d=>d.notes||'').filter(n=>n.trim()).join('\n');
 
     buildPhotoArea(activeNodeDataArray);
-    document.getElementById('info-modal').style.display = 'flex';
+    document.getElementById('info-modal').style.display='flex';
 }
 
-function unmergeCurrent() {
-    if (activeNodeDataArray[0]) {
-        const idx = stitchedPairs.findIndex(p=>p.includes(activeNodeDataArray[0].id));
-        if (idx !== -1) { stitchedPairs.splice(idx,1); closeModal(); calculateBuildingGeometry(); saveCommandState(); if(currentMode==='2d')refreshCurrentView(); if(currentMode==='auto3d')buildProcedural3D(); }
-    }
-}
-function changeStatus(s) {
-    const note = document.getElementById('m-notes').value;
-    activeNodeDataArray.forEach(d=>{if(d){d.notes=note;d.status=s;}});
-    calculateBuildingGeometry(); saveCommandState(); if(currentMode==='2d')refreshCurrentView(); if(currentMode==='auto3d')buildProcedural3D(); closeModal();
-}
-function saveNotesOnly() {
-    const note = document.getElementById('m-notes').value;
-    activeNodeDataArray.forEach(d=>{if(d)d.notes=note;});
-    calculateBuildingGeometry(); saveCommandState(); if(currentMode==='2d')refreshCurrentView(); if(currentMode==='auto3d')buildProcedural3D(); closeModal();
-}
-function unpinCurrent() {
-    if(confirm('Remove 3D pin? Window data stays safe.')) {
-        activeNodeDataArray.forEach(d=>{if(d&&saved3DTags[d.id])delete saved3DTags[d.id];});
-        render3DHotspots(); saveCommandState(); closeModal();
-    }
-}
-function closeModal() { document.getElementById('info-modal').style.display='none'; activeNodeDataArray=[]; modalNodeId=null; }
+function unmergeCurrent(){if(activeNodeDataArray[0]){const idx=stitchedPairs.findIndex(p=>p.includes(activeNodeDataArray[0].id));if(idx!==-1){stitchedPairs.splice(idx,1);closeModal();calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();if(currentMode==='auto3d')buildProcedural3D();}}}
+function changeStatus(s){const note=document.getElementById('m-notes').value;activeNodeDataArray.forEach(d=>{if(d){d.notes=note;d.status=s;}});calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();if(currentMode==='auto3d')buildProcedural3D();closeModal();}
+function saveNotesOnly(){const note=document.getElementById('m-notes').value;activeNodeDataArray.forEach(d=>{if(d)d.notes=note;});calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();if(currentMode==='auto3d')buildProcedural3D();closeModal();}
+function unpinCurrent(){if(confirm('Remove 3D pin?')){activeNodeDataArray.forEach(d=>{if(d&&saved3DTags[d.id])delete saved3DTags[d.id];});render3DHotspots();saveCommandState();closeModal();}}
+function closeModal(){document.getElementById('info-modal').style.display='none';activeNodeDataArray=[];modalNodeId=null;}
 
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // RESET
-// ═══════════════════════════════════════════════════════════════════
-function resetBoard() {
-    if (!confirm('Clear all data and start over?')) return;
+// ═══════════════════════════════════════════════════════
+function resetBoard(){
+    if (!confirm('Clear all data?')) return;
     localStorage.removeItem('strataCommandState');
-    inspectionData={}; imageBank={}; stitchedPairs=[]; projectInfo='Unknown Project';
-    elevations=[]; dropAssignments={}; saved3DTags={}; activeTab=''; manualLinks={};
-    activeNodeDataArray=[]; modalNodeId=null;
-    document.getElementById('project-name').innerText = 'Awaiting Data...';
+    // Revoke all blob URLs
+    Object.values(imageBank).forEach(v=>{if(v.url)URL.revokeObjectURL(v.url);if(v.dcUrl)URL.revokeObjectURL(v.dcUrl);});
+    inspectionData={};imageBank={};stitchedPairs=[];projectInfo='Unknown Project';
+    elevations=[];dropAssignments={};saved3DTags={};activeTab='';manualLinks={};
+    activeNodeDataArray=[];modalNodeId=null;
+    document.getElementById('project-name').innerText='Awaiting Data...';
     document.getElementById('top-reload-banner').style.display='none';
     ['dashboard-screen','mapping-screen','btn-save-project','btn-edit-map','btn-reset','btn-start-mapping']
-        .forEach(id=>{ document.getElementById(id).style.display='none'; });
+        .forEach(id=>{document.getElementById(id).style.display='none';});
     viewer.src='https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/LittlestTokyo.glb';
     document.getElementById('model-status').innerHTML='Showing Default Test Model.';
     updatePhotoStat();
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // MAPPING
-// ═══════════════════════════════════════════════════════════════════
-function openMappingScreen()  { document.getElementById('btn-start-mapping').style.display='none'; document.getElementById('mapping-screen').style.display='block'; renderMappingList(); }
-function editMapping()        { document.getElementById('dashboard-screen').style.display='none'; document.getElementById('mapping-screen').style.display='block'; document.getElementById('btn-save-project').style.display='none'; document.getElementById('btn-edit-map').style.display='none'; renderMappingList(); }
-function addElevation()       {
-    const input=document.getElementById('new-elevation-name'), val=input.value.trim();
-    if(val&&!elevations.includes(val)){elevations.push(val);if(elevations.length===1){activeTab=val;Object.keys(dropAssignments).forEach(d=>{if(!dropAssignments[d])dropAssignments[d]=val;});}input.value='';saveCommandState();renderMappingList();}
-}
-function renderMappingList() {
-    const list=document.getElementById('mapping-list'); list.innerHTML=''; const drops=Object.keys(inspectionData).sort();
-    if(!elevations.length&&drops.length){const w=document.createElement('div');w.style='color:#f1c40f;margin-bottom:15px;font-weight:bold;';w.innerText='⚠️ Add at least one wall above.';list.appendChild(w);}
-    drops.forEach(d=>{
-        const row=document.createElement('div');row.className='mapping-row';row.innerHTML=`<strong style="font-size:1.2rem;color:#0cf;">DROP ${d}</strong>`;
-        const sel=document.createElement('select');sel.onchange=e=>{dropAssignments[d]=e.target.value;saveCommandState();};
-        if(!elevations.length){const o=document.createElement('option');o.value='';o.innerText='Awaiting Wall...';sel.appendChild(o);sel.disabled=true;}
-        else{sel.disabled=false;elevations.forEach(elev=>{const o=document.createElement('option');o.value=elev;o.innerText=elev;if(dropAssignments[d]===elev)o.selected=true;sel.appendChild(o);});}
-        row.appendChild(sel);list.appendChild(row);
-    });
-}
-function generateDashboard() {
-    if(!elevations.length){alert('⚠️ Add at least one wall first.');return;}
-    document.getElementById('mapping-screen').style.display='none'; document.getElementById('dashboard-screen').style.display='flex';
-    document.getElementById('btn-save-project').style.display='inline-block'; document.getElementById('btn-edit-map').style.display='inline-block';
-    if(!elevations.includes(activeTab))activeTab=elevations[0];
-    calculateBuildingGeometry();saveCommandState();if(currentMode==='2d'||currentMode==='auto3d')refreshCurrentView();if(currentMode==='auto3d')buildProcedural3D();
-}
+// ═══════════════════════════════════════════════════════
+function openMappingScreen(){document.getElementById('btn-start-mapping').style.display='none';document.getElementById('mapping-screen').style.display='block';renderMappingList();}
+function editMapping(){document.getElementById('dashboard-screen').style.display='none';document.getElementById('mapping-screen').style.display='block';document.getElementById('btn-save-project').style.display='none';document.getElementById('btn-edit-map').style.display='none';renderMappingList();}
+function addElevation(){const inp=document.getElementById('new-elevation-name'),val=inp.value.trim();if(val&&!elevations.includes(val)){elevations.push(val);if(elevations.length===1){activeTab=val;Object.keys(dropAssignments).forEach(d=>{if(!dropAssignments[d])dropAssignments[d]=val;});}inp.value='';saveCommandState();renderMappingList();}}
+function renderMappingList(){const list=document.getElementById('mapping-list');list.innerHTML='';const drops=Object.keys(inspectionData).sort();if(!elevations.length&&drops.length){const w=document.createElement('div');w.style='color:#f1c40f;margin-bottom:15px;font-weight:bold;';w.innerText='⚠️ Add at least one wall above.';list.appendChild(w);}drops.forEach(d=>{const row=document.createElement('div');row.className='mapping-row';row.innerHTML=`<strong style="font-size:1.2rem;color:#0cf;">DROP ${d}</strong>`;const sel=document.createElement('select');sel.onchange=e=>{dropAssignments[d]=e.target.value;saveCommandState();};if(!elevations.length){const o=document.createElement('option');o.value='';o.innerText='Awaiting Wall...';sel.appendChild(o);sel.disabled=true;}else{sel.disabled=false;elevations.forEach(elev=>{const o=document.createElement('option');o.value=elev;o.innerText=elev;if(dropAssignments[d]===elev)o.selected=true;sel.appendChild(o);});}row.appendChild(sel);list.appendChild(row);});}
+function generateDashboard(){if(!elevations.length){alert('⚠️ Add at least one wall first.');return;}document.getElementById('mapping-screen').style.display='none';document.getElementById('dashboard-screen').style.display='flex';document.getElementById('btn-save-project').style.display='inline-block';document.getElementById('btn-edit-map').style.display='inline-block';if(!elevations.includes(activeTab))activeTab=elevations[0];calculateBuildingGeometry();saveCommandState();if(currentMode==='2d'||currentMode==='auto3d')refreshCurrentView();if(currentMode==='auto3d')buildProcedural3D();}
 
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // 3D TAGGING
-// ═══════════════════════════════════════════════════════════════════
-function openMasterTagMenu() {
-    document.getElementById('tag-master-modal').style.display='flex';
-    const ss=document.getElementById('tag-single-select'); ss.innerHTML='';
-    const all=[]; Object.keys(inspectionData).forEach(d=>Object.keys(inspectionData[d]).forEach(f=>Object.keys(inspectionData[d][f]).forEach(p=>all.push(inspectionData[d][f][p]))));
-    all.sort((a,b)=>a.id.localeCompare(b.id)).forEach(data=>{const o=document.createElement('option');o.value=data.id;o.innerText=`${data.id} (${data.finds.split('|')[0]})`;ss.appendChild(o);});
-    const ds=document.getElementById('tag-drop-select');ds.innerHTML='';Object.keys(inspectionData).sort().forEach(d=>{const o=document.createElement('option');o.value=d;o.innerText=`Drop ${d}`;ds.appendChild(o);});
-    const ws=document.getElementById('tag-wall-select');ws.innerHTML='';elevations.forEach(e=>{const o=document.createElement('option');o.value=e;o.innerText=`Wall: ${e}`;ws.appendChild(o);});
-}
-function closeMasterTagMenu(){ document.getElementById('tag-master-modal').style.display='none'; }
-function activateTaggingUI(instructions){ closeMasterTagMenu();document.querySelectorAll('.tag-toggle').forEach(b=>b.classList.add('tag-mode-on'));viewer.autoRotate=false;viewer.style.cursor='crosshair';document.getElementById('tag-instruction-bar').style.display='block';document.getElementById('tag-instruction-text').innerText=instructions; }
-function cancelBulkTag(){ bulkTagState={mode:null,targetId:null,step:0,anchors:[]};document.querySelectorAll('.tag-toggle').forEach(b=>b.classList.remove('tag-mode-on'));viewer.autoRotate=true;viewer.style.cursor='default';document.getElementById('tag-instruction-bar').style.display='none'; }
-function startSingleTag(){ bulkTagState={mode:'single',targetId:document.getElementById('tag-single-select').value,step:0,anchors:[]};activateTaggingUI(`Double-click exact location for ${bulkTagState.targetId}`); }
-function startDropTag()  { bulkTagState={mode:'drop',  targetId:document.getElementById('tag-drop-select').value,  step:0,anchors:[]};activateTaggingUI(`Step 1 of 2: Double-click TOP centre of Drop ${bulkTagState.targetId}`); }
-function startWallTag()  { bulkTagState={mode:'wall',  targetId:document.getElementById('tag-wall-select').value,  step:0,anchors:[]};activateTaggingUI(`Step 1 of 4: Double-click TOP-LEFT corner of Wall: ${bulkTagState.targetId}`); }
-function startReTag()    { const id=activeNodeDataArray[0]?.id;if(!id)return;closeModal();bulkTagState={mode:'retag',targetId:id,step:0,anchors:[]};activateTaggingUI(`Double-click new location for ${id}`); }
-function parseCoord(c)   { return c&&c.x!==undefined?[c.x,c.y,c.z]:[0,0,0]; }
+// ═══════════════════════════════════════════════════════
+function openMasterTagMenu(){document.getElementById('tag-master-modal').style.display='flex';const ss=document.getElementById('tag-single-select');ss.innerHTML='';const all=[];Object.keys(inspectionData).forEach(d=>Object.keys(inspectionData[d]).forEach(f=>Object.keys(inspectionData[d][f]).forEach(p=>all.push(inspectionData[d][f][p]))));all.sort((a,b)=>a.id.localeCompare(b.id)).forEach(data=>{const o=document.createElement('option');o.value=data.id;o.innerText=`${data.id} (${data.finds.split('|')[0]})`;ss.appendChild(o);});const ds=document.getElementById('tag-drop-select');ds.innerHTML='';Object.keys(inspectionData).sort().forEach(d=>{const o=document.createElement('option');o.value=d;o.innerText=`Drop ${d}`;ds.appendChild(o);});const ws=document.getElementById('tag-wall-select');ws.innerHTML='';elevations.forEach(e=>{const o=document.createElement('option');o.value=e;o.innerText=`Wall: ${e}`;ws.appendChild(o);});}
+function closeMasterTagMenu(){document.getElementById('tag-master-modal').style.display='none';}
+function activateTaggingUI(instr){closeMasterTagMenu();document.querySelectorAll('.tag-toggle').forEach(b=>b.classList.add('tag-mode-on'));viewer.autoRotate=false;viewer.style.cursor='crosshair';document.getElementById('tag-instruction-bar').style.display='block';document.getElementById('tag-instruction-text').innerText=instr;}
+function cancelBulkTag(){bulkTagState={mode:null,targetId:null,step:0,anchors:[]};document.querySelectorAll('.tag-toggle').forEach(b=>b.classList.remove('tag-mode-on'));viewer.autoRotate=true;viewer.style.cursor='default';document.getElementById('tag-instruction-bar').style.display='none';}
+function startSingleTag(){bulkTagState={mode:'single',targetId:document.getElementById('tag-single-select').value,step:0,anchors:[]};activateTaggingUI(`Double-click exact location for ${bulkTagState.targetId}`);}
+function startDropTag(){bulkTagState={mode:'drop',targetId:document.getElementById('tag-drop-select').value,step:0,anchors:[]};activateTaggingUI(`Step 1/2: Double-click TOP centre of Drop ${bulkTagState.targetId}`);}
+function startWallTag(){bulkTagState={mode:'wall',targetId:document.getElementById('tag-wall-select').value,step:0,anchors:[]};activateTaggingUI(`Step 1/4: Double-click TOP-LEFT corner of Wall: ${bulkTagState.targetId}`);}
+function startReTag(){const id=activeNodeDataArray[0]?.id;if(!id)return;closeModal();bulkTagState={mode:'retag',targetId:id,step:0,anchors:[]};activateTaggingUI(`Double-click new location for ${id}`);}
+function parseCoord(c){return c&&c.x!==undefined?[c.x,c.y,c.z]:[0,0,0];}
 
-viewer.addEventListener('dblclick', event => {
+viewer.addEventListener('dblclick',event=>{
     if (!bulkTagState.mode) return;
-    const hit=viewer.positionAndNormalFromPoint(event.clientX,event.clientY); if(!hit)return;
-    const pos_str=`${hit.position.x} ${hit.position.y} ${hit.position.z}`, norm_str=`${hit.normal.x} ${hit.normal.y} ${hit.normal.z}`;
-    if(bulkTagState.mode==='single'||bulkTagState.mode==='retag'){saved3DTags[bulkTagState.targetId]={position:pos_str,normal:norm_str};render3DHotspots();saveCommandState();cancelBulkTag();return;}
-    if(bulkTagState.mode==='drop'){bulkTagState.anchors.push(hit);bulkTagState.step++;if(bulkTagState.step===1)document.getElementById('tag-instruction-text').innerText=`Step 2 of 2: Double-click BOTTOM centre of Drop ${bulkTagState.targetId}`;else if(bulkTagState.step===2){processDropTagging(bulkTagState.targetId,bulkTagState.anchors);cancelBulkTag();}return;}
-    if(bulkTagState.mode==='wall'){bulkTagState.anchors.push(hit);bulkTagState.step++;const steps=['','Step 2 of 4: TOP-RIGHT corner','Step 3 of 4: BOTTOM-LEFT corner','Step 4 of 4: BOTTOM-RIGHT corner'];if(bulkTagState.step<4)document.getElementById('tag-instruction-text').innerText=steps[bulkTagState.step];else{processWallTagging(bulkTagState.targetId,bulkTagState.anchors);cancelBulkTag();}}
+    const hit=viewer.positionAndNormalFromPoint(event.clientX,event.clientY);if(!hit)return;
+    const ps=`${hit.position.x} ${hit.position.y} ${hit.position.z}`,ns=`${hit.normal.x} ${hit.normal.y} ${hit.normal.z}`;
+    if(bulkTagState.mode==='single'||bulkTagState.mode==='retag'){saved3DTags[bulkTagState.targetId]={position:ps,normal:ns};render3DHotspots();saveCommandState();cancelBulkTag();return;}
+    if(bulkTagState.mode==='drop'){bulkTagState.anchors.push(hit);bulkTagState.step++;if(bulkTagState.step===1)document.getElementById('tag-instruction-text').innerText=`Step 2/2: Double-click BOTTOM centre of Drop ${bulkTagState.targetId}`;else if(bulkTagState.step===2){processDropTagging(bulkTagState.targetId,bulkTagState.anchors);cancelBulkTag();}return;}
+    if(bulkTagState.mode==='wall'){bulkTagState.anchors.push(hit);bulkTagState.step++;const steps=['','Step 2/4: TOP-RIGHT corner','Step 3/4: BOTTOM-LEFT corner','Step 4/4: BOTTOM-RIGHT corner'];if(bulkTagState.step<4)document.getElementById('tag-instruction-text').innerText=steps[bulkTagState.step];else{processWallTagging(bulkTagState.targetId,bulkTagState.anchors);cancelBulkTag();}}
 });
 
 function processDropTagging(dropId,anchors){const floors=Object.keys(inspectionData[dropId]).map(Number).sort((a,b)=>b-a);if(!floors.length)return;const maxF=floors[0],minF=floors[floors.length-1],fRange=maxF-minF,pT=parseCoord(anchors[0].position),pB=parseCoord(anchors[1].position),norm=`${anchors[0].normal.x} ${anchors[0].normal.y} ${anchors[0].normal.z}`,rLen=Math.sqrt(anchors[0].normal.z**2+anchors[0].normal.x**2),rX=rLen===0?1:anchors[0].normal.z/rLen,rZ=rLen===0?0:-anchors[0].normal.x/rLen,om={L:-1,C:0,R:1};floors.forEach(f=>{const t=fRange===0?0:(maxF-f)/fRange,cx=pT[0]+(pB[0]-pT[0])*t,cy=pT[1]+(pB[1]-pT[1])*t,cz=pT[2]+(pB[2]-pT[2])*t;Object.keys(inspectionData[dropId][f]).forEach(pos=>{const off=om[pos]??0;saved3DTags[`${dropId}-${f}-${pos}`]={position:`${cx+rX*off*0.8} ${cy} ${cz+rZ*off*0.8}`,normal:norm};});});render3DHotspots();saveCommandState();}
@@ -1533,15 +1414,15 @@ function processWallTagging(wallName,anchors){const drops=Object.keys(dropAssign
 function render3DHotspots(){viewer.querySelectorAll('.hotspot-dot').forEach(el=>el.remove());Object.keys(saved3DTags).forEach(id=>{const data=getNodeData(id);if(!data)return;let fs=data.status;const pair=stitchedPairs.find(p=>p.includes(data.id));if(pair)fs=getCombinedStatus(pair[0],pair[1]);if(activeFilter!=='ALL'&&fs!==activeFilter)return;const btn=document.createElement('button');btn.slot=`hotspot-${id}`;btn.dataset.position=saved3DTags[id].position;btn.dataset.normal=saved3DTags[id].normal;btn.className=`hotspot-dot ${fs}`;btn.onclick=()=>openModal(id);const lbl=document.createElement('div');lbl.className='hotspot-label';lbl.innerText=id;btn.appendChild(lbl);viewer.appendChild(btn);});}
 function toggleFullScreen(id){const el=document.getElementById(id);if(!document.fullscreenElement){if(el.requestFullscreen)el.requestFullscreen();}else{if(document.exitFullscreen)document.exitFullscreen();}}
 
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // AUTO 3D
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 let auto3dRenderer=null,auto3dScene=null,auto3dCamera=null,auto3dControls=null,auto3dAnimId=null;
 function buildProcedural3D(){
     const container=document.getElementById('procedural-3d-container');
-    if(!auto3dRenderer){
+    if (!auto3dRenderer){
         const OC=getOrbitControls();
-        if(!OC){container.innerHTML='<div style="color:#f1c40f;padding:20px;font-weight:bold;">⚠️ Auto 3D unavailable: THREE.OrbitControls failed to load.</div>';return;}
+        if(!OC){container.innerHTML='<div style="color:#f1c40f;padding:20px;font-weight:bold;">⚠️ THREE.OrbitControls failed to load.</div>';return;}
         auto3dRenderer=new THREE.WebGLRenderer({antialias:true,alpha:true});container.appendChild(auto3dRenderer.domElement);
         auto3dCamera=new THREE.PerspectiveCamera(60,container.clientWidth/container.clientHeight,0.1,2000);
         auto3dControls=new OC(auto3dCamera,auto3dRenderer.domElement);auto3dControls.enableDamping=true;auto3dControls.dampingFactor=0.1;
@@ -1565,78 +1446,45 @@ function buildProcedural3D(){
     function animate(){auto3dAnimId=requestAnimationFrame(animate);auto3dRenderer.render(auto3dScene,auto3dCamera);auto3dControls.update();}animate();
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// LIGHTBOX with IR/DC TOGGLE
-// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// LIGHTBOX
+// ═══════════════════════════════════════════════════════
 let lbScale=1,lbPanning=false,lbPX=0,lbPY=0,lbSX=0,lbSY=0,lbPtrs=[],lbInitDist=null,lbInitScale=1;
-const lbImg = document.getElementById('lightbox-img');
+let lbNames=[],lbIndex=0,lbShowDC=false;
+const lbImg=document.getElementById('lightbox-img');
 
-// Lightbox state
-let lbNames = [];       // array of IR clean names currently in lightbox
-let lbIndex = 0;        // current index
-let lbShowDC = false;   // whether we're showing DC view
-
-function initLightboxZoom() {
-    lbImg.addEventListener('pointerdown', e => {
-        lbPtrs.push(e);
-        if (lbPtrs.length===1){lbSX=e.clientX-lbPX;lbSY=e.clientY-lbPY;lbPanning=true;}
-        else if(lbPtrs.length===2){lbPanning=false;lbInitDist=Math.hypot(lbPtrs[0].clientX-lbPtrs[1].clientX,lbPtrs[0].clientY-lbPtrs[1].clientY);lbInitScale=lbScale;}
-    });
-    lbImg.addEventListener('pointermove', e => {
-        e.preventDefault();
-        for(let i=0;i<lbPtrs.length;i++)if(lbPtrs[i].pointerId===e.pointerId)lbPtrs[i]=e;
-        if(lbPtrs.length===1&&lbPanning){lbPX=e.clientX-lbSX;lbPY=e.clientY-lbSY;setLbT();}
-        else if(lbPtrs.length===2){const d=Math.hypot(lbPtrs[0].clientX-lbPtrs[1].clientX,lbPtrs[0].clientY-lbPtrs[1].clientY);lbScale=Math.min(Math.max(1,lbInitScale*(d/lbInitDist)),15);setLbT();}
-    });
+function initLightboxZoom(){
+    lbImg.addEventListener('pointerdown',e=>{lbPtrs.push(e);if(lbPtrs.length===1){lbSX=e.clientX-lbPX;lbSY=e.clientY-lbPY;lbPanning=true;}else if(lbPtrs.length===2){lbPanning=false;lbInitDist=Math.hypot(lbPtrs[0].clientX-lbPtrs[1].clientX,lbPtrs[0].clientY-lbPtrs[1].clientY);lbInitScale=lbScale;}});
+    lbImg.addEventListener('pointermove',e=>{e.preventDefault();for(let i=0;i<lbPtrs.length;i++)if(lbPtrs[i].pointerId===e.pointerId)lbPtrs[i]=e;if(lbPtrs.length===1&&lbPanning){lbPX=e.clientX-lbSX;lbPY=e.clientY-lbSY;setLbT();}else if(lbPtrs.length===2){const d=Math.hypot(lbPtrs[0].clientX-lbPtrs[1].clientX,lbPtrs[0].clientY-lbPtrs[1].clientY);lbScale=Math.min(Math.max(1,lbInitScale*(d/lbInitDist)),15);setLbT();}});
     const rmP=e=>{lbPtrs=lbPtrs.filter(p=>p.pointerId!==e.pointerId);if(lbPtrs.length<2)lbInitDist=null;if(lbPtrs.length===1){lbSX=lbPtrs[0].clientX-lbPX;lbSY=lbPtrs[0].clientY-lbPY;lbPanning=true;}else lbPanning=false;};
     ['pointerup','pointercancel','pointerout','pointerleave'].forEach(ev=>lbImg.addEventListener(ev,rmP));
     lbImg.addEventListener('wheel',e=>{e.preventDefault();const xs=(e.clientX-lbPX)/lbScale,ys=(e.clientY-lbPY)/lbScale;lbScale=Math.min(Math.max(1,lbScale*(e.deltaY<0?1.2:0.8)),15);lbPX=e.clientX-xs*lbScale;lbPY=e.clientY-ys*lbScale;if(lbScale===1){lbPX=0;lbPY=0;}setLbT();});
 }
+function setLbT(){lbImg.style.transform=`translate(${lbPX}px,${lbPY}px) scale(${lbScale})`;}
+function resetLbZoom(){lbScale=1;lbPX=0;lbPY=0;setLbT();}
 
-function setLbT(){ lbImg.style.transform=`translate(${lbPX}px,${lbPY}px) scale(${lbScale})`; }
-function resetLbZoom(){ lbScale=1;lbPX=0;lbPY=0;setLbT(); }
-
-function openLightbox(names, startIdx, showDC) {
-    lbNames  = names;
-    lbIndex  = startIdx;
-    lbShowDC = !!showDC;
-    updateLbUI();
-    document.getElementById('lightbox-modal').style.display = 'flex';
+function openLightbox(names,startIdx,showDC){
+    lbNames=names;lbIndex=startIdx;lbShowDC=!!showDC;
+    updateLbUI();document.getElementById('lightbox-modal').style.display='flex';
 }
-
-function updateLbUI() {
+function updateLbUI(){
     resetLbZoom();
-    const name  = lbNames[lbIndex];
-    const entry = imageBank[name];
-    if (!entry) return;
-
-    const hasDC = !!entry.dcUrl;
-    const toggle = document.getElementById('lightbox-toggle');
-    toggle.classList.toggle('showing-dc', lbShowDC && hasDC);
-    toggle.classList.toggle('no-dc', !hasDC);
-
-    lbImg.src = (lbShowDC && hasDC) ? entry.dcUrl : entry.url;
-
-    const isMulti = lbNames.length > 1;
-    document.getElementById('lightbox-prev').style.display = isMulti ? 'block' : 'none';
-    document.getElementById('lightbox-next').style.display = isMulti ? 'block' : 'none';
-    document.getElementById('lightbox-counter').innerText  =
-        `${lbIndex+1} / ${lbNames.length} — ${name}${lbShowDC && hasDC ? ' (DC)' : ' (IR)'}`;
+    const name=lbNames[lbIndex],entry=imageBank[name];
+    if(!entry)return;
+    const hasDC=!!entry.dcUrl;
+    const tog=document.getElementById('lightbox-toggle');
+    tog.classList.toggle('showing-dc',lbShowDC&&hasDC);
+    tog.classList.toggle('no-dc',!hasDC);
+    lbImg.src=(lbShowDC&&hasDC)?entry.dcUrl:entry.url;
+    const isMulti=lbNames.length>1;
+    document.getElementById('lightbox-prev').style.display=isMulti?'block':'none';
+    document.getElementById('lightbox-next').style.display=isMulti?'block':'none';
+    document.getElementById('lightbox-counter').innerText=
+        `${lbIndex+1} / ${lbNames.length} — ${name}${lbShowDC&&hasDC?' (DC)':' (IR)'}`;
 }
-
-function toggleLightboxView() {
-    const entry = imageBank[lbNames[lbIndex]];
-    if (!entry || !entry.dcUrl) return;
-    lbShowDC = !lbShowDC;
-    updateLbUI();
-}
-
-function changeLightbox(dir) {
-    lbIndex = (lbIndex + dir + lbNames.length) % lbNames.length;
-    updateLbUI();
-}
-
-function closeLightbox() { document.getElementById('lightbox-modal').style.display='none'; resetLbZoom(); }
+function toggleLightboxView(){const e=imageBank[lbNames[lbIndex]];if(!e||!e.dcUrl)return;lbShowDC=!lbShowDC;updateLbUI();}
+function changeLightbox(dir){lbIndex=(lbIndex+dir+lbNames.length)%lbNames.length;updateLbUI();}
+function closeLightbox(){document.getElementById('lightbox-modal').style.display='none';resetLbZoom();}
 </script>
 </body>
 </html>
