@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata Command Center | v6.8 Lean Digital Twin</title>
+    <title>Strata Command Center | v6.9 Lean Digital Twin</title>
     
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="manifest" href="manifest_cmd.json">
@@ -150,7 +150,7 @@
 
     <div id="loading-overlay">
         <div class="spinner"></div>
-        <h2 style="color: #0cf; font-weight: bold;">Extracting Original Timestamps...</h2>
+        <h2 style="color: #0cf; font-weight: bold;">Calibrating Timestamps...</h2>
         <p style="color: #888;" id="loading-text">Please wait.</p>
     </div>
 
@@ -161,7 +161,7 @@
 
     <div class="header">
         <div>
-            <h1>STRATA COMMAND <span>| v6.8 Persistent State Engine</span></h1>
+            <h1>STRATA COMMAND <span>| v6.9 Auto-Calibrating Engine</span></h1>
             <div id="project-name" style="font-weight: bold; color: #888; margin-top: 5px;">Awaiting Data...</div>
         </div>
         <div class="header-btns">
@@ -340,7 +340,7 @@
         let stitchedPairs = []; 
         
         let imageBank = {}; 
-        let imageTimestamps = {}; 
+        let imageTimestamps = {}; // Stores precise timestamps of images
         let linkedPhotosCount = 0;
 
         let elevations = []; 
@@ -461,8 +461,20 @@
                                             imageBank[cleanName] = URL.createObjectURL(blob);
                                             let d = zipEntry.date;
                                             try {
-                                                let exif = await exifr.parse(blob, ['DateTimeOriginal']);
-                                                if (exif && exif.DateTimeOriginal) d = new Date(exif.DateTimeOriginal);
+                                                let exif = await exifr.parse(blob);
+                                                if (exif) {
+                                                    let eDate = exif.DateTimeOriginal || exif.CreateDate || exif.ModifyDate;
+                                                    if (eDate) {
+                                                        if (eDate instanceof Date) d = eDate;
+                                                        else if (typeof eDate === 'string') {
+                                                            let parts = eDate.split(' ');
+                                                            if(parts.length === 2) {
+                                                                let datePart = parts[0].replace(/:/g, '-');
+                                                                d = new Date(datePart + 'T' + parts[1]);
+                                                            } else d = new Date(eDate);
+                                                        }
+                                                    }
+                                                }
                                             } catch(e) {}
                                             imageTimestamps[cleanName] = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
                                             linkedPhotosCount++; newPhotosAdded++;
@@ -509,8 +521,20 @@
                             imageBank[cleanName] = URL.createObjectURL(file);
                             let d = new Date(file.lastModified);
                             try {
-                                let exif = await exifr.parse(file, ['DateTimeOriginal']);
-                                if (exif && exif.DateTimeOriginal) d = new Date(exif.DateTimeOriginal);
+                                let exif = await exifr.parse(file);
+                                if (exif) {
+                                    let eDate = exif.DateTimeOriginal || exif.CreateDate || exif.ModifyDate;
+                                    if (eDate) {
+                                        if (eDate instanceof Date) d = eDate;
+                                        else if (typeof eDate === 'string') {
+                                            let parts = eDate.split(' ');
+                                            if(parts.length === 2) {
+                                                let datePart = parts[0].replace(/:/g, '-');
+                                                d = new Date(datePart + 'T' + parts[1]);
+                                            } else d = new Date(eDate);
+                                        }
+                                    }
+                                }
                             } catch(e) {}
                             imageTimestamps[cleanName] = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
                             linkedPhotosCount++; newPhotosAdded++;
@@ -525,7 +549,7 @@
 
             await Promise.all(filePromises);
             
-            // --- SMART TIMESTAMP AUTO-LINKER ---
+            // --- SMART TIMESTAMP AUTO-LINKER WITH CALIBRATION ENGINE ---
             let allNodes = [];
             Object.keys(inspectionData).forEach(drop => {
                 Object.keys(inspectionData[drop]).forEach(floor => {
@@ -534,7 +558,7 @@
                         if (node.time && node.time !== '--') {
                             let parts = node.time.split(':');
                             if (parts.length === 3) {
-                                node.timeSec = parseInt(parts[0])*3600 + parseInt(parts[1])*60 + parseInt(parts[2]);
+                                node.timeSec = parseInt(parts[0], 10)*3600 + parseInt(parts[1], 10)*60 + parseInt(parts[2], 10);
                                 allNodes.push(node);
                             }
                         }
@@ -542,32 +566,74 @@
                 });
             });
 
-            Object.keys(imageBank).forEach(imgKey => {
-                let matchedNode = allNodes.find(n => n.id === imgKey); 
+            // Auto-Calibration: Calculate the global clock offset between the camera and the phone
+            allNodes.sort((a,b) => a.timeSec - b.timeSec);
+            let imgKeys = Object.keys(imageTimestamps);
+            imgKeys.sort((a,b) => imageTimestamps[a] - imageTimestamps[b]);
+
+            let globalOffset = 0;
+            if (allNodes.length > 0 && imgKeys.length > 0) {
+                // Determine offset using the earliest photo and the earliest log
+                globalOffset = imageTimestamps[imgKeys[0]] - allNodes[0].timeSec;
+            }
+
+            // Check if timestamps were completely destroyed by Google Drive (all identical)
+            let uniqueTimes = new Set(Object.values(imageTimestamps)).size;
+            if (imgKeys.length > 1 && uniqueTimes === 1) {
+                alert("⚠️ WARNING: Your tablet or Google Drive stripped the timestamps from the photos. All photos appear to be taken at the exact same second. \n\nPlease upload them inside a .ZIP folder to preserve the time data!");
+            }
+
+            let successfullyLinked = 0;
+
+            imgKeys.forEach(imgKey => {
+                let matchedNode = allNodes.find(n => n.id === imgKey); // 1. Check exact filename match first
+                
                 if (!matchedNode) {
                     let imgTime = imageTimestamps[imgKey];
                     if (imgTime !== undefined) {
+                        // Apply the calibration offset to neutralize bad camera clocks
+                        let adjustedImgTime = imgTime - globalOffset;
+                        if (adjustedImgTime < 0) adjustedImgTime += 86400;
+                        if (adjustedImgTime >= 86400) adjustedImgTime -= 86400;
+
                         let minDiff = Infinity;
                         allNodes.forEach(node => {
-                            let diff = Math.abs(node.timeSec - imgTime);
-                            if (diff > 43200) diff = 86400 - diff; 
-                            if (diff < minDiff) { minDiff = diff; matchedNode = node; }
+                            let diff = Math.abs(node.timeSec - adjustedImgTime);
+                            if (diff > 43200) diff = 86400 - diff; // Handle midnight crossover
+                            if (diff < minDiff) {
+                                minDiff = diff;
+                                matchedNode = node;
+                            }
                         });
-                        if (minDiff > 3600) matchedNode = null; 
+                        // Because the offset is neutralized, matches should be very close. (30 min tolerance)
+                        if (minDiff > 1800) matchedNode = null; 
                     }
                 }
+                
                 if (matchedNode) {
-                    if (matchedNode.flir === '--' || matchedNode.flir === '') matchedNode.flir = imgKey; 
-                    else if (!matchedNode.flir.split(' & ').includes(imgKey)) matchedNode.flir += ' & ' + imgKey;
+                    successfullyLinked++;
+                    if (matchedNode.flir === '--' || matchedNode.flir === '') {
+                        matchedNode.flir = imgKey; 
+                    } else if (!matchedNode.flir.split(' & ').includes(imgKey)) {
+                        matchedNode.flir += ' & ' + imgKey;
+                    }
                 }
             });
+            // --- END SMART TIMESTAMP AUTO-LINKER ---
 
             document.getElementById('loading-overlay').style.display = 'none';
+
+            if (newPhotosAdded > 0) {
+                if (successfullyLinked === 0) {
+                    alert(`⚠️ ${newPhotosAdded} photos unpacked, but 0 could be linked. Ensure they were taken during the logged timeframes.`);
+                } else {
+                    alert(`✅ Auto-Calibrated and linked ${successfullyLinked} photo(s) to the grid.`);
+                }
+            }
+
             document.getElementById('project-name').innerText = "Project: " + projectInfo;
             document.getElementById('stat-photos').innerText = linkedPhotosCount;
             document.getElementById('btn-reset').style.display = 'inline-block';
-            
-            if (newPhotosAdded > 0) alert(`✅ Successfully unpacked and synced ${newPhotosAdded} photo(s).`);
 
             if (newCsvAdded || isProjectLoaded) {
                 if (rowsParsed > 0 || isProjectLoaded) {
