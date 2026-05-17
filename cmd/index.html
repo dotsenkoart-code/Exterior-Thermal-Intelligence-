@@ -1,12 +1,10 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata Command Center | v6.2 Lean Digital Twin</title>
+    <title>Strata Command Center | v6.3 Lean Digital Twin</title>
     
     <link rel="icon" type="image/x-icon" href="favicon.ico">
-    
     <link rel="manifest" href="manifest_cmd.json">
-    
     <link rel="icon" type="image/png" sizes="192x192" href="icon-cmd192.png">
     <link rel="apple-touch-icon" href="icon-cmd192.png">
     
@@ -17,6 +15,9 @@
     <meta name="apple-mobile-web-app-title" content="Strata CMD">
     <meta name="mobile-web-app-capable" content="yes">
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
 
     <style>
@@ -166,7 +167,7 @@
 
     <div class="header">
         <div>
-            <h1>STRATA COMMAND <span>| v6.2 Lean Digital Twin</span></h1>
+            <h1>STRATA COMMAND <span>| v6.3 Lean Digital Twin</span></h1>
             <div id="project-name" style="font-weight: bold; color: #888; margin-top: 5px;">Awaiting Data...</div>
         </div>
         <div class="header-btns">
@@ -180,7 +181,7 @@
     </div>
 
     <div style="display: flex; gap: 15px; margin-bottom: 20px;">
-        <input type="file" id="csvInput" style="display: none;" onchange="handleFiles(this.files, 'csv')">
+        <input type="file" id="csvInput" multiple style="display: none;" onchange="handleFiles(this.files, 'csv')">
         <button class="btn btn-dark" style="flex: 1; padding: 20px; font-size: 1.1rem; border: 2px dashed #0cf; background: #161922;" onclick="document.getElementById('csvInput').click()">
             📄 1. LOAD CSV OR PROJECT
         </button>
@@ -215,6 +216,7 @@
         <div class="view-controls">
             <span style="color:#888; font-weight:bold; font-size:0.9rem; margin-right: 10px;">MODE:</span>
             <button class="view-toggle-btn active" id="btn-2d" onclick="switchView('2d')">2D TABS</button>
+            <button class="view-toggle-btn" id="btn-auto3d" onclick="switchView('auto3d')" style="background: #1d212f; border: 1px solid #0cf; color: #0cf;">🏢 AUTO 3D MODEL</button>
             <button class="view-toggle-btn" id="btn-true3d" onclick="switchView('true3d')">✨ TRUE 3D TWIN</button>
             <div style="flex:0.2;"></div>
             <button class="view-toggle-btn stitch-toggle" style="border:1px solid #555;" onclick="toggleStitchMode()">🔗 STITCH 2D WIDE WINDOWS</button>
@@ -247,6 +249,15 @@
         <div id="view-2d">
             <div class="tabs-container" id="tabs-container"></div>
             <div id="building-container-2d"></div>
+        </div>
+
+        <div id="arena-auto3d" style="display: none; width: 100%; height: 80vh; min-height: 700px; background: #0f111a; border: 1px solid #0cf; border-radius: 12px; overflow: hidden; position: relative; margin-bottom: 20px; box-shadow: 0 0 30px rgba(0, 204, 255, 0.1);">
+            <button class="btn-fullscreen" onclick="toggleFullScreen('arena-auto3d')">⛶ FULL SCREEN</button>
+            <div id="procedural-3d-container" style="width:100%; height:100%; cursor: grab;"></div>
+            <div style="position: absolute; top: 15px; left: 15px; color: #fff; font-size: 0.9rem; font-weight: bold; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; border: 1px solid #0cf; pointer-events:none; z-index:100;">
+                <strong>Auto-Generated 3D Building</strong><br>
+                <span style="font-weight:normal; color:#ccc;">Built instantly from your CSV data. Spin, Zoom, and Click windows.</span>
+            </div>
         </div>
 
         <div id="arena-true3d">
@@ -499,7 +510,8 @@
                             });
                         }
                         calculateBuildingGeometry();
-                        if (currentMode !== 'true3d') refreshCurrentView();
+                        if (currentMode === '2d') refreshCurrentView();
+                        if (currentMode === 'auto3d') buildProcedural3D();
                         if (isProjectLoaded) {
                             alert("✅ Dashboard fully restored from Project File.");
                         } else {
@@ -516,7 +528,7 @@
             document.getElementById('folderInput').value = "";
         }
 
-        // --- UPDATED parseCSV WITH 5-COLUMN LOGIC INCORPORATED ---
+        // --- UPDATED parseCSV ---
         function parseCSV(text) {
             const rows = text.trim().split(/\r\n|\n|\r/);
             let validRows = 0;
@@ -528,7 +540,6 @@
                 let cur = '';
                 let inQuotes = false;
                 
-                // Parse CSV line properly accounting for commas inside quotes
                 for (let j = 0; j < rows[i].length; j++) {
                     let c = rows[i][j];
                     if (c === '"') {
@@ -542,14 +553,12 @@
                 }
                 cols.push(cur.trim());
                 
-                // Process only if it has at least 5 columns (Phone export format)
                 if (cols.length >= 5) {
                     let fullId, flir, finds, proved, tech, time;
                     let parsedProj = cols[0].replace(/^"|"$/g, '');
                     
                     if (projectInfo === "Unknown Project") projectInfo = parsedProj;
 
-                    // FORMAT 1: Raw from Strata Drop Phone App (5 columns)
                     if (cols.length === 5) {
                         tech = cols[1].replace(/^"|"$/g, '');
                         fullId = cols[2].replace(/^"|"$/g, '');
@@ -558,7 +567,6 @@
                         flir = "--";
                         proved = "NO";
                     } 
-                    // FORMAT 2: Re-imported from Command Center Master Export (8+ columns)
                     else {
                         tech = "Unknown"; 
                         fullId = cols[2].replace(/^"|"$/g, '');
@@ -568,8 +576,14 @@
                         time = "--";
                     }
                     
+                    // FIXED: Red status for Sealant Fails
                     let status = 'status-clear';
-                    if (!finds.includes('CLEAR')) status = 'status-flagged';
+                    let upperFinds = finds.toUpperCase();
+                    if (upperFinds.includes('FAIL') || upperFinds.includes('DEFECT') || upperFinds.includes('CONFIRM')) {
+                        status = 'status-confirmed'; // Red
+                    } else if (!upperFinds.includes('CLEAR')) {
+                        status = 'status-flagged';   // Yellow
+                    }
 
                     const parts = fullId.split('-');
                     if(parts.length === 3) {
@@ -776,7 +790,6 @@
             }
         });
 
-        // --- UPDATED DROP TAGGING (WITH HORIZONTAL SPACING) ---
         function processDropTagging(dropId, anchors) {
             let floors = Object.keys(inspectionData[dropId]).map(Number).sort((a,b) => b-a); 
             if(floors.length === 0) return;
@@ -791,12 +804,11 @@
             let nX = anchors[0].normal.x, nY = anchors[0].normal.y, nZ = anchors[0].normal.z;
             let norm = `${nX} ${nY} ${nZ}`;
             
-            // MATH: Calculate the "Right" vector based on the wall's normal
             let rLen = Math.sqrt(nZ*nZ + nX*nX);
             let rX = rLen === 0 ? 1 : nZ/rLen;
             let rY = 0;
             let rZ = rLen === 0 ? 0 : -nX/rLen;
-            let spacing = 0.8; // Arbitrary distance between L, C, R windows in 3D units
+            let spacing = 0.8; 
 
             let orderMap = { 'L': -1, 'C': 0, 'R': 1 };
 
@@ -809,7 +821,6 @@
                 Object.keys(inspectionData[dropId][f]).forEach(pos => {
                     let offset = orderMap[pos] !== undefined ? orderMap[pos] : 0;
                     
-                    // Physically offset the pin horizontally
                     let px = cx + (rX * offset * spacing);
                     let py = cy + (rY * offset * spacing);
                     let pz = cz + (rZ * offset * spacing);
@@ -821,7 +832,6 @@
             render3DHotspots();
         }
 
-        // --- UPDATED WALL TAGGING (WITH HORIZONTAL SPACING) ---
         function processWallTagging(wallName, anchors) {
             let drops = Object.keys(dropAssignments).filter(d => dropAssignments[d] === wallName).sort();
             if(drops.length === 0) { alert("No drops assigned to this wall yet."); return; }
@@ -843,16 +853,14 @@
             let nX = anchors[0].normal.x, nY = anchors[0].normal.y, nZ = anchors[0].normal.z;
             let norm = `${nX} ${nY} ${nZ}`;
 
-            // MATH: Calculate actual Right Vector along the Top edge
             let vTopX = TR[0] - TL[0], vTopY = TR[1] - TL[1], vTopZ = TR[2] - TL[2];
             let wallWidth = Math.sqrt(vTopX*vTopX + vTopY*vTopY + vTopZ*vTopZ);
             let rX = wallWidth === 0 ? 1 : vTopX/wallWidth;
             let rY = wallWidth === 0 ? 0 : vTopY/wallWidth;
             let rZ = wallWidth === 0 ? 0 : vTopZ/wallWidth;
             
-            // Dynamic spacing based on physical wall width
             let dropWidth = wallWidth / (drops.length || 1);
-            let spacing = dropWidth * 0.3; // 30% of a drop width per window
+            let spacing = dropWidth * 0.3; 
 
             let orderMap = { 'L': -1, 'C': 0, 'R': 1 };
 
@@ -929,7 +937,8 @@
             document.getElementById('filter-card-flagged').classList.toggle('dimmed', activeFilter !== 'ALL' && activeFilter !== 'status-flagged');
             document.getElementById('filter-card-confirmed').classList.toggle('dimmed', activeFilter !== 'ALL' && activeFilter !== 'status-confirmed');
 
-            refreshCurrentView();
+            if (currentMode === '2d') refreshCurrentView();
+            if (currentMode === 'auto3d') buildProcedural3D();
             render3DHotspots();
         }
 
@@ -938,7 +947,7 @@
             document.querySelectorAll('.stitch-toggle').forEach(btn => btn.classList.toggle('stitch-mode-on', isStitchMode));
             stitchSelection = [];
             if(isStitchMode) alert("STITCH MODE ACTIVE:\nClick the right half of the window, then click the left half.");
-            if (currentMode !== 'true3d') refreshCurrentView();
+            if (currentMode === '2d') refreshCurrentView();
         }
 
         function getNodeData(fullId) {
@@ -966,7 +975,7 @@
                         isStitchMode = false;
                         document.querySelectorAll('.stitch-toggle').forEach(btn => btn.classList.remove('stitch-mode-on'));
                         calculateBuildingGeometry();
-                        refreshCurrentView();
+                        if (currentMode === '2d') refreshCurrentView();
                     }
                     return;
                 }
@@ -980,7 +989,7 @@
                     isStitchMode = false;
                     document.querySelectorAll('.stitch-toggle').forEach(btn => btn.classList.remove('stitch-mode-on'));
                     stitchSelection = [];
-                    refreshCurrentView();
+                    if (currentMode === '2d') refreshCurrentView();
                 }
                 return;
             }
@@ -1068,7 +1077,8 @@
             
             if(!elevations.includes(activeTab)) activeTab = elevations[0];
             calculateBuildingGeometry();
-            if (currentMode !== 'true3d') refreshCurrentView();
+            if (currentMode === '2d') refreshCurrentView();
+            if (currentMode === 'auto3d') buildProcedural3D();
         }
 
         function calculateBuildingGeometry() {
@@ -1111,10 +1121,26 @@
         function switchView(mode) {
             currentMode = mode;
             document.getElementById('btn-2d').classList.toggle('active', mode === '2d');
+            
+            const btnAuto3d = document.getElementById('btn-auto3d');
+            if(mode === 'auto3d') {
+                btnAuto3d.style.background = '#0cf';
+                btnAuto3d.style.color = '#000';
+            } else {
+                btnAuto3d.style.background = '#1d212f';
+                btnAuto3d.style.color = '#0cf';
+            }
+            
             document.getElementById('btn-true3d').classList.toggle('active', mode === 'true3d');
+            
             document.getElementById('view-2d').style.display = (mode === '2d') ? 'block' : 'none';
+            document.getElementById('arena-auto3d').style.display = (mode === 'auto3d') ? 'block' : 'none';
             document.getElementById('arena-true3d').style.display = (mode === 'true3d') ? 'block' : 'none';
-            if (mode !== 'true3d') refreshCurrentView();
+            
+            if (mode === '2d') refreshCurrentView();
+            if (mode === 'auto3d') {
+                setTimeout(() => { buildProcedural3D(); }, 100);
+            }
         }
 
         function refreshCurrentView() {
@@ -1242,6 +1268,154 @@
             return fragment;
         }
 
+        // --- NEW PROCEDURAL 3D BUILDING GENERATOR ---
+        let auto3dRenderer = null;
+        let auto3dScene = null;
+        let auto3dCamera = null;
+        let auto3dControls = null;
+        let auto3dAnimationId = null;
+
+        function buildProcedural3D() {
+            const container = document.getElementById('procedural-3d-container');
+            
+            if (!auto3dRenderer) {
+                auto3dRenderer = new THREE.WebGLRenderer({ antialias: true });
+                container.appendChild(auto3dRenderer.domElement);
+                
+                auto3dCamera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 2000);
+                auto3dControls = new THREE.OrbitControls(auto3dCamera, auto3dRenderer.domElement);
+                
+                const raycaster = new THREE.Raycaster();
+                const mouse = new THREE.Vector2();
+                container.addEventListener('click', (event) => {
+                    const rect = auto3dRenderer.domElement.getBoundingClientRect();
+                    mouse.x = ( (event.clientX - rect.left) / rect.width ) * 2 - 1;
+                    mouse.y = - ( (event.clientY - rect.top) / rect.height ) * 2 + 1;
+
+                    raycaster.setFromCamera(mouse, auto3dCamera);
+                    if (auto3dScene) {
+                        const intersects = raycaster.intersectObjects(auto3dScene.children);
+                        if (intersects.length > 0) {
+                            const obj = intersects[0].object;
+                            if(obj.userData.id) openModal(obj.userData.id);
+                        }
+                    }
+                });
+
+                window.addEventListener('resize', () => {
+                    if(document.getElementById('arena-auto3d').style.display !== 'none') {
+                        auto3dCamera.aspect = container.clientWidth / container.clientHeight;
+                        auto3dCamera.updateProjectionMatrix();
+                        auto3dRenderer.setSize(container.clientWidth, container.clientHeight);
+                    }
+                });
+            }
+            
+            if (auto3dAnimationId) cancelAnimationFrame(auto3dAnimationId);
+
+            auto3dRenderer.setSize(container.clientWidth, container.clientHeight);
+            auto3dCamera.aspect = container.clientWidth / container.clientHeight;
+            auto3dCamera.updateProjectionMatrix();
+
+            auto3dScene = new THREE.Scene();
+            auto3dScene.background = new THREE.Color(0x0f111a);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            auto3dScene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(20, 50, 20);
+            auto3dScene.add(dirLight);
+
+            let walls = {};
+            Object.keys(inspectionData).forEach(d => {
+                let wall = dropAssignments[d] || "Unassigned";
+                if(!walls[wall]) walls[wall] = [];
+                walls[wall].push(d);
+            });
+
+            const wallNames = Object.keys(walls);
+            const numWalls = wallNames.length;
+            
+            let currentAngle = 0;
+            const angleStep = Math.PI * 2 / Math.max(numWalls, 4); 
+            const radius = Math.max(10, Object.keys(inspectionData).length * 1.5);
+
+            wallNames.forEach((wName) => {
+                const drops = walls[wName].sort();
+                
+                const startX = Math.cos(currentAngle) * radius;
+                const startZ = Math.sin(currentAngle) * radius;
+                const nextAngle = currentAngle + angleStep;
+                const endX = Math.cos(nextAngle) * radius;
+                const endZ = Math.sin(nextAngle) * radius;
+                
+                const dx = (endX - startX) / Math.max(drops.length, 1);
+                const dz = (endZ - startZ) / Math.max(drops.length, 1);
+
+                const wallRot = Math.atan2(endZ - startZ, endX - startX);
+
+                drops.forEach((d, dIdx) => {
+                    const baseX = startX + dx * dIdx + dx/2;
+                    const baseZ = startZ + dz * dIdx + dz/2;
+
+                    const floors = Object.keys(inspectionData[d]);
+                    floors.forEach(f => {
+                        const floorNum = parseInt(f);
+                        const posKeys = Object.keys(inspectionData[d][f]);
+                        posKeys.forEach(pos => {
+                            const node = inspectionData[d][f][pos];
+                            
+                            let finalStatus = node.status;
+                            let pair = stitchedPairs.find(p => p.includes(node.id));
+                            if(pair) finalStatus = getCombinedStatus(pair[0], pair[1]);
+                            
+                            let color = 0x28a745; 
+                            if (finalStatus === 'status-flagged') color = 0xf1c40f;
+                            if (finalStatus === 'status-confirmed') color = 0xd9534f;
+                            
+                            if (activeFilter !== 'ALL' && finalStatus !== activeFilter) {
+                                color = 0x333333;
+                            }
+
+                            const geom = new THREE.BoxGeometry(1.2, 0.8, 0.2);
+                            const mat = new THREE.MeshStandardMaterial({ color: color, metalness: 0.2, roughness: 0.7 });
+                            
+                            if (activeFilter !== 'ALL' && finalStatus !== activeFilter) {
+                                mat.transparent = true;
+                                mat.opacity = 0.1;
+                            }
+
+                            const mesh = new THREE.Mesh(geom, mat);
+
+                            let xOffset = 0;
+                            if (pos === 'L') xOffset = -1.4;
+                            if (pos === 'R') xOffset = 1.4;
+
+                            const worldX = baseX + Math.cos(wallRot) * xOffset;
+                            const worldZ = baseZ + Math.sin(wallRot) * xOffset;
+
+                            mesh.position.set(worldX, floorNum * 1.2, worldZ);
+                            mesh.rotation.y = -wallRot;
+                            
+                            mesh.userData = { id: node.id };
+                            auto3dScene.add(mesh);
+                        });
+                    });
+                });
+                currentAngle = nextAngle;
+            });
+
+            auto3dCamera.position.set(0, (globalStats.maxFloor || 10) * 1.2, radius * 2.5);
+            auto3dControls.target.set(0, ((globalStats.maxFloor - globalStats.minFloor)/2 || 5) * 1.2, 0);
+            auto3dControls.update();
+
+            function animate() {
+                auto3dAnimationId = requestAnimationFrame(animate);
+                auto3dRenderer.render(auto3dScene, auto3dCamera);
+            }
+            animate();
+        }
+
         // --- FULLSCREEN LIGHTBOX LOGIC ---
         function openLightbox(imgArray, startIndex) {
             currentLightboxImages = imgArray;
@@ -1315,7 +1489,6 @@
             document.getElementById('m-finds').innerText = allFinds.join(' | ');
             document.getElementById('m-finds').style.color = allFinds.includes('CLEAR') ? '#28a745' : '#f1c40f';
             
-            // DYNAMIC METER ROW LOGIC
             document.getElementById('m-row-proved').style.display = allFinds.includes('MOISTURE') ? 'flex' : 'none';
             document.getElementById('m-proved').innerText = proved;
             
@@ -1367,7 +1540,8 @@
                     stitchedPairs.splice(idx, 1);
                     closeModal();
                     calculateBuildingGeometry();
-                    refreshCurrentView();
+                    if (currentMode === '2d') refreshCurrentView();
+                    if (currentMode === 'auto3d') buildProcedural3D();
                 }
             }
         }
@@ -1377,7 +1551,8 @@
                 let note = document.getElementById('m-notes').value;
                 activeNodeDataArray.forEach(d => { d.notes = note; d.status = newStatus; });
                 calculateBuildingGeometry();
-                refreshCurrentView();
+                if (currentMode === '2d') refreshCurrentView();
+                if (currentMode === 'auto3d') buildProcedural3D();
                 closeModal();
             }
         }
@@ -1387,7 +1562,8 @@
                 let note = document.getElementById('m-notes').value;
                 activeNodeDataArray.forEach(d => d.notes = note);
                 calculateBuildingGeometry();
-                refreshCurrentView();
+                if (currentMode === '2d') refreshCurrentView();
+                if (currentMode === 'auto3d') buildProcedural3D();
                 closeModal();
             }
         }
