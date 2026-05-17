@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata Command Center | v8.2 Nearest Match Engine</title>
+    <title>Strata Command Center | v9.0 Zipline Engine</title>
     
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="manifest" href="manifest_cmd.json">
@@ -93,7 +93,6 @@
         .btn-dark { background: #333; color: #fff; border: 1px solid #555; }
         .btn-red { background: #d9534f; color: #fff; }
         .btn-green { background: #28a745; color: #fff; }
-        .btn-purple { background: #8e44ad; color: #fff; }
         .btn-block { width: 100%; margin-top: 10px; }
         .header-btns { display: flex; gap: 10px; }
 
@@ -171,7 +170,7 @@
 
     <div id="loading-overlay">
         <div class="spinner"></div>
-        <h2 style="color: #0cf; font-weight: bold;">Mapping Folders & Syncing Data...</h2>
+        <h2 style="color: #0cf; font-weight: bold;">Activating Zipline Sync Engine...</h2>
         <p style="color: #888;" id="loading-text">Please wait.</p>
     </div>
 
@@ -182,7 +181,7 @@
 
     <div class="header">
         <div>
-            <h1>STRATA COMMAND <span>| v8.2 Nearest Match Engine</span></h1>
+            <h1>STRATA COMMAND <span>| v9.0 Zipline Engine</span></h1>
             <div id="project-name" style="font-weight: bold; color: #888; margin-top: 5px;">Awaiting Data...</div>
         </div>
         <div class="header-btns">
@@ -390,6 +389,21 @@
 
         const viewer = document.querySelector('#main-3d-viewer');
 
+        // --- NEW V9.0 ROBUST EXIF DATE PARSER ---
+        function parseExifDate(eDate, fallbackDate) {
+            if (!eDate) return fallbackDate;
+            if (eDate instanceof Date && !isNaN(eDate.getTime())) return eDate;
+            if (typeof eDate === 'string') {
+                let s = eDate.trim();
+                // Fix the FLIR colon-separated date bug that crashes browsers
+                s = s.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3');
+                s = s.replace(' ', 'T');
+                let parsed = new Date(s);
+                if (!isNaN(parsed.getTime())) return parsed;
+            }
+            return fallbackDate;
+        }
+
         // --- INIT & PERSISTENCE ---
         function initApp() {
             requestWakeLock();
@@ -408,12 +422,8 @@
 
         function saveCommandState() {
             const state = {
-                projectInfo: projectInfo,
-                inspectionData: inspectionData,
-                elevations: elevations,
-                dropAssignments: dropAssignments,
-                stitchedPairs: stitchedPairs,
-                saved3DTags: saved3DTags
+                projectInfo: projectInfo, inspectionData: inspectionData, elevations: elevations,
+                dropAssignments: dropAssignments, stitchedPairs: stitchedPairs, saved3DTags: saved3DTags
             };
             localStorage.setItem('strataCommandState', JSON.stringify(state));
         }
@@ -492,19 +502,12 @@
                                             let url = URL.createObjectURL(blob);
                                             let detectedDrop = extractDropIdFromPath(zipEntry.name);
                                             
-                                            let d = zipEntry.date;
+                                            let d = zipEntry.date || new Date();
                                             try {
                                                 let exif = await exifr.parse(blob);
                                                 if (exif) {
                                                     let eDate = exif.DateTimeOriginal || exif.CreateDate || exif.ModifyDate;
-                                                    if (eDate) {
-                                                        if (eDate instanceof Date) d = eDate;
-                                                        else if (typeof eDate === 'string') {
-                                                            let parts = eDate.split(' ');
-                                                            if(parts.length === 2) d = new Date(parts[0].replace(/:/g, '-') + 'T' + parts[1]);
-                                                            else d = new Date(eDate);
-                                                        }
-                                                    }
+                                                    d = parseExifDate(eDate, d);
                                                 }
                                             } catch(e) {}
                                             
@@ -559,14 +562,7 @@
                                 let exif = await exifr.parse(file);
                                 if (exif) {
                                     let eDate = exif.DateTimeOriginal || exif.CreateDate || exif.ModifyDate;
-                                    if (eDate) {
-                                        if (eDate instanceof Date) d = eDate;
-                                        else if (typeof eDate === 'string') {
-                                            let parts = eDate.split(' ');
-                                            if(parts.length === 2) d = new Date(parts[0].replace(/:/g, '-') + 'T' + parts[1]);
-                                            else d = new Date(eDate);
-                                        }
-                                    }
+                                    d = parseExifDate(eDate, d);
                                 }
                             } catch(e) {}
                             
@@ -584,7 +580,7 @@
 
             await Promise.all(filePromises);
             
-            // --- V8.2: NEAREST MATCH ENGINE (MIDPOINT SNAPPING) ---
+            // --- V9.0: THE ZIPLINE ENGINE ---
             let dropNodes = {};
             Object.keys(inspectionData).forEach(drop => {
                 dropNodes[drop] = [];
@@ -601,6 +597,16 @@
                         }
                     });
                 });
+                // Sort chronologically (Top Down)
+                dropNodes[drop].sort((a,b) => a.timeSec - b.timeSec);
+            });
+
+            // Assign loose files to a single drop if there is only 1 drop loaded
+            let dropNames = Object.keys(dropNodes);
+            Object.values(imageBank).forEach(imgData => {
+                if (!imgData.drop && dropNames.length === 1) {
+                    imgData.drop = dropNames[0];
+                }
             });
 
             let dropImages = {};
@@ -614,67 +620,98 @@
 
             let successfullyLinked = 0;
 
-            // Process linking strictly Drop by Drop
             Object.keys(dropImages).forEach(drop => {
                 let images = dropImages[drop];
                 let nodes = dropNodes[drop];
 
                 if (!nodes || nodes.length === 0 || images.length === 0) return;
 
-                // 1. Sort images entirely by FILENAME to guarantee chronological display order in the gallery
+                // 1. Sort images entirely by FILENAME to guarantee visual chronological order
                 images.sort((a, b) => a.id.localeCompare(b.id, undefined, {numeric: true}));
 
-                images.forEach(img => {
-                    let targetNode = null;
-                    
-                    // Direct Filename Match Check
-                    let exact = nodes.find(n => n.id === img.id);
-                    if (exact) {
-                        targetNode = exact;
-                    } else {
-                        // Nearest Neighbor Match (Snaps to the closest log)
-                        let minDiff = Infinity;
-                        nodes.forEach(node => {
-                            let diff = Math.abs(node.timeSec - img.time);
-                            if (diff > 43200) diff = 86400 - diff; // Handle midnight crossover
-                            if (diff < minDiff) { 
-                                minDiff = diff; 
-                                targetNode = node; 
-                            }
-                        });
-                        
-                        // Safety threshold: 3 Hours (10800 seconds). 
-                        // Prevents rejection if camera clock is slightly drifted or user took a break.
-                        if (minDiff > 10800) targetNode = null;
-                    }
+                // Fallback check: If all timestamps are identical (the Google Drive bug)
+                let isZipBug = images.length > 1 && images.every(img => img.time === images[0].time);
 
-                    if (targetNode) {
-                        successfullyLinked++;
-                        if (targetNode.flir === '--' || targetNode.flir === '') targetNode.flir = img.id; 
-                        else if (!targetNode.flir.split(' & ').includes(img.id)) targetNode.flir += ' & ' + img.id;
+                if (isZipBug) {
+                    // Sequential Zipline: If times are corrupted, map 1:1 down the line
+                    let nIdx = 0;
+                    images.forEach(img => {
+                        if (nIdx < nodes.length) {
+                            let targetNode = nodes[nIdx];
+                            if (targetNode.flir === '--' || targetNode.flir === '') targetNode.flir = img.id; 
+                            else targetNode.flir += ' & ' + img.id;
+                            nIdx++;
+                            successfullyLinked++;
+                        }
+                    });
+                } else {
+                    // Smart Zipline: Calculate the median offset to neutralize wrong camera clocks
+                    let diffs = [];
+                    let minLen = Math.min(nodes.length, images.length);
+                    for(let i=0; i<minLen; i++) {
+                        let diff = images[i].time - nodes[i].timeSec;
+                        if (diff > 43200) diff -= 86400; // Handle Midnight Shifts
+                        if (diff < -43200) diff += 86400;
+                        diffs.push(diff);
                     }
-                });
-            });
-            
-            // Fallback for manually uploaded files NOT inside a Drop folder
-            Object.keys(imageBank).forEach(imgKey => {
-                let imgData = imageBank[imgKey];
-                if (!imgData.drop) {
-                    let allNodesList = [].concat(...Object.values(dropNodes));
-                    let exact = allNodesList.find(n => n.id === imgKey);
-                    if(exact) {
-                        successfullyLinked++;
-                        if (exact.flir === '--' || exact.flir === '') exact.flir = imgKey; 
-                        else if (!exact.flir.split(' & ').includes(imgKey)) exact.flir += ' & ' + imgKey;
-                    }
+                    diffs.sort((a,b) => a-b);
+                    let medianOffset = diffs.length > 0 ? diffs[Math.floor(diffs.length/2)] : 0;
+
+                    let lastNodeIndex = 0; // The Zipline Anchor (prevents backwards assignment)
+
+                    images.forEach(img => {
+                        // 1. Direct exact filename override
+                        let exactIdx = nodes.findIndex(n => n.id === img.id);
+                        if (exactIdx !== -1) {
+                            if(exactIdx >= lastNodeIndex) lastNodeIndex = exactIdx;
+                            successfullyLinked++;
+                            let exactNode = nodes[exactIdx];
+                            if (exactNode.flir === '--' || exactNode.flir === '') exactNode.flir = img.id; 
+                            else if (!exactNode.flir.split(' & ').includes(img.id)) exactNode.flir += ' & ' + img.id;
+                            return;
+                        }
+
+                        // 2. Relative Time Mapping
+                        let adjustedTime = img.time - medianOffset;
+                        if (adjustedTime < 0) adjustedTime += 86400;
+                        if (adjustedTime >= 86400) adjustedTime -= 86400;
+
+                        let bestNode = null;
+                        let minDiff = Infinity;
+                        let bestIndex = -1;
+
+                        // ONLY search forward from the anchor
+                        for(let i = lastNodeIndex; i < nodes.length; i++) {
+                            let diff = Math.abs(nodes[i].timeSec - adjustedTime);
+                            if (diff > 43200) diff = 86400 - diff; // midnight wrap
+
+                            // Add a tiny 30-sec penalty for skipping nodes to encourage 1:1 mapping when times are close
+                            let skipPenalty = (i - lastNodeIndex) * 30; 
+                            let score = diff + skipPenalty;
+
+                            if (score < minDiff) {
+                                minDiff = score;
+                                bestIndex = i;
+                                bestNode = nodes[i];
+                            }
+                        }
+
+                        // If within 3 hours (after neutralizing offset), lock it in and advance the anchor
+                        if (bestNode && minDiff < 10800) {
+                            lastNodeIndex = bestIndex;
+                            successfullyLinked++;
+                            if (bestNode.flir === '--' || bestNode.flir === '') bestNode.flir = img.id; 
+                            else if (!bestNode.flir.split(' & ').includes(img.id)) bestNode.flir += ' & ' + img.id;
+                        }
+                    });
                 }
             });
 
             document.getElementById('loading-overlay').style.display = 'none';
 
             if (newPhotosAdded > 0) {
-                if (successfullyLinked === 0) alert(`⚠️ ${newPhotosAdded} photos unpacked, but 0 could be linked. Ensure they were taken within 3 hours of the logged time periods.`);
-                else alert(`✅ Engine securely linked ${successfullyLinked} photo(s) to the grid.`);
+                if (successfullyLinked === 0) alert(`⚠️ ${newPhotosAdded} photos unpacked, but 0 could be linked. Please ensure they were taken during the logged time periods.`);
+                else alert(`✅ Zipline Engine securely sorted and linked ${successfullyLinked} photo(s).`);
             }
 
             document.getElementById('project-name').innerText = "Project: " + projectInfo;
@@ -1193,7 +1230,7 @@
         function resetBoard() {
             if(confirm("Are you sure you want to clear all data and start over?")) {
                 localStorage.removeItem('strataCommandState');
-                inspectionData = {}; imageBank = {}; imageTimestamps = {}; stitchedPairs = []; linkedPhotosCount = 0; projectInfo = "Unknown Project"; elevations = []; dropAssignments = {}; saved3DTags = {};
+                inspectionData = {}; imageBank = {}; stitchedPairs = []; linkedPhotosCount = 0; projectInfo = "Unknown Project"; elevations = []; dropAssignments = {}; saved3DTags = {};
                 document.getElementById('project-name').innerText = "Awaiting Data..."; document.getElementById('stat-photos').innerText = "0"; document.getElementById('dashboard-screen').style.display = 'none'; document.getElementById('mapping-screen').style.display = 'none'; document.getElementById('btn-save-project').style.display = 'none'; document.getElementById('btn-edit-map').style.display = 'none'; document.getElementById('btn-reset').style.display = 'none'; document.getElementById('btn-start-mapping').style.display = 'none';
                 document.getElementById('main-3d-viewer').src = "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/LittlestTokyo.glb"; document.getElementById('model-status').innerHTML = "Showing Default Test Model. Drop a custom .glb file above to replace.";
             }
