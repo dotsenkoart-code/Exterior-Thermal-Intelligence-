@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata Command Center | v6.4 Lean Digital Twin</title>
+    <title>Strata Command Center | v6.5 Lean Digital Twin</title>
     
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="manifest" href="manifest_cmd.json">
@@ -17,8 +17,9 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
     <style>
         /* --- KILLS THE PULL-TO-REFRESH CURSE --- */
@@ -156,9 +157,20 @@
         .btn-purple:hover { background: #732d91; }
         .btn-block { width: 100%; margin-top: 10px; }
         .header-btns { display: flex; gap: 10px; }
+        
+        /* ZIP LOADING SPINNER */
+        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999; display: none; align-items: center; justify-content: center; flex-direction: column; }
+        .spinner { border: 8px solid #222; border-top: 8px solid #0cf; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
+
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <h2 style="color: #0cf; font-weight: bold;">Unpacking ZIP & Processing Files...</h2>
+        <p style="color: #888;" id="loading-text">Please wait.</p>
+    </div>
 
     <div id="tag-instruction-bar">
         <span id="tag-instruction-text">Double-Click the model...</span>
@@ -167,7 +179,7 @@
 
     <div class="header">
         <div>
-            <h1>STRATA COMMAND <span>| v6.4 Lean Digital Twin</span></h1>
+            <h1>STRATA COMMAND <span>| v6.5 Lean Digital Twin</span></h1>
             <div id="project-name" style="font-weight: bold; color: #888; margin-top: 5px;">Awaiting Data...</div>
         </div>
         <div class="header-btns">
@@ -193,7 +205,7 @@
 
         <input type="file" id="folderInput" webkitdirectory directory multiple style="display: none;" onchange="handleFiles(this.files, 'media')">
         <button class="btn btn-dark" style="flex: 1; padding: 20px; font-size: 1.1rem; border: 2px dashed #f39c12; background: #161922;" onclick="document.getElementById('folderInput').click()">
-            📁 3. ADD ENTIRE FOLDER
+            📁 3. ADD ZIP OR FOLDER
         </button>
     </div>
     
@@ -408,27 +420,67 @@
         async function handleFiles(files, forcedType = null) {
             if (!files || files.length === 0) return;
             
-            const csvPromises = [];
+            document.getElementById('loading-overlay').style.display = 'flex';
+            document.getElementById('loading-text').innerText = `Processing ${files.length} file(s)...`;
+            
+            const filePromises = [];
             let newPhotosAdded = 0;
             let newCsvAdded = false;
             let isProjectLoaded = false;
             let rowsParsed = 0;
-            let filePreview = "";
 
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
 
                 if (file.size === 0 || file.size === undefined) {
-                    alert(`⚠️ ERROR: "${file.name}" has 0 bytes. It is a cloud placeholder. Please download it from Google Drive to your device first.`);
+                    console.log(`Ignored 0-byte file: ${file.name}`);
                     continue;
                 }
 
                 const fileName = (file.name || '').toLowerCase();
                 const fileType = (file.type || '').toLowerCase();
                 
-                if (fileName.endsWith('.json')) {
+                // 1. HANDLE ZIP FILES WITH JSZIP
+                if (fileName.endsWith('.zip') || fileType.includes('zip')) {
+                    filePromises.push(new Promise((resolveZip) => {
+                        JSZip.loadAsync(file).then(async function(zip) {
+                            const internalPromises = [];
+                            zip.forEach(function (relativePath, zipEntry) {
+                                // Ignore directories and hidden Mac files
+                                if (zipEntry.dir || relativePath.includes('__MACOSX') || relativePath.includes('.DS_Store')) return;
+                                
+                                const entryName = zipEntry.name.toLowerCase();
+                                
+                                if (entryName.endsWith('.csv')) {
+                                    newCsvAdded = true;
+                                    internalPromises.push(zipEntry.async("text").then(function(text) {
+                                        rowsParsed += parseCSV(text);
+                                    }));
+                                } 
+                                else if (entryName.endsWith('.jpg') || entryName.endsWith('.jpeg') || entryName.endsWith('.png')) {
+                                    internalPromises.push(zipEntry.async("blob").then(function(blob) {
+                                        const cleanName = zipEntry.name.split('/').pop().split('.')[0].toUpperCase();
+                                        if (!imageBank[cleanName]) {
+                                            imageBank[cleanName] = URL.createObjectURL(blob);
+                                            linkedPhotosCount++;
+                                            newPhotosAdded++;
+                                        }
+                                    }));
+                                }
+                            });
+                            await Promise.all(internalPromises);
+                            resolveZip();
+                        }).catch(err => {
+                            alert("⚠️ Error reading ZIP file: " + err.message);
+                            resolveZip();
+                        });
+                    }));
+                }
+                
+                // 2. HANDLE INDIVIDUAL PROJECT JSON FILES
+                else if (fileName.endsWith('.json')) {
                     isProjectLoaded = true;
-                    csvPromises.push(new Promise((resolve) => {
+                    filePromises.push(new Promise((resolve) => {
                         const reader = new FileReader();
                         reader.onload = (event) => {
                             try {
@@ -441,33 +493,28 @@
                                 saved3DTags = parsed.saved3DTags || {};
                                 resolve();
                             } catch(e) {
-                                alert("⚠️ Error reading Project file. File might be corrupted.");
+                                alert("⚠️ Error reading Project file.");
                                 resolve();
                             }
                         };
-                        reader.onerror = () => {
-                            alert("⚠️ Error reading file. Ensure it is fully downloaded to your device.");
-                            resolve();
-                        };
                         reader.readAsText(file);
                     }));
                 }
+                
+                // 3. HANDLE INDIVIDUAL CSV FILES
                 else if (forcedType === 'csv' || fileName.endsWith('.csv') || fileType.includes('csv') || fileType === 'application/vnd.ms-excel') {
                     newCsvAdded = true;
-                    csvPromises.push(new Promise((resolve) => {
+                    filePromises.push(new Promise((resolve) => {
                         const reader = new FileReader();
                         reader.onload = (event) => { 
-                            filePreview = event.target.result.substring(0, 200); 
                             rowsParsed += parseCSV(event.target.result); 
                             resolve(); 
                         };
-                        reader.onerror = () => {
-                            alert("⚠️ Error reading file. Ensure it is fully downloaded to your device.");
-                            resolve();
-                        };
                         reader.readAsText(file);
                     }));
                 }
+                
+                // 4. HANDLE INDIVIDUAL IMAGES
                 else if (fileType.startsWith('image/') || fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || fileName.endsWith('.png')) {
                     const cleanName = file.name.split('.')[0].toUpperCase();
                     if (!imageBank[cleanName]) {
@@ -476,34 +523,31 @@
                         newPhotosAdded++;
                     }
                 } 
+                
+                // 5. HANDLE GLB 3D MODELS
                 else if (fileName.endsWith('.glb') || fileName.endsWith('.gltf') || fileType.includes('model/gltf')) {
                     const modelUrl = URL.createObjectURL(file);
                     viewer.src = modelUrl;
                     document.getElementById('model-status').innerHTML = `<span style="color:#0cf;">Loaded Custom Model:</span> ${file.name}`;
-                } else {
-                    console.log("Ignored unrecognized file:", fileName);
                 }
             }
 
-            await Promise.all(csvPromises);
+            await Promise.all(filePromises);
+            
+            document.getElementById('loading-overlay').style.display = 'none';
 
             document.getElementById('project-name').innerText = "Project: " + projectInfo;
             document.getElementById('stat-photos').innerText = linkedPhotosCount;
             document.getElementById('btn-reset').style.display = 'inline-block';
             
             if (newPhotosAdded > 0) {
-                alert(`✅ Successfully cached ${newPhotosAdded} photo(s). They will link automatically to the grid.`);
+                alert(`✅ Successfully unpacked ${newPhotosAdded} photo(s). They will link automatically to the grid.`);
             }
 
             if (newCsvAdded || isProjectLoaded) {
                 if (rowsParsed > 0 || isProjectLoaded) {
                     if (document.getElementById('dashboard-screen').style.display !== 'block') {
                         document.getElementById('btn-start-mapping').style.display = 'block';
-                        if (isProjectLoaded) {
-                            alert("✅ Project File Loaded Successfully! Click 'MAP BUILDING ELEVATIONS' to continue.");
-                        } else {
-                            alert(`✅ Successfully loaded ${rowsParsed} windows from CSV! Click 'MAP BUILDING ELEVATIONS' to continue.`);
-                        }
                     } else {
                         if (activeTab !== "") {
                             Object.keys(dropAssignments).forEach(d => {
@@ -513,14 +557,9 @@
                         calculateBuildingGeometry();
                         if (currentMode === '2d' || currentMode === 'auto3d') refreshCurrentView();
                         if (currentMode === 'auto3d') buildProcedural3D();
-                        if (isProjectLoaded) {
-                            alert("✅ Dashboard fully restored from Project File.");
-                        } else {
-                            alert(`✅ Dashboard updated with new window logs.`);
-                        }
                     }
                 } else {
-                    alert("⚠️ The file was read, but no valid Strata data was found.\n\nHere is what the tablet saw inside the file:\n\n" + filePreview);
+                    alert("⚠️ The file was read, but no valid Strata data was found.");
                 }
             }
 
@@ -1303,13 +1342,11 @@
                 
                 let startX, startY;
 
-                // Track where the mouse started
                 container.addEventListener('pointerdown', (e) => {
                     startX = e.clientX;
                     startY = e.clientY;
                 });
 
-                // Check hover states to change cursor
                 container.addEventListener('pointermove', (event) => {
                     const rect = auto3dRenderer.domElement.getBoundingClientRect();
                     mouse.x = ( (event.clientX - rect.left) / rect.width ) * 2 - 1;
@@ -1323,10 +1360,9 @@
                     }
                 });
 
-                // Detect pure clicks vs drags
                 container.addEventListener('pointerup', (event) => {
                     const dist = Math.abs(event.clientX - startX) + Math.abs(event.clientY - startY);
-                    if (dist > 5) return; // If mouse moved more than 5px, it was a drag, abort click.
+                    if (dist > 5) return; 
 
                     const rect = auto3dRenderer.domElement.getBoundingClientRect();
                     mouse.x = ( (event.clientX - rect.left) / rect.width ) * 2 - 1;
