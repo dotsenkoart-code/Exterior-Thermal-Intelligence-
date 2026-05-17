@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata Command Center | v7.0 Lean Digital Twin</title>
+    <title>Strata Command Center | v7.1 Lean Digital Twin</title>
     
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="manifest" href="manifest_cmd.json">
@@ -190,7 +190,7 @@
 
     <div class="header">
         <div>
-            <h1>STRATA COMMAND <span>| v7.0 Sandbox Sync Engine</span></h1>
+            <h1>STRATA COMMAND <span>| v7.1 Strict Bounding Box Engine</span></h1>
             <div id="project-name" style="font-weight: bold; color: #888; margin-top: 5px;">Awaiting Data...</div>
         </div>
         <div class="header-btns">
@@ -466,13 +466,11 @@
             }
         }
 
-        // Helper to extract Drop ID from a folder path string
+        // Helper to extract Drop ID from a folder path string. Extremely robust for "Drop A", "Drop-A", "Drop_A"
         function extractDropIdFromPath(pathString) {
             if(!pathString) return null;
-            const parts = pathString.split('/');
-            const folderName = parts.length > 1 ? parts[parts.length - 2] : '';
-            const dropMatch = folderName.match(/Drop[\s_-]?([A-Za-z0-9\-]+)/i);
-            return dropMatch ? dropMatch[1].toUpperCase() : null;
+            const match = pathString.match(/Drop[\s_-]?([A-Za-z0-9\-]+)/i);
+            return match ? match[1].toUpperCase() : null;
         }
 
         async function handleFiles(files, forcedType = null) {
@@ -601,9 +599,10 @@
 
             await Promise.all(filePromises);
             
-            // --- SMART TIMESTAMP AUTO-LINKER WITH FOLDER SANDBOXING ---
-            let allNodes = [];
+            // --- STRICT FOLDER & TIME PERIOD AUTO-LINKER ---
+            let dropNodes = {};
             Object.keys(inspectionData).forEach(drop => {
+                dropNodes[drop] = [];
                 Object.keys(inspectionData[drop]).forEach(floor => {
                     Object.keys(inspectionData[drop][floor]).forEach(pos => {
                         const node = inspectionData[drop][floor][pos];
@@ -612,69 +611,69 @@
                             if (parts.length === 3) {
                                 node.timeSec = parseInt(parts[0], 10)*3600 + parseInt(parts[1], 10)*60 + parseInt(parts[2], 10);
                                 node.parentDrop = drop;
-                                allNodes.push(node);
+                                dropNodes[drop].push(node);
                             }
                         }
                     });
                 });
+                // Sort chronologically (earliest log to latest log in the day)
+                dropNodes[drop].sort((a,b) => a.timeSec - b.timeSec);
             });
-
-            // Auto-Calibration
-            allNodes.sort((a,b) => a.timeSec - b.timeSec);
-            let imgKeys = Object.keys(imageBank);
-            imgKeys.sort((a,b) => imageBank[a].time - imageBank[b].time);
-
-            let globalOffset = 0;
-            if (allNodes.length > 0 && imgKeys.length > 0) {
-                globalOffset = imageBank[imgKeys[0]].time - allNodes[0].timeSec;
-            }
 
             let successfullyLinked = 0;
 
-            imgKeys.forEach(imgKey => {
+            Object.keys(imageBank).forEach(imgKey => {
                 let imgData = imageBank[imgKey];
+                let targetNode = null;
                 
-                // If we detected a folder (e.g. "Drop O"), only search for matching nodes inside Drop O.
-                // If not, search across the entire project as a fallback.
-                let allowedNodes = imgData.drop && inspectionData[imgData.drop] ? allNodes.filter(n => n.parentDrop === imgData.drop) : allNodes;
+                // 1. Check exact string match across everything (e.g. R-12-L.jpg)
+                for(let drop in dropNodes) {
+                    let exact = dropNodes[drop].find(n => n.id === imgKey);
+                    if(exact) { targetNode = exact; break; }
+                }
 
-                let matchedNode = allowedNodes.find(n => n.id === imgKey); // 1. Check exact filename match
-                
-                if (!matchedNode) {
-                    if (imgData.time !== undefined) {
-                        let adjustedImgTime = imgData.time - globalOffset;
-                        if (adjustedImgTime < 0) adjustedImgTime += 86400;
-                        if (adjustedImgTime >= 86400) adjustedImgTime -= 86400;
+                // 2. Strict Folder Sandbox + Time Period Match
+                if (!targetNode && imgData.drop && dropNodes[imgData.drop]) {
+                    let nodes = dropNodes[imgData.drop];
+                    let imgTime = imgData.time;
 
-                        let minDiff = Infinity;
-                        allowedNodes.forEach(node => {
-                            let diff = Math.abs(node.timeSec - adjustedImgTime);
-                            if (diff > 43200) diff = 86400 - diff; 
-                            if (diff < minDiff) {
-                                minDiff = diff;
-                                matchedNode = node;
+                    if (imgTime !== undefined) {
+                        for (let i = 0; i < nodes.length; i++) {
+                            let nTime = nodes[i].timeSec;
+                            // Next window's time, or if it's the last window, give it a 30 min window to wrap up
+                            let nextTime = (i + 1 < nodes.length) ? nodes[i+1].timeSec : (nTime + 1800);
+                            
+                            // Handle midnight crossover logic
+                            if (nextTime < nTime) nextTime += 86400;
+                            let adjustedImgTime = imgTime;
+                            if (adjustedImgTime < nTime && (nTime - adjustedImgTime) > 43200) adjustedImgTime += 86400;
+
+                            // Bounding Box Logic: The photo was taken AFTER this window was logged, but BEFORE the next window was logged.
+                            // We allow a 60-second grace period before the log in case the tech snapped it just before saving the log.
+                            if (adjustedImgTime >= (nTime - 60) && adjustedImgTime < nextTime) {
+                                targetNode = nodes[i];
+                                break; 
                             }
-                        });
-                        // 30 min tolerance
-                        if (minDiff > 1800) matchedNode = null; 
+                        }
                     }
                 }
                 
-                if (matchedNode) {
+                if (targetNode) {
                     successfullyLinked++;
-                    if (matchedNode.flir === '--' || matchedNode.flir === '') {
-                        matchedNode.flir = imgKey; 
-                    } else if (!matchedNode.flir.split(' & ').includes(imgKey)) {
-                        matchedNode.flir += ' & ' + imgKey;
+                    if (targetNode.flir === '--' || targetNode.flir === '') {
+                        targetNode.flir = imgKey; 
+                    } else if (!targetNode.flir.split(' & ').includes(imgKey)) {
+                        targetNode.flir += ' & ' + imgKey;
                     }
                 }
             });
+            // --- END STRICT AUTO-LINKER ---
 
             document.getElementById('loading-overlay').style.display = 'none';
 
             if (newPhotosAdded > 0) {
-                if (successfullyLinked === 0) alert(`⚠️ ${newPhotosAdded} photos unpacked, but 0 could be linked. Ensure they were taken during the logged timeframes or folder names match drop letters.`);
-                else alert(`✅ Sandbox Engine securely linked ${successfullyLinked} photo(s) to the grid.`);
+                if (successfullyLinked === 0) alert(`⚠️ ${newPhotosAdded} photos unpacked, but 0 could be linked. Ensure the folder names exactly match drop letters (e.g. "Drop R").`);
+                else alert(`✅ Strict Sandbox Engine accurately linked ${successfullyLinked} photo(s) to the grid.`);
             }
 
             document.getElementById('project-name').innerText = "Project: " + projectInfo;
@@ -995,10 +994,7 @@
                             if (pair) { finalStatus = getCombinedStatus(pair[0], pair[1]); if (pair[0] === data.id) isStitchedLeft = true; if (pair[1] === data.id) isStitchedRight = true; }
                             winNode.className = `window-node ${finalStatus}`; if (activeFilter !== 'ALL' && finalStatus !== activeFilter) winNode.classList.add('node-filtered-out');
                             winNode.innerText = pos; winNode.onclick = () => handleNodeClick(data, winNode);
-                            
-                            // Check if photo is linked based on imageBank structure
                             if (data.flir.split(' & ').some(imgId => imageBank[imgId])) winNode.style.border = "2px solid #fff";
-                            
                             if (isStitchedLeft) { winNode.style.borderTopRightRadius = '0'; winNode.style.borderBottomRightRadius = '0'; winNode.style.borderRight = "none"; winNode.style.zIndex = '5'; const bridge = document.createElement('div'); bridge.className = `stitch-bridge ${finalStatus}`; if (data.flir.split(' & ').some(imgId => imageBank[imgId])) { bridge.style.borderTop = "2px solid #fff"; bridge.style.borderBottom = "2px solid #fff"; } winNode.appendChild(bridge); }
                             if (isStitchedRight) { winNode.style.borderTopLeftRadius = '0'; winNode.style.borderBottomLeftRadius = '0'; winNode.style.borderLeft = "none"; winNode.style.zIndex = '6'; }
                             winGroup.appendChild(winNode);
@@ -1133,42 +1129,13 @@
             });
         }
 
-        function setLbTransform() {
-            lbImg.style.transform = `translate(${lbPointX}px, ${lbPointY}px) scale(${lbScale})`;
-        }
+        function setLbTransform() { lbImg.style.transform = `translate(${lbPointX}px, ${lbPointY}px) scale(${lbScale})`; }
+        function resetLightboxZoom() { lbScale = 1; lbPointX = 0; lbPointY = 0; setLbTransform(); }
 
-        function resetLightboxZoom() {
-            lbScale = 1; lbPointX = 0; lbPointY = 0;
-            setLbTransform();
-        }
-
-        function openLightbox(imgArray, startIndex) { 
-            currentLightboxImages = imgArray; 
-            currentLightboxIndex = startIndex; 
-            updateLightboxUI(); 
-            document.getElementById('lightbox-modal').style.display = 'flex'; 
-        }
-
-        function updateLightboxUI() { 
-            resetLightboxZoom();
-            document.getElementById('lightbox-img').src = currentLightboxImages[currentLightboxIndex]; 
-            document.getElementById('lightbox-counter').innerText = `${currentLightboxIndex + 1} / ${currentLightboxImages.length}`; 
-            const isMulti = currentLightboxImages.length > 1; 
-            document.getElementById('lightbox-prev').style.display = isMulti ? 'block' : 'none'; 
-            document.getElementById('lightbox-next').style.display = isMulti ? 'block' : 'none'; 
-        }
-
-        function changeLightbox(dir) { 
-            currentLightboxIndex += dir; 
-            if (currentLightboxIndex < 0) currentLightboxIndex = currentLightboxImages.length - 1; 
-            if (currentLightboxIndex >= currentLightboxImages.length) currentLightboxIndex = 0; 
-            updateLightboxUI(); 
-        }
-
-        function closeLightbox() { 
-            document.getElementById('lightbox-modal').style.display = 'none'; 
-            resetLightboxZoom();
-        }
+        function openLightbox(imgArray, startIndex) { currentLightboxImages = imgArray; currentLightboxIndex = startIndex; updateLightboxUI(); document.getElementById('lightbox-modal').style.display = 'flex'; }
+        function updateLightboxUI() { resetLightboxZoom(); document.getElementById('lightbox-img').src = currentLightboxImages[currentLightboxIndex]; document.getElementById('lightbox-counter').innerText = `${currentLightboxIndex + 1} / ${currentLightboxImages.length}`; const isMulti = currentLightboxImages.length > 1; document.getElementById('lightbox-prev').style.display = isMulti ? 'block' : 'none'; document.getElementById('lightbox-next').style.display = isMulti ? 'block' : 'none'; }
+        function changeLightbox(dir) { currentLightboxIndex += dir; if (currentLightboxIndex < 0) currentLightboxIndex = currentLightboxImages.length - 1; if (currentLightboxIndex >= currentLightboxImages.length) currentLightboxIndex = 0; updateLightboxUI(); }
+        function closeLightbox() { document.getElementById('lightbox-modal').style.display = 'none'; resetLightboxZoom(); }
 
         function openModal(nodeId) {
             let pair = stitchedPairs.find(p => p.includes(nodeId)); activeNodeDataArray = [];
@@ -1189,7 +1156,6 @@
             
             const gallery = document.getElementById('m-photo-gallery'), noPhoto = document.getElementById('m-no-photo'), carouselHint = document.getElementById('m-carousel-hint'); gallery.innerHTML = '';
             
-            // Extract the actual blob URLs using the imageBank objects
             let validImgUrls = []; 
             flirs.forEach(f => { if(imageBank[f]) validImgUrls.push(imageBank[f].url); });
 
