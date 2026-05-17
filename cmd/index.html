@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata Command Center | v6.3 Lean Digital Twin</title>
+    <title>Strata Command Center | v6.4 Lean Digital Twin</title>
     
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="manifest" href="manifest_cmd.json">
@@ -167,7 +167,7 @@
 
     <div class="header">
         <div>
-            <h1>STRATA COMMAND <span>| v6.3 Lean Digital Twin</span></h1>
+            <h1>STRATA COMMAND <span>| v6.4 Lean Digital Twin</span></h1>
             <div id="project-name" style="font-weight: bold; color: #888; margin-top: 5px;">Awaiting Data...</div>
         </div>
         <div class="header-btns">
@@ -246,8 +246,9 @@
             </div>
         </div>
 
+        <div class="tabs-container" id="tabs-container"></div>
+
         <div id="view-2d">
-            <div class="tabs-container" id="tabs-container"></div>
             <div id="building-container-2d"></div>
         </div>
 
@@ -255,8 +256,8 @@
             <button class="btn-fullscreen" onclick="toggleFullScreen('arena-auto3d')">⛶ FULL SCREEN</button>
             <div id="procedural-3d-container" style="width:100%; height:100%; cursor: grab;"></div>
             <div style="position: absolute; top: 15px; left: 15px; color: #fff; font-size: 0.9rem; font-weight: bold; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; border: 1px solid #0cf; pointer-events:none; z-index:100;">
-                <strong>Auto-Generated 3D Building</strong><br>
-                <span style="font-weight:normal; color:#ccc;">Built instantly from your CSV data. Spin, Zoom, and Click windows.</span>
+                <strong>Auto-Generated 3D Elevation</strong><br>
+                <span style="font-weight:normal; color:#ccc;">A precise 3D reflection of the 2D grid. Select tabs above to change walls.</span>
             </div>
         </div>
 
@@ -510,7 +511,7 @@
                             });
                         }
                         calculateBuildingGeometry();
-                        if (currentMode === '2d') refreshCurrentView();
+                        if (currentMode === '2d' || currentMode === 'auto3d') refreshCurrentView();
                         if (currentMode === 'auto3d') buildProcedural3D();
                         if (isProjectLoaded) {
                             alert("✅ Dashboard fully restored from Project File.");
@@ -528,7 +529,6 @@
             document.getElementById('folderInput').value = "";
         }
 
-        // --- UPDATED parseCSV ---
         function parseCSV(text) {
             const rows = text.trim().split(/\r\n|\n|\r/);
             let validRows = 0;
@@ -576,7 +576,6 @@
                         time = "--";
                     }
                     
-                    // FIXED: Red status for Sealant Fails
                     let status = 'status-clear';
                     let upperFinds = finds.toUpperCase();
                     if (upperFinds.includes('FAIL') || upperFinds.includes('DEFECT') || upperFinds.includes('CONFIRM')) {
@@ -937,7 +936,7 @@
             document.getElementById('filter-card-flagged').classList.toggle('dimmed', activeFilter !== 'ALL' && activeFilter !== 'status-flagged');
             document.getElementById('filter-card-confirmed').classList.toggle('dimmed', activeFilter !== 'ALL' && activeFilter !== 'status-confirmed');
 
-            if (currentMode === '2d') refreshCurrentView();
+            if (currentMode === '2d' || currentMode === 'auto3d') refreshCurrentView();
             if (currentMode === 'auto3d') buildProcedural3D();
             render3DHotspots();
         }
@@ -976,6 +975,7 @@
                         document.querySelectorAll('.stitch-toggle').forEach(btn => btn.classList.remove('stitch-mode-on'));
                         calculateBuildingGeometry();
                         if (currentMode === '2d') refreshCurrentView();
+                        if (currentMode === 'auto3d') buildProcedural3D();
                     }
                     return;
                 }
@@ -990,6 +990,7 @@
                     document.querySelectorAll('.stitch-toggle').forEach(btn => btn.classList.remove('stitch-mode-on'));
                     stitchSelection = [];
                     if (currentMode === '2d') refreshCurrentView();
+                    if (currentMode === 'auto3d') buildProcedural3D();
                 }
                 return;
             }
@@ -1077,7 +1078,7 @@
             
             if(!elevations.includes(activeTab)) activeTab = elevations[0];
             calculateBuildingGeometry();
-            if (currentMode === '2d') refreshCurrentView();
+            if (currentMode === '2d' || currentMode === 'auto3d') refreshCurrentView();
             if (currentMode === 'auto3d') buildProcedural3D();
         }
 
@@ -1137,14 +1138,16 @@
             document.getElementById('arena-auto3d').style.display = (mode === 'auto3d') ? 'block' : 'none';
             document.getElementById('arena-true3d').style.display = (mode === 'true3d') ? 'block' : 'none';
             
-            if (mode === '2d') refreshCurrentView();
+            document.getElementById('tabs-container').style.display = (mode === 'true3d') ? 'none' : 'flex';
+
+            if (mode === '2d' || mode === 'auto3d') refreshCurrentView();
             if (mode === 'auto3d') {
                 setTimeout(() => { buildProcedural3D(); }, 100);
             }
         }
 
         function refreshCurrentView() {
-            if (currentMode === '2d') {
+            if (currentMode === '2d' || currentMode === 'auto3d') {
                 const container = document.getElementById('tabs-container');
                 container.innerHTML = "";
                 const usedElevations = new Set(Object.values(dropAssignments));
@@ -1154,15 +1157,21 @@
                         const tab = document.createElement('div');
                         tab.className = `tab ${activeTab === elev ? 'active' : ''}`;
                         tab.innerText = elev;
-                        tab.onclick = () => { activeTab = elev; refreshCurrentView(); };
+                        tab.onclick = () => { 
+                            activeTab = elev; 
+                            refreshCurrentView(); 
+                            if(currentMode === 'auto3d') buildProcedural3D();
+                        };
                         container.appendChild(tab);
                     }
                 });
                 if(!usedElevations.has(activeTab) && usedElevations.size > 0) activeTab = Array.from(usedElevations)[0];
                 
-                const gridContainer = document.getElementById('building-container-2d');
-                gridContainer.innerHTML = '';
-                gridContainer.appendChild(generateWallDOM(activeTab, false));
+                if (currentMode === '2d') {
+                    const gridContainer = document.getElementById('building-container-2d');
+                    gridContainer.innerHTML = '';
+                    gridContainer.appendChild(generateWallDOM(activeTab, false));
+                }
             }
         }
 
@@ -1279,11 +1288,13 @@
             const container = document.getElementById('procedural-3d-container');
             
             if (!auto3dRenderer) {
-                auto3dRenderer = new THREE.WebGLRenderer({ antialias: true });
+                auto3dRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
                 container.appendChild(auto3dRenderer.domElement);
                 
                 auto3dCamera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 2000);
                 auto3dControls = new THREE.OrbitControls(auto3dCamera, auto3dRenderer.domElement);
+                auto3dControls.enableDamping = true;
+                auto3dControls.dampingFactor = 0.1;
                 
                 const raycaster = new THREE.Raycaster();
                 const mouse = new THREE.Vector2();
@@ -1317,96 +1328,115 @@
             auto3dCamera.aspect = container.clientWidth / container.clientHeight;
             auto3dCamera.updateProjectionMatrix();
 
+            if (auto3dScene) {
+                auto3dScene.children.forEach(child => {
+                    if(child.geometry) child.geometry.dispose();
+                    if(child.material) {
+                        if(Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+                        else child.material.dispose();
+                    }
+                });
+            }
+            
             auto3dScene = new THREE.Scene();
-            auto3dScene.background = new THREE.Color(0x0f111a);
 
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
             auto3dScene.add(ambientLight);
             const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            dirLight.position.set(20, 50, 20);
+            dirLight.position.set(0, 50, 50);
             auto3dScene.add(dirLight);
 
-            let walls = {};
-            Object.keys(inspectionData).forEach(d => {
-                let wall = dropAssignments[d] || "Unassigned";
-                if(!walls[wall]) walls[wall] = [];
-                walls[wall].push(d);
+            const activeDrops = Object.keys(inspectionData).filter(d => dropAssignments[d] === activeTab).sort();
+            if (activeDrops.length === 0) return;
+
+            let renderMaxFloor = -Infinity;
+            let renderMinFloor = Infinity;
+
+            activeDrops.forEach(d => {
+                const floors = Object.keys(inspectionData[d]).map(Number);
+                renderMaxFloor = Math.max(renderMaxFloor, ...floors);
+                renderMinFloor = Math.min(renderMinFloor, ...floors);
             });
 
-            const wallNames = Object.keys(walls);
-            const numWalls = wallNames.length;
-            
-            let currentAngle = 0;
-            const angleStep = Math.PI * 2 / Math.max(numWalls, 4); 
-            const radius = Math.max(10, Object.keys(inspectionData).length * 1.5);
+            if (renderMaxFloor === -Infinity) { renderMaxFloor = 1; renderMinFloor = 1; }
 
-            wallNames.forEach((wName) => {
-                const drops = walls[wName].sort();
-                
-                const startX = Math.cos(currentAngle) * radius;
-                const startZ = Math.sin(currentAngle) * radius;
-                const nextAngle = currentAngle + angleStep;
-                const endX = Math.cos(nextAngle) * radius;
-                const endZ = Math.sin(nextAngle) * radius;
-                
-                const dx = (endX - startX) / Math.max(drops.length, 1);
-                const dz = (endZ - startZ) / Math.max(drops.length, 1);
+            const dropSpacing = 5;
+            const floorSpacing = 1.5;
+            const windowWidth = 1.2;
+            const windowHeight = 1.0;
+            const order = { 'L': -1.4, 'C': 0, 'R': 1.4 }; 
 
-                const wallRot = Math.atan2(endZ - startZ, endX - startX);
+            activeDrops.forEach((dropStr, dropIndex) => {
+                const baseX = dropIndex * dropSpacing - ((activeDrops.length - 1) * dropSpacing) / 2;
 
-                drops.forEach((d, dIdx) => {
-                    const baseX = startX + dx * dIdx + dx/2;
-                    const baseZ = startZ + dz * dIdx + dz/2;
+                for (let f = renderMaxFloor; f >= renderMinFloor; f--) {
+                    if (inspectionData[dropStr] && inspectionData[dropStr][f]) {
+                        const posKeys = Object.keys(inspectionData[dropStr][f]);
 
-                    const floors = Object.keys(inspectionData[d]);
-                    floors.forEach(f => {
-                        const floorNum = parseInt(f);
-                        const posKeys = Object.keys(inspectionData[d][f]);
                         posKeys.forEach(pos => {
-                            const node = inspectionData[d][f][pos];
-                            
-                            let finalStatus = node.status;
-                            let pair = stitchedPairs.find(p => p.includes(node.id));
-                            if(pair) finalStatus = getCombinedStatus(pair[0], pair[1]);
-                            
+                            const data = inspectionData[dropStr][f][pos];
+                            let finalStatus = data.status;
+                            let pair = stitchedPairs.find(p => p.includes(data.id));
+                            if (pair) finalStatus = getCombinedStatus(pair[0], pair[1]);
+
                             let color = 0x28a745; 
-                            if (finalStatus === 'status-flagged') color = 0xf1c40f;
-                            if (finalStatus === 'status-confirmed') color = 0xd9534f;
-                            
+                            if (finalStatus === 'status-flagged') color = 0xf1c40f; 
+                            if (finalStatus === 'status-confirmed') color = 0xd9534f; 
+
                             if (activeFilter !== 'ALL' && finalStatus !== activeFilter) {
-                                color = 0x333333;
+                                color = 0x333333; 
                             }
 
-                            const geom = new THREE.BoxGeometry(1.2, 0.8, 0.2);
-                            const mat = new THREE.MeshStandardMaterial({ color: color, metalness: 0.2, roughness: 0.7 });
-                            
+                            let xPos = baseX + (order[pos] !== undefined ? order[pos] : 0);
+                            const geom = new THREE.BoxGeometry(windowWidth, windowHeight, 0.2);
+                            const mat = new THREE.MeshStandardMaterial({ color: color, metalness: 0.1, roughness: 0.8 });
+
                             if (activeFilter !== 'ALL' && finalStatus !== activeFilter) {
                                 mat.transparent = true;
                                 mat.opacity = 0.1;
                             }
 
                             const mesh = new THREE.Mesh(geom, mat);
+                            mesh.position.set(xPos, f * floorSpacing, 0);
+                            mesh.userData = { id: data.id };
 
-                            let xOffset = 0;
-                            if (pos === 'L') xOffset = -1.4;
-                            if (pos === 'R') xOffset = 1.4;
+                            let hasAnyImage = data.flir.split(' & ').some(imgId => imageBank[imgId]);
+                            if (hasAnyImage) {
+                                const edges = new THREE.EdgesGeometry(geom);
+                                const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 }));
+                                mesh.add(line);
+                            }
 
-                            const worldX = baseX + Math.cos(wallRot) * xOffset;
-                            const worldZ = baseZ + Math.sin(wallRot) * xOffset;
-
-                            mesh.position.set(worldX, floorNum * 1.2, worldZ);
-                            mesh.rotation.y = -wallRot;
-                            
-                            mesh.userData = { id: node.id };
                             auto3dScene.add(mesh);
+                            
+                            if (pair && pair[0] === data.id) {
+                                let p1 = data.id.split('-')[2];
+                                let p2 = pair[1].split('-')[2];
+                                let dist = order[p2] - order[p1];
+                                if(dist > 0) {
+                                    const bridgeGeom = new THREE.BoxGeometry(dist, windowHeight - 0.1, 0.15);
+                                    const bridgeMesh = new THREE.Mesh(bridgeGeom, mat); 
+                                    bridgeMesh.position.set(xPos + dist/2, f * floorSpacing, 0);
+                                    auto3dScene.add(bridgeMesh);
+                                }
+                            }
                         });
-                    });
-                });
-                currentAngle = nextAngle;
+                    }
+                }
             });
 
-            auto3dCamera.position.set(0, (globalStats.maxFloor || 10) * 1.2, radius * 2.5);
-            auto3dControls.target.set(0, ((globalStats.maxFloor - globalStats.minFloor)/2 || 5) * 1.2, 0);
+            const wallWidth = activeDrops.length * dropSpacing;
+            const wallHeight = (renderMaxFloor - renderMinFloor + 2) * floorSpacing;
+            const centerY = ((renderMaxFloor + renderMinFloor) / 2) * floorSpacing;
+            
+            const wallGeom = new THREE.PlaneGeometry(wallWidth + 4, wallHeight + 2);
+            const wallMat = new THREE.MeshStandardMaterial({ color: 0x161922, side: THREE.DoubleSide });
+            const wallMesh = new THREE.Mesh(wallGeom, wallMat);
+            wallMesh.position.set(0, centerY, -0.5);
+            auto3dScene.add(wallMesh);
+
+            auto3dCamera.position.set(0, centerY, Math.max(wallWidth, wallHeight) * 0.8 + 5);
+            auto3dControls.target.set(0, centerY, 0);
             auto3dControls.update();
 
             function animate() {
