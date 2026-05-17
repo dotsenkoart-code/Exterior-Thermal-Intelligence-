@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata Command Center | v7.2 True Sandbox Engine</title>
+    <title>Strata Command Center | v8.0 True Bucket Engine</title>
     
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="manifest" href="manifest_cmd.json">
@@ -22,59 +22,59 @@
     <script src="https://cdn.jsdelivr.net/npm/exifr/dist/lite.umd.js"></script>
 
     <style>
-        /* --- CORE STYLES (FULL SCREEN ALIGNMENT) --- */
+        /* --- FULL SCREEN FLEXBOX LAYOUT --- */
         * { box-sizing: border-box; }
-        html, body { overscroll-behavior-y: none; margin: 0; padding: 0; width: 100vw; height: 100vh; overflow-x: hidden; }
-        body { font-family: 'Segoe UI', Roboto, sans-serif; background: #0f111a; color: #fff; padding: 15px; }
+        html, body { 
+            margin: 0; padding: 0; width: 100vw; height: 100vh; 
+            overflow: hidden; display: flex; flex-direction: column;
+            background: #0f111a; color: #fff; font-family: 'Segoe UI', Roboto, sans-serif; 
+        }
         
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0cf; padding-bottom: 10px; margin-bottom: 15px; width: 100%; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0cf; padding: 15px 20px; flex-shrink: 0; }
         .header h1 { margin: 0; font-size: 1.6rem; font-weight: 900; letter-spacing: 1px; color: #fff; }
         .header span { color: #0cf; }
         
-        /* --- MAPPING SCREEN --- */
-        #mapping-screen { background: #1a1d27; border-radius: 12px; padding: 25px; border: 1px solid #333; display: none; margin-bottom: 20px; width: 100%; }
+        .main-content { display: flex; flex-direction: column; flex-grow: 1; padding: 15px 20px; overflow: hidden; }
+
+        /* --- DASHBOARD CONTROLS --- */
+        #mapping-screen { background: #1a1d27; border-radius: 12px; padding: 25px; border: 1px solid #333; display: none; width: 100%; }
         .elevation-creator { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 20px; }
         .elevation-creator input { flex: 1; padding: 12px; background: #111; border: 1px solid #444; color: #fff; border-radius: 6px; font-size: 1rem; }
         .mapping-row { display: flex; justify-content: space-between; align-items: center; background: #111; padding: 15px; border-radius: 6px; margin-bottom: 10px; border: 1px solid #222; }
         .mapping-row select { padding: 10px; background: #222; color: #0cf; border: 1px solid #444; border-radius: 4px; font-size: 1rem; font-weight: bold; width: 200px; }
-        .mapping-row select:disabled { color: #888; border-color: #333; cursor: not-allowed; }
 
-        /* --- DASHBOARD CONTROLS --- */
-        #dashboard-screen { display: none; width: 100%; }
-        .view-controls { display: flex; gap: 10px; margin-bottom: 15px; background: #1a1d27; padding: 10px; border-radius: 8px; border: 1px solid #333; align-items: center; width: 100%; }
+        #dashboard-screen { display: none; flex-direction: column; height: 100%; width: 100%; }
+        .view-controls { display: flex; gap: 10px; margin-bottom: 15px; background: #1a1d27; padding: 10px; border-radius: 8px; border: 1px solid #333; align-items: center; flex-shrink: 0; }
         .view-toggle-btn { flex: 1; padding: 12px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; background: #222; color: #888; transition: 0.2s; }
         .view-toggle-btn.active { background: #0cf; color: #000; }
-        
         #btn-true3d { background: #2b113d; color: #d080ff; border: 1px solid #5a2e7a; }
         #btn-true3d.active { background: #b055ff; color: #fff; }
 
         .stitch-mode-on { border-color: #f39c12 !important; background: rgba(243, 156, 18, 0.4) !important; color: #fff !important; box-shadow: 0 0 15px rgba(243, 156, 18, 0.8) !important; }
         .tag-mode-on { border-color: #d080ff !important; background: rgba(176, 85, 255, 0.4) !important; color: #fff !important; box-shadow: 0 0 15px rgba(176, 85, 255, 0.8) !important; }
-        .node-selected { border-color: #0cf !important; transform: scale(1.1); box-shadow: 0 0 15px #0cf !important; z-index: 20 !important; }
 
-        .tabs-container { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 5px; border-bottom: 2px solid #333; margin-bottom: 15px; width: 100%; }
+        .tabs-container { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 5px; border-bottom: 2px solid #333; margin-bottom: 15px; flex-shrink: 0; }
         .tab { padding: 12px 25px; background: #1a1d27; color: #888; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: bold; font-size: 1rem; border: 1px solid #333; border-bottom: none; transition: 0.2s; white-space: nowrap; }
-        .tab:hover { background: #202430; color: #ccc; }
         .tab.active { background: #0cf; color: #000; border-color: #0cf; }
 
         /* --- STATS BAR --- */
-        .stats-bar { display: flex; gap: 10px; margin-bottom: 15px; width: 100%; }
+        .stats-bar { display: flex; gap: 10px; margin-bottom: 15px; flex-shrink: 0; }
         .stat-card { flex: 1; background: #1a1d27; padding: 15px; border-radius: 8px; border-left: 4px solid #333; cursor: pointer; transition: transform 0.2s, opacity 0.2s; }
-        .stat-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
         .stat-card.dimmed { opacity: 0.3; }
-        .stat-card.no-hover { cursor: default; }
-        .stat-card.no-hover:hover { transform: none; box-shadow: none; }
         .stat-label { font-size: 0.75rem; color: #888; text-transform: uppercase; font-weight: bold; }
         .stat-value { font-size: 2rem; font-weight: 900; margin-top: 5px; }
 
-        /* --- 2D GRID --- */
-        #building-container-2d { display: flex; gap: 15px; overflow-x: auto; padding-bottom: 20px; align-items: stretch; width: 100%; }
+        /* --- VIEWS --- */
+        #view-2d { flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; }
+        #building-container-2d { flex-grow: 1; overflow: auto; display: flex; gap: 15px; align-items: flex-start; padding-bottom: 20px; }
+        
         .drop-column { background: #161922; border: 1px solid #2a2d38; border-radius: 8px; padding: 10px; display: flex; flex-direction: column; min-width: max-content; }
         .drop-header { text-align: center; font-size: 1.2rem; font-weight: bold; color: #0cf; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 10px; height: 40px; display: flex; align-items: center; justify-content: center; }
         .floor-axis-column { background: transparent; border: none; padding-right: 0; padding-left: 0; min-width: auto; margin-right: -5px; }
         .floor-axis-header { border-bottom-color: transparent; color: transparent; height: 40px; margin-bottom: 10px; padding-bottom: 10px; }
         .floor-row { display: flex; align-items: center; margin-bottom: 4px; height: 50px; }
         .floor-label { width: 35px; font-weight: bold; color: #888; font-size: 0.9rem; text-align: right; margin-right: 10px; height: 50px; display: flex; align-items: center; justify-content: flex-end; }
+        
         .window-group { display: flex; gap: 4px; flex: 1; justify-content: center; width: 140px; height: 50px; } 
         .window-node { flex: 1; height: 50px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: bold; color: rgba(255,255,255,0.9); border: 2px solid rgba(0,0,0,0.5); transition: transform 0.1s; position: relative; }
         .window-node:hover { transform: scale(1.1); box-shadow: 0 5px 15px rgba(0,0,0,0.8); z-index: 10; }
@@ -98,7 +98,8 @@
         .header-btns { display: flex; gap: 10px; }
 
         /* --- AUTO 3D AND TRUE 3D VIEWS --- */
-        #arena-auto3d, #arena-true3d { display: none; width: 100%; height: calc(100vh - 220px); min-height: 500px; background: #0f111a; border: 1px solid #0cf; border-radius: 12px; overflow: hidden; position: relative; margin-bottom: 20px; box-shadow: 0 0 30px rgba(0, 204, 255, 0.1); }
+        #arena-auto3d, #arena-true3d { display: none; flex-grow: 1; width: 100%; background: #0f111a; border: 1px solid #0cf; border-radius: 12px; overflow: hidden; position: relative; box-shadow: 0 0 30px rgba(0, 204, 255, 0.1); }
+        #arena-true3d { background: radial-gradient(circle, #2a2d38 0%, #0f111a 100%); border-color: #5a2e7a; box-shadow: 0 0 30px rgba(176, 85, 255, 0.2); }
         model-viewer { width: 100%; height: 100%; outline: none; }
         .btn-fullscreen { position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.7); color: #fff; border: 1px solid #555; z-index: 100; padding: 10px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; letter-spacing: 1px; }
         
@@ -154,7 +155,6 @@
             max-width: 100%; max-height: 100%; object-fit: contain; cursor: grab; transition: transform 0.05s linear; transform-origin: center center; will-change: transform;
         }
         #lightbox-img:active { cursor: grabbing; }
-
         .lightbox-nav-btn {
             position: absolute; top: 50%; transform: translateY(-50%); z-index: 3010;
             background: rgba(0,0,0,0.8); color: #fff; border: 2px solid #0cf; border-radius: 8px;
@@ -177,7 +177,7 @@
 
     <div class="header">
         <div>
-            <h1>STRATA COMMAND <span>| v7.2 True Sandbox Engine</span></h1>
+            <h1>STRATA COMMAND <span>| v8.0 True Bucket Engine</span></h1>
             <div id="project-name" style="font-weight: bold; color: #888; margin-top: 5px;">Awaiting Data...</div>
         </div>
         <div class="header-btns">
@@ -187,94 +187,96 @@
         </div>
     </div>
 
-    <div style="display: flex; gap: 15px; margin-bottom: 20px; width: 100%;">
-        <input type="file" id="csvInput" multiple style="display: none;" onchange="handleFiles(this.files, 'csv')">
-        <button class="btn btn-dark" style="flex: 1; padding: 20px; font-size: 1.1rem; border: 2px dashed #0cf; background: #161922;" onclick="document.getElementById('csvInput').click()">
-            📄 1. LOAD CSV OR PROJECT
-        </button>
+    <div class="main-content">
+        <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-shrink: 0;">
+            <input type="file" id="csvInput" multiple style="display: none;" onchange="handleFiles(this.files, 'csv')">
+            <button class="btn btn-dark" style="flex: 1; padding: 20px; font-size: 1.1rem; border: 2px dashed #0cf; background: #161922;" onclick="document.getElementById('csvInput').click()">
+                📄 1. LOAD CSV OR PROJECT
+            </button>
 
-        <input type="file" id="mediaInput" multiple style="display: none;" onchange="handleFiles(this.files, 'media')">
-        <button class="btn btn-dark" style="flex: 1; padding: 20px; font-size: 1.1rem; border: 2px dashed #d080ff; background: #161922;" onclick="document.getElementById('mediaInput').click()">
-            🖼️ 2. ADD INDIVIDUAL FILES
-        </button>
+            <input type="file" id="mediaInput" multiple style="display: none;" onchange="handleFiles(this.files, 'media')">
+            <button class="btn btn-dark" style="flex: 1; padding: 20px; font-size: 1.1rem; border: 2px dashed #d080ff; background: #161922;" onclick="document.getElementById('mediaInput').click()">
+                🖼️ 2. ADD INDIVIDUAL FILES
+            </button>
 
-        <input type="file" id="folderInput" webkitdirectory directory multiple style="display: none;" onchange="handleFiles(this.files, 'media')">
-        <button class="btn btn-dark" style="flex: 1; padding: 20px; font-size: 1.1rem; border: 2px dashed #f39c12; background: #161922;" onclick="document.getElementById('folderInput').click()">
-            📁 3. ADD ZIP OR FOLDER
-        </button>
-    </div>
-    
-    <button id="btn-start-mapping" class="btn btn-green btn-block" style="display:none; padding: 20px; font-size: 1.2rem;" onclick="openMappingScreen()">🗺️ MAP BUILDING ELEVATIONS</button>
-
-    <div id="mapping-screen">
-        <h2 style="margin-top:0; color:#0cf;">Assign Drops to Walls</h2>
-        <p style="color:#888; margin-bottom: 20px;">Create your architectural structure below. Add your custom walls, then assign drops.</p>
+            <input type="file" id="folderInput" webkitdirectory directory multiple style="display: none;" onchange="handleFiles(this.files, 'media')">
+            <button class="btn btn-dark" style="flex: 1; padding: 20px; font-size: 1.1rem; border: 2px dashed #f39c12; background: #161922;" onclick="document.getElementById('folderInput').click()">
+                📁 3. ADD ZIP OR FOLDER
+            </button>
+        </div>
         
-        <div class="elevation-creator">
-            <input type="text" id="new-elevation-name" placeholder="e.g. North Face, Courtyard, Penthouse..." onkeypress="if(event.key === 'Enter') addElevation()">
-            <button class="btn btn-blue" onclick="addElevation()">➕ ADD WALL</button>
-        </div>
-        <div id="mapping-list"></div>
-        <button class="btn btn-green btn-block" style="padding: 20px; font-size: 1.2rem; margin-top: 20px;" onclick="generateDashboard()">✅ GENERATE DASHBOARD</button>
-    </div>
+        <button id="btn-start-mapping" class="btn btn-green btn-block" style="display:none; padding: 20px; font-size: 1.2rem; flex-shrink: 0;" onclick="openMappingScreen()">🗺️ MAP BUILDING ELEVATIONS</button>
 
-    <div id="dashboard-screen">
-        <div class="view-controls">
-            <span style="color:#888; font-weight:bold; font-size:0.9rem; margin-right: 10px;">MODE:</span>
-            <button class="view-toggle-btn active" id="btn-2d" onclick="switchView('2d')">2D TABS</button>
-            <button class="view-toggle-btn" id="btn-auto3d" onclick="switchView('auto3d')" style="background: #1d212f; border: 1px solid #0cf; color: #0cf;">🏢 AUTO 3D MODEL</button>
-            <button class="view-toggle-btn" id="btn-true3d" onclick="switchView('true3d')">✨ TRUE 3D TWIN</button>
-            <div style="flex:0.2;"></div>
-            <button class="view-toggle-btn stitch-toggle" style="border:1px solid #555;" onclick="toggleStitchMode()">🔗 STITCH 2D WIDE WINDOWS</button>
-            <button class="view-toggle-btn tag-toggle" style="border:1px solid #d080ff; display:none;" id="btn-tag3d-main" onclick="openMasterTagMenu()">📍 3D TAG MENU</button>
+        <div id="mapping-screen">
+            <h2 style="margin-top:0; color:#0cf;">Assign Drops to Walls</h2>
+            <p style="color:#888; margin-bottom: 20px;">Create your architectural structure below. Add your custom walls, then assign drops.</p>
+            
+            <div class="elevation-creator">
+                <input type="text" id="new-elevation-name" placeholder="e.g. North Face, Courtyard, Penthouse..." onkeypress="if(event.key === 'Enter') addElevation()">
+                <button class="btn btn-blue" onclick="addElevation()">➕ ADD WALL</button>
+            </div>
+            <div id="mapping-list"></div>
+            <button class="btn btn-green btn-block" style="padding: 20px; font-size: 1.2rem; margin-top: 20px;" onclick="generateDashboard()">✅ GENERATE DASHBOARD</button>
         </div>
 
-        <div class="stats-bar" id="stats-bar">
-            <div class="stat-card" id="filter-card-all" style="border-color:#888;" onclick="setFilter('ALL')">
-                <div class="stat-label" style="color:#fff;">ALL WINDOWS</div>
-                <div class="stat-value" id="stat-total" style="color:#fff;">0</div>
+        <div id="dashboard-screen">
+            <div class="view-controls">
+                <span style="color:#888; font-weight:bold; font-size:0.9rem; margin-right: 10px;">MODE:</span>
+                <button class="view-toggle-btn active" id="btn-2d" onclick="switchView('2d')">2D TABS</button>
+                <button class="view-toggle-btn" id="btn-auto3d" onclick="switchView('auto3d')" style="background: #1d212f; border: 1px solid #0cf; color: #0cf;">🏢 AUTO 3D MODEL</button>
+                <button class="view-toggle-btn" id="btn-true3d" onclick="switchView('true3d')">✨ TRUE 3D TWIN</button>
+                <div style="flex:0.2;"></div>
+                <button class="view-toggle-btn stitch-toggle" style="border:1px solid #555;" onclick="toggleStitchMode()">🔗 STITCH 2D WIDE WINDOWS</button>
+                <button class="view-toggle-btn tag-toggle" style="border:1px solid #d080ff; display:none;" id="btn-tag3d-main" onclick="openMasterTagMenu()">📍 3D TAG MENU</button>
             </div>
-            <div class="stat-card" id="filter-card-clear" style="border-color:#28a745;" onclick="setFilter('status-clear')">
-                <div class="stat-label">CLEAR (GREEN)</div>
-                <div class="stat-value" id="stat-clear" style="color:#28a745;">0</div>
-            </div>
-            <div class="stat-card" id="filter-card-flagged" style="border-color:#f1c40f;" onclick="setFilter('status-flagged')">
-                <div class="stat-label">PENDING (YELLOW)</div>
-                <div class="stat-value" id="stat-flagged" style="color:#f1c40f;">0</div>
-            </div>
-            <div class="stat-card" id="filter-card-confirmed" style="border-color:#d9534f;" onclick="setFilter('status-confirmed')">
-                <div class="stat-label">DEFECTS (RED)</div>
-                <div class="stat-value" id="stat-confirmed" style="color:#d9534f;">0</div>
-            </div>
-            <div class="stat-card no-hover" style="border-color:#0cf;">
-                <div class="stat-label">IMAGES LINKED</div>
-                <div class="stat-value" id="stat-photos" style="color:#0cf;">0</div>
-            </div>
-        </div>
 
-        <div class="tabs-container" id="tabs-container"></div>
-
-        <div id="view-2d">
-            <div id="building-container-2d"></div>
-        </div>
-
-        <div id="arena-auto3d">
-            <button class="btn-fullscreen" onclick="toggleFullScreen('arena-auto3d')">⛶ FULL SCREEN</button>
-            <div id="procedural-3d-container" style="width:100%; height:100%; cursor: grab;"></div>
-            <div style="position: absolute; top: 15px; left: 15px; color: #fff; font-size: 0.9rem; font-weight: bold; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; border: 1px solid #0cf; pointer-events:none; z-index:100;">
-                <strong>Auto-Generated 3D Elevation</strong><br>
-                <span style="font-weight:normal; color:#ccc;">A precise 3D reflection of the 2D grid. Select tabs above to change walls.</span>
+            <div class="stats-bar" id="stats-bar">
+                <div class="stat-card" id="filter-card-all" style="border-color:#888;" onclick="setFilter('ALL')">
+                    <div class="stat-label" style="color:#fff;">ALL WINDOWS</div>
+                    <div class="stat-value" id="stat-total" style="color:#fff;">0</div>
+                </div>
+                <div class="stat-card" id="filter-card-clear" style="border-color:#28a745;" onclick="setFilter('status-clear')">
+                    <div class="stat-label">CLEAR (GREEN)</div>
+                    <div class="stat-value" id="stat-clear" style="color:#28a745;">0</div>
+                </div>
+                <div class="stat-card" id="filter-card-flagged" style="border-color:#f1c40f;" onclick="setFilter('status-flagged')">
+                    <div class="stat-label">PENDING (YELLOW)</div>
+                    <div class="stat-value" id="stat-flagged" style="color:#f1c40f;">0</div>
+                </div>
+                <div class="stat-card" id="filter-card-confirmed" style="border-color:#d9534f;" onclick="setFilter('status-confirmed')">
+                    <div class="stat-label">DEFECTS (RED)</div>
+                    <div class="stat-value" id="stat-confirmed" style="color:#d9534f;">0</div>
+                </div>
+                <div class="stat-card no-hover" style="border-color:#0cf;">
+                    <div class="stat-label">IMAGES LINKED</div>
+                    <div class="stat-value" id="stat-photos" style="color:#0cf;">0</div>
+                </div>
             </div>
-        </div>
 
-        <div id="arena-true3d">
-            <button class="btn-fullscreen" onclick="toggleFullScreen('arena-true3d')">⛶ FULL SCREEN</button>
-            <model-viewer id="main-3d-viewer" src="https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/LittlestTokyo.glb" alt="3D model" auto-rotate camera-controls tone-mapping="neutral" shadow-intensity="1"></model-viewer>
-            <div style="position: absolute; top: 15px; left: 15px; color: #fff; font-size: 0.9rem; font-weight: bold; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; border: 1px solid #d080ff; pointer-events:none; z-index:100;">
-                <strong>Drone Photogrammetry Engine</strong><br>
-                <span id="model-status" style="font-weight:normal; color:#ccc;">Showing Default Test Model. Drop a custom .glb file above to replace.</span>
+            <div class="tabs-container" id="tabs-container"></div>
+
+            <div id="view-2d">
+                <div id="building-container-2d"></div>
             </div>
-            <div class="floating-tools"><button class="float-btn tag-toggle" onclick="openMasterTagMenu()">📍 3D TAG MENU</button></div>
+
+            <div id="arena-auto3d">
+                <button class="btn-fullscreen" onclick="toggleFullScreen('arena-auto3d')">⛶ FULL SCREEN</button>
+                <div id="procedural-3d-container" style="width:100%; height:100%; cursor: grab;"></div>
+                <div style="position: absolute; top: 15px; left: 15px; color: #fff; font-size: 0.9rem; font-weight: bold; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; border: 1px solid #0cf; pointer-events:none; z-index:100;">
+                    <strong>Auto-Generated 3D Elevation</strong><br>
+                    <span style="font-weight:normal; color:#ccc;">A precise 3D reflection of the 2D grid. Select tabs above to change walls.</span>
+                </div>
+            </div>
+
+            <div id="arena-true3d">
+                <button class="btn-fullscreen" onclick="toggleFullScreen('arena-true3d')">⛶ FULL SCREEN</button>
+                <model-viewer id="main-3d-viewer" src="https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/LittlestTokyo.glb" alt="3D model" auto-rotate camera-controls tone-mapping="neutral" shadow-intensity="1"></model-viewer>
+                <div style="position: absolute; top: 15px; left: 15px; color: #fff; font-size: 0.9rem; font-weight: bold; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; border: 1px solid #d080ff; pointer-events:none; z-index:100;">
+                    <strong>Drone Photogrammetry Engine</strong><br>
+                    <span id="model-status" style="font-weight:normal; color:#ccc;">Showing Default Test Model. Drop a custom .glb file above to replace.</span>
+                </div>
+                <div class="floating-tools"><button class="float-btn tag-toggle" onclick="openMasterTagMenu()">📍 3D TAG MENU</button></div>
+            </div>
         </div>
     </div>
 
@@ -314,20 +316,15 @@
 
     <div id="lightbox-modal" class="modal-overlay" style="z-index: 3000;">
         <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column;">
-            
             <button onclick="closeLightbox()" style="position: absolute; top: 20px; right: 20px; z-index: 3020; background: rgba(0,0,0,0.8); color: #fff; border: 2px solid #fff; border-radius: 50%; width: 50px; height: 50px; font-size: 1.5rem; font-weight: bold; cursor: pointer;">X</button>
             <div id="lightbox-counter" style="position: absolute; top: 20px; left: 20px; z-index: 3020; background: rgba(0,0,0,0.8); color: #0cf; padding: 10px 20px; border-radius: 8px; font-weight: bold; font-size: 1.2rem; border: 1px solid #0cf;">1 / 3</div>
-            
             <button id="lightbox-prev" class="lightbox-nav-btn" onclick="changeLightbox(-1)" style="left: 20px;">&#10094;</button>
-            
             <div id="lightbox-container">
                 <img id="lightbox-img" src="" draggable="false">
             </div>
-            
             <div style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 3020; background: rgba(0,0,0,0.8); color: #0cf; padding: 8px 15px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; border: 1px solid #0cf; pointer-events: none;">
                 Mouse Wheel or Pinch to Zoom • Click & Drag to Pan
             </div>
-
             <button id="lightbox-next" class="lightbox-nav-btn" onclick="changeLightbox(1)" style="right: 20px;">&#10095;</button>
         </div>
     </div>
@@ -429,7 +426,7 @@
                         document.getElementById('btn-save-project').style.display = 'inline-block';
 
                         if (elevations.length > 0) {
-                            document.getElementById('dashboard-screen').style.display = 'block';
+                            document.getElementById('dashboard-screen').style.display = 'flex';
                             document.getElementById('btn-edit-map').style.display = 'inline-block';
                             if (!elevations.includes(activeTab)) activeTab = elevations[0];
                             calculateBuildingGeometry();
@@ -443,12 +440,12 @@
         }
 
         // --- CORE FUNCTIONS ---
-        // Helper to extract Drop ID strictly from folder path
+
+        // NEW FIX: Scans the ENTIRE path string to find the Drop letter safely
         function extractDropIdFromPath(pathString) {
             if(!pathString) return null;
-            const parts = pathString.split('/');
-            const folderName = parts.length > 1 ? parts[parts.length - 2] : '';
-            const match = folderName.match(/Drop[\s_-]?([A-Za-z0-9\-]+)/i);
+            try { pathString = decodeURIComponent(pathString); } catch(e){}
+            const match = pathString.match(/Drop[\s_-]?([A-Za-z0-9\-]+)/i);
             return match ? match[1].toUpperCase() : null;
         }
 
@@ -578,7 +575,7 @@
 
             await Promise.all(filePromises);
             
-            // --- STRICT PER-DROP TIMESTAMP AUTO-LINKER ---
+            // --- STRICT PER-DROP BUCKET AUTO-LINKER ---
             let dropNodes = {};
             Object.keys(inspectionData).forEach(drop => {
                 dropNodes[drop] = [];
@@ -595,11 +592,10 @@
                         }
                     });
                 });
-                // Sort chronologically per drop (earliest log to latest log)
+                // Sort chronologically (earliest to latest in the day)
                 dropNodes[drop].sort((a,b) => a.timeSec - b.timeSec);
             });
 
-            // Group images by Drop (from folder name)
             let dropImages = {};
             Object.keys(imageBank).forEach(imgKey => {
                 let imgData = imageBank[imgKey];
@@ -611,59 +607,62 @@
 
             let successfullyLinked = 0;
 
-            // Process linking strictly Drop by Drop
+            // Process linking strictly Drop by Drop using Time Buckets
             Object.keys(dropImages).forEach(drop => {
                 let images = dropImages[drop];
                 let nodes = dropNodes[drop];
 
                 if (!nodes || nodes.length === 0 || images.length === 0) return;
 
-                // Sort images chronologically per drop
-                images.sort((a, b) => a.time - b.time);
-
-                // Calculate the specific offset for THIS drop
-                let dropOffset = images[0].time - nodes[0].timeSec;
-
                 images.forEach(img => {
                     let targetNode = null;
                     
-                    // 1. Check exact string match first (e.g. R-12-L.jpg)
+                    // 1. Check exact explicit filename match first (e.g. R-12-L.jpg)
                     let exact = nodes.find(n => n.id === img.id);
                     if (exact) {
                         targetNode = exact;
                     } else {
-                        // 2. Strict Chronological Proximity Match within this Drop
-                        let adjustedImgTime = img.time - dropOffset;
-                        if (adjustedImgTime < 0) adjustedImgTime += 86400;
-                        if (adjustedImgTime >= 86400) adjustedImgTime -= 86400;
+                        // 2. Strict Bucket Mapping
+                        for (let i = 0; i < nodes.length; i++) {
+                            let nTime = nodes[i].timeSec;
+                            
+                            // The start of the bucket is the time the PREVIOUS window was logged. 
+                            // (If it's the first window of the drop, we allow 30 minutes before it).
+                            let prevTime = (i === 0) ? (nTime - 1800) : nodes[i-1].timeSec;
+                            
+                            if (nTime < prevTime) prevTime -= 86400; // Handle midnight crossover
+                            let imgTime = img.time;
+                            if (imgTime < prevTime && (prevTime - imgTime) > 43200) imgTime += 86400;
 
-                        let minDiff = Infinity;
-                        nodes.forEach(node => {
-                            let diff = Math.abs(node.timeSec - adjustedImgTime);
-                            if (diff > 43200) diff = 86400 - diff; // midnight crossover
-                            if (diff < minDiff) {
-                                minDiff = diff;
-                                targetNode = node;
+                            // If the photo was taken AFTER the previous window was submitted, 
+                            // but BEFORE (or right as) this window is submitted (plus a generous 60s grace period)
+                            if (imgTime > prevTime && imgTime <= (nTime + 60)) {
+                                targetNode = nodes[i];
+                                break;
                             }
-                        });
-
-                        // Security limit: only match if adjusted time is within 30 mins
-                        if (minDiff > 1800) targetNode = null;
+                        }
+                        
+                        // 3. Fallback: If it fell out of a bucket, assign it to the closest window (within 15 mins)
+                        if (!targetNode) {
+                            let minDiff = Infinity;
+                            nodes.forEach(node => {
+                                let diff = Math.abs(node.timeSec - img.time);
+                                if (diff > 43200) diff = 86400 - diff;
+                                if (diff < minDiff) { minDiff = diff; targetNode = node; }
+                            });
+                            if (minDiff > 900) targetNode = null;
+                        }
                     }
 
-                    // Assign the image to EXACTLY ONE window in this drop
                     if (targetNode) {
                         successfullyLinked++;
-                        if (targetNode.flir === '--' || targetNode.flir === '') {
-                            targetNode.flir = img.id; 
-                        } else if (!targetNode.flir.split(' & ').includes(img.id)) {
-                            targetNode.flir += ' & ' + img.id; // Stacks chronologically inside that specific window
-                        }
+                        if (targetNode.flir === '--' || targetNode.flir === '') targetNode.flir = img.id; 
+                        else if (!targetNode.flir.split(' & ').includes(img.id)) targetNode.flir += ' & ' + img.id;
                     }
                 });
             });
             
-            // Fallback for loosely uploaded files NOT in a Drop folder (e.g., manually selected)
+            // Fallback for manually uploaded files NOT in a Drop folder
             Object.keys(imageBank).forEach(imgKey => {
                 let imgData = imageBank[imgKey];
                 if (!imgData.drop) {
@@ -676,13 +675,13 @@
                     }
                 }
             });
-            // --- END STRICT PER-DROP AUTO-LINKER ---
+            // --- END STRICT PER-DROP BUCKET AUTO-LINKER ---
 
             document.getElementById('loading-overlay').style.display = 'none';
 
             if (newPhotosAdded > 0) {
-                if (successfullyLinked === 0) alert(`⚠️ ${newPhotosAdded} photos unpacked, but 0 could be linked. Ensure the folder names exactly match drop letters (e.g. "Drop R").`);
-                else alert(`✅ Strict Sandbox Engine accurately linked ${successfullyLinked} photo(s) to the grid.`);
+                if (successfullyLinked === 0) alert(`⚠️ ${newPhotosAdded} photos unpacked, but 0 could be linked. Ensure they were taken within the logged time periods.`);
+                else alert(`✅ Bucket Engine securely linked ${successfullyLinked} photo(s) to the grid.`);
             }
 
             document.getElementById('project-name').innerText = "Project: " + projectInfo;
@@ -691,7 +690,7 @@
 
             if (newCsvAdded || isProjectLoaded) {
                 if (rowsParsed > 0 || isProjectLoaded) {
-                    if (document.getElementById('dashboard-screen').style.display !== 'block') {
+                    if (document.getElementById('dashboard-screen').style.display !== 'flex') {
                         document.getElementById('btn-start-mapping').style.display = 'block';
                     } else {
                         if (activeTab !== "") Object.keys(dropAssignments).forEach(d => { if (dropAssignments[d] === "") dropAssignments[d] = activeTab; });
@@ -937,7 +936,7 @@
 
         function generateDashboard() {
             if (elevations.length === 0) { alert("⚠️ You must add at least one custom wall before generating the dashboard."); return; }
-            document.getElementById('mapping-screen').style.display = 'none'; document.getElementById('dashboard-screen').style.display = 'block';
+            document.getElementById('mapping-screen').style.display = 'none'; document.getElementById('dashboard-screen').style.display = 'flex';
             document.getElementById('btn-save-project').style.display = 'inline-block'; document.getElementById('btn-edit-map').style.display = 'inline-block';
             if(!elevations.includes(activeTab)) activeTab = elevations[0];
             calculateBuildingGeometry(); saveCommandState(); if (currentMode === '2d' || currentMode === 'auto3d') refreshCurrentView(); if (currentMode === 'auto3d') buildProcedural3D();
@@ -964,7 +963,7 @@
             currentMode = mode; document.getElementById('btn-2d').classList.toggle('active', mode === '2d');
             const btnAuto3d = document.getElementById('btn-auto3d'); if(mode === 'auto3d') { btnAuto3d.style.background = '#0cf'; btnAuto3d.style.color = '#000'; } else { btnAuto3d.style.background = '#1d212f'; btnAuto3d.style.color = '#0cf'; }
             document.getElementById('btn-true3d').classList.toggle('active', mode === 'true3d');
-            document.getElementById('view-2d').style.display = (mode === '2d') ? 'block' : 'none'; document.getElementById('arena-auto3d').style.display = (mode === 'auto3d') ? 'block' : 'none'; document.getElementById('arena-true3d').style.display = (mode === 'true3d') ? 'block' : 'none';
+            document.getElementById('view-2d').style.display = (mode === '2d') ? 'flex' : 'none'; document.getElementById('arena-auto3d').style.display = (mode === 'auto3d') ? 'block' : 'none'; document.getElementById('arena-true3d').style.display = (mode === 'true3d') ? 'block' : 'none';
             document.getElementById('tabs-container').style.display = (mode === 'true3d') ? 'none' : 'flex';
             if (mode === '2d' || mode === 'auto3d') refreshCurrentView(); if (mode === 'auto3d') setTimeout(() => { buildProcedural3D(); }, 100);
         }
