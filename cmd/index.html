@@ -140,6 +140,12 @@
 
         .no-photo-banner { background:#111;color:#555;padding:20px;text-align:center;border-radius:8px;border:2px dashed #333;margin-bottom:12px;font-size:0.9rem;font-weight:bold; }
         .stale-banner { background:#1a1400;color:#f1c40f;padding:8px 12px;border-radius:6px;border:1px solid #f1c40f44;font-size:0.8rem;font-weight:bold;margin-bottom:10px;display:none; }
+        /* Photo move mode */
+        .photo-move-btn { padding:3px 10px;font-size:0.7rem;font-weight:bold;background:#1a2a3a;color:#0cf;border:1px solid #0cf;border-radius:4px;cursor:pointer;margin-left:8px;text-transform:uppercase;letter-spacing:0.5px; }
+        .photo-move-btn:hover { background:#0cf;color:#000; }
+        #photo-move-banner { display:none;position:fixed;top:0;left:0;width:100%;z-index:8000;background:#003d5a;color:#0cf;padding:14px 20px;font-size:1rem;font-weight:bold;text-align:center;border-bottom:2px solid #0cf;cursor:pointer; }
+        .window-node.move-target-hover { outline:3px solid #0cf!important;transform:scale(1.1)!important;z-index:20!important; }
+
         .drop-slot { min-height:70px;border:2px dashed #333;border-radius:8px;display:flex;align-items:center;justify-content:center;gap:10px;color:#444;font-size:0.8rem;font-weight:bold;cursor:pointer;transition:0.2s;margin-top:10px;padding:12px;text-align:center; }
         .drop-slot:hover, .drop-slot.drag-over { border-color:#0cf;color:#0cf;background:rgba(0,204,255,0.05); }
 
@@ -170,6 +176,11 @@
 <div id="tag-instruction-bar">
     <span id="tag-instruction-text">Double-click the model...</span>
     <button onclick="cancelBulkTag()">CANCEL</button>
+</div>
+
+<div id="photo-move-banner" onclick="cancelPhotoMove()">
+    <span id="photo-move-text">Tap the correct window to move this photo</span>
+    &nbsp;&nbsp;— tap here or press ESC to cancel
 </div>
 
 <div id="top-reload-banner" class="top-banner">
@@ -363,6 +374,7 @@ let saved3DTags         = {};
 let manualLinks         = {};   // { nodeId: [cleanName, ...] } manager overrides (additive)
 let wakeLock            = null;
 let modalNodeId         = null;
+let photoMoveMode       = null; // { photoName, fromNodeId } when move is active
 
 /*
  * imageBank: { CLEAN_UPPER_NAME: { url, dcUrl, time, drop } }
@@ -1347,7 +1359,69 @@ function toggleStitchMode() {
     if (currentMode==='2d') refreshCurrentView();
 }
 
+// ═══════════════════════════════════════════════════════
+// PHOTO MOVE MODE
+// ═══════════════════════════════════════════════════════
+function startPhotoMove(photoName, fromNodeId) {
+    photoMoveMode = { photoName, fromNodeId };
+    closeModal();
+    const banner = document.getElementById('photo-move-banner');
+    const fname = photoName.split('_').slice(1).join('_') || photoName; // strip drop prefix for display
+    document.getElementById('photo-move-text').innerText =
+        `📷 Moving ${fname} — tap the correct window`;
+    banner.style.display = 'block';
+}
+
+function cancelPhotoMove() {
+    photoMoveMode = null;
+    document.getElementById('photo-move-banner').style.display = 'none';
+    if (currentMode === '2d') refreshCurrentView();
+}
+
+function finishPhotoMove(targetNodeId) {
+    if (!photoMoveMode) return;
+    const { photoName, fromNodeId } = photoMoveMode;
+
+    // Remove from source node
+    const fromNode = getNodeData(fromNodeId);
+    if (fromNode) {
+        fromNode.photos = (fromNode.photos || []).filter(p => p !== photoName);
+    }
+    // Remove from source manualLinks too
+    if (manualLinks[fromNodeId]) {
+        manualLinks[fromNodeId] = manualLinks[fromNodeId].filter(p => p !== photoName);
+        if (!manualLinks[fromNodeId].length) delete manualLinks[fromNodeId];
+    }
+
+    // Add to target node
+    const toNode = getNodeData(targetNodeId);
+    if (toNode) {
+        if (!toNode.photos) toNode.photos = [];
+        if (!toNode.photos.includes(photoName)) toNode.photos.push(photoName);
+    }
+    // Also track in manualLinks so it survives CSV reloads
+    if (!manualLinks[targetNodeId]) manualLinks[targetNodeId] = [];
+    if (!manualLinks[targetNodeId].includes(photoName)) manualLinks[targetNodeId].push(photoName);
+
+    cancelPhotoMove();
+    calculateBuildingGeometry();
+    saveCommandState();
+    refreshCurrentView();
+    // Open the target window so user sees the photo landed correctly
+    openModal(targetNodeId);
+}
+
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && photoMoveMode) cancelPhotoMove();
+});
+
 function handleNodeClick(data,el) {
+    // Photo move mode: tap a window to reassign the photo there
+    if (photoMoveMode) {
+        finishPhotoMove(data.id);
+        return;
+    }
+
     if (isStitchMode) {
         const idx=stitchedPairs.findIndex(p=>p.includes(data.id));
         if (idx!==-1) {
@@ -1528,7 +1602,19 @@ function buildPhotoArea(nodes) {
                 };
             })(irName, entry, pill, img);
 
-            bar.appendChild(nl);bar.appendChild(pill);wrap.appendChild(bar);
+            // Move button — lets manager reassign this photo to a different window
+            const moveBtn = document.createElement('button');
+            moveBtn.className = 'photo-move-btn';
+            moveBtn.innerText = '↗ Move';
+            moveBtn.title = 'Reassign this photo to a different window';
+            moveBtn.onclick = (function(name, fromId) {
+                return function(e) {
+                    e.stopPropagation();
+                    startPhotoMove(name, fromId);
+                };
+            })(irName, nodes[0]?.id);
+
+            bar.appendChild(nl);bar.appendChild(pill);bar.appendChild(moveBtn);wrap.appendChild(bar);
 
             // Click image → lightbox, opening at the current IR/DC state
             img.onclick=(function(name, ent){
