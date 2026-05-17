@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata Command Center | v9.1 Hardened Engine</title>
+    <title>Strata Command Center | v9.2 Fixed Engine</title>
     
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="manifest" href="manifest_cmd.json">
@@ -15,6 +15,11 @@
     <meta name="apple-mobile-web-app-title" content="Strata CMD">
     <meta name="mobile-web-app-capable" content="yes">
 
+    <!--
+        FIX #9: OrbitControls — Load THREE first, then the examples script which
+        attaches OrbitControls to the THREE global via THREE.OrbitControls.
+        The JSDelivr /examples/js/ path does exactly this for r128.
+    -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
@@ -22,7 +27,6 @@
     <script src="https://cdn.jsdelivr.net/npm/exifr/dist/lite.umd.js"></script>
 
     <style>
-        /* --- FULL SCREEN FLEXBOX LAYOUT --- */
         * { box-sizing: border-box; }
         html, body { 
             margin: 0; padding: 0; width: 100vw; height: 100vh; 
@@ -36,7 +40,6 @@
         
         .main-content { display: flex; flex-direction: column; flex-grow: 1; padding: 15px 20px; overflow-y: auto; overflow-x: hidden; }
 
-        /* --- DASHBOARD CONTROLS --- */
         #mapping-screen { background: #1a1d27; border-radius: 12px; padding: 25px; border: 1px solid #333; display: none; width: 100%; }
         .elevation-creator { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 20px; }
         .elevation-creator input { flex: 1; padding: 12px; background: #111; border: 1px solid #444; color: #fff; border-radius: 6px; font-size: 1rem; }
@@ -57,14 +60,12 @@
         .tab { padding: 12px 25px; background: #1a1d27; color: #888; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: bold; font-size: 1rem; border: 1px solid #333; border-bottom: none; transition: 0.2s; white-space: nowrap; }
         .tab.active { background: #0cf; color: #000; border-color: #0cf; }
 
-        /* --- STATS BAR --- */
         .stats-bar { display: flex; gap: 10px; margin-bottom: 15px; flex-shrink: 0; }
         .stat-card { flex: 1; background: #1a1d27; padding: 15px; border-radius: 8px; border-left: 4px solid #333; cursor: pointer; transition: transform 0.2s, opacity 0.2s; }
         .stat-card.dimmed { opacity: 0.3; }
         .stat-label { font-size: 0.75rem; color: #888; text-transform: uppercase; font-weight: bold; }
         .stat-value { font-size: 2rem; font-weight: 900; margin-top: 5px; }
 
-        /* --- VIEWS --- */
         #view-2d { flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; }
         #building-container-2d { flex-grow: 1; overflow: auto; display: flex; gap: 15px; align-items: flex-start; padding-bottom: 20px; }
         
@@ -87,7 +88,6 @@
         .status-empty { background: #222; border: 2px dashed #444; color: #555; pointer-events: none; }
         .status-void { background: transparent; border: 2px solid transparent; cursor: default; pointer-events: none; }
 
-        /* --- BUTTONS --- */
         .btn { padding: 12px 20px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; font-size: 1rem; text-transform: uppercase; letter-spacing: 1px; }
         .btn-blue { background: #0cf; color: #000; }
         .btn-dark { background: #333; color: #fff; border: 1px solid #555; }
@@ -97,7 +97,6 @@
         .btn-block { width: 100%; margin-top: 10px; }
         .header-btns { display: flex; gap: 10px; }
 
-        /* --- AUTO 3D AND TRUE 3D VIEWS --- */
         #arena-auto3d, #arena-true3d { display: none; flex-grow: 1; width: 100%; background: #0f111a; border: 1px solid #0cf; border-radius: 12px; overflow: hidden; position: relative; box-shadow: 0 0 30px rgba(0, 204, 255, 0.1); }
         #arena-true3d { background: radial-gradient(circle, #2a2d38 0%, #0f111a 100%); border-color: #5a2e7a; box-shadow: 0 0 30px rgba(176, 85, 255, 0.2); }
         model-viewer { width: 100%; height: 100%; outline: none; }
@@ -116,7 +115,6 @@
         #tag-instruction-bar { display: none; position: fixed; top: 0; left: 0; width: 100%; background: #d080ff; color: #000; text-align: center; padding: 15px; font-weight: 900; font-size: 1.2rem; z-index: 9999; box-shadow: 0 5px 25px rgba(208, 128, 255, 0.5); }
         #tag-instruction-bar button { margin-left: 20px; padding: 5px 15px; font-weight: bold; background: #000; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
 
-        /* --- MODALS --- */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 2000; backdrop-filter: blur(3px); }
         .modal-box { background: #1a1d27; border: 1px solid #0cf; border-radius: 12px; padding: 25px; width: 500px; max-height: 90vh; overflow-y: auto; box-shadow: 0 15px 35px rgba(0,0,0,0.9); }
         .modal-title { font-size: 2rem; color: #0cf; margin: 0 0 5px 0; font-weight: 900; }
@@ -135,6 +133,9 @@
         
         .no-photo-banner { background: #222; color: #666; padding: 20px; text-align: center; border-radius: 8px; border: 1px dashed #444; margin-bottom: 15px; font-size: 0.9rem; font-weight: bold; }
 
+        /* FIX #3 UI: Banner shown after project reload to prompt re-upload of photos */
+        .photo-reload-banner { background: #1a1400; color: #f1c40f; padding: 10px 15px; text-align: center; border-radius: 8px; border: 1px solid #f1c40f55; margin-bottom: 15px; font-size: 0.85rem; font-weight: bold; display: none; }
+
         .data-row { display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding: 10px 0; }
         .data-label { color: #888; font-size: 0.8rem; text-transform: uppercase; }
         .data-val { font-weight: bold; text-align: right; max-width: 65%; color: #fff; }
@@ -146,18 +147,12 @@
         .btn-status { flex: 1; padding: 10px; font-size: 0.8rem; border-radius: 4px; }
         .btn-status-yellow { background: #f1c40f; color: #000; }
         
-        /* ZIP LOADING SPINNER */
         #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999; display: none; align-items: center; justify-content: center; flex-direction: column; }
         .spinner { border: 8px solid #222; border-top: 8px solid #0cf; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* LIGHTBOX IMAGE ZOOM & PAN CONTAINER */
-        #lightbox-container {
-            width: 95vw; height: 90vh; overflow: hidden; display: flex; align-items: center; justify-content: center; touch-action: none; 
-        }
-        #lightbox-img {
-            max-width: 100%; max-height: 100%; object-fit: contain; cursor: grab; transition: transform 0.05s linear; transform-origin: center center; will-change: transform;
-        }
+        #lightbox-container { width: 95vw; height: 90vh; overflow: hidden; display: flex; align-items: center; justify-content: center; touch-action: none; }
+        #lightbox-img { max-width: 100%; max-height: 100%; object-fit: contain; cursor: grab; transition: transform 0.05s linear; transform-origin: center center; will-change: transform; }
         #lightbox-img:active { cursor: grabbing; }
 
         .lightbox-nav-btn {
@@ -182,7 +177,7 @@
 
     <div class="header">
         <div>
-            <h1>STRATA COMMAND <span>| v9.1 Hardened Engine</span></h1>
+            <h1>STRATA COMMAND <span>| v9.2 Fixed Engine</span></h1>
             <div id="project-name" style="font-weight: bold; color: #888; margin-top: 5px;">Awaiting Data...</div>
         </div>
         <div class="header-btns">
@@ -208,6 +203,11 @@
             <button class="btn btn-dark" style="flex: 1; padding: 20px; font-size: 1.1rem; border: 2px dashed #f39c12; background: #161922;" onclick="document.getElementById('folderInput').click()">
                 📁 3. ADD ZIP OR FOLDER
             </button>
+        </div>
+
+        <!-- FIX #3 UI: Persistent re-upload nudge shown after a project .json is loaded -->
+        <div id="photo-reload-banner" class="photo-reload-banner">
+            ⚠️ Photos are not saved inside the project file. Re-upload your ZIP or folder to restore image links.
         </div>
         
         <button id="btn-start-mapping" class="btn btn-green btn-block" style="display:none; padding: 20px; font-size: 1.2rem; flex-shrink: 0;" onclick="openMappingScreen()">🗺️ MAP BUILDING ELEVATIONS</button>
@@ -252,7 +252,11 @@
                     <div class="stat-label">DEFECTS (RED)</div>
                     <div class="stat-value" id="stat-confirmed" style="color:#d9534f;">0</div>
                 </div>
-                <div class="stat-card no-hover" style="border-color:#0cf;" title="Total photos loaded in memory. If 0 after reload, re-upload ZIP.">
+                <!--
+                    FIX #2/#3: Renamed to "PHOTOS LOADED" and always driven from
+                    Object.keys(imageBank).length so it reflects reality after reloads.
+                -->
+                <div class="stat-card" style="border-color:#0cf; cursor:default;" title="Photos currently in memory. Re-upload ZIP after a page reload to restore links.">
                     <div class="stat-label">PHOTOS LOADED</div>
                     <div class="stat-value" id="stat-photos" style="color:#0cf;">0</div>
                 </div>
@@ -297,6 +301,8 @@
             <div class="carousel-hint" id="m-carousel-hint"></div>
             <div class="photo-gallery" id="m-photo-gallery"></div>
             <div id="m-no-photo" class="no-photo-banner">IMAGE NOT UPLOADED TO DASHBOARD</div>
+            <!-- FIX #3: Shown inside modal when node has FLIR refs but no blobs loaded -->
+            <div id="m-photo-stale" class="photo-reload-banner">📷 Photo references exist but images are not loaded. Re-upload your ZIP to view them.</div>
             
             <div class="data-row"><span class="data-label">Field Findings</span><span class="data-val" id="m-finds" style="color:#f1c40f;">--</span></div>
             <div class="data-row" id="m-row-proved"><span class="data-label">Meter Proved</span><span class="data-val" id="m-proved">--</span></div>
@@ -320,20 +326,15 @@
 
     <div id="lightbox-modal" class="modal-overlay" style="z-index: 3000;">
         <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column;">
-            
             <button onclick="closeLightbox()" style="position: absolute; top: 20px; right: 20px; z-index: 3020; background: rgba(0,0,0,0.8); color: #fff; border: 2px solid #fff; border-radius: 50%; width: 50px; height: 50px; font-size: 1.5rem; font-weight: bold; cursor: pointer;">X</button>
             <div id="lightbox-counter" style="position: absolute; top: 20px; left: 20px; z-index: 3020; background: rgba(0,0,0,0.8); color: #0cf; padding: 10px 20px; border-radius: 8px; font-weight: bold; font-size: 1.2rem; border: 1px solid #0cf;">1 / 3</div>
-            
             <button id="lightbox-prev" class="lightbox-nav-btn" onclick="changeLightbox(-1)" style="left: 20px;">&#10094;</button>
-            
             <div id="lightbox-container">
                 <img id="lightbox-img" src="" draggable="false">
             </div>
-            
             <div style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 3020; background: rgba(0,0,0,0.8); color: #0cf; padding: 8px 15px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; border: 1px solid #0cf; pointer-events: none;">
                 Mouse Wheel or Pinch to Zoom • Click & Drag to Pan
             </div>
-
             <button id="lightbox-next" class="lightbox-nav-btn" onclick="changeLightbox(1)" style="right: 20px;">&#10095;</button>
         </div>
     </div>
@@ -361,57 +362,78 @@
     </div>
 
     <script>
-        // --- GLOBAL VARIABLES ---
-        let inspectionData = {};
-        let projectInfo = "Unknown Project";
-        let activeNodeDataArray = []; 
-        let isStitchMode = false;
-        let stitchSelection = [];
-        let stitchedPairs = []; 
-        
-        let imageBank = {}; // { IMG_NAME: { url: blob, time: num, drop: str } }
+        // ─────────────────────────────────────────────
+        // GLOBAL STATE
+        // ─────────────────────────────────────────────
+        let inspectionData   = {};
+        let projectInfo      = "Unknown Project";
+        let activeNodeDataArray = [];
+        let isStitchMode     = false;
+        let stitchSelection  = [];
+        let stitchedPairs    = [];
 
-        let elevations = []; 
-        let dropAssignments = {}; 
-        let activeTab = "";
-        let globalStats = { t:0, clear:0, f:0, c:0, maxFloor: -Infinity, minFloor: Infinity };
+        // imageBank: { IMG_NAME: { url: blobUrl, time: seconds, drop: dropId|null } }
+        // NOTE: blob URLs are session-only and are never persisted to localStorage or JSON.
+        let imageBank        = {};
 
-        let currentMode = '2d'; 
-        let activeFilter = 'ALL'; 
+        let elevations       = [];
+        let dropAssignments  = {};
+        let activeTab        = "";
+        let globalStats      = { t:0, clear:0, f:0, c:0, maxFloor: -Infinity, minFloor: Infinity };
 
-        let bulkTagState = { mode: null, targetId: null, step: 0, anchors: [] };
-        let saved3DTags = {}; 
+        let currentMode      = '2d';
+        let activeFilter     = 'ALL';
+
+        let bulkTagState     = { mode: null, targetId: null, step: 0, anchors: [] };
+        let saved3DTags      = {};
 
         let currentLightboxImages = [];
-        let currentLightboxNames = [];
-        let currentLightboxIndex = 0;
-        let wakeLock = null;
+        let currentLightboxNames  = [];
+        let currentLightboxIndex  = 0;
+        let wakeLock         = null;
+
+        // FIX #9: Guard so buildProcedural3D() gives a clear error if OrbitControls
+        // failed to attach to THREE (CDN timing issue) instead of a cryptic crash.
+        function getOrbitControls() {
+            if (typeof THREE.OrbitControls === 'function') return THREE.OrbitControls;
+            // Fallback: try the namespace the examples script may have used
+            if (window.THREE && THREE.OrbitControls) return THREE.OrbitControls;
+            console.error('THREE.OrbitControls not found. Auto 3D view disabled.');
+            return null;
+        }
 
         const viewer = document.querySelector('#main-3d-viewer');
 
-        // --- NEW V9.0 ROBUST EXIF DATE PARSER ---
+        // ─────────────────────────────────────────────
+        // ROBUST EXIF DATE PARSER
+        // ─────────────────────────────────────────────
         function parseExifDate(eDate, fallbackDate) {
             if (!eDate) return fallbackDate;
             if (eDate instanceof Date && !isNaN(eDate.getTime())) return eDate;
             if (typeof eDate === 'string') {
                 let s = eDate.trim();
+                // Fix the FLIR colon-separated date bug
                 s = s.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3');
                 s = s.replace(' ', 'T');
-                let parsed = new Date(s);
+                const parsed = new Date(s);
                 if (!isNaN(parsed.getTime())) return parsed;
             }
             return fallbackDate;
         }
 
-        // Safe Node Fetcher (Bug 10 Fix)
+        // ─────────────────────────────────────────────
+        // FIX #10: Null-safe node fetcher
+        // ─────────────────────────────────────────────
         function getNodeData(fullId) {
-            if (!fullId) return null;
+            if (!fullId || typeof fullId !== 'string') return null;
             const parts = fullId.split('-');
             if (parts.length !== 3) return null;
-            return inspectionData[parts[0]]?.[parts[1]]?.[parts[2]] || null;
+            return inspectionData[parts[0]]?.[parts[1]]?.[parts[2]] ?? null;
         }
 
-        // --- INIT & PERSISTENCE ---
+        // ─────────────────────────────────────────────
+        // INIT
+        // ─────────────────────────────────────────────
         function initApp() {
             requestWakeLock();
             loadCommandState();
@@ -420,18 +442,18 @@
 
         async function requestWakeLock() {
             try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); }
-            catch (err) { console.warn("Wake Lock not supported/allowed."); }
+            catch (err) { console.warn('Wake Lock not supported/allowed.'); }
         }
 
         document.addEventListener('visibilitychange', () => {
             if (wakeLock !== null && document.visibilityState === 'visible') requestWakeLock();
         });
 
+        // ─────────────────────────────────────────────
+        // PERSISTENCE  (imageBank intentionally excluded — blobs are session-only)
+        // ─────────────────────────────────────────────
         function saveCommandState() {
-            const state = {
-                projectInfo: projectInfo, inspectionData: inspectionData, elevations: elevations,
-                dropAssignments: dropAssignments, stitchedPairs: stitchedPairs, saved3DTags: saved3DTags
-            };
+            const state = { projectInfo, inspectionData, elevations, dropAssignments, stitchedPairs, saved3DTags };
             localStorage.setItem('strataCommandState', JSON.stringify(state));
         }
 
@@ -440,15 +462,15 @@
             if (saved) {
                 try {
                     const state = JSON.parse(saved);
-                    projectInfo = state.projectInfo || "Unknown Project";
-                    inspectionData = state.inspectionData || {};
-                    elevations = state.elevations || [];
+                    projectInfo     = state.projectInfo     || 'Unknown Project';
+                    inspectionData  = state.inspectionData  || {};
+                    elevations      = state.elevations      || [];
                     dropAssignments = state.dropAssignments || {};
-                    stitchedPairs = state.stitchedPairs || [];
-                    saved3DTags = state.saved3DTags || {};
+                    stitchedPairs   = state.stitchedPairs   || [];
+                    saved3DTags     = state.saved3DTags     || {};
 
                     if (Object.keys(inspectionData).length > 0) {
-                        document.getElementById('project-name').innerText = "Project: " + projectInfo;
+                        document.getElementById('project-name').innerText = 'Project: ' + projectInfo;
                         document.getElementById('btn-reset').style.display = 'inline-block';
                         document.getElementById('btn-save-project').style.display = 'inline-block';
 
@@ -462,74 +484,84 @@
                             document.getElementById('btn-start-mapping').style.display = 'block';
                         }
                     }
-                } catch(e) { console.error("Error loading saved state", e); }
+                } catch(e) { console.error('Error loading saved state', e); }
             }
-            // Bug 3 Fix: Ensure photo stat accurately reads loaded blobs on boot.
+            // FIX #2/#3: Stat always reflects live imageBank size (0 on fresh load — correct)
+            updatePhotoStat();
+        }
+
+        function updatePhotoStat() {
             document.getElementById('stat-photos').innerText = Object.keys(imageBank).length;
         }
 
-        // --- CORE FUNCTIONS ---
+        // ─────────────────────────────────────────────
+        // FILE HANDLING
+        // ─────────────────────────────────────────────
         function extractDropIdFromPath(pathString) {
-            if(!pathString) return null;
-            try { pathString = decodeURIComponent(pathString); } catch(e){}
+            if (!pathString) return null;
+            try { pathString = decodeURIComponent(pathString); } catch(e) {}
             const match = pathString.match(/Drop[\s_-]?([A-Za-z0-9\-]+)/i);
             return match ? match[1].toUpperCase() : null;
         }
 
         async function handleFiles(files, forcedType = null) {
             if (!files || files.length === 0) return;
-            
+
             document.getElementById('loading-overlay').style.display = 'flex';
-            document.getElementById('loading-text').innerText = `Processing file(s)...`;
-            
+            document.getElementById('loading-text').innerText = 'Processing file(s)...';
+
             const filePromises = [];
             let newPhotosAdded = 0, newCsvAdded = false, isProjectLoaded = false, rowsParsed = 0;
 
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
-                if (file.size === 0 || file.size === undefined) continue;
+                if (!file.size) continue;
 
                 const fileName = (file.name || '').toLowerCase();
                 const fileType = (file.type || '').toLowerCase();
-                
+
+                // ── ZIP ──────────────────────────────────────────────────────
                 if (fileName.endsWith('.zip') || fileType.includes('zip')) {
                     filePromises.push(new Promise((resolveZip) => {
-                        JSZip.loadAsync(file).then(async function(zip) {
+                        JSZip.loadAsync(file).then(async (zip) => {
                             const internalPromises = [];
-                            zip.forEach(function (relativePath, zipEntry) {
+                            zip.forEach((relativePath, zipEntry) => {
                                 if (zipEntry.dir || relativePath.includes('__MACOSX') || relativePath.includes('.DS_Store')) return;
                                 const entryName = zipEntry.name.toLowerCase();
-                                
+
                                 if (entryName.endsWith('.csv')) {
                                     newCsvAdded = true;
-                                    internalPromises.push(zipEntry.async("text").then(function(text) { rowsParsed += parseCSV(text); }));
+                                    internalPromises.push(zipEntry.async('text').then(text => { rowsParsed += parseCSV(text); }));
                                 } else if (entryName.endsWith('.jpg') || entryName.endsWith('.jpeg') || entryName.endsWith('.png')) {
-                                    internalPromises.push(zipEntry.async("blob").then(async function(blob) {
+                                    internalPromises.push(zipEntry.async('blob').then(async (blob) => {
                                         const cleanName = zipEntry.name.split('/').pop().split('.')[0].toUpperCase();
-                                        // Bug 5 Fix: Removed !imageBank guard so new uploads seamlessly overwrite old Blobs
-                                        let url = URL.createObjectURL(blob);
-                                        let detectedDrop = extractDropIdFromPath(zipEntry.name);
-                                        
+                                        // FIX #5: Always overwrite so a second upload of the same ZIP
+                                        // replaces a stale/revoked blob with a fresh one.
+                                        const url = URL.createObjectURL(blob);
+                                        const detectedDrop = extractDropIdFromPath(zipEntry.name);
+
                                         let d = zipEntry.date || new Date();
                                         try {
-                                            let exif = await exifr.parse(blob);
+                                            const exif = await exifr.parse(blob);
                                             if (exif) {
-                                                let eDate = exif.DateTimeOriginal || exif.CreateDate || exif.ModifyDate;
+                                                const eDate = exif.DateTimeOriginal || exif.CreateDate || exif.ModifyDate;
                                                 d = parseExifDate(eDate, d);
                                             }
                                         } catch(e) {}
-                                        
-                                        let t = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
-                                        if(!imageBank[cleanName]) newPhotosAdded++; // Only increment alert counter if it's new
-                                        imageBank[cleanName] = { url: url, time: t, drop: detectedDrop };
+
+                                        const t = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+                                        if (!imageBank[cleanName]) newPhotosAdded++;
+                                        imageBank[cleanName] = { url, time: t, drop: detectedDrop };
                                     }));
                                 }
                             });
                             await Promise.all(internalPromises);
                             resolveZip();
-                        }).catch(err => { alert("Error reading ZIP: " + err.message); resolveZip(); });
+                        }).catch(err => { alert('Error reading ZIP: ' + err.message); resolveZip(); });
                     }));
                 }
+
+                // ── JSON PROJECT ─────────────────────────────────────────────
                 else if (fileName.endsWith('.json')) {
                     isProjectLoaded = true;
                     filePromises.push(new Promise((resolve) => {
@@ -537,18 +569,22 @@
                         reader.onload = (event) => {
                             try {
                                 const parsed = JSON.parse(event.target.result);
-                                projectInfo = parsed.projectInfo || "Unknown Project";
-                                inspectionData = parsed.inspectionData || {};
-                                elevations = parsed.elevations || [];
+                                projectInfo     = parsed.projectInfo     || 'Unknown Project';
+                                inspectionData  = parsed.inspectionData  || {};
+                                elevations      = parsed.elevations      || [];
                                 dropAssignments = parsed.dropAssignments || {};
-                                stitchedPairs = parsed.stitchedPairs || [];
-                                saved3DTags = parsed.saved3DTags || {};
-                                resolve();
-                            } catch(e) { resolve(); }
+                                stitchedPairs   = parsed.stitchedPairs   || [];
+                                saved3DTags     = parsed.saved3DTags     || {};
+                                // FIX #3: Show persistent re-upload banner after JSON load
+                                document.getElementById('photo-reload-banner').style.display = 'block';
+                            } catch(e) {}
+                            resolve();
                         };
                         reader.readAsText(file);
                     }));
                 }
+
+                // ── CSV ──────────────────────────────────────────────────────
                 else if (forcedType === 'csv' || fileName.endsWith('.csv') || fileType.includes('csv') || fileType === 'application/vnd.ms-excel') {
                     newCsvAdded = true;
                     filePromises.push(new Promise((resolve) => {
@@ -557,26 +593,31 @@
                         reader.readAsText(file);
                     }));
                 }
+
+                // ── IMAGES (individual) ──────────────────────────────────────
                 else if (fileType.startsWith('image/') || fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || fileName.endsWith('.png')) {
-                    filePromises.push((async function() {
+                    filePromises.push((async () => {
                         const cleanName = file.name.split('.')[0].toUpperCase();
-                        let url = URL.createObjectURL(file);
-                        let detectedDrop = extractDropIdFromPath(file.webkitRelativePath);
-                        
+                        const url = URL.createObjectURL(file);
+                        const detectedDrop = extractDropIdFromPath(file.webkitRelativePath);
+
                         let d = new Date(file.lastModified);
                         try {
-                            let exif = await exifr.parse(file);
+                            const exif = await exifr.parse(file);
                             if (exif) {
-                                let eDate = exif.DateTimeOriginal || exif.CreateDate || exif.ModifyDate;
+                                const eDate = exif.DateTimeOriginal || exif.CreateDate || exif.ModifyDate;
                                 d = parseExifDate(eDate, d);
                             }
                         } catch(e) {}
-                        
-                        let t = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
-                        if(!imageBank[cleanName]) newPhotosAdded++;
-                        imageBank[cleanName] = { url: url, time: t, drop: detectedDrop };
+
+                        const t = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+                        if (!imageBank[cleanName]) newPhotosAdded++;
+                        // FIX #5: Always overwrite — same name, fresh blob
+                        imageBank[cleanName] = { url, time: t, drop: detectedDrop };
                     })());
-                } 
+                }
+
+                // ── 3D MODEL ─────────────────────────────────────────────────
                 else if (fileName.endsWith('.glb') || fileName.endsWith('.gltf') || fileType.includes('model/gltf')) {
                     viewer.src = URL.createObjectURL(file);
                     document.getElementById('model-status').innerHTML = `<span style="color:#0cf;">Loaded Custom Model:</span> ${file.name}`;
@@ -584,39 +625,39 @@
             }
 
             await Promise.all(filePromises);
-            
-            // --- V9.1: THE ZIPLINE ENGINE ---
-            let dropNodes = {};
+
+            // ── ZIPLINE ENGINE ───────────────────────────────────────────────
+            // Build per-drop sorted node lists
+            const dropNodes = {};
             Object.keys(inspectionData).forEach(drop => {
                 dropNodes[drop] = [];
                 Object.keys(inspectionData[drop]).forEach(floor => {
                     Object.keys(inspectionData[drop][floor]).forEach(pos => {
                         const node = inspectionData[drop][floor][pos];
                         if (node.time && node.time !== '--') {
-                            let parts = node.time.split(':');
+                            const parts = node.time.split(':');
                             if (parts.length === 3) {
-                                node.timeSec = parseInt(parts[0], 10)*3600 + parseInt(parts[1], 10)*60 + parseInt(parts[2], 10);
+                                node.timeSec   = parseInt(parts[0],10)*3600 + parseInt(parts[1],10)*60 + parseInt(parts[2],10);
                                 node.parentDrop = drop;
                                 dropNodes[drop].push(node);
                             }
                         }
                     });
                 });
-                // Sort chronologically (Top Down)
-                dropNodes[drop].sort((a,b) => a.timeSec - b.timeSec);
+                // Chronological (top-down during the rope descent)
+                dropNodes[drop].sort((a, b) => a.timeSec - b.timeSec);
             });
 
-            // Assign loose files to a single drop if there is only 1 drop loaded
-            let dropNames = Object.keys(dropNodes);
+            // Assign loose images to a single drop when there is only one
+            const dropNames = Object.keys(dropNodes);
             Object.values(imageBank).forEach(imgData => {
-                if (!imgData.drop && dropNames.length === 1) {
-                    imgData.drop = dropNames[0];
-                }
+                if (!imgData.drop && dropNames.length === 1) imgData.drop = dropNames[0];
             });
 
-            let dropImages = {};
+            // Group images by drop
+            const dropImages = {};
             Object.keys(imageBank).forEach(imgKey => {
-                let imgData = imageBank[imgKey];
+                const imgData = imageBank[imgKey];
                 if (imgData.drop) {
                     if (!dropImages[imgData.drop]) dropImages[imgData.drop] = [];
                     dropImages[imgData.drop].push({ id: imgKey, time: imgData.time });
@@ -626,88 +667,89 @@
             let successfullyLinked = 0;
 
             Object.keys(dropImages).forEach(drop => {
-                let images = dropImages[drop];
-                let nodes = dropNodes[drop];
-
+                const images = dropImages[drop];
+                const nodes  = dropNodes[drop];
                 if (!nodes || nodes.length === 0 || images.length === 0) return;
 
-                // 1. Sort images entirely by FILENAME to guarantee visual chronological order
-                images.sort((a, b) => a.id.localeCompare(b.id, undefined, {numeric: true}));
+                // FIX #4: Sort images by filename (numeric-aware) to match the
+                // photographer's natural top-down naming convention.
+                images.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
 
-                // Fallback check: Bug 4 Mitigation. If Google Drive stripped everything, warn the user.
-                let isZipBug = images.length > 1 && images.every(img => img.time === images[0].time);
+                // Detect Google Drive timestamp stripping bug (all times identical)
+                const isZipBug = images.length > 1 && images.every(img => img.time === images[0].time);
 
                 if (isZipBug) {
-                    // Sequential Zipline
+                    // FIX #4: Sequential fallback — nodes are also in top-down order
+                    // (sorted by timeSec ascending = earliest = top floor first),
+                    // matching the filename-sorted images array.
                     let nIdx = 0;
                     images.forEach(img => {
                         if (nIdx < nodes.length) {
-                            let targetNode = nodes[nIdx];
-                            if (targetNode.flir === '--' || targetNode.flir === '') targetNode.flir = img.id; 
-                            else targetNode.flir += ' & ' + img.id;
+                            const targetNode = nodes[nIdx];
+                            if (!targetNode.flir || targetNode.flir === '--') targetNode.flir = img.id;
+                            else if (!targetNode.flir.split(' & ').includes(img.id)) targetNode.flir += ' & ' + img.id;
                             nIdx++;
                             successfullyLinked++;
                         }
                     });
-                    setTimeout(() => { alert("⚠️ TIMESTAMP WARNING:\n\nGoogle Drive has stripped the original time data from these photos. The engine mapped them strictly by filename order (IMG_01, IMG_02...). \n\nIf the files were not named in perfect chronological order, the mapping will be inaccurate. To prevent this, upload the photos inside a .ZIP folder."); }, 500);
+                    setTimeout(() => alert(
+                        '⚠️ TIMESTAMP WARNING:\n\n' +
+                        'Google Drive has stripped the original time data from these photos. ' +
+                        'The engine mapped them strictly by filename order (IMG_01, IMG_02…).\n\n' +
+                        'If the files were not named in perfect top-to-bottom order, the mapping ' +
+                        'will be inaccurate. To prevent this, upload photos inside a .ZIP folder.'
+                    ), 500);
                 } else {
-                    // Smart Zipline: Calculate the median offset to neutralize wrong camera clocks
-                    let diffs = [];
-                    let minLen = Math.min(nodes.length, images.length);
-                    for(let i=0; i<minLen; i++) {
+                    // Smart Zipline: neutralise camera-clock offsets via median
+                    const diffs = [];
+                    const minLen = Math.min(nodes.length, images.length);
+                    for (let i = 0; i < minLen; i++) {
                         let diff = images[i].time - nodes[i].timeSec;
-                        if (diff > 43200) diff -= 86400; // Handle Midnight Shifts
+                        if (diff >  43200) diff -= 86400;
                         if (diff < -43200) diff += 86400;
                         diffs.push(diff);
                     }
-                    diffs.sort((a,b) => a-b);
-                    let medianOffset = diffs.length > 0 ? diffs[Math.floor(diffs.length/2)] : 0;
+                    diffs.sort((a, b) => a - b);
+                    const medianOffset = diffs.length > 0 ? diffs[Math.floor(diffs.length / 2)] : 0;
 
-                    let lastNodeIndex = 0; // The Zipline Anchor (prevents backwards assignment)
+                    // Zipline anchor: prevents backwards assignment
+                    let lastNodeIndex = 0;
 
                     images.forEach(img => {
-                        // 1. Direct exact filename override
-                        let exactIdx = nodes.findIndex(n => n.id === img.id);
+                        // 1. Direct filename match takes precedence
+                        const exactIdx = nodes.findIndex(n => n.id === img.id);
                         if (exactIdx !== -1) {
-                            if(exactIdx >= lastNodeIndex) lastNodeIndex = exactIdx;
-                            successfullyLinked++;
-                            let exactNode = nodes[exactIdx];
-                            if (exactNode.flir === '--' || exactNode.flir === '') exactNode.flir = img.id; 
+                            if (exactIdx >= lastNodeIndex) lastNodeIndex = exactIdx;
+                            const exactNode = nodes[exactIdx];
+                            if (!exactNode.flir || exactNode.flir === '--') exactNode.flir = img.id;
                             else if (!exactNode.flir.split(' & ').includes(img.id)) exactNode.flir += ' & ' + img.id;
+                            successfullyLinked++;
                             return;
                         }
 
-                        // 2. Relative Time Mapping
+                        // 2. Relative time match (forward-only from anchor)
                         let adjustedTime = img.time - medianOffset;
-                        if (adjustedTime < 0) adjustedTime += 86400;
-                        if (adjustedTime >= 86400) adjustedTime -= 86400;
+                        if (adjustedTime <  0)     adjustedTime += 86400;
+                        if (adjustedTime >= 86400)  adjustedTime -= 86400;
 
-                        let bestNode = null;
-                        let minDiff = Infinity;
+                        let bestNode  = null;
+                        let minScore  = Infinity;
                         let bestIndex = -1;
 
-                        // ONLY search forward from the anchor
-                        for(let i = lastNodeIndex; i < nodes.length; i++) {
+                        for (let i = lastNodeIndex; i < nodes.length; i++) {
                             let diff = Math.abs(nodes[i].timeSec - adjustedTime);
-                            if (diff > 43200) diff = 86400 - diff; // midnight wrap
-
-                            // Add a tiny penalty for skipping nodes to encourage 1:1 mapping when times are close
-                            let skipPenalty = (i - lastNodeIndex) * 30; 
-                            let score = diff + skipPenalty;
-
-                            if (score < minDiff) {
-                                minDiff = score;
-                                bestIndex = i;
-                                bestNode = nodes[i];
-                            }
+                            if (diff > 43200) diff = 86400 - diff;
+                            // Small penalty per skipped node encourages 1:1 mapping
+                            const score = diff + (i - lastNodeIndex) * 30;
+                            if (score < minScore) { minScore = score; bestIndex = i; bestNode = nodes[i]; }
                         }
 
-                        // If within 3 hours (after neutralizing offset), lock it in and advance the anchor
-                        if (bestNode && minDiff < 10800) {
+                        // Accept if within 3 hours of adjusted time
+                        if (bestNode && minScore < 10800) {
                             lastNodeIndex = bestIndex;
-                            successfullyLinked++;
-                            if (bestNode.flir === '--' || bestNode.flir === '') bestNode.flir = img.id; 
+                            if (!bestNode.flir || bestNode.flir === '--') bestNode.flir = img.id;
                             else if (!bestNode.flir.split(' & ').includes(img.id)) bestNode.flir += ' & ' + img.id;
+                            successfullyLinked++;
                         }
                     });
                 }
@@ -716,13 +758,15 @@
             document.getElementById('loading-overlay').style.display = 'none';
 
             if (newPhotosAdded > 0) {
-                if (successfullyLinked === 0) alert(`⚠️ ${newPhotosAdded} photos unpacked, but 0 could be linked. Please ensure they were taken during the logged time periods.`);
-                else alert(`✅ Zipline Engine securely sorted and linked ${successfullyLinked} photo(s).`);
+                if (successfullyLinked === 0)
+                    alert(`⚠️ ${newPhotosAdded} photos unpacked but 0 could be linked. Ensure they were taken during the logged time periods.`);
+                else
+                    alert(`✅ Zipline Engine linked ${successfullyLinked} photo(s).`);
             }
 
-            document.getElementById('project-name').innerText = "Project: " + projectInfo;
-            // Update UI safely based on exact imageBank keys
-            document.getElementById('stat-photos').innerText = Object.keys(imageBank).length;
+            document.getElementById('project-name').innerText = 'Project: ' + projectInfo;
+            // FIX #2: Always derive count from live imageBank
+            updatePhotoStat();
             document.getElementById('btn-reset').style.display = 'inline-block';
 
             if (newCsvAdded || isProjectLoaded) {
@@ -730,190 +774,303 @@
                     if (document.getElementById('dashboard-screen').style.display !== 'flex') {
                         document.getElementById('btn-start-mapping').style.display = 'block';
                     } else {
-                        if (activeTab !== "") Object.keys(dropAssignments).forEach(d => { if (dropAssignments[d] === "") dropAssignments[d] = activeTab; });
+                        if (activeTab !== '') Object.keys(dropAssignments).forEach(d => { if (dropAssignments[d] === '') dropAssignments[d] = activeTab; });
                         calculateBuildingGeometry();
                         if (currentMode === '2d' || currentMode === 'auto3d') refreshCurrentView();
                         if (currentMode === 'auto3d') buildProcedural3D();
                     }
-                } else alert("⚠️ The file was read, but no valid Strata data was found.");
+                } else {
+                    alert('⚠️ The file was read, but no valid Strata data was found.');
+                }
             }
 
             saveCommandState();
 
-            document.getElementById('csvInput').value = "";
-            document.getElementById('mediaInput').value = "";
-            document.getElementById('folderInput').value = "";
+            document.getElementById('csvInput').value   = '';
+            document.getElementById('mediaInput').value = '';
+            document.getElementById('folderInput').value = '';
         }
 
+        // ─────────────────────────────────────────────
+        // CSV PARSER
+        // ─────────────────────────────────────────────
         function parseCSV(text) {
             const rows = text.trim().split(/\r\n|\n|\r/);
             let validRows = 0;
             for (let i = 1; i < rows.length; i++) {
-                if(!rows[i].trim()) continue;
-                
-                let cols = [], cur = '', inQuotes = false;
+                if (!rows[i].trim()) continue;
+
+                const cols = [];
+                let cur = '', inQuotes = false;
                 for (let j = 0; j < rows[i].length; j++) {
-                    let c = rows[i][j];
+                    const c = rows[i][j];
                     if (c === '"') inQuotes = !inQuotes;
-                    else if (c === ',' && !inQuotes) { cols.push(cur.trim()); cur = ''; } 
+                    else if (c === ',' && !inQuotes) { cols.push(cur.trim()); cur = ''; }
                     else cur += c;
                 }
                 cols.push(cur.trim());
-                
-                if (cols.length >= 5) {
-                    let fullId, flir, finds, proved, tech, time;
-                    let parsedProj = cols[0].replace(/^"|"$/g, '');
-                    if (projectInfo === "Unknown Project") projectInfo = parsedProj;
 
-                    if (cols.length === 5) {
-                        tech = cols[1].replace(/^"|"$/g, ''); fullId = cols[2].replace(/^"|"$/g, '');
-                        finds = cols[3].replace(/^"|"$/g, ''); time = cols[4].replace(/^"|"$/g, '');
-                        flir = "--"; proved = "NO";
-                    } else {
-                        tech = "Unknown"; fullId = cols[2].replace(/^"|"$/g, ''); flir = cols[3].replace(/^"|"$/g, '');
-                        finds = cols[4].replace(/^"|"$/g, ''); proved = cols[5].replace(/^"|"$/g, ''); time = "--";
-                    }
-                    
-                    let status = 'status-clear'; let upperFinds = finds.toUpperCase();
-                    if (upperFinds.includes('FAIL') || upperFinds.includes('DEFECT') || upperFinds.includes('CONFIRM')) status = 'status-confirmed';
-                    else if (!upperFinds.includes('CLEAR')) status = 'status-flagged';
+                if (cols.length < 5) continue;
 
-                    const parts = fullId.split('-');
-                    if(parts.length === 3) {
-                        const drop = parts[0], floor = parseInt(parts[1]), pos = parts[2];
-                        if (!inspectionData[drop]) inspectionData[drop] = {};
-                        if (!inspectionData[drop][floor]) inspectionData[drop][floor] = {};
-                        
-                        // Bug 6 Fix: Strict status parsing
-                        let existingNotes = cols.length >= 8 ? cols[7].replace(/^"|"$/g, '') : "";
-                        let existingStatus = status;
-                        if (cols.length >= 8) {
-                            let rawStat = cols[6].toUpperCase().trim();
-                            if (rawStat.includes("CONFIRM")) existingStatus = 'status-confirmed';
-                            else if (rawStat.includes("PENDING")) existingStatus = 'status-flagged';
-                            else if (rawStat.includes("CLEAR")) existingStatus = 'status-clear';
-                        }
+                let fullId, flir, finds, proved, tech, time;
+                const parsedProj = cols[0].replace(/^"|"$/g, '');
+                if (projectInfo === 'Unknown Project') projectInfo = parsedProj;
 
-                        let mergedFlir = flir !== '--' && flir !== '' ? [flir] : [];
-                        let mergedFinds = finds !== '' ? finds.split(' | ') : [];
-                        let mergedProved = proved;
-                        
-                        if(inspectionData[drop][floor][pos]) {
-                            let prev = inspectionData[drop][floor][pos];
-                            if(!existingNotes) existingNotes = prev.notes;
-                            if (prev.flir && prev.flir !== '--') mergedFlir = [...prev.flir.split(' & '), ...mergedFlir];
-                            if (prev.finds && prev.finds !== 'CLEAR') mergedFinds = [...prev.finds.split(' | '), ...mergedFinds];
-                            if (prev.proved === 'YES') mergedProved = 'YES';
-                            
-                            if (prev.status === 'status-confirmed') existingStatus = 'status-confirmed';
-                            else if (prev.status === 'status-flagged' && existingStatus !== 'status-confirmed') existingStatus = 'status-flagged';
-                        }
-
-                        mergedFlir = [...new Set(mergedFlir)]; 
-                        mergedFinds = [...new Set(mergedFinds)].filter(f => f !== 'CLEAR');
-                        if (mergedFinds.length === 0) mergedFinds = ['CLEAR'];
-
-                        inspectionData[drop][floor][pos] = {
-                            id: fullId, flir: mergedFlir.length > 0 ? mergedFlir.join(' & ') : '--', 
-                            finds: mergedFinds.join(' | '), proved: mergedProved, tech: tech, time: time, status: existingStatus, notes: existingNotes
-                        };
-                        if(!dropAssignments[drop]) dropAssignments[drop] = cols.length >= 8 ? cols[1].replace(/^"|"$/g, '') : "";
-                        validRows++;
-                    }
+                if (cols.length === 5) {
+                    tech   = cols[1].replace(/^"|"$/g, '');
+                    fullId = cols[2].replace(/^"|"$/g, '');
+                    finds  = cols[3].replace(/^"|"$/g, '');
+                    time   = cols[4].replace(/^"|"$/g, '');
+                    flir   = '--'; proved = 'NO';
+                } else {
+                    tech   = 'Unknown';
+                    fullId = cols[2].replace(/^"|"$/g, '');
+                    flir   = cols[3].replace(/^"|"$/g, '');
+                    finds  = cols[4].replace(/^"|"$/g, '');
+                    proved = cols[5].replace(/^"|"$/g, '');
+                    time   = '--';
                 }
+
+                let status = 'status-clear';
+                const upperFinds = finds.toUpperCase();
+                if (upperFinds.includes('FAIL') || upperFinds.includes('DEFECT') || upperFinds.includes('CONFIRM')) status = 'status-confirmed';
+                else if (!upperFinds.includes('CLEAR')) status = 'status-flagged';
+
+                const parts = fullId.split('-');
+                if (parts.length !== 3) continue;
+
+                const drop  = parts[0];
+                const floor = parseInt(parts[1], 10);
+                const pos   = parts[2];
+
+                if (!inspectionData[drop]) inspectionData[drop] = {};
+                if (!inspectionData[drop][floor]) inspectionData[drop][floor] = {};
+
+                // FIX #6: Strict status parsing — no partial-string false matches
+                let existingNotes  = '';
+                let existingStatus = status;
+                if (cols.length >= 8) {
+                    existingNotes = cols[7].replace(/^"|"$/g, '');
+                    const rawStat = cols[6].toUpperCase().trim();
+                    // Use word-boundary style checks to avoid "unconfirmed" matching "CONFIRMED"
+                    if      (rawStat === 'CONFIRMED DEFECT' || rawStat === 'CONFIRMED') existingStatus = 'status-confirmed';
+                    else if (rawStat === 'PENDING' || rawStat === 'PENDING REVIEW')    existingStatus = 'status-flagged';
+                    else if (rawStat === 'CLEAR')                                       existingStatus = 'status-clear';
+                    // Anything else: keep the finds-derived status from above
+                }
+
+                let mergedFlir  = (flir !== '--' && flir !== '') ? [flir] : [];
+                let mergedFinds = finds !== '' ? finds.split(' | ') : [];
+                let mergedProved = proved;
+
+                if (inspectionData[drop][floor][pos]) {
+                    const prev = inspectionData[drop][floor][pos];
+                    if (!existingNotes) existingNotes = prev.notes || '';
+                    if (prev.flir && prev.flir !== '--') mergedFlir  = [...prev.flir.split(' & '),  ...mergedFlir];
+                    if (prev.finds && prev.finds !== 'CLEAR') mergedFinds = [...prev.finds.split(' | '), ...mergedFinds];
+                    if (prev.proved === 'YES') mergedProved = 'YES';
+                    // Escalate status, never downgrade
+                    if (prev.status === 'status-confirmed') existingStatus = 'status-confirmed';
+                    else if (prev.status === 'status-flagged' && existingStatus !== 'status-confirmed') existingStatus = 'status-flagged';
+                }
+
+                mergedFlir  = [...new Set(mergedFlir)];
+                mergedFinds = [...new Set(mergedFinds)].filter(f => f !== 'CLEAR' && f !== '');
+                if (mergedFinds.length === 0) mergedFinds = ['CLEAR'];
+
+                inspectionData[drop][floor][pos] = {
+                    id: fullId,
+                    flir:   mergedFlir.length > 0 ? mergedFlir.join(' & ') : '--',
+                    finds:  mergedFinds.join(' | '),
+                    proved: mergedProved,
+                    tech, time,
+                    status: existingStatus,
+                    notes:  existingNotes
+                };
+
+                if (!dropAssignments[drop]) dropAssignments[drop] = (cols.length >= 8 ? cols[1].replace(/^"|"$/g, '') : '');
+                validRows++;
             }
             return validRows;
         }
 
+        // ─────────────────────────────────────────────
+        // PROJECT SAVE
+        // ─────────────────────────────────────────────
         function saveProject() {
+            // imageBank is deliberately excluded (blob URLs are session-only)
             const projectData = { projectInfo, inspectionData, elevations, dropAssignments, stitchedPairs, saved3DTags };
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(projectData));
-            const a = document.createElement('a'); a.href = dataStr; a.download = `Strata_Project_${projectInfo.replace(/\s+/g, '_')}.json`; a.click();
+            const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(projectData));
+            const a = document.createElement('a');
+            a.href = dataStr;
+            a.download = `Strata_Project_${projectInfo.replace(/\s+/g, '_')}.json`;
+            a.click();
         }
 
+        // ─────────────────────────────────────────────
+        // 3D TAGGING
+        // ─────────────────────────────────────────────
         function openMasterTagMenu() {
             document.getElementById('tag-master-modal').style.display = 'flex';
-            const sSelect = document.getElementById('tag-single-select'); sSelect.innerHTML = ""; let allIds = [];
-            Object.keys(inspectionData).forEach(d => Object.keys(inspectionData[d]).forEach(f => Object.keys(inspectionData[d][f]).forEach(p => allIds.push(inspectionData[d][f][p]))));
-            allIds.sort((a,b) => a.id.localeCompare(b.id)).forEach(data => { const opt = document.createElement('option'); opt.value = data.id; opt.innerText = `${data.id} (${data.finds.split('|')[0]})`; sSelect.appendChild(opt); });
 
-            const dSelect = document.getElementById('tag-drop-select'); dSelect.innerHTML = "";
-            Object.keys(inspectionData).sort().forEach(d => { const opt = document.createElement('option'); opt.value = d; opt.innerText = `Drop ${d}`; dSelect.appendChild(opt); });
+            const sSelect = document.getElementById('tag-single-select');
+            sSelect.innerHTML = '';
+            const allIds = [];
+            Object.keys(inspectionData).forEach(d =>
+                Object.keys(inspectionData[d]).forEach(f =>
+                    Object.keys(inspectionData[d][f]).forEach(p => allIds.push(inspectionData[d][f][p]))
+                )
+            );
+            allIds.sort((a, b) => a.id.localeCompare(b.id)).forEach(data => {
+                const opt = document.createElement('option');
+                opt.value = data.id;
+                opt.innerText = `${data.id} (${data.finds.split('|')[0]})`;
+                sSelect.appendChild(opt);
+            });
 
-            const wSelect = document.getElementById('tag-wall-select'); wSelect.innerHTML = "";
-            elevations.forEach(e => { const opt = document.createElement('option'); opt.value = e; opt.innerText = `Wall: ${e}`; wSelect.appendChild(opt); });
+            const dSelect = document.getElementById('tag-drop-select');
+            dSelect.innerHTML = '';
+            Object.keys(inspectionData).sort().forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d; opt.innerText = `Drop ${d}`;
+                dSelect.appendChild(opt);
+            });
+
+            const wSelect = document.getElementById('tag-wall-select');
+            wSelect.innerHTML = '';
+            elevations.forEach(e => {
+                const opt = document.createElement('option');
+                opt.value = e; opt.innerText = `Wall: ${e}`;
+                wSelect.appendChild(opt);
+            });
         }
 
         function closeMasterTagMenu() { document.getElementById('tag-master-modal').style.display = 'none'; }
 
         function activateTaggingUI(modeName, instructions) {
-            closeMasterTagMenu(); document.querySelectorAll('.tag-toggle').forEach(btn => btn.classList.add('tag-mode-on'));
-            viewer.autoRotate = false; viewer.style.cursor = "crosshair";
-            document.getElementById('tag-instruction-bar').style.display = 'block'; document.getElementById('tag-instruction-text').innerText = instructions;
+            closeMasterTagMenu();
+            document.querySelectorAll('.tag-toggle').forEach(btn => btn.classList.add('tag-mode-on'));
+            viewer.autoRotate = false;
+            viewer.style.cursor = 'crosshair';
+            document.getElementById('tag-instruction-bar').style.display = 'block';
+            document.getElementById('tag-instruction-text').innerText = instructions;
         }
 
         function cancelBulkTag() {
             bulkTagState = { mode: null, targetId: null, step: 0, anchors: [] };
             document.querySelectorAll('.tag-toggle').forEach(btn => btn.classList.remove('tag-mode-on'));
-            viewer.autoRotate = true; viewer.style.cursor = "default"; document.getElementById('tag-instruction-bar').style.display = 'none';
+            viewer.autoRotate = true;
+            viewer.style.cursor = 'default';
+            document.getElementById('tag-instruction-bar').style.display = 'none';
         }
 
-        function startSingleTag() { bulkTagState = { mode: 'single', targetId: document.getElementById('tag-single-select').value, step: 0, anchors: [] }; activateTaggingUI('single', `Double-Click exact location for ${bulkTagState.targetId}`); }
-        function startDropTag() { bulkTagState = { mode: 'drop', targetId: document.getElementById('tag-drop-select').value, step: 0, anchors: [] }; activateTaggingUI('drop', `Step 1 of 2: Double-Click TOP center of Drop ${bulkTagState.targetId}`); }
-        function startWallTag() { bulkTagState = { mode: 'wall', targetId: document.getElementById('tag-wall-select').value, step: 0, anchors: [] }; activateTaggingUI('wall', `Step 1 of 4: Double-Click TOP-LEFT corner of Wall: ${bulkTagState.targetId}`); }
-        function startReTag() { const id = activeNodeDataArray[0].id; closeModal(); bulkTagState = { mode: 'retag', targetId: id, step: 0, anchors: [] }; activateTaggingUI('retag', `Double-Click new location for ${id}`); }
+        function startSingleTag() {
+            bulkTagState = { mode: 'single', targetId: document.getElementById('tag-single-select').value, step: 0, anchors: [] };
+            activateTaggingUI('single', `Double-Click exact location for ${bulkTagState.targetId}`);
+        }
+        function startDropTag() {
+            bulkTagState = { mode: 'drop', targetId: document.getElementById('tag-drop-select').value, step: 0, anchors: [] };
+            activateTaggingUI('drop', `Step 1 of 2: Double-Click TOP center of Drop ${bulkTagState.targetId}`);
+        }
+        function startWallTag() {
+            bulkTagState = { mode: 'wall', targetId: document.getElementById('tag-wall-select').value, step: 0, anchors: [] };
+            activateTaggingUI('wall', `Step 1 of 4: Double-Click TOP-LEFT corner of Wall: ${bulkTagState.targetId}`);
+        }
+        function startReTag() {
+            const id = activeNodeDataArray[0]?.id;
+            if (!id) return;
+            closeModal();
+            bulkTagState = { mode: 'retag', targetId: id, step: 0, anchors: [] };
+            activateTaggingUI('retag', `Double-Click new location for ${id}`);
+        }
 
-        function parseCoord(coordObj) { return (coordObj && coordObj.x !== undefined) ? [coordObj.x, coordObj.y, coordObj.z] : [0,0,0]; }
+        function parseCoord(coordObj) {
+            return (coordObj && coordObj.x !== undefined) ? [coordObj.x, coordObj.y, coordObj.z] : [0, 0, 0];
+        }
 
         viewer.addEventListener('dblclick', (event) => {
             if (!bulkTagState.mode) return;
-            const hit = viewer.positionAndNormalFromPoint(event.clientX, event.clientY); if (!hit) return;
+            const hit = viewer.positionAndNormalFromPoint(event.clientX, event.clientY);
+            if (!hit) return;
 
             if (bulkTagState.mode === 'single' || bulkTagState.mode === 'retag') {
-                saved3DTags[bulkTagState.targetId] = { position: `${hit.position.x} ${hit.position.y} ${hit.position.z}`, normal: `${hit.normal.x} ${hit.normal.y} ${hit.normal.z}` };
+                saved3DTags[bulkTagState.targetId] = {
+                    position: `${hit.position.x} ${hit.position.y} ${hit.position.z}`,
+                    normal:   `${hit.normal.x} ${hit.normal.y} ${hit.normal.z}`
+                };
                 render3DHotspots(); saveCommandState(); cancelBulkTag(); return;
             }
 
             if (bulkTagState.mode === 'drop') {
                 bulkTagState.anchors.push(hit); bulkTagState.step++;
-                if (bulkTagState.step === 1) document.getElementById('tag-instruction-text').innerText = `Step 2 of 2: Double-Click BOTTOM center of Drop ${bulkTagState.targetId}`;
+                if (bulkTagState.step === 1)
+                    document.getElementById('tag-instruction-text').innerText = `Step 2 of 2: Double-Click BOTTOM center of Drop ${bulkTagState.targetId}`;
                 else if (bulkTagState.step === 2) { processDropTagging(bulkTagState.targetId, bulkTagState.anchors); cancelBulkTag(); }
                 return;
             }
 
             if (bulkTagState.mode === 'wall') {
                 bulkTagState.anchors.push(hit); bulkTagState.step++;
-                if (bulkTagState.step === 1) document.getElementById('tag-instruction-text').innerText = `Step 2 of 4: Double-Click TOP-RIGHT corner of Wall`;
-                else if (bulkTagState.step === 2) document.getElementById('tag-instruction-text').innerText = `Step 3 of 4: Double-Click BOTTOM-LEFT corner of Wall`;
-                else if (bulkTagState.step === 3) document.getElementById('tag-instruction-text').innerText = `Step 4 of 4: Double-Click BOTTOM-RIGHT corner of Wall`;
+                if      (bulkTagState.step === 1) document.getElementById('tag-instruction-text').innerText = 'Step 2 of 4: Double-Click TOP-RIGHT corner of Wall';
+                else if (bulkTagState.step === 2) document.getElementById('tag-instruction-text').innerText = 'Step 3 of 4: Double-Click BOTTOM-LEFT corner of Wall';
+                else if (bulkTagState.step === 3) document.getElementById('tag-instruction-text').innerText = 'Step 4 of 4: Double-Click BOTTOM-RIGHT corner of Wall';
                 else if (bulkTagState.step === 4) { processWallTagging(bulkTagState.targetId, bulkTagState.anchors); cancelBulkTag(); }
             }
         });
 
         function processDropTagging(dropId, anchors) {
-            let floors = Object.keys(inspectionData[dropId]).map(Number).sort((a,b) => b-a); if(floors.length === 0) return;
-            let maxF = floors[0], minF = floors[floors.length - 1], fRange = maxF - minF, pT = parseCoord(anchors[0].position), pB = parseCoord(anchors[1].position);
-            let nX = anchors[0].normal.x, nY = anchors[0].normal.y, nZ = anchors[0].normal.z, norm = `${nX} ${nY} ${nZ}`;
-            let rLen = Math.sqrt(nZ*nZ + nX*nX), rX = rLen === 0 ? 1 : nZ/rLen, rY = 0, rZ = rLen === 0 ? 0 : -nX/rLen, spacing = 0.8, orderMap = { 'L': -1, 'C': 0, 'R': 1 };
+            const floors = Object.keys(inspectionData[dropId]).map(Number).sort((a, b) => b - a);
+            if (floors.length === 0) return;
+            const maxF = floors[0], minF = floors[floors.length - 1], fRange = maxF - minF;
+            const pT = parseCoord(anchors[0].position), pB = parseCoord(anchors[1].position);
+            const nX = anchors[0].normal.x, nY = anchors[0].normal.y, nZ = anchors[0].normal.z;
+            const norm = `${nX} ${nY} ${nZ}`;
+            const rLen = Math.sqrt(nZ*nZ + nX*nX);
+            const rX = rLen === 0 ? 1 : nZ/rLen, rY = 0, rZ = rLen === 0 ? 0 : -nX/rLen;
+            const spacing = 0.8, orderMap = { L: -1, C: 0, R: 1 };
             floors.forEach(f => {
-                let t = (fRange === 0) ? 0 : (maxF - f) / fRange, cx = pT[0] + (pB[0] - pT[0]) * t, cy = pT[1] + (pB[1] - pT[1]) * t, cz = pT[2] + (pB[2] - pT[2]) * t;
-                Object.keys(inspectionData[dropId][f]).forEach(pos => { let offset = orderMap[pos] !== undefined ? orderMap[pos] : 0; saved3DTags[`${dropId}-${f}-${pos}`] = { position: `${cx + (rX * offset * spacing)} ${cy + (rY * offset * spacing)} ${cz + (rZ * offset * spacing)}`, normal: norm }; });
+                const t = fRange === 0 ? 0 : (maxF - f) / fRange;
+                const cx = pT[0] + (pB[0]-pT[0])*t, cy = pT[1] + (pB[1]-pT[1])*t, cz = pT[2] + (pB[2]-pT[2])*t;
+                Object.keys(inspectionData[dropId][f]).forEach(pos => {
+                    const offset = orderMap[pos] ?? 0;
+                    saved3DTags[`${dropId}-${f}-${pos}`] = {
+                        position: `${cx+rX*offset*spacing} ${cy+rY*offset*spacing} ${cz+rZ*offset*spacing}`,
+                        normal: norm
+                    };
+                });
             });
             render3DHotspots(); saveCommandState();
         }
 
         function processWallTagging(wallName, anchors) {
-            let drops = Object.keys(dropAssignments).filter(d => dropAssignments[d] === wallName).sort(); if(drops.length === 0) return;
-            let allFloors = []; drops.forEach(d => allFloors.push(...Object.keys(inspectionData[d]).map(Number)));
-            let maxF = Math.max(...allFloors), minF = Math.min(...allFloors), fRange = maxF - minF, dRange = drops.length > 1 ? drops.length - 1 : 1;
-            let TL = parseCoord(anchors[0].position), TR = parseCoord(anchors[1].position), BL = parseCoord(anchors[2].position), BR = parseCoord(anchors[3].position);
-            let nX = anchors[0].normal.x, nY = anchors[0].normal.y, nZ = anchors[0].normal.z, norm = `${nX} ${nY} ${nZ}`;
-            let vTopX = TR[0] - TL[0], vTopY = TR[1] - TL[1], vTopZ = TR[2] - TL[2], wallWidth = Math.sqrt(vTopX*vTopX + vTopY*vTopY + vTopZ*vTopZ), rX = wallWidth === 0 ? 1 : vTopX/wallWidth, rY = wallWidth === 0 ? 0 : vTopY/wallWidth, rZ = wallWidth === 0 ? 0 : vTopZ/wallWidth, spacing = (wallWidth / (drops.length || 1)) * 0.3, orderMap = { 'L': -1, 'C': 0, 'R': 1 };
+            const drops = Object.keys(dropAssignments).filter(d => dropAssignments[d] === wallName).sort();
+            if (drops.length === 0) return;
+            const allFloors = [];
+            drops.forEach(d => allFloors.push(...Object.keys(inspectionData[d]).map(Number)));
+            const maxF = Math.max(...allFloors), minF = Math.min(...allFloors);
+            const fRange = maxF - minF, dRange = drops.length > 1 ? drops.length - 1 : 1;
+            const TL = parseCoord(anchors[0].position), TR = parseCoord(anchors[1].position);
+            const BL = parseCoord(anchors[2].position), BR = parseCoord(anchors[3].position);
+            const nX = anchors[0].normal.x, nY = anchors[0].normal.y, nZ = anchors[0].normal.z;
+            const norm = `${nX} ${nY} ${nZ}`;
+            const vTopX = TR[0]-TL[0], vTopY = TR[1]-TL[1], vTopZ = TR[2]-TL[2];
+            const wallWidth = Math.sqrt(vTopX*vTopX+vTopY*vTopY+vTopZ*vTopZ);
+            const rX = wallWidth===0?1:vTopX/wallWidth, rY = wallWidth===0?0:vTopY/wallWidth, rZ = wallWidth===0?0:vTopZ/wallWidth;
+            const spacing = (wallWidth / (drops.length || 1)) * 0.3, orderMap = { L: -1, C: 0, R: 1 };
             drops.forEach((dropId, dIdx) => {
-                let u = (drops.length > 1) ? (dIdx / dRange) : 0.5;
+                const u = drops.length > 1 ? dIdx / dRange : 0.5;
                 Object.keys(inspectionData[dropId]).map(Number).forEach(f => {
-                    let v = (fRange === 0) ? 0 : (maxF - f) / fRange, cx = (1-u)*(1-v)*TL[0] + u*(1-v)*TR[0] + (1-u)*v*BL[0] + u*v*BR[0], cy = (1-u)*(1-v)*TL[1] + u*(1-v)*TR[1] + (1-u)*v*BL[1] + u*v*BR[1], cz = (1-u)*(1-v)*TL[2] + u*(1-v)*TR[2] + (1-u)*v*BL[2] + u*v*BR[2];
-                    Object.keys(inspectionData[dropId][f]).forEach(pos => { let offset = orderMap[pos] !== undefined ? orderMap[pos] : 0; saved3DTags[`${dropId}-${f}-${pos}`] = { position: `${cx + (rX * offset * spacing)} ${cy + (rY * offset * spacing)} ${cz + (rZ * offset * spacing)}`, normal: norm }; });
+                    const v = fRange === 0 ? 0 : (maxF - f) / fRange;
+                    const cx = (1-u)*(1-v)*TL[0]+u*(1-v)*TR[0]+(1-u)*v*BL[0]+u*v*BR[0];
+                    const cy = (1-u)*(1-v)*TL[1]+u*(1-v)*TR[1]+(1-u)*v*BL[1]+u*v*BR[1];
+                    const cz = (1-u)*(1-v)*TL[2]+u*(1-v)*TR[2]+(1-u)*v*BL[2]+u*v*BR[2];
+                    Object.keys(inspectionData[dropId][f]).forEach(pos => {
+                        const offset = orderMap[pos] ?? 0;
+                        saved3DTags[`${dropId}-${f}-${pos}`] = {
+                            position: `${cx+rX*offset*spacing} ${cy+rY*offset*spacing} ${cz+rZ*offset*spacing}`,
+                            normal: norm
+                        };
+                    });
                 });
             });
             render3DHotspots(); saveCommandState();
@@ -922,222 +1079,545 @@
         function render3DHotspots() {
             viewer.querySelectorAll('.hotspot-dot').forEach(el => el.remove());
             Object.keys(saved3DTags).forEach(id => {
-                const data = getNodeData(id); if(!data) return;
-                let finalStatus = data.status, pair = stitchedPairs.find(p => p.includes(data.id)); if(pair) finalStatus = getCombinedStatus(pair[0], pair[1]);
+                const data = getNodeData(id);
+                if (!data) return;
+                let finalStatus = data.status;
+                const pair = stitchedPairs.find(p => p.includes(data.id));
+                if (pair) finalStatus = getCombinedStatus(pair[0], pair[1]);
                 if (activeFilter !== 'ALL' && finalStatus !== activeFilter) return;
 
-                const btn = document.createElement('button'); btn.slot = `hotspot-${id}`; btn.dataset.position = saved3DTags[id].position; btn.dataset.normal = saved3DTags[id].normal;
-                btn.className = `hotspot-dot ${finalStatus}`; btn.onclick = () => openModal(id);
-                const label = document.createElement('div'); label.className = 'hotspot-label'; label.innerText = id; btn.appendChild(label); viewer.appendChild(btn);
+                const btn = document.createElement('button');
+                btn.slot = `hotspot-${id}`;
+                btn.dataset.position = saved3DTags[id].position;
+                btn.dataset.normal   = saved3DTags[id].normal;
+                btn.className = `hotspot-dot ${finalStatus}`;
+                btn.onclick = () => openModal(id);
+                const label = document.createElement('div');
+                label.className = 'hotspot-label';
+                label.innerText = id;
+                btn.appendChild(label);
+                viewer.appendChild(btn);
             });
         }
 
-        function toggleFullScreen(elementId) { const elem = document.getElementById(elementId); if (!document.fullscreenElement) { if (elem.requestFullscreen) elem.requestFullscreen(); } else { if (document.exitFullscreen) document.exitFullscreen(); } }
+        function toggleFullScreen(elementId) {
+            const elem = document.getElementById(elementId);
+            if (!document.fullscreenElement) { if (elem.requestFullscreen) elem.requestFullscreen(); }
+            else { if (document.exitFullscreen) document.exitFullscreen(); }
+        }
 
+        // ─────────────────────────────────────────────
+        // FILTERS
+        // ─────────────────────────────────────────────
         function setFilter(filterType) {
             activeFilter = (activeFilter === filterType && filterType !== 'ALL') ? 'ALL' : filterType;
             document.getElementById('filter-card-all').classList.toggle('dimmed', activeFilter !== 'ALL');
             document.getElementById('filter-card-clear').classList.toggle('dimmed', activeFilter !== 'ALL' && activeFilter !== 'status-clear');
             document.getElementById('filter-card-flagged').classList.toggle('dimmed', activeFilter !== 'ALL' && activeFilter !== 'status-flagged');
             document.getElementById('filter-card-confirmed').classList.toggle('dimmed', activeFilter !== 'ALL' && activeFilter !== 'status-confirmed');
-            if (currentMode === '2d' || currentMode === 'auto3d') refreshCurrentView(); if (currentMode === 'auto3d') buildProcedural3D(); render3DHotspots();
+            if (currentMode === '2d' || currentMode === 'auto3d') refreshCurrentView();
+            if (currentMode === 'auto3d') buildProcedural3D();
+            render3DHotspots();
         }
 
-        function toggleStitchMode() { isStitchMode = !isStitchMode; document.querySelectorAll('.stitch-toggle').forEach(btn => btn.classList.toggle('stitch-mode-on', isStitchMode)); stitchSelection = []; if(isStitchMode) alert("STITCH MODE ACTIVE:\nClick the right half of the window, then click the left half."); if (currentMode === '2d') refreshCurrentView(); }
-        
-        function getCombinedStatus(id1, id2) { let d1 = getNodeData(id1), d2 = getNodeData(id2); if(!d1 || !d2) return 'status-clear'; if(d1.status === 'status-confirmed' || d2.status === 'status-confirmed') return 'status-confirmed'; if(d1.status === 'status-flagged' || d2.status === 'status-flagged') return 'status-flagged'; return 'status-clear'; }
+        // ─────────────────────────────────────────────
+        // STITCH
+        // ─────────────────────────────────────────────
+        function toggleStitchMode() {
+            isStitchMode = !isStitchMode;
+            document.querySelectorAll('.stitch-toggle').forEach(btn => btn.classList.toggle('stitch-mode-on', isStitchMode));
+            stitchSelection = [];
+            if (isStitchMode) alert('STITCH MODE ACTIVE:\nClick the right half of the window, then click the left half.');
+            if (currentMode === '2d') refreshCurrentView();
+        }
+
+        function getCombinedStatus(id1, id2) {
+            const d1 = getNodeData(id1), d2 = getNodeData(id2);
+            if (!d1 || !d2) return 'status-clear';
+            if (d1.status === 'status-confirmed' || d2.status === 'status-confirmed') return 'status-confirmed';
+            if (d1.status === 'status-flagged'   || d2.status === 'status-flagged')   return 'status-flagged';
+            return 'status-clear';
+        }
 
         function handleNodeClick(data, nodeElement) {
-            if(isStitchMode) {
-                let existingPairIndex = stitchedPairs.findIndex(p => p.includes(data.id));
+            if (isStitchMode) {
+                const existingPairIndex = stitchedPairs.findIndex(p => p.includes(data.id));
                 if (existingPairIndex !== -1) {
-                    if(confirm("This window is already stitched. Do you want to un-stitch it?")) { stitchedPairs.splice(existingPairIndex, 1); stitchSelection = []; isStitchMode = false; document.querySelectorAll('.stitch-toggle').forEach(btn => btn.classList.remove('stitch-mode-on')); calculateBuildingGeometry(); saveCommandState(); if (currentMode === '2d') refreshCurrentView(); if (currentMode === 'auto3d') buildProcedural3D(); }
+                    if (confirm('This window is already stitched. Do you want to un-stitch it?')) {
+                        stitchedPairs.splice(existingPairIndex, 1);
+                        stitchSelection = []; isStitchMode = false;
+                        document.querySelectorAll('.stitch-toggle').forEach(btn => btn.classList.remove('stitch-mode-on'));
+                        calculateBuildingGeometry(); saveCommandState();
+                        if (currentMode === '2d') refreshCurrentView();
+                        if (currentMode === 'auto3d') buildProcedural3D();
+                    }
                     return;
                 }
-                stitchSelection.push(data.id); nodeElement.classList.add('node-selected');
-                if(stitchSelection.length === 2) {
-                    stitchSelection.sort(); stitchedPairs.push([...stitchSelection]); isStitchMode = false; document.querySelectorAll('.stitch-toggle').forEach(btn => btn.classList.remove('stitch-mode-on')); stitchSelection = []; saveCommandState(); if (currentMode === '2d') refreshCurrentView(); if (currentMode === 'auto3d') buildProcedural3D();
+                stitchSelection.push(data.id);
+                nodeElement.classList.add('node-selected');
+                if (stitchSelection.length === 2) {
+                    stitchSelection.sort();
+                    stitchedPairs.push([...stitchSelection]);
+                    isStitchMode = false;
+                    document.querySelectorAll('.stitch-toggle').forEach(btn => btn.classList.remove('stitch-mode-on'));
+                    stitchSelection = [];
+                    saveCommandState();
+                    if (currentMode === '2d') refreshCurrentView();
+                    if (currentMode === 'auto3d') buildProcedural3D();
                 }
                 return;
             }
             openModal(data.id);
         }
 
-        function openMappingScreen() { document.getElementById('btn-start-mapping').style.display = 'none'; document.getElementById('mapping-screen').style.display = 'block'; renderMappingList(); }
-        // Bug 8 Fix: Active tab reset explicitly in map builder
-        function editMapping() { document.getElementById('dashboard-screen').style.display = 'none'; document.getElementById('mapping-screen').style.display = 'block'; document.getElementById('btn-save-project').style.display = 'none'; document.getElementById('btn-edit-map').style.display = 'none'; renderMappingList(); }
-        function addElevation() { const input = document.getElementById('new-elevation-name'), val = input.value.trim(); if(val && !elevations.includes(val)) { elevations.push(val); if (elevations.length === 1) { activeTab = val; Object.keys(dropAssignments).forEach(d => { if (dropAssignments[d] === "") dropAssignments[d] = val; }); } input.value = ""; saveCommandState(); renderMappingList(); } }
+        // ─────────────────────────────────────────────
+        // MAPPING SCREEN
+        // ─────────────────────────────────────────────
+        function openMappingScreen() {
+            document.getElementById('btn-start-mapping').style.display = 'none';
+            document.getElementById('mapping-screen').style.display = 'block';
+            renderMappingList();
+        }
+
+        function editMapping() {
+            document.getElementById('dashboard-screen').style.display = 'none';
+            document.getElementById('mapping-screen').style.display = 'block';
+            document.getElementById('btn-save-project').style.display = 'none';
+            document.getElementById('btn-edit-map').style.display = 'none';
+            renderMappingList();
+        }
+
+        function addElevation() {
+            const input = document.getElementById('new-elevation-name');
+            const val = input.value.trim();
+            if (val && !elevations.includes(val)) {
+                elevations.push(val);
+                if (elevations.length === 1) {
+                    activeTab = val;
+                    Object.keys(dropAssignments).forEach(d => { if (dropAssignments[d] === '') dropAssignments[d] = val; });
+                }
+                input.value = '';
+                saveCommandState();
+                renderMappingList();
+            }
+        }
 
         function renderMappingList() {
-            const list = document.getElementById('mapping-list'); list.innerHTML = ""; const drops = Object.keys(inspectionData).sort();
-            if (elevations.length === 0 && drops.length > 0) { const warning = document.createElement('div'); warning.style = "color: #f1c40f; margin-bottom: 15px; font-weight: bold;"; warning.innerText = "⚠️ Please add at least one wall above to map your drops."; list.appendChild(warning); }
+            const list  = document.getElementById('mapping-list');
+            list.innerHTML = '';
+            const drops = Object.keys(inspectionData).sort();
+            if (elevations.length === 0 && drops.length > 0) {
+                const warning = document.createElement('div');
+                warning.style = 'color:#f1c40f; margin-bottom:15px; font-weight:bold;';
+                warning.innerText = '⚠️ Please add at least one wall above to map your drops.';
+                list.appendChild(warning);
+            }
             drops.forEach(dropStr => {
-                const row = document.createElement('div'); row.className = 'mapping-row'; row.innerHTML = `<strong style="font-size:1.2rem; color:#0cf;">DROP ${dropStr}</strong>`;
-                const select = document.createElement('select'); select.onchange = (e) => { dropAssignments[dropStr] = e.target.value; saveCommandState(); };
-                if (elevations.length === 0) { const opt = document.createElement('option'); opt.value = ""; opt.innerText = "Awaiting Wall..."; select.appendChild(opt); select.disabled = true; } 
-                else { select.disabled = false; elevations.forEach(elev => { const opt = document.createElement('option'); opt.value = elev; opt.innerText = elev; if(dropAssignments[dropStr] === elev) opt.selected = true; select.appendChild(opt); }); }
-                row.appendChild(select); list.appendChild(row);
+                const row = document.createElement('div');
+                row.className = 'mapping-row';
+                row.innerHTML = `<strong style="font-size:1.2rem; color:#0cf;">DROP ${dropStr}</strong>`;
+                const select = document.createElement('select');
+                select.onchange = (e) => { dropAssignments[dropStr] = e.target.value; saveCommandState(); };
+                if (elevations.length === 0) {
+                    const opt = document.createElement('option'); opt.value = ''; opt.innerText = 'Awaiting Wall...';
+                    select.appendChild(opt); select.disabled = true;
+                } else {
+                    select.disabled = false;
+                    elevations.forEach(elev => {
+                        const opt = document.createElement('option');
+                        opt.value = elev; opt.innerText = elev;
+                        if (dropAssignments[dropStr] === elev) opt.selected = true;
+                        select.appendChild(opt);
+                    });
+                }
+                row.appendChild(select);
+                list.appendChild(row);
             });
         }
 
         function generateDashboard() {
-            if (elevations.length === 0) { alert("⚠️ You must add at least one custom wall before generating the dashboard."); return; }
-            document.getElementById('mapping-screen').style.display = 'none'; document.getElementById('dashboard-screen').style.display = 'flex';
-            document.getElementById('btn-save-project').style.display = 'inline-block'; document.getElementById('btn-edit-map').style.display = 'inline-block';
-            if(!elevations.includes(activeTab)) activeTab = elevations[0];
-            calculateBuildingGeometry(); saveCommandState(); if (currentMode === '2d' || currentMode === 'auto3d') refreshCurrentView(); if (currentMode === 'auto3d') buildProcedural3D();
+            if (elevations.length === 0) { alert('⚠️ You must add at least one custom wall before generating the dashboard.'); return; }
+            document.getElementById('mapping-screen').style.display = 'none';
+            document.getElementById('dashboard-screen').style.display = 'flex';
+            document.getElementById('btn-save-project').style.display = 'inline-block';
+            document.getElementById('btn-edit-map').style.display = 'inline-block';
+            if (!elevations.includes(activeTab)) activeTab = elevations[0];
+            calculateBuildingGeometry();
+            saveCommandState();
+            if (currentMode === '2d' || currentMode === 'auto3d') refreshCurrentView();
+            if (currentMode === 'auto3d') buildProcedural3D();
         }
 
-        // Bug 1 Fix: Explicitly remove inner status overlaps before adding combined Stitched status
+        // ─────────────────────────────────────────────
+        // FIX #1: Stats — correctly deduplicates stitched pairs regardless of
+        // whether the two nodes share the same status or different statuses.
+        // ─────────────────────────────────────────────
         function calculateBuildingGeometry() {
-            globalStats = { t:0, clear:0, f:0, c:0, maxFloor: -Infinity, minFloor: Infinity };
+            globalStats = { t: 0, clear: 0, f: 0, c: 0, maxFloor: -Infinity, minFloor: Infinity };
+
             Object.keys(inspectionData).forEach(dropStr => {
                 Object.keys(inspectionData[dropStr]).map(Number).forEach(f => {
-                    if (f > globalStats.maxFloor) globalStats.maxFloor = f; if (f < globalStats.minFloor) globalStats.minFloor = f;
-                    Object.keys(inspectionData[dropStr][f]).forEach(pos => { const d = inspectionData[dropStr][f][pos]; globalStats.t++; if (d.status === 'status-flagged') globalStats.f++; else if (d.status === 'status-confirmed') globalStats.c++; else globalStats.clear++; });
+                    if (f > globalStats.maxFloor) globalStats.maxFloor = f;
+                    if (f < globalStats.minFloor) globalStats.minFloor = f;
+                    Object.keys(inspectionData[dropStr][f]).forEach(pos => {
+                        const d = inspectionData[dropStr][f][pos];
+                        globalStats.t++;
+                        if      (d.status === 'status-flagged')   globalStats.f++;
+                        else if (d.status === 'status-confirmed') globalStats.c++;
+                        else                                       globalStats.clear++;
+                    });
                 });
             });
             if (globalStats.maxFloor === -Infinity) { globalStats.maxFloor = 0; globalStats.minFloor = 0; }
+
+            // For each stitched pair: remove both individual contributions, add one combined entry
             stitchedPairs.forEach(pair => {
-                let d1 = getNodeData(pair[0]), d2 = getNodeData(pair[1]);
-                if (d1 && d2) { 
-                    globalStats.t--; // Treat stitched window as a single entity
-                    let combined = getCombinedStatus(pair[0], pair[1]);
-                    // Pull individual counts
-                    if (d1.status === 'status-flagged') globalStats.f--;
-                    if (d1.status === 'status-confirmed') globalStats.c--;
-                    if (d1.status === 'status-clear') globalStats.clear--;
-                    if (d2.status === 'status-flagged') globalStats.f--;
-                    if (d2.status === 'status-confirmed') globalStats.c--;
-                    if (d2.status === 'status-clear') globalStats.clear--;
-                    // Add back unified count
-                    if (combined === 'status-flagged') globalStats.f++;
-                    if (combined === 'status-confirmed') globalStats.c++;
-                    if (combined === 'status-clear') globalStats.clear++;
-                }
+                const d1 = getNodeData(pair[0]), d2 = getNodeData(pair[1]);
+                if (!d1 || !d2) return;
+
+                globalStats.t--;  // treat pair as a single window
+
+                // Remove individual contributions
+                if (d1.status === 'status-flagged')   globalStats.f--;
+                else if (d1.status === 'status-confirmed') globalStats.c--;
+                else globalStats.clear--;
+
+                if (d2.status === 'status-flagged')   globalStats.f--;
+                else if (d2.status === 'status-confirmed') globalStats.c--;
+                else globalStats.clear--;
+
+                // Add back single combined contribution
+                const combined = getCombinedStatus(pair[0], pair[1]);
+                if      (combined === 'status-flagged')   globalStats.f++;
+                else if (combined === 'status-confirmed') globalStats.c++;
+                else                                       globalStats.clear++;
             });
-            document.getElementById('stat-total').innerText = globalStats.t; document.getElementById('stat-clear').innerText = globalStats.clear; document.getElementById('stat-flagged').innerText = globalStats.f; document.getElementById('stat-confirmed').innerText = globalStats.c;
+
+            document.getElementById('stat-total').innerText     = globalStats.t;
+            document.getElementById('stat-clear').innerText     = globalStats.clear;
+            document.getElementById('stat-flagged').innerText   = globalStats.f;
+            document.getElementById('stat-confirmed').innerText = globalStats.c;
             render3DHotspots();
         }
 
+        // ─────────────────────────────────────────────
+        // VIEW SWITCHING
+        // ─────────────────────────────────────────────
         function switchView(mode) {
-            currentMode = mode; document.getElementById('btn-2d').classList.toggle('active', mode === '2d');
-            const btnAuto3d = document.getElementById('btn-auto3d'); if(mode === 'auto3d') { btnAuto3d.style.background = '#0cf'; btnAuto3d.style.color = '#000'; } else { btnAuto3d.style.background = '#1d212f'; btnAuto3d.style.color = '#0cf'; }
+            currentMode = mode;
+            document.getElementById('btn-2d').classList.toggle('active', mode === '2d');
+            const btnAuto3d = document.getElementById('btn-auto3d');
+            if (mode === 'auto3d') { btnAuto3d.style.background = '#0cf'; btnAuto3d.style.color = '#000'; }
+            else { btnAuto3d.style.background = '#1d212f'; btnAuto3d.style.color = '#0cf'; }
             document.getElementById('btn-true3d').classList.toggle('active', mode === 'true3d');
-            document.getElementById('view-2d').style.display = (mode === '2d') ? 'flex' : 'none'; document.getElementById('arena-auto3d').style.display = (mode === 'auto3d') ? 'block' : 'none'; document.getElementById('arena-true3d').style.display = (mode === 'true3d') ? 'block' : 'none';
-            document.getElementById('tabs-container').style.display = (mode === 'true3d') ? 'none' : 'flex';
-            if (mode === '2d' || mode === 'auto3d') refreshCurrentView(); if (mode === 'auto3d') setTimeout(() => { buildProcedural3D(); }, 100);
+            document.getElementById('view-2d').style.display          = mode === '2d'      ? 'flex'  : 'none';
+            document.getElementById('arena-auto3d').style.display     = mode === 'auto3d'  ? 'block' : 'none';
+            document.getElementById('arena-true3d').style.display     = mode === 'true3d'  ? 'block' : 'none';
+            document.getElementById('tabs-container').style.display   = mode === 'true3d'  ? 'none'  : 'flex';
+            if (mode === '2d' || mode === 'auto3d') refreshCurrentView();
+            if (mode === 'auto3d') setTimeout(buildProcedural3D, 100);
         }
 
+        // FIX #8: refreshCurrentView always resolves activeTab to a valid wall before rendering
         function refreshCurrentView() {
-            if (currentMode === '2d' || currentMode === 'auto3d') {
-                const container = document.getElementById('tabs-container'); container.innerHTML = ""; const usedElevations = new Set(Object.values(dropAssignments));
-                elevations.forEach(elev => {
-                    if(usedElevations.has(elev)) {
-                        const tab = document.createElement('div'); tab.className = `tab ${activeTab === elev ? 'active' : ''}`; tab.innerText = elev;
-                        tab.onclick = () => { activeTab = elev; refreshCurrentView(); if(currentMode === 'auto3d') buildProcedural3D(); }; container.appendChild(tab);
-                    }
-                });
-                // Bug 8 Fix: Revert to valid tab if mappings changed
-                if(!usedElevations.has(activeTab) && usedElevations.size > 0) activeTab = Array.from(usedElevations)[0];
-                if(usedElevations.size === 0) activeTab = ""; // Failsafe
+            if (currentMode !== '2d' && currentMode !== 'auto3d') return;
 
-                if (currentMode === '2d' && activeTab) { const gridContainer = document.getElementById('building-container-2d'); gridContainer.innerHTML = ''; gridContainer.appendChild(generateWallDOM(activeTab, false)); }
-                else if (currentMode === '2d' && !activeTab) { document.getElementById('building-container-2d').innerHTML = ''; }
+            const container      = document.getElementById('tabs-container');
+            container.innerHTML  = '';
+            const usedElevations = new Set(Object.values(dropAssignments));
+
+            elevations.forEach(elev => {
+                if (!usedElevations.has(elev)) return;
+                const tab = document.createElement('div');
+                tab.className = `tab ${activeTab === elev ? 'active' : ''}`;
+                tab.innerText = elev;
+                tab.onclick   = () => { activeTab = elev; refreshCurrentView(); if (currentMode === 'auto3d') buildProcedural3D(); };
+                container.appendChild(tab);
+            });
+
+            // FIX #8: Revert to a valid tab if the current one was removed/reassigned
+            if (!usedElevations.has(activeTab)) {
+                activeTab = usedElevations.size > 0 ? Array.from(usedElevations)[0] : '';
+            }
+
+            const gridContainer = document.getElementById('building-container-2d');
+            gridContainer.innerHTML = '';
+            if (currentMode === '2d') {
+                if (activeTab) {
+                    gridContainer.appendChild(generateWallDOM(activeTab));
+                } else {
+                    const msg = document.createElement('div');
+                    msg.style = 'padding:40px; color:#888; width:100%; text-align:center;';
+                    msg.innerText = 'No wall selected. Go to Edit Map and assign drops to a wall.';
+                    gridContainer.appendChild(msg);
+                }
             }
         }
 
-        function generateWallDOM(elevationName, useGlobalFloors = false) {
-            const fragment = document.createDocumentFragment(); const activeDrops = Object.keys(inspectionData).filter(d => dropAssignments[d] === elevationName).sort();
-            if(activeDrops.length === 0) { const empty = document.createElement('div'); empty.style = "padding: 40px; color:#888; width:100%; text-align:center;"; empty.innerText = "No drops assigned."; fragment.appendChild(empty); return fragment; }
-            let renderMaxFloor = -Infinity, renderMinFloor = Infinity; activeDrops.forEach(d => { const floors = Object.keys(inspectionData[d]).map(Number); renderMaxFloor = Math.max(renderMaxFloor, ...floors); renderMinFloor = Math.min(renderMinFloor, ...floors); });
+        function generateWallDOM(elevationName) {
+            const fragment    = document.createDocumentFragment();
+            const activeDrops = Object.keys(inspectionData).filter(d => dropAssignments[d] === elevationName).sort();
+            if (activeDrops.length === 0) {
+                const empty = document.createElement('div');
+                empty.style = 'padding:40px; color:#888; width:100%; text-align:center;';
+                empty.innerText = 'No drops assigned to this wall.';
+                fragment.appendChild(empty);
+                return fragment;
+            }
 
-            const axisCol = document.createElement('div'); axisCol.className = 'drop-column floor-axis-column'; const axisHeader = document.createElement('div'); axisHeader.className = 'drop-header floor-axis-header'; axisHeader.innerText = 'FL'; axisCol.appendChild(axisHeader);
-            for (let f = renderMaxFloor; f >= renderMinFloor; f--) { const fRow = document.createElement('div'); fRow.className = 'floor-row'; fRow.innerHTML = `<div class="floor-label">${f}F</div>`; axisCol.appendChild(fRow); } fragment.appendChild(axisCol);
-            
+            let renderMaxFloor = -Infinity, renderMinFloor = Infinity;
+            activeDrops.forEach(d => {
+                const floors = Object.keys(inspectionData[d]).map(Number);
+                renderMaxFloor = Math.max(renderMaxFloor, ...floors);
+                renderMinFloor = Math.min(renderMinFloor, ...floors);
+            });
+
+            // Floor axis column
+            const axisCol    = document.createElement('div');
+            axisCol.className = 'drop-column floor-axis-column';
+            const axisHeader  = document.createElement('div');
+            axisHeader.className = 'drop-header floor-axis-header';
+            axisHeader.innerText = 'FL';
+            axisCol.appendChild(axisHeader);
+            for (let f = renderMaxFloor; f >= renderMinFloor; f--) {
+                const fRow = document.createElement('div');
+                fRow.className = 'floor-row';
+                fRow.innerHTML = `<div class="floor-label">${f}F</div>`;
+                axisCol.appendChild(fRow);
+            }
+            fragment.appendChild(axisCol);
+
+            const order = { L: 1, C: 2, R: 3 };
             activeDrops.forEach(dropStr => {
-                const dropDiv = document.createElement('div'); dropDiv.className = 'drop-column'; dropDiv.innerHTML = `<div class="drop-header">DROP ${dropStr}</div>`;
+                const dropDiv = document.createElement('div');
+                dropDiv.className = 'drop-column';
+                dropDiv.innerHTML = `<div class="drop-header">DROP ${dropStr}</div>`;
+
                 for (let f = renderMaxFloor; f >= renderMinFloor; f--) {
-                    const floorDiv = document.createElement('div'); floorDiv.className = 'floor-row'; const winGroup = document.createElement('div'); winGroup.className = 'window-group';
-                    if (inspectionData[dropStr] && inspectionData[dropStr][f]) {
-                        const order = { 'L': 1, 'C': 2, 'R': 3 };
-                        Object.keys(inspectionData[dropStr][f]).sort((a, b) => order[a] - order[b]).forEach(pos => {
-                            const data = inspectionData[dropStr][f][pos]; const winNode = document.createElement('div');
-                            let isStitchedLeft = false, isStitchedRight = false, finalStatus = data.status, pair = stitchedPairs.find(p => p.includes(data.id));
-                            if (pair) { finalStatus = getCombinedStatus(pair[0], pair[1]); if (pair[0] === data.id) isStitchedLeft = true; if (pair[1] === data.id) isStitchedRight = true; }
-                            winNode.className = `window-node ${finalStatus}`; if (activeFilter !== 'ALL' && finalStatus !== activeFilter) winNode.classList.add('node-filtered-out');
-                            winNode.innerText = pos; winNode.onclick = () => handleNodeClick(data, winNode);
-                            
-                            if (data.flir.split(' & ').some(imgId => imageBank[imgId])) winNode.style.border = "2px solid #fff";
-                            
-                            if (isStitchedLeft) { winNode.style.borderTopRightRadius = '0'; winNode.style.borderBottomRightRadius = '0'; winNode.style.borderRight = "none"; winNode.style.zIndex = '5'; const bridge = document.createElement('div'); bridge.className = `stitch-bridge ${finalStatus}`; if (data.flir.split(' & ').some(imgId => imageBank[imgId])) { bridge.style.borderTop = "2px solid #fff"; bridge.style.borderBottom = "2px solid #fff"; } winNode.appendChild(bridge); }
-                            if (isStitchedRight) { winNode.style.borderTopLeftRadius = '0'; winNode.style.borderBottomLeftRadius = '0'; winNode.style.borderLeft = "none"; winNode.style.zIndex = '6'; }
+                    const floorDiv = document.createElement('div');
+                    floorDiv.className = 'floor-row';
+                    const winGroup = document.createElement('div');
+                    winGroup.className = 'window-group';
+
+                    if (inspectionData[dropStr]?.[f]) {
+                        Object.keys(inspectionData[dropStr][f]).sort((a, b) => (order[a]||9) - (order[b]||9)).forEach(pos => {
+                            const data    = inspectionData[dropStr][f][pos];
+                            const winNode = document.createElement('div');
+                            let isStitchedLeft = false, isStitchedRight = false;
+                            let finalStatus = data.status;
+                            const pair = stitchedPairs.find(p => p.includes(data.id));
+                            if (pair) {
+                                finalStatus = getCombinedStatus(pair[0], pair[1]);
+                                if (pair[0] === data.id) isStitchedLeft  = true;
+                                if (pair[1] === data.id) isStitchedRight = true;
+                            }
+                            winNode.className = `window-node ${finalStatus}`;
+                            if (activeFilter !== 'ALL' && finalStatus !== activeFilter) winNode.classList.add('node-filtered-out');
+                            winNode.innerText = pos;
+                            winNode.onclick   = () => handleNodeClick(data, winNode);
+
+                            if (data.flir.split(' & ').some(imgId => imageBank[imgId]))
+                                winNode.style.border = '2px solid #fff';
+
+                            if (isStitchedLeft) {
+                                winNode.style.borderTopRightRadius    = '0';
+                                winNode.style.borderBottomRightRadius = '0';
+                                winNode.style.borderRight = 'none';
+                                winNode.style.zIndex = '5';
+                                const bridge = document.createElement('div');
+                                bridge.className = `stitch-bridge ${finalStatus}`;
+                                if (data.flir.split(' & ').some(imgId => imageBank[imgId])) {
+                                    bridge.style.borderTop    = '2px solid #fff';
+                                    bridge.style.borderBottom = '2px solid #fff';
+                                }
+                                winNode.appendChild(bridge);
+                            }
+                            if (isStitchedRight) {
+                                winNode.style.borderTopLeftRadius    = '0';
+                                winNode.style.borderBottomLeftRadius = '0';
+                                winNode.style.borderLeft = 'none';
+                                winNode.style.zIndex = '6';
+                            }
                             winGroup.appendChild(winNode);
                         });
-                    } else { const winNode = document.createElement('div'); winNode.className = `window-node status-void`; winGroup.appendChild(winNode); }
-                    floorDiv.appendChild(winGroup); dropDiv.appendChild(floorDiv);
+                    } else {
+                        const winNode = document.createElement('div');
+                        winNode.className = 'window-node status-void';
+                        winGroup.appendChild(winNode);
+                    }
+
+                    floorDiv.appendChild(winGroup);
+                    dropDiv.appendChild(floorDiv);
                 }
                 fragment.appendChild(dropDiv);
             });
             return fragment;
         }
 
-        // --- NEW PROCEDURAL 3D BUILDING GENERATOR ---
+        // ─────────────────────────────────────────────
+        // FIX #9: PROCEDURAL 3D — guards OrbitControls before use
+        // ─────────────────────────────────────────────
         let auto3dRenderer = null, auto3dScene = null, auto3dCamera = null, auto3dControls = null, auto3dAnimationId = null;
+
         function buildProcedural3D() {
             const container = document.getElementById('procedural-3d-container');
+
             if (!auto3dRenderer) {
-                auto3dRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); container.appendChild(auto3dRenderer.domElement);
-                auto3dCamera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 2000);
-                auto3dControls = new THREE.OrbitControls(auto3dCamera, auto3dRenderer.domElement); auto3dControls.enableDamping = true; auto3dControls.dampingFactor = 0.1;
-                const raycaster = new THREE.Raycaster(), mouse = new THREE.Vector2(); let startX, startY;
+                // FIX #9: Bail early with a clear message if OrbitControls didn't load
+                const OrbitControls = getOrbitControls();
+                if (!OrbitControls) {
+                    container.innerHTML = '<div style="color:#f1c40f;padding:20px;font-weight:bold;">⚠️ Auto 3D unavailable: THREE.OrbitControls failed to load. Check your network connection and reload.</div>';
+                    return;
+                }
+
+                auto3dRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                container.appendChild(auto3dRenderer.domElement);
+                auto3dCamera   = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 2000);
+                auto3dControls = new OrbitControls(auto3dCamera, auto3dRenderer.domElement);
+                auto3dControls.enableDamping = true;
+                auto3dControls.dampingFactor = 0.1;
+
+                const raycaster = new THREE.Raycaster(), mouse = new THREE.Vector2();
+                let startX, startY;
                 container.addEventListener('pointerdown', (e) => { startX = e.clientX; startY = e.clientY; });
                 container.addEventListener('pointermove', (event) => {
-                    const rect = auto3dRenderer.domElement.getBoundingClientRect(); mouse.x = ( (event.clientX - rect.left) / rect.width ) * 2 - 1; mouse.y = - ( (event.clientY - rect.top) / rect.height ) * 2 + 1;
-                    raycaster.setFromCamera(mouse, auto3dCamera); if (auto3dScene) { const intersects = raycaster.intersectObjects(auto3dScene.children); const hitWindow = intersects.find(hit => hit.object.userData.id); container.style.cursor = hitWindow ? 'pointer' : 'grab'; }
+                    const rect = auto3dRenderer.domElement.getBoundingClientRect();
+                    mouse.x =  ((event.clientX - rect.left) / rect.width)  * 2 - 1;
+                    mouse.y = -((event.clientY - rect.top)  / rect.height) * 2 + 1;
+                    raycaster.setFromCamera(mouse, auto3dCamera);
+                    if (auto3dScene) {
+                        const intersects = raycaster.intersectObjects(auto3dScene.children);
+                        container.style.cursor = intersects.find(h => h.object.userData.id) ? 'pointer' : 'grab';
+                    }
                 });
                 container.addEventListener('pointerup', (event) => {
-                    if (Math.abs(event.clientX - startX) + Math.abs(event.clientY - startY) > 5) return; 
-                    const rect = auto3dRenderer.domElement.getBoundingClientRect(); mouse.x = ( (event.clientX - rect.left) / rect.width ) * 2 - 1; mouse.y = - ( (event.clientY - rect.top) / rect.height ) * 2 + 1;
-                    raycaster.setFromCamera(mouse, auto3dCamera); if (auto3dScene) { const intersects = raycaster.intersectObjects(auto3dScene.children); const hitWindow = intersects.find(hit => hit.object.userData.id); if (hitWindow) openModal(hitWindow.object.userData.id); }
+                    if (Math.abs(event.clientX - startX) + Math.abs(event.clientY - startY) > 5) return;
+                    const rect = auto3dRenderer.domElement.getBoundingClientRect();
+                    mouse.x =  ((event.clientX - rect.left) / rect.width)  * 2 - 1;
+                    mouse.y = -((event.clientY - rect.top)  / rect.height) * 2 + 1;
+                    raycaster.setFromCamera(mouse, auto3dCamera);
+                    if (auto3dScene) {
+                        const intersects = raycaster.intersectObjects(auto3dScene.children);
+                        const hit = intersects.find(h => h.object.userData.id);
+                        if (hit) openModal(hit.object.userData.id);
+                    }
                 });
-                window.addEventListener('resize', () => { if(document.getElementById('arena-auto3d').style.display !== 'none') { auto3dCamera.aspect = container.clientWidth / container.clientHeight; auto3dCamera.updateProjectionMatrix(); auto3dRenderer.setSize(container.clientWidth, container.clientHeight); } });
+                window.addEventListener('resize', () => {
+                    if (document.getElementById('arena-auto3d').style.display !== 'none') {
+                        auto3dCamera.aspect = container.clientWidth / container.clientHeight;
+                        auto3dCamera.updateProjectionMatrix();
+                        auto3dRenderer.setSize(container.clientWidth, container.clientHeight);
+                    }
+                });
             }
-            if (auto3dAnimationId) cancelAnimationFrame(auto3dAnimationId);
-            auto3dRenderer.setSize(container.clientWidth, container.clientHeight); auto3dCamera.aspect = container.clientWidth / container.clientHeight; auto3dCamera.updateProjectionMatrix();
-            if (auto3dScene) { auto3dScene.children.forEach(child => { if(child.geometry) child.geometry.dispose(); if(child.material) { if(Array.isArray(child.material)) child.material.forEach(m => m.dispose()); else child.material.dispose(); } }); }
-            auto3dScene = new THREE.Scene(); auto3dScene.add(new THREE.AmbientLight(0xffffff, 0.6)); const dirLight = new THREE.DirectionalLight(0xffffff, 0.8); dirLight.position.set(0, 50, 50); auto3dScene.add(dirLight);
 
-            const activeDrops = Object.keys(inspectionData).filter(d => dropAssignments[d] === activeTab).sort(); if (activeDrops.length === 0) return;
-            let renderMaxFloor = -Infinity, renderMinFloor = Infinity; activeDrops.forEach(d => { const floors = Object.keys(inspectionData[d]).map(Number); renderMaxFloor = Math.max(renderMaxFloor, ...floors); renderMinFloor = Math.min(renderMinFloor, ...floors); });
+            if (auto3dAnimationId) cancelAnimationFrame(auto3dAnimationId);
+            auto3dRenderer.setSize(container.clientWidth, container.clientHeight);
+            auto3dCamera.aspect = container.clientWidth / container.clientHeight;
+            auto3dCamera.updateProjectionMatrix();
+
+            if (auto3dScene) {
+                auto3dScene.children.forEach(child => {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) {
+                        if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+                        else child.material.dispose();
+                    }
+                });
+            }
+
+            auto3dScene = new THREE.Scene();
+            auto3dScene.add(new THREE.AmbientLight(0xffffff, 0.6));
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(0, 50, 50);
+            auto3dScene.add(dirLight);
+
+            const activeDrops = Object.keys(inspectionData).filter(d => dropAssignments[d] === activeTab).sort();
+            if (activeDrops.length === 0) return;
+
+            let renderMaxFloor = -Infinity, renderMinFloor = Infinity;
+            activeDrops.forEach(d => {
+                const floors = Object.keys(inspectionData[d]).map(Number);
+                renderMaxFloor = Math.max(renderMaxFloor, ...floors);
+                renderMinFloor = Math.min(renderMinFloor, ...floors);
+            });
             if (renderMaxFloor === -Infinity) { renderMaxFloor = 1; renderMinFloor = 1; }
 
-            const dropSpacing = 5, floorSpacing = 1.5, windowWidth = 1.2, windowHeight = 1.0, order = { 'L': -1.4, 'C': 0, 'R': 1.4 }; 
+            const dropSpacing = 5, floorSpacing = 1.5, windowWidth = 1.2, windowHeight = 1.0;
+            const orderOff    = { L: -1.4, C: 0, R: 1.4 };
+
             activeDrops.forEach((dropStr, dropIndex) => {
                 const baseX = dropIndex * dropSpacing - ((activeDrops.length - 1) * dropSpacing) / 2;
                 for (let f = renderMaxFloor; f >= renderMinFloor; f--) {
-                    if (inspectionData[dropStr] && inspectionData[dropStr][f]) {
-                        Object.keys(inspectionData[dropStr][f]).forEach(pos => {
-                            const data = inspectionData[dropStr][f][pos]; let finalStatus = data.status, pair = stitchedPairs.find(p => p.includes(data.id)); if (pair) finalStatus = getCombinedStatus(pair[0], pair[1]);
-                            let color = 0x28a745; if (finalStatus === 'status-flagged') color = 0xf1c40f; if (finalStatus === 'status-confirmed') color = 0xd9534f; if (activeFilter !== 'ALL' && finalStatus !== activeFilter) color = 0x333333; 
+                    if (!inspectionData[dropStr]?.[f]) continue;
+                    Object.keys(inspectionData[dropStr][f]).forEach(pos => {
+                        const data = inspectionData[dropStr][f][pos];
+                        let finalStatus = data.status;
+                        const pair = stitchedPairs.find(p => p.includes(data.id));
+                        if (pair) finalStatus = getCombinedStatus(pair[0], pair[1]);
 
-                            let xPos = baseX + (order[pos] !== undefined ? order[pos] : 0); const geom = new THREE.BoxGeometry(windowWidth, windowHeight, 0.2), mat = new THREE.MeshStandardMaterial({ color: color, metalness: 0.1, roughness: 0.8 });
-                            if (activeFilter !== 'ALL' && finalStatus !== activeFilter) { mat.transparent = true; mat.opacity = 0.1; }
-                            const mesh = new THREE.Mesh(geom, mat); mesh.position.set(xPos, f * floorSpacing, 0); mesh.userData = { id: data.id }; 
+                        let color = 0x28a745;
+                        if (finalStatus === 'status-flagged')   color = 0xf1c40f;
+                        if (finalStatus === 'status-confirmed') color = 0xd9534f;
 
-                            if (data.flir.split(' & ').some(imgId => imageBank[imgId])) { const line = new THREE.LineSegments(new THREE.EdgesGeometry(geom), new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 })); mesh.add(line); } auto3dScene.add(mesh);
-                            if (pair && pair[0] === data.id) { let dist = order[pair[1].split('-')[2]] - order[data.id.split('-')[2]]; if(dist > 0) { const bridgeMesh = new THREE.Mesh(new THREE.BoxGeometry(dist, windowHeight - 0.1, 0.15), mat); bridgeMesh.position.set(xPos + dist/2, f * floorSpacing, 0); bridgeMesh.userData = { id: data.id }; auto3dScene.add(bridgeMesh); } }
-                        });
-                    }
+                        const xPos = baseX + (orderOff[pos] ?? 0);
+                        const geom = new THREE.BoxGeometry(windowWidth, windowHeight, 0.2);
+                        const mat  = new THREE.MeshStandardMaterial({ color, metalness: 0.1, roughness: 0.8 });
+                        if (activeFilter !== 'ALL' && finalStatus !== activeFilter) { mat.transparent = true; mat.opacity = 0.1; }
+
+                        const mesh = new THREE.Mesh(geom, mat);
+                        mesh.position.set(xPos, f * floorSpacing, 0);
+                        mesh.userData = { id: data.id };
+
+                        if (data.flir.split(' & ').some(imgId => imageBank[imgId])) {
+                            const edges = new THREE.LineSegments(
+                                new THREE.EdgesGeometry(geom),
+                                new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 })
+                            );
+                            mesh.add(edges);
+                        }
+                        auto3dScene.add(mesh);
+
+                        if (pair && pair[0] === data.id) {
+                            const dist = (orderOff[pair[1].split('-')[2]] ?? 0) - (orderOff[pos] ?? 0);
+                            if (dist > 0) {
+                                const bridgeMesh = new THREE.Mesh(
+                                    new THREE.BoxGeometry(dist, windowHeight - 0.1, 0.15), mat
+                                );
+                                bridgeMesh.position.set(xPos + dist / 2, f * floorSpacing, 0);
+                                bridgeMesh.userData = { id: data.id };
+                                auto3dScene.add(bridgeMesh);
+                            }
+                        }
+                    });
                 }
             });
-            const wallWidth = activeDrops.length * dropSpacing, wallHeight = (renderMaxFloor - renderMinFloor + 2) * floorSpacing, centerY = ((renderMaxFloor + renderMinFloor) / 2) * floorSpacing;
-            const wallMesh = new THREE.Mesh(new THREE.PlaneGeometry(wallWidth + 4, wallHeight + 2), new THREE.MeshStandardMaterial({ color: 0x161922, side: THREE.DoubleSide })); wallMesh.position.set(0, centerY, -0.5); auto3dScene.add(wallMesh);
-            auto3dCamera.position.set(0, centerY, Math.max(wallWidth, wallHeight) * 0.8 + 5); auto3dControls.target.set(0, centerY, 0); auto3dControls.update();
-            function animate() { auto3dAnimationId = requestAnimationFrame(animate); auto3dRenderer.render(auto3dScene, auto3dCamera); auto3dControls.update();  } animate();
+
+            const wallWidth  = activeDrops.length * dropSpacing;
+            const wallHeight = (renderMaxFloor - renderMinFloor + 2) * floorSpacing;
+            const centerY    = ((renderMaxFloor + renderMinFloor) / 2) * floorSpacing;
+            const wallMesh   = new THREE.Mesh(
+                new THREE.PlaneGeometry(wallWidth + 4, wallHeight + 2),
+                new THREE.MeshStandardMaterial({ color: 0x161922, side: THREE.DoubleSide })
+            );
+            wallMesh.position.set(0, centerY, -0.5);
+            auto3dScene.add(wallMesh);
+
+            auto3dCamera.position.set(0, centerY, Math.max(wallWidth, wallHeight) * 0.8 + 5);
+            auto3dControls.target.set(0, centerY, 0);
+            auto3dControls.update();
+
+            function animate() {
+                auto3dAnimationId = requestAnimationFrame(animate);
+                auto3dRenderer.render(auto3dScene, auto3dCamera);
+                auto3dControls.update();
+            }
+            animate();
         }
 
-        // --- FULLSCREEN LIGHTBOX & ZOOM LOGIC ---
+        // ─────────────────────────────────────────────
+        // LIGHTBOX
+        // ─────────────────────────────────────────────
         let lbScale = 1, lbPanning = false, lbPointX = 0, lbPointY = 0, lbStartX = 0, lbStartY = 0;
         let lbPointers = [], initialDist = null, initialScale = 1;
         const lbImg = document.getElementById('lightbox-img');
@@ -1148,35 +1628,42 @@
                 if (lbPointers.length === 1) {
                     lbStartX = e.clientX - lbPointX; lbStartY = e.clientY - lbPointY; lbPanning = true;
                 } else if (lbPointers.length === 2) {
-                    lbPanning = false; initialDist = Math.hypot(lbPointers[0].clientX - lbPointers[1].clientX, lbPointers[0].clientY - lbPointers[1].clientY); initialScale = lbScale;
+                    lbPanning = false;
+                    initialDist  = Math.hypot(lbPointers[0].clientX - lbPointers[1].clientX, lbPointers[0].clientY - lbPointers[1].clientY);
+                    initialScale = lbScale;
                 }
             });
 
             lbImg.addEventListener('pointermove', (e) => {
                 e.preventDefault();
-                for(let i=0; i<lbPointers.length; i++) { if(lbPointers[i].pointerId === e.pointerId) lbPointers[i] = e; }
+                for (let i = 0; i < lbPointers.length; i++) { if (lbPointers[i].pointerId === e.pointerId) lbPointers[i] = e; }
                 if (lbPointers.length === 1 && lbPanning) {
                     lbPointX = e.clientX - lbStartX; lbPointY = e.clientY - lbStartY; setLbTransform();
                 } else if (lbPointers.length === 2) {
-                    let dist = Math.hypot(lbPointers[0].clientX - lbPointers[1].clientX, lbPointers[0].clientY - lbPointers[1].clientY);
-                    lbScale = initialScale * (dist / initialDist); lbScale = Math.min(Math.max(1, lbScale), 15); setLbTransform();
+                    const dist = Math.hypot(lbPointers[0].clientX - lbPointers[1].clientX, lbPointers[0].clientY - lbPointers[1].clientY);
+                    lbScale = Math.min(Math.max(1, initialScale * (dist / initialDist)), 15);
+                    setLbTransform();
                 }
             });
 
             function removePointer(e) {
                 lbPointers = lbPointers.filter(p => p.pointerId !== e.pointerId);
-                if(lbPointers.length < 2) initialDist = null;
-                if(lbPointers.length === 1) { lbStartX = lbPointers[0].clientX - lbPointX; lbStartY = lbPointers[0].clientY - lbPointY; lbPanning = true; } else { lbPanning = false; }
+                if (lbPointers.length < 2) initialDist = null;
+                if (lbPointers.length === 1) { lbStartX = lbPointers[0].clientX - lbPointX; lbStartY = lbPointers[0].clientY - lbPointY; lbPanning = true; }
+                else lbPanning = false;
             }
-
-            lbImg.addEventListener('pointerup', removePointer); lbImg.addEventListener('pointercancel', removePointer); lbImg.addEventListener('pointerout', removePointer); lbImg.addEventListener('pointerleave', removePointer);
+            lbImg.addEventListener('pointerup',     removePointer);
+            lbImg.addEventListener('pointercancel', removePointer);
+            lbImg.addEventListener('pointerout',    removePointer);
+            lbImg.addEventListener('pointerleave',  removePointer);
 
             lbImg.addEventListener('wheel', (e) => {
                 e.preventDefault();
-                let xs = (e.clientX - lbPointX) / lbScale, ys = (e.clientY - lbPointY) / lbScale, delta = e.deltaY < 0 ? 1 : -1;
-                lbScale *= (delta > 0 ? 1.2 : 0.8); lbScale = Math.min(Math.max(1, lbScale), 15);
+                const xs = (e.clientX - lbPointX) / lbScale, ys = (e.clientY - lbPointY) / lbScale;
+                const delta = e.deltaY < 0 ? 1 : -1;
+                lbScale = Math.min(Math.max(1, lbScale * (delta > 0 ? 1.2 : 0.8)), 15);
                 lbPointX = e.clientX - xs * lbScale; lbPointY = e.clientY - ys * lbScale;
-                if(lbScale === 1) { lbPointX = 0; lbPointY = 0; }
+                if (lbScale === 1) { lbPointX = 0; lbPointY = 0; }
                 setLbTransform();
             });
         }
@@ -1184,94 +1671,189 @@
         function setLbTransform() { lbImg.style.transform = `translate(${lbPointX}px, ${lbPointY}px) scale(${lbScale})`; }
         function resetLightboxZoom() { lbScale = 1; lbPointX = 0; lbPointY = 0; setLbTransform(); }
 
-        function openLightbox(imgArray, nameArray, startIndex) { 
-            currentLightboxImages = imgArray; 
-            currentLightboxNames = nameArray;
-            currentLightboxIndex = startIndex; 
-            updateLightboxUI(); 
-            document.getElementById('lightbox-modal').style.display = 'flex'; 
+        function openLightbox(imgArray, nameArray, startIndex) {
+            currentLightboxImages = imgArray; currentLightboxNames = nameArray; currentLightboxIndex = startIndex;
+            updateLightboxUI();
+            document.getElementById('lightbox-modal').style.display = 'flex';
         }
-        
-        function updateLightboxUI() { 
-            resetLightboxZoom(); 
-            document.getElementById('lightbox-img').src = currentLightboxImages[currentLightboxIndex]; 
-            document.getElementById('lightbox-counter').innerText = `${currentLightboxIndex + 1} / ${currentLightboxImages.length}  —  ${currentLightboxNames[currentLightboxIndex]}`; 
-            const isMulti = currentLightboxImages.length > 1; 
-            document.getElementById('lightbox-prev').style.display = isMulti ? 'block' : 'none'; 
-            document.getElementById('lightbox-next').style.display = isMulti ? 'block' : 'none'; 
+
+        function updateLightboxUI() {
+            resetLightboxZoom();
+            document.getElementById('lightbox-img').src = currentLightboxImages[currentLightboxIndex];
+            document.getElementById('lightbox-counter').innerText =
+                `${currentLightboxIndex + 1} / ${currentLightboxImages.length}  —  ${currentLightboxNames[currentLightboxIndex]}`;
+            const isMulti = currentLightboxImages.length > 1;
+            document.getElementById('lightbox-prev').style.display = isMulti ? 'block' : 'none';
+            document.getElementById('lightbox-next').style.display = isMulti ? 'block' : 'none';
         }
-        
-        function changeLightbox(dir) { 
-            currentLightboxIndex += dir; 
-            if (currentLightboxIndex < 0) currentLightboxIndex = currentLightboxImages.length - 1; 
-            if (currentLightboxIndex >= currentLightboxImages.length) currentLightboxIndex = 0; 
-            updateLightboxUI(); 
+
+        function changeLightbox(dir) {
+            currentLightboxIndex = (currentLightboxIndex + dir + currentLightboxImages.length) % currentLightboxImages.length;
+            updateLightboxUI();
         }
-        
+
         function closeLightbox() { document.getElementById('lightbox-modal').style.display = 'none'; resetLightboxZoom(); }
 
+        // ─────────────────────────────────────────────
+        // MODAL  (FIX #10: guards against null node data throughout)
+        // ─────────────────────────────────────────────
         function openModal(nodeId) {
-            let pair = stitchedPairs.find(p => p.includes(nodeId)); activeNodeDataArray = [];
-            if (pair) { activeNodeDataArray.push(getNodeData(pair[0])); activeNodeDataArray.push(getNodeData(pair[1])); document.getElementById('btn-unmerge').style.display = 'block'; } 
-            else { activeNodeDataArray.push(getNodeData(nodeId)); document.getElementById('btn-unmerge').style.display = 'none'; }
-            
-            if (saved3DTags[nodeId] || (pair && (saved3DTags[pair[0]] || saved3DTags[pair[1]]))) { document.getElementById('btn-unpin').style.display = 'block'; document.getElementById('btn-retag').style.display = 'block'; } 
-            else { document.getElementById('btn-unpin').style.display = 'none'; document.getElementById('btn-retag').style.display = 'none'; }
+            // FIX #10: Abort entirely if the node doesn't exist
+            const primaryData = getNodeData(nodeId);
+            if (!primaryData) {
+                console.warn(`openModal: no data found for id "${nodeId}"`);
+                return;
+            }
 
-            let ids = activeNodeDataArray.map(d => d?.id).filter(Boolean).join(' + ');
-            let techs = [...new Set(activeNodeDataArray.map(d => d?.tech).filter(Boolean))].join(', ');
-            let allFinds = []; activeNodeDataArray.forEach(d => { if(d) allFinds.push(...d.finds.split(' | ')); }); allFinds = [...new Set(allFinds)].filter(f => f !== 'CLEAR' && f !== ''); if(allFinds.length === 0) allFinds = ['CLEAR'];
-            let proved = activeNodeDataArray.some(d => d?.proved === 'YES') ? 'YES' : 'NO';
-            let notes = activeNodeDataArray.map(d => d?.notes).filter(n => n && n.trim() !== '').join('\n');
-            let allFlirs = []; activeNodeDataArray.forEach(d => { if (d?.flir && d.flir !== '--') allFlirs.push(...d.flir.split(' & ')); }); let flirs = [...new Set(allFlirs)];
+            const pair = stitchedPairs.find(p => p.includes(nodeId));
+            activeNodeDataArray = [];
 
-            document.getElementById('m-id').innerText = ids; document.getElementById('m-tech').innerText = `Logged by: ${techs}`; document.getElementById('m-finds').innerText = allFinds.join(' | '); document.getElementById('m-finds').style.color = allFinds.includes('CLEAR') ? '#28a745' : '#f1c40f';
-            document.getElementById('m-row-proved').style.display = allFinds.includes('MOISTURE') ? 'flex' : 'none'; document.getElementById('m-proved').innerText = proved;
-            
-            const gallery = document.getElementById('m-photo-gallery'), noPhoto = document.getElementById('m-no-photo'), carouselHint = document.getElementById('m-carousel-hint'); gallery.innerHTML = '';
-            
-            let validImgUrls = []; 
-            flirs.forEach(f => { if(imageBank[f]) validImgUrls.push(imageBank[f].url); });
+            if (pair) {
+                const d0 = getNodeData(pair[0]), d1 = getNodeData(pair[1]);
+                // Only push non-null entries; still show the modal with whatever we have
+                if (d0) activeNodeDataArray.push(d0);
+                if (d1) activeNodeDataArray.push(d1);
+                document.getElementById('btn-unmerge').style.display = 'block';
+            } else {
+                activeNodeDataArray.push(primaryData);
+                document.getElementById('btn-unmerge').style.display = 'none';
+            }
 
-            if (validImgUrls.length > 0) {
-                validImgUrls.forEach((url, index) => { 
-                    let wrapper = document.createElement('div');
+            const hasTag = saved3DTags[nodeId] || (pair && (saved3DTags[pair[0]] || saved3DTags[pair[1]]));
+            document.getElementById('btn-unpin').style.display  = hasTag ? 'block' : 'none';
+            document.getElementById('btn-retag').style.display  = hasTag ? 'block' : 'none';
+
+            const ids   = activeNodeDataArray.map(d => d.id).join(' + ');
+            const techs = [...new Set(activeNodeDataArray.map(d => d.tech).filter(Boolean))].join(', ');
+            const allFinds = [...new Set(activeNodeDataArray.flatMap(d => d.finds.split(' | ')))].filter(f => f !== 'CLEAR' && f !== '');
+            const finds = allFinds.length > 0 ? allFinds : ['CLEAR'];
+            const proved = activeNodeDataArray.some(d => d.proved === 'YES') ? 'YES' : 'NO';
+            const notes  = activeNodeDataArray.map(d => d.notes || '').filter(n => n.trim()).join('\n');
+            const flirs  = [...new Set(activeNodeDataArray.flatMap(d => (d.flir && d.flir !== '--') ? d.flir.split(' & ') : []))];
+
+            document.getElementById('m-id').innerText        = ids;
+            document.getElementById('m-tech').innerText      = `Logged by: ${techs}`;
+            document.getElementById('m-finds').innerText     = finds.join(' | ');
+            document.getElementById('m-finds').style.color   = finds.includes('CLEAR') ? '#28a745' : '#f1c40f';
+            document.getElementById('m-row-proved').style.display = finds.includes('MOISTURE') ? 'flex' : 'none';
+            document.getElementById('m-proved').innerText    = proved;
+            document.getElementById('m-notes').value         = notes;
+
+            const gallery      = document.getElementById('m-photo-gallery');
+            const noPhoto      = document.getElementById('m-no-photo');
+            const stalePhoto   = document.getElementById('m-photo-stale');
+            const carouselHint = document.getElementById('m-carousel-hint');
+            gallery.innerHTML  = '';
+
+            const validImgUrls = flirs.filter(f => imageBank[f]).map(f => imageBank[f].url);
+            const hasFlirRefs  = flirs.length > 0;
+            const hasBlobUrls  = validImgUrls.length > 0;
+
+            if (hasBlobUrls) {
+                validImgUrls.forEach((url, index) => {
+                    const wrapper = document.createElement('div');
                     wrapper.className = 'photo-gallery-item';
-                    
-                    let img = document.createElement('img'); 
-                    img.src = url; 
-                    img.onclick = () => openLightbox(validImgUrls, flirs, index); 
-                    
-                    let label = document.createElement('span');
-                    label.innerText = flirs[index]; 
-                    
-                    wrapper.appendChild(img);
-                    wrapper.appendChild(label);
-                    gallery.appendChild(wrapper); 
+                    const img = document.createElement('img');
+                    img.src = url;
+                    img.onclick = () => openLightbox(validImgUrls, flirs.filter(f => imageBank[f]), index);
+                    const label = document.createElement('span');
+                    label.innerText = flirs.filter(f => imageBank[f])[index];
+                    wrapper.appendChild(img); wrapper.appendChild(label);
+                    gallery.appendChild(wrapper);
                 });
-                
-                gallery.style.display = 'flex'; noPhoto.style.display = 'none';
-                if (validImgUrls.length > 1) { carouselHint.style.display = 'block'; carouselHint.innerText = `👉 TAP TO ENLARGE & SWIPE (${validImgUrls.length} IMAGES) 👈`; } 
-                else { carouselHint.style.display = 'block'; carouselHint.innerText = `👉 TAP IMAGE TO ENLARGE 👈`; }
-            } else { gallery.style.display = 'none'; noPhoto.style.display = 'block'; carouselHint.style.display = 'none'; }
-            
+                gallery.style.display    = 'flex';
+                noPhoto.style.display    = 'none';
+                stalePhoto.style.display = 'none';
+                carouselHint.style.display = 'block';
+                carouselHint.innerText = validImgUrls.length > 1
+                    ? `👉 TAP TO ENLARGE & SWIPE (${validImgUrls.length} IMAGES) 👈`
+                    : '👉 TAP IMAGE TO ENLARGE 👈';
+            } else if (hasFlirRefs) {
+                // FIX #3: Node has FLIR refs but blobs aren't loaded — show specific nudge
+                gallery.style.display    = 'none';
+                noPhoto.style.display    = 'none';
+                stalePhoto.style.display = 'block';
+                carouselHint.style.display = 'none';
+            } else {
+                gallery.style.display    = 'none';
+                noPhoto.style.display    = 'block';
+                stalePhoto.style.display = 'none';
+                carouselHint.style.display = 'none';
+            }
+
             document.getElementById('info-modal').style.display = 'flex';
         }
 
-        function unmergeCurrent() { if (activeNodeDataArray.length === 2 && activeNodeDataArray[0]) { const id1 = activeNodeDataArray[0].id; const idx = stitchedPairs.findIndex(p => p.includes(id1)); if (idx !== -1) { stitchedPairs.splice(idx, 1); closeModal(); calculateBuildingGeometry(); saveCommandState(); if (currentMode === '2d') refreshCurrentView(); if (currentMode === 'auto3d') buildProcedural3D(); } } }
-        function changeStatus(newStatus) { if (activeNodeDataArray.length > 0) { let note = document.getElementById('m-notes').value; activeNodeDataArray.forEach(d => { if(d) { d.notes = note; d.status = newStatus; } }); calculateBuildingGeometry(); saveCommandState(); if (currentMode === '2d') refreshCurrentView(); if (currentMode === 'auto3d') buildProcedural3D(); closeModal(); } }
-        function saveNotesOnly() { if (activeNodeDataArray.length > 0) { let note = document.getElementById('m-notes').value; activeNodeDataArray.forEach(d => { if(d) d.notes = note; }); calculateBuildingGeometry(); saveCommandState(); if (currentMode === '2d') refreshCurrentView(); if (currentMode === 'auto3d') buildProcedural3D(); closeModal(); } }
-        function unpinCurrent() { if(confirm("Remove this pin from the 3D map? The underlying window data will remain safe in your vault.")) { activeNodeDataArray.forEach(d => { if(d && saved3DTags[d.id]) delete saved3DTags[d.id]; }); render3DHotspots(); saveCommandState(); closeModal(); } }
-        function closeModal() { document.getElementById('info-modal').style.display = 'none'; activeNodeDataArray = []; }
-        
-        function resetBoard() {
-            if(confirm("Are you sure you want to clear all data and start over?")) {
-                localStorage.removeItem('strataCommandState');
-                // Bug 2/7 Fix: Fully wipe image banks and internal counters
-                inspectionData = {}; imageBank = {}; stitchedPairs = []; linkedPhotosCount = 0; projectInfo = "Unknown Project"; elevations = []; dropAssignments = {}; saved3DTags = {}; currentLightboxImages = []; currentLightboxNames = [];
-                document.getElementById('project-name').innerText = "Awaiting Data..."; document.getElementById('stat-photos').innerText = "0"; document.getElementById('dashboard-screen').style.display = 'none'; document.getElementById('mapping-screen').style.display = 'none'; document.getElementById('btn-save-project').style.display = 'none'; document.getElementById('btn-edit-map').style.display = 'none'; document.getElementById('btn-reset').style.display = 'none'; document.getElementById('btn-start-mapping').style.display = 'none';
-                document.getElementById('main-3d-viewer').src = "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/LittlestTokyo.glb"; document.getElementById('model-status').innerHTML = "Showing Default Test Model. Drop a custom .glb file above to replace.";
+        function unmergeCurrent() {
+            if (activeNodeDataArray.length >= 1 && activeNodeDataArray[0]) {
+                const id1 = activeNodeDataArray[0].id;
+                const idx = stitchedPairs.findIndex(p => p.includes(id1));
+                if (idx !== -1) {
+                    stitchedPairs.splice(idx, 1);
+                    closeModal(); calculateBuildingGeometry(); saveCommandState();
+                    if (currentMode === '2d') refreshCurrentView();
+                    if (currentMode === 'auto3d') buildProcedural3D();
+                }
             }
+        }
+
+        function changeStatus(newStatus) {
+            if (activeNodeDataArray.length > 0) {
+                const note = document.getElementById('m-notes').value;
+                activeNodeDataArray.forEach(d => { if (d) { d.notes = note; d.status = newStatus; } });
+                calculateBuildingGeometry(); saveCommandState();
+                if (currentMode === '2d') refreshCurrentView();
+                if (currentMode === 'auto3d') buildProcedural3D();
+                closeModal();
+            }
+        }
+
+        function saveNotesOnly() {
+            if (activeNodeDataArray.length > 0) {
+                const note = document.getElementById('m-notes').value;
+                activeNodeDataArray.forEach(d => { if (d) d.notes = note; });
+                calculateBuildingGeometry(); saveCommandState();
+                if (currentMode === '2d') refreshCurrentView();
+                if (currentMode === 'auto3d') buildProcedural3D();
+                closeModal();
+            }
+        }
+
+        function unpinCurrent() {
+            if (confirm('Remove this pin from the 3D map? The underlying window data will remain safe.')) {
+                activeNodeDataArray.forEach(d => { if (d && saved3DTags[d.id]) delete saved3DTags[d.id]; });
+                render3DHotspots(); saveCommandState(); closeModal();
+            }
+        }
+
+        function closeModal() { document.getElementById('info-modal').style.display = 'none'; activeNodeDataArray = []; }
+
+        // ─────────────────────────────────────────────
+        // FIX #2 / #7: resetBoard fully wipes imageBank and all derived state.
+        // No reference to the removed linkedPhotosCount variable.
+        // ─────────────────────────────────────────────
+        function resetBoard() {
+            if (!confirm('Are you sure you want to clear all data and start over?')) return;
+            localStorage.removeItem('strataCommandState');
+
+            inspectionData = {}; imageBank = {}; stitchedPairs = [];
+            projectInfo = 'Unknown Project'; elevations = []; dropAssignments = {};
+            saved3DTags = {}; activeTab = ''; activeNodeDataArray = [];
+            currentLightboxImages = []; currentLightboxNames = [];
+
+            document.getElementById('project-name').innerText                  = 'Awaiting Data...';
+            document.getElementById('photo-reload-banner').style.display        = 'none';
+            document.getElementById('dashboard-screen').style.display           = 'none';
+            document.getElementById('mapping-screen').style.display             = 'none';
+            document.getElementById('btn-save-project').style.display           = 'none';
+            document.getElementById('btn-edit-map').style.display               = 'none';
+            document.getElementById('btn-reset').style.display                  = 'none';
+            document.getElementById('btn-start-mapping').style.display          = 'none';
+            document.getElementById('main-3d-viewer').src =
+                'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/LittlestTokyo.glb';
+            document.getElementById('model-status').innerHTML =
+                'Showing Default Test Model. Drop a custom .glb file above to replace.';
+            updatePhotoStat();
         }
     </script>
 </body>
