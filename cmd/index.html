@@ -277,7 +277,7 @@
         <button class="btn btn-dark btn-block" id="btn-retag"   style="display:none;margin-bottom:10px;border-color:#0cf;color:#0cf;"       onclick="startReTag()">📍 RE-TAG POSITION</button>
         <button class="btn btn-dark btn-block" id="btn-unpin"   style="display:none;margin-bottom:10px;border-color:#d080ff;color:#d080ff;"  onclick="unpinCurrent()">🗑️ REMOVE 3D PIN</button>
         <button class="btn btn-dark btn-block" id="btn-unmerge" style="display:none;margin-bottom:15px;border-color:#f39c12;color:#f39c12;" onclick="unmergeCurrent()">✂️ UN-STITCH WINDOWS</button>
-        <div id="m-stale-banner" class="stale-banner">📷 Photo references exist but images not loaded. Re-upload your ZIP.</div>
+        <div id="m-stale-banner" class="stale-banner">📷 Photo references exist but images not loaded. Re-upload your ZIP to restore photos.</div>
         <div id="m-photo-area"></div>
         <div class="data-row">
             <span class="data-label">Field Findings</span>
@@ -552,9 +552,20 @@ function parseExifTimestamp(buf) {
 // DC-only files (FLIR segment count < 3) are silently ignored —
 // all DC content is already embedded inside the IR file.
 // Returns true if ingested as IR, false if skipped.
+// Convert Uint8Array to base64 data URL — works in all contexts
+// (PWA webview, sandboxed iframe, local file) unlike blob URLs which
+// are blocked by WKWebView and claude.ai CSP.
+function bytesToDataURL(bytes, mime) {
+    let bin = '';
+    const chunk = 8192;
+    for (let i = 0; i < bytes.length; i += chunk) {
+        bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
+    }
+    return `data:${mime};base64,${btoa(bin)}`;
+}
+
 async function ingestFromBytes(bytes, cleanName, dropId) {
-    // bytes is a Uint8Array owned by us — no JSZip blob lifetime dependency.
-    // Make a guaranteed clean copy so nothing can mutate or detach it.
+    // Make an owned copy — safe from JSZip internal mutations
     const owned = new Uint8Array(bytes);
     const buf   = owned.buffer;
 
@@ -569,17 +580,18 @@ async function ingestFromBytes(bytes, cleanName, dropId) {
         return false;
     }
 
-    const prev = imageBank[cleanName];
-    if (prev) {
-        if (prev.url)   URL.revokeObjectURL(prev.url);
-        if (prev.dcUrl) URL.revokeObjectURL(prev.dcUrl);
-    }
-
     const timeSec = parseExifTimestamp(buf);
-    const irBlob  = new Blob([owned], {type: 'image/jpeg'});
-    const url     = URL.createObjectURL(irBlob);
-    const dcBlob  = extractEmbeddedDC(buf);
-    const dcUrl   = dcBlob ? URL.createObjectURL(dcBlob) : null;
+
+    // Use base64 data URLs instead of blob URLs.
+    // Blob URLs are blocked in WKWebView (iOS PWA) and sandboxed iframes.
+    // Data URLs are embedded strings — no URL scheme, no CSP, no origin issues.
+    const url   = bytesToDataURL(owned, 'image/jpeg');
+    const dcBlob = extractEmbeddedDC(buf);
+    let   dcUrl  = null;
+    if (dcBlob) {
+        const dcBytes = new Uint8Array(await dcBlob.arrayBuffer());
+        dcUrl = bytesToDataURL(dcBytes, 'image/jpeg');
+    }
 
     imageBank[cleanName] = { url, dcUrl, time: timeSec, drop: dropId };
     return true;
@@ -654,35 +666,7 @@ function initApp() {
     initGlobalDragDrop();
 }
 
-// Test whether blob URLs can be loaded as images in this context.
-// claude.ai artifact iframes block blob: URLs via CSP even though
-// the app creates them correctly. In that case, show a clear banner.
-function detectBlobSupport() {
-    const testBlob = new Blob(['<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>'],
-                               {type:'image/svg+xml'});
-    const testUrl  = URL.createObjectURL(testBlob);
-    const img      = new Image();
-    img.onload  = () => { URL.revokeObjectURL(testUrl); }; // blob URLs work fine
-    img.onerror = () => {
-        URL.revokeObjectURL(testUrl);
-        // Blob URLs are blocked — show persistent warning
-        const banner = document.createElement('div');
-        banner.style.cssText = [
-            'position:fixed;top:0;left:0;width:100%;z-index:99999;',
-            'background:#8b0000;color:#fff;padding:16px 20px;',
-            'font-size:1rem;font-weight:bold;text-align:center;',
-            'border-bottom:3px solid #ff4444;line-height:1.6;'
-        ].join('');
-        banner.innerHTML = [
-            '⚠️ <strong>Photos cannot display inside claude.ai.</strong> ',
-            'Download this file and open it directly in your browser as a local file. ',
-            '<br>The app works perfectly outside claude.ai — ',
-            'all data, CSV parsing and photo linking will work normally.'
-        ].join('');
-        document.body.prepend(banner);
-    };
-    img.src = testUrl;
-}
+// Blob URL detection removed — app now uses data URLs universally
 async function requestWakeLock() {
     try { if ('wakeLock' in navigator) wakeLock=await navigator.wakeLock.request('screen'); } catch(e){}
 }
@@ -783,12 +767,13 @@ async function handleFiles(files, forcedType=null) {
                     // Collect all tasks first, then run with limited concurrency.
                     // Running 1000+ heavy ArrayBuffer ops simultaneously crashes
                     // the browser — process 8 at a time.
-                    // Start decompressing all image entries immediately inside forEach
-                    // so JSZip entry references are captured while still valid.
-                    // Each entry.async() returns a Promise we store directly —
-                    // lazy closures over entry can fail once forEach finishes.
+                    // Collect entry metadata inside forEach (safe — no async here).
+                    // We store entry references with their clean name and path.
+                    // We do NOT call entry.async() here — we call it later one
+                    // at a time inside the concurrency pool to avoid firing 3000+
+                    // simultaneous decompression operations which crashes the browser.
                     const csvTasks=[];
-                    const imgPromises=[]; // { promise, clean, path }
+                    const imgEntries=[]; // { entry, clean, path }
                     zip.forEach((rel,entry)=>{
                         if (entry.dir||rel.includes('__MACOSX')||rel.includes('.DS_Store')) return;
                         const en=entry.name.toLowerCase();
@@ -797,43 +782,37 @@ async function handleFiles(files, forcedType=null) {
                             csvTasks.push(entry.async('text').then(t=>{rowsParsed+=parseCSV(t);}));
                         } else if (en.endsWith('.jpg')||en.endsWith('.jpeg')||en.endsWith('.png')) {
                             const clean=entry.name.split('/').pop().replace(/\.[^.]+$/,'').toUpperCase();
-                            const path=entry.name;
-                            // Kick off decompression immediately, store the promise
-                            const p=entry.async('uint8array');
-                            imgPromises.push({p, clean, path});
+                            // Freeze the entry reference in an object literal right now,
+                            // while forEach still holds it validly
+                            imgEntries.push({entry:entry, clean:clean, path:entry.name});
                         }
                     });
 
                     // Wait for all CSVs first (fast)
                     await Promise.all(csvTasks);
 
-                    // Process images with concurrency cap — each worker awaits
-                    // the already-started decompression promise then ingests
-                    const CONCURRENCY = 6;
-                    let taskIdx = 0;
+                    // Process images fully sequentially — one at a time.
+                    // Concurrency causes memory issues on tablets (OOM-kills
+                    // tasks for drops G/H/I/J). Sequential + yield lets the
+                    // device GC between images and process all 3092 reliably.
+                    const total = imgEntries.length;
                     let done = 0;
-                    const total = imgPromises.length;
-                    async function runNextTask() {
-                        while (taskIdx < total) {
-                            const myIdx = taskIdx++;
-                            const {p, clean, path} = imgPromises[myIdx];
-                            try {
-                                const bytes = await p;
-                                await processBytes(bytes, clean, path);
-                            } catch(e) {
-                                console.warn('[ZIP] failed:', clean, e.message||e);
-                            }
-                            done++;
-                            if (done % 20 === 0 || done === total) {
-                                setLoading(true, `Processing IR photos... ${done} / ${total}`, '');
-                            }
+                    for (let idx = 0; idx < total; idx++) {
+                        const {entry, clean, path} = imgEntries[idx];
+                        try {
+                            const bytes = await entry.async('uint8array');
+                            await processBytes(bytes, clean, path);
+                        } catch(e) {
+                            console.warn('[ZIP] failed:', clean, e.message||e);
+                        }
+                        done++;
+                        if (done % 10 === 0 || done === total) {
+                            setLoading(true, `Processing IR photos... ${done} / ${total}`, '');
+                            // Yield to event loop every 10 images so the tablet
+                            // can GC and repaint the loading indicator
+                            await new Promise(r => setTimeout(r, 0));
                         }
                     }
-                    const workers = [];
-                    for (let w=0; w<Math.min(CONCURRENCY, total); w++) {
-                        workers.push(runNextTask());
-                    }
-                    await Promise.all(workers);
 
                     res();
                 }).catch(err=>{showToast('⚠️ ZIP error: '+err.message, 6000, true);res();});
@@ -887,6 +866,24 @@ async function handleFiles(files, forcedType=null) {
     // updated in this call or a previous one. Running it every time means
     // loading CSV after ZIP, or ZIP after CSV, both produce correct links.
     const linked=runBracketZipline();
+
+    // ── DIAGNOSTIC ──────────────────────────────────────
+    // Log imageBank state so we can see exactly what was loaded
+    const ibKeys = Object.keys(imageBank);
+    const dropCounts = {};
+    ibKeys.forEach(k => {
+        const d = imageBank[k].drop || 'null';
+        dropCounts[d] = (dropCounts[d]||0) + 1;
+    });
+    console.log('[Diag] imageBank total:', ibKeys.length, '| by drop:', JSON.stringify(dropCounts));
+    console.log('[Diag] inspectionData drops:', Object.keys(inspectionData).sort());
+    Object.keys(inspectionData).forEach(drop => {
+        const imgs = ibKeys.filter(k => imageBank[k].drop === drop);
+        const nodes = Object.values(inspectionData[drop]||{}).flatMap(f => Object.values(f));
+        const linked_nodes = nodes.filter(n => n.photos && n.photos.length > 0);
+        console.log(`[Diag] Drop ${drop}: ${imgs.length} imgs in bank, ${nodes.length} nodes, ${linked_nodes.length} linked`);
+    });
+    // ── END DIAGNOSTIC ───────────────────────────────────
 
     setLoading(false);
 
@@ -1500,10 +1497,10 @@ function buildPhotoArea(nodes) {
             const img=document.createElement('img');
             img.src=photoViewState[irName]==='dc'&&hasDC?entry.dcUrl:entry.url;
             img.onerror=()=>{
-                img.style.display='none';
+                img.style.cssText='display:none';
                 const err=document.createElement('div');
                 err.style.cssText='background:#1a0000;color:#f66;padding:10px;font-size:0.8rem;border-radius:4px;';
-                err.innerText=`⚠️ Blob URL broken for ${irName} — re-upload ZIP`;
+                err.innerText=`⚠️ Could not display ${irName} — try re-uploading ZIP`;
                 vw.appendChild(err);
             };
 
@@ -1823,7 +1820,7 @@ function updateLbUI(){
     tog.classList.toggle('showing-dc',lbShowDC&&hasDC);
     tog.classList.toggle('no-dc',!hasDC);
     lbImg.src=(lbShowDC&&hasDC)?entry.dcUrl:entry.url;
-    lbImg.onerror=()=>{ lbImg.alt=`Blob URL broken for ${name} — re-upload ZIP`; };
+    lbImg.onerror=()=>{ lbImg.alt=`Could not display ${name} — try re-uploading ZIP`; };
     const isMulti=lbNames.length>1;
     document.getElementById('lightbox-prev').style.display=isMulti?'block':'none';
     document.getElementById('lightbox-next').style.display=isMulti?'block':'none';
