@@ -516,7 +516,7 @@
             document.getElementById('folderInput').value = "";
         }
 
-        // --- HORIZONTAL 3D PIN SPACING UPGRADE ---
+        // --- UPDATED parseCSV WITH 5-COLUMN LOGIC INCORPORATED ---
         function parseCSV(text) {
             const rows = text.trim().split(/\r\n|\n|\r/);
             let validRows = 0;
@@ -528,6 +528,7 @@
                 let cur = '';
                 let inQuotes = false;
                 
+                // Parse CSV line properly accounting for commas inside quotes
                 for (let j = 0; j < rows[i].length; j++) {
                     let c = rows[i][j];
                     if (c === '"') {
@@ -541,15 +542,34 @@
                 }
                 cols.push(cur.trim());
                 
-                if (cols.length >= 8) {
-                    if (projectInfo === "Unknown Project") projectInfo = cols[0];
-                    const fullId = cols[3]; 
-                    let flir = cols[4];
-                    let finds = cols[5];
-                    let proved = cols[6];
+                // Process only if it has at least 5 columns (Phone export format)
+                if (cols.length >= 5) {
+                    let fullId, flir, finds, proved, tech, time;
+                    let parsedProj = cols[0].replace(/^"|"$/g, '');
+                    
+                    if (projectInfo === "Unknown Project") projectInfo = parsedProj;
+
+                    // FORMAT 1: Raw from Strata Drop Phone App (5 columns)
+                    if (cols.length === 5) {
+                        tech = cols[1].replace(/^"|"$/g, '');
+                        fullId = cols[2].replace(/^"|"$/g, '');
+                        finds = cols[3].replace(/^"|"$/g, '');
+                        time = cols[4].replace(/^"|"$/g, '');
+                        flir = "--";
+                        proved = "NO";
+                    } 
+                    // FORMAT 2: Re-imported from Command Center Master Export (8+ columns)
+                    else {
+                        tech = "Unknown"; 
+                        fullId = cols[2].replace(/^"|"$/g, '');
+                        flir = cols[3].replace(/^"|"$/g, '');
+                        finds = cols[4].replace(/^"|"$/g, '');
+                        proved = cols[5].replace(/^"|"$/g, '');
+                        time = "--";
+                    }
                     
                     let status = 'status-clear';
-                    if (!finds.includes('CLEAR')) status = 'status-flagged'; 
+                    if (!finds.includes('CLEAR')) status = 'status-flagged';
 
                     const parts = fullId.split('-');
                     if(parts.length === 3) {
@@ -560,15 +580,18 @@
                         if (!inspectionData[drop]) inspectionData[drop] = {};
                         if (!inspectionData[drop][floor]) inspectionData[drop][floor] = {};
                         
-                        let existingNotes = "";
-                        let existingStatus = status;
+                        let existingNotes = cols.length >= 8 ? cols[7].replace(/^"|"$/g, '') : "";
+                        let existingStatus = cols.length >= 8 ? 
+                            (cols[6].includes("CONFIRMED") ? 'status-confirmed' : (cols[6].includes("Pending") ? 'status-flagged' : 'status-clear')) 
+                            : status;
+
                         let mergedFlir = flir !== '--' && flir !== '' ? [flir] : [];
                         let mergedFinds = finds !== '' ? finds.split(' | ') : [];
                         let mergedProved = proved;
                         
                         if(inspectionData[drop][floor][pos]) {
                             let prev = inspectionData[drop][floor][pos];
-                            existingNotes = prev.notes;
+                            if(!existingNotes) existingNotes = prev.notes;
                             
                             if (prev.flir && prev.flir !== '--') {
                                 mergedFlir = [...prev.flir.split(' & '), ...mergedFlir];
@@ -591,12 +614,13 @@
                             flir: mergedFlir.length > 0 ? mergedFlir.join(' & ') : '--', 
                             finds: mergedFinds.join(' | '), 
                             proved: mergedProved, 
-                            tech: cols[2], 
-                            time: cols[7], 
+                            tech: tech, 
+                            time: time, 
                             status: existingStatus, 
                             notes: existingNotes
                         };
-                        if(!dropAssignments[drop]) dropAssignments[drop] = "";
+                        
+                        if(!dropAssignments[drop]) dropAssignments[drop] = cols.length >= 8 ? cols[1].replace(/^"|"$/g, '') : "";
                         validRows++;
                     }
                 }
