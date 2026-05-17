@@ -743,15 +743,19 @@ async function handleFiles(files, forcedType=null) {
     // Process one image from raw bytes (Uint8Array) — avoids JSZip blob lifetime issues
     async function processBytes(bytes, cleanName, pathHint) {
         const drop = extractDropFromPath(pathHint);
-        const ir   = await ingestFromBytes(bytes, cleanName, drop);
+        // Prefix clean name with drop ID to avoid collisions when multiple
+        // drops have files with the same filename (e.g. FLIR0001.jpg in H and R)
+        const key = drop ? `${drop}_${cleanName}` : cleanName;
+        const ir  = await ingestFromBytes(bytes, key, drop);
         if (ir) newIR++;
     }
 
     // Process one image blob (for direct file uploads, not ZIP entries)
     async function processBlob(blob, cleanName, pathHint) {
         const drop  = extractDropFromPath(pathHint);
+        const key   = drop ? `${drop}_${cleanName}` : cleanName;
         const bytes = new Uint8Array(await blob.arrayBuffer());
-        const ir    = await ingestFromBytes(bytes, cleanName, drop);
+        const ir    = await ingestFromBytes(bytes, key, drop);
         if (ir) newIR++;
     }
 
