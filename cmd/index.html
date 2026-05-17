@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Strata Command Center | v6.9 Lean Digital Twin</title>
+    <title>Strata Command Center | v7.0 Lean Digital Twin</title>
     
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="manifest" href="manifest_cmd.json">
@@ -121,7 +121,7 @@
         .modal-subtitle { color: #888; margin-bottom: 15px; font-size: 0.9rem; }
         
         .photo-gallery { display: flex; gap: 15px; overflow-x: auto; margin-bottom: 15px; padding-bottom: 10px; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
-        .photo-gallery img { flex: 0 0 100%; width: 100%; max-height: 280px; border-radius: 8px; border: 2px solid #555; object-fit: cover; background: #000; box-shadow: 0 5px 15px rgba(0,0,0,0.5); scroll-snap-align: center; cursor: zoom-in; }
+        .photo-gallery img { flex: 0 0 100%; width: 100%; max-height: 280px; border-radius: 8px; border: 2px solid #555; object-fit: cover; background: #000; box-shadow: 0 5px 15px rgba(0,0,0,0.5); scroll-snap-align: center; cursor: pointer; }
         .photo-gallery::-webkit-scrollbar { height: 8px; }
         .photo-gallery::-webkit-scrollbar-track { background: #111; border-radius: 4px; }
         .photo-gallery::-webkit-scrollbar-thumb { background: #0cf; border-radius: 4px; }
@@ -144,13 +144,42 @@
         #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999; display: none; align-items: center; justify-content: center; flex-direction: column; }
         .spinner { border: 8px solid #222; border-top: 8px solid #0cf; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* LIGHTBOX IMAGE ZOOM & PAN CONTAINER */
+        #lightbox-container {
+            width: 95vw;
+            height: 90vh;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: none; /* Crucial for pinch to zoom */
+        }
+        
+        #lightbox-img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            cursor: grab;
+            transition: transform 0.05s linear;
+            transform-origin: center center;
+            will-change: transform;
+        }
+
+        #lightbox-img:active { cursor: grabbing; }
+
+        .lightbox-nav-btn {
+            position: absolute; top: 50%; transform: translateY(-50%); z-index: 3010;
+            background: rgba(0,0,0,0.8); color: #fff; border: 2px solid #0cf; border-radius: 8px;
+            padding: 25px 20px; font-size: 2rem; cursor: pointer; transition: 0.2s;
+        }
     </style>
 </head>
 <body onload="initApp()">
 
     <div id="loading-overlay">
         <div class="spinner"></div>
-        <h2 style="color: #0cf; font-weight: bold;">Calibrating Timestamps...</h2>
+        <h2 style="color: #0cf; font-weight: bold;">Mapping Folders & Syncing Data...</h2>
         <p style="color: #888;" id="loading-text">Please wait.</p>
     </div>
 
@@ -161,7 +190,7 @@
 
     <div class="header">
         <div>
-            <h1>STRATA COMMAND <span>| v6.9 Auto-Calibrating Engine</span></h1>
+            <h1>STRATA COMMAND <span>| v7.0 Sandbox Sync Engine</span></h1>
             <div id="project-name" style="font-weight: bold; color: #888; margin-top: 5px;">Awaiting Data...</div>
         </div>
         <div class="header-btns">
@@ -300,11 +329,21 @@
 
     <div id="lightbox-modal" class="modal-overlay" style="z-index: 3000;">
         <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column;">
-            <button onclick="closeLightbox()" style="position: absolute; top: 20px; right: 20px; z-index: 3010; background: rgba(0,0,0,0.8); color: #fff; border: 2px solid #fff; border-radius: 50%; width: 50px; height: 50px; font-size: 1.5rem; font-weight: bold; cursor: pointer;">X</button>
-            <div id="lightbox-counter" style="position: absolute; top: 20px; left: 20px; z-index: 3010; background: rgba(0,0,0,0.8); color: #0cf; padding: 10px 20px; border-radius: 8px; font-weight: bold; font-size: 1.2rem; border: 1px solid #0cf;">1 / 3</div>
-            <button id="lightbox-prev" onclick="changeLightbox(-1)" style="position: absolute; left: 20px; top: 50%; transform: translateY(-50%); z-index: 3010; background: rgba(0,0,0,0.8); color: #fff; border: 2px solid #0cf; border-radius: 8px; padding: 25px 20px; font-size: 2rem; cursor: pointer;">&#10094;</button>
-            <img id="lightbox-img" src="" style="max-width: 95vw; max-height: 90vh; object-fit: contain; cursor: zoom-out;" onclick="changeLightbox(1)">
-            <button id="lightbox-next" onclick="changeLightbox(1)" style="position: absolute; right: 20px; top: 50%; transform: translateY(-50%); z-index: 3010; background: rgba(0,0,0,0.8); color: #fff; border: 2px solid #0cf; border-radius: 8px; padding: 25px 20px; font-size: 2rem; cursor: pointer;">&#10095;</button>
+            
+            <button onclick="closeLightbox()" style="position: absolute; top: 20px; right: 20px; z-index: 3020; background: rgba(0,0,0,0.8); color: #fff; border: 2px solid #fff; border-radius: 50%; width: 50px; height: 50px; font-size: 1.5rem; font-weight: bold; cursor: pointer;">X</button>
+            <div id="lightbox-counter" style="position: absolute; top: 20px; left: 20px; z-index: 3020; background: rgba(0,0,0,0.8); color: #0cf; padding: 10px 20px; border-radius: 8px; font-weight: bold; font-size: 1.2rem; border: 1px solid #0cf;">1 / 3</div>
+            
+            <button id="lightbox-prev" class="lightbox-nav-btn" onclick="changeLightbox(-1)" style="left: 20px;">&#10094;</button>
+            
+            <div id="lightbox-container">
+                <img id="lightbox-img" src="" draggable="false">
+            </div>
+            
+            <div style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 3020; background: rgba(0,0,0,0.8); color: #0cf; padding: 8px 15px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; border: 1px solid #0cf; pointer-events: none;">
+                Mouse Wheel or Pinch to Zoom • Click & Drag to Pan
+            </div>
+
+            <button id="lightbox-next" class="lightbox-nav-btn" onclick="changeLightbox(1)" style="right: 20px;">&#10095;</button>
         </div>
     </div>
 
@@ -339,8 +378,7 @@
         let stitchSelection = [];
         let stitchedPairs = []; 
         
-        let imageBank = {}; 
-        let imageTimestamps = {}; // Stores precise timestamps of images
+        let imageBank = {}; // { IMG_NAME: { url: blob, time: num, drop: str } }
         let linkedPhotosCount = 0;
 
         let elevations = []; 
@@ -364,6 +402,7 @@
         function initApp() {
             requestWakeLock();
             loadCommandState();
+            initLightboxZoom();
         }
 
         async function requestWakeLock() {
@@ -427,6 +466,15 @@
             }
         }
 
+        // Helper to extract Drop ID from a folder path string
+        function extractDropIdFromPath(pathString) {
+            if(!pathString) return null;
+            const parts = pathString.split('/');
+            const folderName = parts.length > 1 ? parts[parts.length - 2] : '';
+            const dropMatch = folderName.match(/Drop[\s_-]?([A-Za-z0-9\-]+)/i);
+            return dropMatch ? dropMatch[1].toUpperCase() : null;
+        }
+
         async function handleFiles(files, forcedType = null) {
             if (!files || files.length === 0) return;
             
@@ -458,7 +506,9 @@
                                     internalPromises.push(zipEntry.async("blob").then(async function(blob) {
                                         const cleanName = zipEntry.name.split('/').pop().split('.')[0].toUpperCase();
                                         if (!imageBank[cleanName]) {
-                                            imageBank[cleanName] = URL.createObjectURL(blob);
+                                            let url = URL.createObjectURL(blob);
+                                            let detectedDrop = extractDropIdFromPath(zipEntry.name);
+                                            
                                             let d = zipEntry.date;
                                             try {
                                                 let exif = await exifr.parse(blob);
@@ -468,15 +518,15 @@
                                                         if (eDate instanceof Date) d = eDate;
                                                         else if (typeof eDate === 'string') {
                                                             let parts = eDate.split(' ');
-                                                            if(parts.length === 2) {
-                                                                let datePart = parts[0].replace(/:/g, '-');
-                                                                d = new Date(datePart + 'T' + parts[1]);
-                                                            } else d = new Date(eDate);
+                                                            if(parts.length === 2) d = new Date(parts[0].replace(/:/g, '-') + 'T' + parts[1]);
+                                                            else d = new Date(eDate);
                                                         }
                                                     }
                                                 }
                                             } catch(e) {}
-                                            imageTimestamps[cleanName] = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+                                            
+                                            let t = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+                                            imageBank[cleanName] = { url: url, time: t, drop: detectedDrop };
                                             linkedPhotosCount++; newPhotosAdded++;
                                         }
                                     }));
@@ -518,7 +568,9 @@
                     filePromises.push((async function() {
                         const cleanName = file.name.split('.')[0].toUpperCase();
                         if (!imageBank[cleanName]) {
-                            imageBank[cleanName] = URL.createObjectURL(file);
+                            let url = URL.createObjectURL(file);
+                            let detectedDrop = extractDropIdFromPath(file.webkitRelativePath);
+                            
                             let d = new Date(file.lastModified);
                             try {
                                 let exif = await exifr.parse(file);
@@ -528,15 +580,15 @@
                                         if (eDate instanceof Date) d = eDate;
                                         else if (typeof eDate === 'string') {
                                             let parts = eDate.split(' ');
-                                            if(parts.length === 2) {
-                                                let datePart = parts[0].replace(/:/g, '-');
-                                                d = new Date(datePart + 'T' + parts[1]);
-                                            } else d = new Date(eDate);
+                                            if(parts.length === 2) d = new Date(parts[0].replace(/:/g, '-') + 'T' + parts[1]);
+                                            else d = new Date(eDate);
                                         }
                                     }
                                 }
                             } catch(e) {}
-                            imageTimestamps[cleanName] = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+                            
+                            let t = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+                            imageBank[cleanName] = { url: url, time: t, drop: detectedDrop };
                             linkedPhotosCount++; newPhotosAdded++;
                         }
                     })());
@@ -549,7 +601,7 @@
 
             await Promise.all(filePromises);
             
-            // --- SMART TIMESTAMP AUTO-LINKER WITH CALIBRATION ENGINE ---
+            // --- SMART TIMESTAMP AUTO-LINKER WITH FOLDER SANDBOXING ---
             let allNodes = [];
             Object.keys(inspectionData).forEach(drop => {
                 Object.keys(inspectionData[drop]).forEach(floor => {
@@ -559,6 +611,7 @@
                             let parts = node.time.split(':');
                             if (parts.length === 3) {
                                 node.timeSec = parseInt(parts[0], 10)*3600 + parseInt(parts[1], 10)*60 + parseInt(parts[2], 10);
+                                node.parentDrop = drop;
                                 allNodes.push(node);
                             }
                         }
@@ -566,46 +619,43 @@
                 });
             });
 
-            // Auto-Calibration: Calculate the global clock offset between the camera and the phone
+            // Auto-Calibration
             allNodes.sort((a,b) => a.timeSec - b.timeSec);
-            let imgKeys = Object.keys(imageTimestamps);
-            imgKeys.sort((a,b) => imageTimestamps[a] - imageTimestamps[b]);
+            let imgKeys = Object.keys(imageBank);
+            imgKeys.sort((a,b) => imageBank[a].time - imageBank[b].time);
 
             let globalOffset = 0;
             if (allNodes.length > 0 && imgKeys.length > 0) {
-                // Determine offset using the earliest photo and the earliest log
-                globalOffset = imageTimestamps[imgKeys[0]] - allNodes[0].timeSec;
-            }
-
-            // Check if timestamps were completely destroyed by Google Drive (all identical)
-            let uniqueTimes = new Set(Object.values(imageTimestamps)).size;
-            if (imgKeys.length > 1 && uniqueTimes === 1) {
-                alert("⚠️ WARNING: Your tablet or Google Drive stripped the timestamps from the photos. All photos appear to be taken at the exact same second. \n\nPlease upload them inside a .ZIP folder to preserve the time data!");
+                globalOffset = imageBank[imgKeys[0]].time - allNodes[0].timeSec;
             }
 
             let successfullyLinked = 0;
 
             imgKeys.forEach(imgKey => {
-                let matchedNode = allNodes.find(n => n.id === imgKey); // 1. Check exact filename match first
+                let imgData = imageBank[imgKey];
+                
+                // If we detected a folder (e.g. "Drop O"), only search for matching nodes inside Drop O.
+                // If not, search across the entire project as a fallback.
+                let allowedNodes = imgData.drop && inspectionData[imgData.drop] ? allNodes.filter(n => n.parentDrop === imgData.drop) : allNodes;
+
+                let matchedNode = allowedNodes.find(n => n.id === imgKey); // 1. Check exact filename match
                 
                 if (!matchedNode) {
-                    let imgTime = imageTimestamps[imgKey];
-                    if (imgTime !== undefined) {
-                        // Apply the calibration offset to neutralize bad camera clocks
-                        let adjustedImgTime = imgTime - globalOffset;
+                    if (imgData.time !== undefined) {
+                        let adjustedImgTime = imgData.time - globalOffset;
                         if (adjustedImgTime < 0) adjustedImgTime += 86400;
                         if (adjustedImgTime >= 86400) adjustedImgTime -= 86400;
 
                         let minDiff = Infinity;
-                        allNodes.forEach(node => {
+                        allowedNodes.forEach(node => {
                             let diff = Math.abs(node.timeSec - adjustedImgTime);
-                            if (diff > 43200) diff = 86400 - diff; // Handle midnight crossover
+                            if (diff > 43200) diff = 86400 - diff; 
                             if (diff < minDiff) {
                                 minDiff = diff;
                                 matchedNode = node;
                             }
                         });
-                        // Because the offset is neutralized, matches should be very close. (30 min tolerance)
+                        // 30 min tolerance
                         if (minDiff > 1800) matchedNode = null; 
                     }
                 }
@@ -619,16 +669,12 @@
                     }
                 }
             });
-            // --- END SMART TIMESTAMP AUTO-LINKER ---
 
             document.getElementById('loading-overlay').style.display = 'none';
 
             if (newPhotosAdded > 0) {
-                if (successfullyLinked === 0) {
-                    alert(`⚠️ ${newPhotosAdded} photos unpacked, but 0 could be linked. Ensure they were taken during the logged timeframes.`);
-                } else {
-                    alert(`✅ Auto-Calibrated and linked ${successfullyLinked} photo(s) to the grid.`);
-                }
+                if (successfullyLinked === 0) alert(`⚠️ ${newPhotosAdded} photos unpacked, but 0 could be linked. Ensure they were taken during the logged timeframes or folder names match drop letters.`);
+                else alert(`✅ Sandbox Engine securely linked ${successfullyLinked} photo(s) to the grid.`);
             }
 
             document.getElementById('project-name').innerText = "Project: " + projectInfo;
@@ -648,7 +694,7 @@
                 } else alert("⚠️ The file was read, but no valid Strata data was found.");
             }
 
-            saveCommandState(); // PERMANENT AUTOSAVE
+            saveCommandState();
 
             document.getElementById('csvInput').value = "";
             document.getElementById('mediaInput').value = "";
@@ -949,7 +995,10 @@
                             if (pair) { finalStatus = getCombinedStatus(pair[0], pair[1]); if (pair[0] === data.id) isStitchedLeft = true; if (pair[1] === data.id) isStitchedRight = true; }
                             winNode.className = `window-node ${finalStatus}`; if (activeFilter !== 'ALL' && finalStatus !== activeFilter) winNode.classList.add('node-filtered-out');
                             winNode.innerText = pos; winNode.onclick = () => handleNodeClick(data, winNode);
+                            
+                            // Check if photo is linked based on imageBank structure
                             if (data.flir.split(' & ').some(imgId => imageBank[imgId])) winNode.style.border = "2px solid #fff";
+                            
                             if (isStitchedLeft) { winNode.style.borderTopRightRadius = '0'; winNode.style.borderBottomRightRadius = '0'; winNode.style.borderRight = "none"; winNode.style.zIndex = '5'; const bridge = document.createElement('div'); bridge.className = `stitch-bridge ${finalStatus}`; if (data.flir.split(' & ').some(imgId => imageBank[imgId])) { bridge.style.borderTop = "2px solid #fff"; bridge.style.borderBottom = "2px solid #fff"; } winNode.appendChild(bridge); }
                             if (isStitchedRight) { winNode.style.borderTopLeftRadius = '0'; winNode.style.borderBottomLeftRadius = '0'; winNode.style.borderLeft = "none"; winNode.style.zIndex = '6'; }
                             winGroup.appendChild(winNode);
@@ -1017,11 +1066,109 @@
             function animate() { auto3dAnimationId = requestAnimationFrame(animate); auto3dRenderer.render(auto3dScene, auto3dCamera); auto3dControls.update();  } animate();
         }
 
-        // --- FULLSCREEN LIGHTBOX LOGIC ---
-        function openLightbox(imgArray, startIndex) { currentLightboxImages = imgArray; currentLightboxIndex = startIndex; updateLightboxUI(); document.getElementById('lightbox-modal').style.display = 'flex'; }
-        function updateLightboxUI() { document.getElementById('lightbox-img').src = currentLightboxImages[currentLightboxIndex]; document.getElementById('lightbox-counter').innerText = `${currentLightboxIndex + 1} / ${currentLightboxImages.length}`; const isMulti = currentLightboxImages.length > 1; document.getElementById('lightbox-prev').style.display = isMulti ? 'block' : 'none'; document.getElementById('lightbox-next').style.display = isMulti ? 'block' : 'none'; }
-        function changeLightbox(dir) { currentLightboxIndex += dir; if (currentLightboxIndex < 0) currentLightboxIndex = currentLightboxImages.length - 1; if (currentLightboxIndex >= currentLightboxImages.length) currentLightboxIndex = 0; updateLightboxUI(); }
-        function closeLightbox() { document.getElementById('lightbox-modal').style.display = 'none'; }
+        // --- FULLSCREEN LIGHTBOX & ZOOM LOGIC ---
+        let lbScale = 1, lbPanning = false, lbPointX = 0, lbPointY = 0, lbStartX = 0, lbStartY = 0;
+        let lbPointers = [], initialDist = null, initialScale = 1;
+        const lbImg = document.getElementById('lightbox-img');
+
+        function initLightboxZoom() {
+            lbImg.addEventListener('pointerdown', (e) => {
+                lbPointers.push(e);
+                if (lbPointers.length === 1) {
+                    lbStartX = e.clientX - lbPointX;
+                    lbStartY = e.clientY - lbPointY;
+                    lbPanning = true;
+                } else if (lbPointers.length === 2) {
+                    lbPanning = false;
+                    initialDist = Math.hypot(lbPointers[0].clientX - lbPointers[1].clientX, lbPointers[0].clientY - lbPointers[1].clientY);
+                    initialScale = lbScale;
+                }
+            });
+
+            lbImg.addEventListener('pointermove', (e) => {
+                e.preventDefault();
+                for(let i=0; i<lbPointers.length; i++) { if(lbPointers[i].pointerId === e.pointerId) lbPointers[i] = e; }
+                
+                if (lbPointers.length === 1 && lbPanning) {
+                    lbPointX = e.clientX - lbStartX;
+                    lbPointY = e.clientY - lbStartY;
+                    setLbTransform();
+                } else if (lbPointers.length === 2) {
+                    let dist = Math.hypot(lbPointers[0].clientX - lbPointers[1].clientX, lbPointers[0].clientY - lbPointers[1].clientY);
+                    lbScale = initialScale * (dist / initialDist);
+                    lbScale = Math.min(Math.max(1, lbScale), 15);
+                    setLbTransform();
+                }
+            });
+
+            function removePointer(e) {
+                lbPointers = lbPointers.filter(p => p.pointerId !== e.pointerId);
+                if(lbPointers.length < 2) initialDist = null;
+                if(lbPointers.length === 1) {
+                    lbStartX = lbPointers[0].clientX - lbPointX;
+                    lbStartY = lbPointers[0].clientY - lbPointY;
+                    lbPanning = true;
+                } else { lbPanning = false; }
+            }
+
+            lbImg.addEventListener('pointerup', removePointer);
+            lbImg.addEventListener('pointercancel', removePointer);
+            lbImg.addEventListener('pointerout', removePointer);
+            lbImg.addEventListener('pointerleave', removePointer);
+
+            lbImg.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                let xs = (e.clientX - lbPointX) / lbScale;
+                let ys = (e.clientY - lbPointY) / lbScale;
+                let delta = e.deltaY < 0 ? 1 : -1;
+                
+                lbScale *= (delta > 0 ? 1.2 : 0.8);
+                lbScale = Math.min(Math.max(1, lbScale), 15);
+                
+                lbPointX = e.clientX - xs * lbScale;
+                lbPointY = e.clientY - ys * lbScale;
+                
+                if(lbScale === 1) { lbPointX = 0; lbPointY = 0; }
+                setLbTransform();
+            });
+        }
+
+        function setLbTransform() {
+            lbImg.style.transform = `translate(${lbPointX}px, ${lbPointY}px) scale(${lbScale})`;
+        }
+
+        function resetLightboxZoom() {
+            lbScale = 1; lbPointX = 0; lbPointY = 0;
+            setLbTransform();
+        }
+
+        function openLightbox(imgArray, startIndex) { 
+            currentLightboxImages = imgArray; 
+            currentLightboxIndex = startIndex; 
+            updateLightboxUI(); 
+            document.getElementById('lightbox-modal').style.display = 'flex'; 
+        }
+
+        function updateLightboxUI() { 
+            resetLightboxZoom();
+            document.getElementById('lightbox-img').src = currentLightboxImages[currentLightboxIndex]; 
+            document.getElementById('lightbox-counter').innerText = `${currentLightboxIndex + 1} / ${currentLightboxImages.length}`; 
+            const isMulti = currentLightboxImages.length > 1; 
+            document.getElementById('lightbox-prev').style.display = isMulti ? 'block' : 'none'; 
+            document.getElementById('lightbox-next').style.display = isMulti ? 'block' : 'none'; 
+        }
+
+        function changeLightbox(dir) { 
+            currentLightboxIndex += dir; 
+            if (currentLightboxIndex < 0) currentLightboxIndex = currentLightboxImages.length - 1; 
+            if (currentLightboxIndex >= currentLightboxImages.length) currentLightboxIndex = 0; 
+            updateLightboxUI(); 
+        }
+
+        function closeLightbox() { 
+            document.getElementById('lightbox-modal').style.display = 'none'; 
+            resetLightboxZoom();
+        }
 
         function openModal(nodeId) {
             let pair = stitchedPairs.find(p => p.includes(nodeId)); activeNodeDataArray = [];
@@ -1041,7 +1188,10 @@
             document.getElementById('m-flir').innerText = flirs.join(' & ') || '--'; document.getElementById('m-notes').value = notes;
             
             const gallery = document.getElementById('m-photo-gallery'), noPhoto = document.getElementById('m-no-photo'), carouselHint = document.getElementById('m-carousel-hint'); gallery.innerHTML = '';
-            let validImgUrls = []; flirs.forEach(f => { if(imageBank[f]) validImgUrls.push(imageBank[f]); });
+            
+            // Extract the actual blob URLs using the imageBank objects
+            let validImgUrls = []; 
+            flirs.forEach(f => { if(imageBank[f]) validImgUrls.push(imageBank[f].url); });
 
             if (validImgUrls.length > 0) {
                 validImgUrls.forEach((url, index) => { let img = document.createElement('img'); img.src = url; img.onclick = () => openLightbox(validImgUrls, index); gallery.appendChild(img); });
