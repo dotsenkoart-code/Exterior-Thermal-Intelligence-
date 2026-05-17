@@ -460,28 +460,126 @@ function extractEmbeddedDC(buf) {
     return new Blob([d.slice(best.start,best.end)],{type:'image/jpeg'});
 }
 
+/*
+ * Parse DateTimeOriginal directly from a JPEG ArrayBuffer.
+ * Returns seconds-since-midnight (integer), or null if not found.
+ * Reads the raw bytes itself — no exifr dependency.
+ */
+function parseExifTimestamp(buf) {
+    const b = new Uint8Array(buf);
+    const len = b.length;
+
+    // Helper: read big-endian u16 from the FULL file array
+    function rb16(p) { return (b[p]<<8)|b[p+1]; }
+
+    // Scan for the first APP1 (0xFF 0xE1) that starts with "Exif"
+    let i = 2; // skip SOI
+    while (i < len - 4) {
+        if (b[i] !== 0xFF) { i++; continue; }
+        const marker = b[i+1];
+        const segLen = rb16(i+2);
+        if (marker === 0xE1 &&
+            b[i+4]===0x45 && b[i+5]===0x78 && b[i+6]===0x69 && b[i+7]===0x66) {
+            // Found Exif APP1. TIFF header starts at i+10 (after FF E1 LL LL Exif \0\0)
+            const tBase = i + 10;
+            if (tBase + 8 > len) break;
+
+            const le = b[tBase] === 0x49; // 'II' = little-endian
+            function t16(p) { return le ? b[tBase+p]|(b[tBase+p+1]<<8) : (b[tBase+p]<<8)|b[tBase+p+1]; }
+            function t32(p) { return le
+                ? b[tBase+p]|(b[tBase+p+1]<<8)|(b[tBase+p+2]<<16)|(b[tBase+p+3]<<24)
+                : (b[tBase+p]<<24)|(b[tBase+p+1]<<16)|(b[tBase+p+2]<<8)|b[tBase+p+3]; }
+
+            // Read an ASCII tag value; tagOff is relative to tBase
+            function readAscii(tagOff) {
+                if (t16(tagOff+2) !== 2) return null; // not ASCII type
+                const cnt  = t32(tagOff+4);
+                const vOff = cnt <= 4 ? tagOff+8 : t32(tagOff+8);
+                if (tBase+vOff+cnt > len) return null;
+                let s = '';
+                for (let k=0; k<cnt; k++) {
+                    const c = b[tBase+vOff+k];
+                    if (c === 0) break;
+                    s += String.fromCharCode(c);
+                }
+                return s || null;
+            }
+
+            // Read IFD entries; ifdOff relative to tBase
+            function readIFD(ifdOff) {
+                if (tBase+ifdOff+2 > len) return {};
+                const n = t16(ifdOff);
+                const tags = {};
+                for (let j=0; j<n; j++) {
+                    const off = ifdOff+2+j*12;
+                    if (tBase+off+12 > len) break;
+                    tags[t16(off)] = off; // tag → offset of entry
+                }
+                return tags;
+            }
+
+            const ifd0Off = t32(4); // IFD0 offset from TIFF base
+            const ifd0    = readIFD(ifd0Off);
+
+            let dateStr = null;
+
+            // Try ExifIFD → DateTimeOriginal (0x9003) first
+            if (ifd0[0x8769] !== undefined) {
+                const exifOff = t32(ifd0[0x8769]+8);
+                const exif    = readIFD(exifOff);
+                if (exif[0x9003] !== undefined) dateStr = readAscii(exif[0x9003]);
+                if (!dateStr && exif[0x9004] !== undefined) dateStr = readAscii(exif[0x9004]);
+            }
+
+            // Fall back to IFD0 DateTime (0x0132)
+            if (!dateStr && ifd0[0x0132] !== undefined) {
+                dateStr = readAscii(ifd0[0x0132]);
+            }
+
+            if (dateStr) {
+                // Format: 'YYYY:MM:DD HH:MM:SS'
+                const m = dateStr.match(/(\d{2}):(\d{2}):(\d{2})\s*$/);
+                if (m) return parseInt(m[1])*3600 + parseInt(m[2])*60 + parseInt(m[3]);
+            }
+            break; // only need the first Exif APP1
+        }
+        i += 2 + segLen;
+    }
+    return null;
+}
+
 // Ingest one IR image blob into imageBank.
 // DC-only files (FLIR segment count < 3) are silently ignored —
 // all DC content is already embedded inside the IR file.
 // Returns true if ingested as IR, false if skipped.
-async function ingestImage(blob, cleanName, dropId, timeSec) {
-    const buf   = await blob.arrayBuffer();
+async function ingestFromBytes(bytes, cleanName, dropId) {
+    // bytes is a Uint8Array owned by us — no JSZip blob lifetime dependency.
+    // Make a guaranteed clean copy so nothing can mutate or detach it.
+    const owned = new Uint8Array(bytes);
+    const buf   = owned.buffer;
+
     const flirN = countFlirSegments(buf);
-    const isIR  = flirN >= 3;
+    const isIR  = flirN >= 2;
 
-    // Silently discard DC-only files — nothing useful to store
-    if (!isIR) return false;
+    if (!isIR) {
+        window._diagSkipped = (window._diagSkipped || 0) + 1;
+        window._diagSkipReasons = window._diagSkipReasons || {};
+        const reason = `FLIR segments: ${flirN}`;
+        window._diagSkipReasons[reason] = (window._diagSkipReasons[reason] || 0) + 1;
+        return false;
+    }
 
-    // Revoke stale blob URLs to avoid memory leak on re-upload
     const prev = imageBank[cleanName];
     if (prev) {
         if (prev.url)   URL.revokeObjectURL(prev.url);
         if (prev.dcUrl) URL.revokeObjectURL(prev.dcUrl);
     }
 
-    const url    = URL.createObjectURL(blob);
-    const dcBlob = extractEmbeddedDC(buf);
-    const dcUrl  = dcBlob ? URL.createObjectURL(dcBlob) : null;
+    const timeSec = parseExifTimestamp(buf);
+    const irBlob  = new Blob([owned], {type: 'image/jpeg'});
+    const url     = URL.createObjectURL(irBlob);
+    const dcBlob  = extractEmbeddedDC(buf);
+    const dcUrl   = dcBlob ? URL.createObjectURL(dcBlob) : null;
 
     imageBank[cleanName] = { url, dcUrl, time: timeSec, drop: dropId };
     return true;
@@ -550,9 +648,40 @@ function updatePhotoStat() {
 // ═══════════════════════════════════════════════════════
 function initApp() {
     requestWakeLock();
+    detectBlobSupport();
     loadCommandState();
     initLightboxZoom();
     initGlobalDragDrop();
+}
+
+// Test whether blob URLs can be loaded as images in this context.
+// claude.ai artifact iframes block blob: URLs via CSP even though
+// the app creates them correctly. In that case, show a clear banner.
+function detectBlobSupport() {
+    const testBlob = new Blob(['<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>'],
+                               {type:'image/svg+xml'});
+    const testUrl  = URL.createObjectURL(testBlob);
+    const img      = new Image();
+    img.onload  = () => { URL.revokeObjectURL(testUrl); }; // blob URLs work fine
+    img.onerror = () => {
+        URL.revokeObjectURL(testUrl);
+        // Blob URLs are blocked — show persistent warning
+        const banner = document.createElement('div');
+        banner.style.cssText = [
+            'position:fixed;top:0;left:0;width:100%;z-index:99999;',
+            'background:#8b0000;color:#fff;padding:16px 20px;',
+            'font-size:1rem;font-weight:bold;text-align:center;',
+            'border-bottom:3px solid #ff4444;line-height:1.6;'
+        ].join('');
+        banner.innerHTML = [
+            '⚠️ <strong>Photos cannot display inside claude.ai.</strong> ',
+            'Download this file and open it directly in your browser as a local file. ',
+            '<br>The app works perfectly outside claude.ai — ',
+            'all data, CSV parsing and photo linking will work normally.'
+        ].join('');
+        document.body.prepend(banner);
+    };
+    img.src = testUrl;
 }
 async function requestWakeLock() {
     try { if ('wakeLock' in navigator) wakeLock=await navigator.wakeLock.request('screen'); } catch(e){}
@@ -627,15 +756,18 @@ async function handleFiles(files, forcedType=null) {
     const promises=[];
     let newIR=0, newCsvAdded=false, isProjectLoaded=false, rowsParsed=0;
 
-    // Process one image blob: EXIF → ingest → count
-    async function processBlob(blob, cleanName, pathHint, dateHint) {
-        let drop=extractDropFromPath(pathHint);
-        let d=dateHint||new Date();
-        try {
-            const exif=await exifr.parse(blob);
-            if (exif) d=parseExifDate(exif.DateTimeOriginal||exif.CreateDate||exif.ModifyDate,d);
-        } catch(e){}
-        const ir=await ingestImage(blob,cleanName,drop,dateToSec(d));
+    // Process one image from raw bytes (Uint8Array) — avoids JSZip blob lifetime issues
+    async function processBytes(bytes, cleanName, pathHint) {
+        const drop = extractDropFromPath(pathHint);
+        const ir   = await ingestFromBytes(bytes, cleanName, drop);
+        if (ir) newIR++;
+    }
+
+    // Process one image blob (for direct file uploads, not ZIP entries)
+    async function processBlob(blob, cleanName, pathHint) {
+        const drop  = extractDropFromPath(pathHint);
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        const ir    = await ingestFromBytes(bytes, cleanName, drop);
         if (ir) newIR++;
     }
 
@@ -648,23 +780,55 @@ async function handleFiles(files, forcedType=null) {
         if (nm.endsWith('.zip')||ty.includes('zip')) {
             promises.push(new Promise(res=>{
                 JSZip.loadAsync(file).then(async zip=>{
-                    const inner=[];
+                    // Collect all tasks first, then run with limited concurrency.
+                    // Running 1000+ heavy ArrayBuffer ops simultaneously crashes
+                    // the browser — process 8 at a time.
+                    const csvTasks=[], imgTasks=[];
                     zip.forEach((rel,entry)=>{
                         if (entry.dir||rel.includes('__MACOSX')||rel.includes('.DS_Store')) return;
                         const en=entry.name.toLowerCase();
                         if (en.endsWith('.csv')) {
                             newCsvAdded=true;
-                            inner.push(entry.async('text').then(t=>{rowsParsed+=parseCSV(t);}));
+                            csvTasks.push(()=>entry.async('text').then(t=>{rowsParsed+=parseCSV(t);}));
                         } else if (en.endsWith('.jpg')||en.endsWith('.jpeg')||en.endsWith('.png')) {
-                            inner.push(entry.async('blob').then(async blob=>{
-                                const clean=entry.name.split('/').pop().replace(/\.[^.]+$/,'').toUpperCase();
-                                await processBlob(blob,clean,entry.name,entry.date||new Date());
+                            const clean=entry.name.split('/').pop().replace(/\.[^.]+$/,'').toUpperCase();
+                            imgTasks.push(()=>entry.async('uint8array').then(async bytes=>{
+                                await processBytes(bytes, clean, entry.name);
                             }));
                         }
                     });
-                    await Promise.all(inner);
+
+                    // Run CSV tasks immediately (they're fast)
+                    await Promise.all(csvTasks.map(t=>t()));
+
+                    // Run image tasks with concurrency cap of 6
+                    // Lower concurrency reduces memory pressure on large ZIPs
+                    const CONCURRENCY = 6;
+                    let taskIdx = 0;
+                    let done = 0;
+                    const total = imgTasks.length;
+                    async function runNextTask() {
+                        while (taskIdx < total) {
+                            const myIdx = taskIdx++;
+                            try {
+                                await imgTasks[myIdx]();
+                            } catch(e) {
+                                console.warn(`[Zipline] Image task ${myIdx} failed:`, e);
+                            }
+                            done++;
+                            if (done % 20 === 0 || done === total) {
+                                setLoading(true, `Processing IR photos... ${done} / ${total}`, '');
+                            }
+                        }
+                    }
+                    const workers = [];
+                    for (let w=0; w<Math.min(CONCURRENCY, total); w++) {
+                        workers.push(runNextTask());
+                    }
+                    await Promise.all(workers);
+
                     res();
-                }).catch(err=>{alert('ZIP error: '+err.message);res();});
+                }).catch(err=>{showToast('⚠️ ZIP error: '+err.message, 6000, true);res();});
             }));
         } else if (nm.endsWith('.json')) {
             isProjectLoaded=true;
@@ -695,7 +859,7 @@ async function handleFiles(files, forcedType=null) {
             }));
         } else if (ty.startsWith('image/')||nm.endsWith('.jpg')||nm.endsWith('.jpeg')||nm.endsWith('.png')) {
             const clean=file.name.replace(/\.[^.]+$/,'').toUpperCase();
-            promises.push(processBlob(file,clean,file.webkitRelativePath,new Date(file.lastModified)));
+            promises.push(processBlob(file, clean, file.webkitRelativePath));
         } else if (nm.endsWith('.glb')||nm.endsWith('.gltf')||ty.includes('model/gltf')) {
             viewer.src=URL.createObjectURL(file);
             document.getElementById('model-status').innerHTML=`<span style="color:#0cf;">Loaded:</span> ${file.name}`;
@@ -710,33 +874,47 @@ async function handleFiles(files, forcedType=null) {
         Object.values(imageBank).forEach(img=>{ if (!img.drop) img.drop=dropNames[0]; });
     }
 
-    // ── RUN BRACKET ZIPLINE ─────────────────────────────
+    // Always run the bracket engine after ANY file load.
+    // Both imageBank (photos) and inspectionData (CSV nodes) may have been
+    // updated in this call or a previous one. Running it every time means
+    // loading CSV after ZIP, or ZIP after CSV, both produce correct links.
     const linked=runBracketZipline();
 
     setLoading(false);
 
-    if (newIR>0) {
+    if (newIR>0||(window._diagSkipped||0)>0) {
+        const skipped=window._diagSkipped||0;
+        const reasons=window._diagSkipReasons||{};
+        const reasonStr=Object.entries(reasons).map(([k,v])=>`${k}x${v}`).join(', ');
         if (linked===0)
-            alert(`⚠️ ${newIR} IR photo(s) loaded but none could be bracketed.\nCheck that photos were taken after the CSV timestamps.`);
+            showToast(`⚠️ ${newIR} IR loaded, 0 bracketed. Skipped: ${skipped} (${reasonStr||'none'}).`,10000,true);
         else
-            alert(`✅ Bracket Engine linked ${linked} photo(s) across windows.\nDC view available via toggle on each IR image.`);
+            showToast(`✅ ${newIR} IR loaded, ${linked} photo(s) linked to windows.`,6000);
+        window._diagSkipped=0; window._diagSkipReasons={};
+    } else if (newCsvAdded&&linked>0) {
+        showToast(`✅ CSV loaded. ${linked} photo(s) linked to windows.`,5000);
+    } else if (newCsvAdded&&Object.keys(imageBank).length===0) {
+        showToast(`✅ CSV loaded. Upload your ZIP to link photos.`,4000);
+    } else if (isProjectLoaded) {
+        showToast(`✅ Project loaded. Re-upload your ZIP to restore photos.`,5000);
     }
 
     document.getElementById('project-name').innerText='Project: '+projectInfo;
     document.getElementById('btn-reset').style.display='inline-block';
     updatePhotoStat();
 
-    if (newCsvAdded||isProjectLoaded) {
-        if (rowsParsed>0||isProjectLoaded) {
-            if (document.getElementById('dashboard-screen').style.display!=='flex') {
+    // Always refresh dashboard if visible — covers ZIP-then-CSV and CSV-then-ZIP workflows
+    if (Object.keys(inspectionData).length>0) {
+        if (document.getElementById('dashboard-screen').style.display==='flex') {
+            if (activeTab) Object.keys(dropAssignments).forEach(d=>{if(!dropAssignments[d])dropAssignments[d]=activeTab;});
+            calculateBuildingGeometry();
+            if (currentMode==='2d'||currentMode==='auto3d') refreshCurrentView();
+            if (currentMode==='auto3d') buildProcedural3D();
+        } else if (newCsvAdded||isProjectLoaded) {
+            if (rowsParsed>0||isProjectLoaded) {
                 document.getElementById('btn-start-mapping').style.display='block';
-            } else {
-                if (activeTab) Object.keys(dropAssignments).forEach(d=>{if(!dropAssignments[d])dropAssignments[d]=activeTab;});
-                calculateBuildingGeometry();
-                if (currentMode==='2d'||currentMode==='auto3d') refreshCurrentView();
-                if (currentMode==='auto3d') buildProcedural3D();
-            }
-        } else { alert('⚠️ File read but no valid Strata data found.'); }
+            } else { showToast('⚠️ File read but no valid Strata data found.',6000,true); }
+        }
     }
 
     saveCommandState();
@@ -834,9 +1012,10 @@ function runBracketZipline() {
         if (!allNodes.length) return;
 
         // ── 2. Collect all IR images for this drop ───────────────
-        // imageBank now contains only IR files (DC-only files are discarded on ingest)
+        // imageBank contains only IR files. Images with no EXIF timestamp (time=null)
+        // cannot be bracket-matched and are excluded from auto-linking.
         const images = Object.keys(imageBank)
-            .filter(k => imageBank[k].drop === drop)
+            .filter(k => imageBank[k].drop === drop && imageBank[k].time !== null)
             .map(k => ({ name: k, time: imageBank[k].time }))
             .sort((a,b) => a.name.localeCompare(b.name, undefined, {numeric:true}));
 
@@ -864,27 +1043,61 @@ function runBracketZipline() {
 
         if (!brackets.length) return;
 
-        // ── 4. Estimate camera clock offset ──────────────────────
-        // Compare the first min(5, brackets.length, images.length)
-        // image times to the first bracket starts (skipping the sync
-        // photo if it's before bracket[0].start).
+        // ── 4. Find camera clock offset vs phone clock ───────────
         //
-        // We take the median difference (image.time - bracket.start)
-        // from the first few pairs, then use that offset globally.
-        const nonSyncImages = images.filter(img => img.time >= brackets[0].start - 7200);
-        // (7200s = 2hr tolerance for a camera that's slightly ahead)
+        // Search ±30 minutes in 5-second steps first (realistic drift).
+        // Only widen to ±6 hours if zero matches found (wrong timezone).
+        // This prevents the false-positive wrapping bug where ±6hr brute
+        // force finds a spurious match at the search boundary.
 
-        const sampleSize = Math.min(5, brackets.length, nonSyncImages.length);
-        const rawDiffs   = [];
-        for (let i = 0; i < sampleSize; i++) {
-            let diff = nonSyncImages[i].time - brackets[i].start;
-            // Wrap midnight
-            if (diff >  43200) diff -= 86400;
-            if (diff < -43200) diff += 86400;
-            rawDiffs.push(diff);
+        // Identify sync photos by their raw time — photos taken before the
+        // first stamp are sync shots and must not influence offset selection.
+        // We use the raw time at offset=0 to flag them: any photo whose
+        // time falls before brackets[0].start is a sync photo candidate.
+        // Exclude sync photos from offset scoring using their raw (unadjusted) time.
+        // Sync photos are taken before the first stamp, so their raw time < brackets[0].start.
+        // Including them skews the offset search toward false positives.
+        const firstBracketStart = brackets[0].start;
+        const scoringImages = images.filter(img => img.time >= firstBracketStart);
+
+        function countMatchesForOffset(offSec) {
+            let m = 0;
+            scoringImages.forEach(img => {
+                let t = img.time - offSec;
+                if (t <  0)     t += 86400;
+                if (t >= 86400) t -= 86400;
+                for (const br of brackets) {
+                    if (t >= br.start && t < br.end) { m++; break; }
+                }
+            });
+            return m;
         }
-        rawDiffs.sort((a,b)=>a-b);
-        const offset = rawDiffs.length ? rawDiffs[Math.floor(rawDiffs.length/2)] : 0;
+
+        let bestOffset  = 0;
+        let bestMatches = countMatchesForOffset(0);
+
+        // Photos are always taken AFTER the stamp, so the camera clock offset
+        // (cameraTime - phoneTime) is typically 0 or small positive.
+        // Search +30min to -10min in 5-second steps.
+        // We avoid large negative offsets which cause wrap-around false positives.
+        for (let offSec = -600; offSec <= 1800; offSec += 5) {
+            if (offSec === 0) continue;
+            const m = countMatchesForOffset(offSec);
+            if (m > bestMatches) { bestMatches = m; bestOffset = offSec; }
+        }
+
+        // Coarse fallback only if still zero matches: camera on wrong timezone
+        if (bestMatches === 0) {
+            for (let offMin = -360; offMin <= 360; offMin++) {
+                const offSec = offMin * 60;
+                if (offSec >= -600 && offSec <= 1800) continue;
+                const m = countMatchesForOffset(offSec);
+                if (m > bestMatches) { bestMatches = m; bestOffset = offSec; }
+            }
+        }
+
+        const offset = bestOffset;
+        console.log(`[Zipline] Drop ${drop}: ${images.length} photos, ${brackets.length} brackets, offset=${offset}s (${(offset/60).toFixed(1)}min), matches=${bestMatches}/${images.length}`);
 
         // ── 5. Clear existing Zipline assignments for this drop ──
         // This prevents double-linking when photos are re-uploaded.
@@ -1121,7 +1334,7 @@ function toggleStitchMode() {
     isStitchMode=!isStitchMode;
     document.querySelectorAll('.stitch-toggle').forEach(b=>b.classList.toggle('stitch-mode-on',isStitchMode));
     stitchSelection=[];
-    if (isStitchMode) alert('STITCH MODE: Click right window then left window to join them.');
+    if (isStitchMode) showToast('🔗 STITCH MODE ACTIVE — click the right window then the left window to join them.');
     if (currentMode==='2d') refreshCurrentView();
 }
 
@@ -1129,13 +1342,13 @@ function handleNodeClick(data,el) {
     if (isStitchMode) {
         const idx=stitchedPairs.findIndex(p=>p.includes(data.id));
         if (idx!==-1) {
-            if (confirm('Already stitched — un-stitch?')) {
+            showConfirm('✂️ Un-stitch windows?','These two windows will be separated back into individual nodes.','UN-STITCH',()=>{
                 stitchedPairs.splice(idx,1);stitchSelection=[];isStitchMode=false;
                 document.querySelectorAll('.stitch-toggle').forEach(b=>b.classList.remove('stitch-mode-on'));
                 calculateBuildingGeometry();saveCommandState();
                 if (currentMode==='2d') refreshCurrentView();
                 if (currentMode==='auto3d') buildProcedural3D();
-            }
+            });
             return;
         }
         stitchSelection.push(data.id);el.style.outline='3px solid #f39c12';
@@ -1274,29 +1487,48 @@ function buildPhotoArea(nodes) {
 
             const wrap=document.createElement('div');wrap.className='photo-entry';
 
-            // Toggle bar
+            // Image element — declared FIRST so pill.onclick can safely reference it
+            const vw=document.createElement('div');vw.className='photo-viewer-wrap';
+            const img=document.createElement('img');
+            img.src=photoViewState[irName]==='dc'&&hasDC?entry.dcUrl:entry.url;
+            img.onerror=()=>{
+                img.style.display='none';
+                const err=document.createElement('div');
+                err.style.cssText='background:#1a0000;color:#f66;padding:10px;font-size:0.8rem;border-radius:4px;';
+                err.innerText=`⚠️ Blob URL broken for ${irName} — re-upload ZIP`;
+                vw.appendChild(err);
+            };
+
+            // Toggle bar — references img which is now already declared above
             const bar=document.createElement('div');bar.className='photo-toggle-bar';
             const nl=document.createElement('div');nl.className='photo-name-label';nl.innerText=irName;
             const pill=document.createElement('div');
             pill.className=`toggle-pill${hasDC?'':' no-dc'}${photoViewState[irName]==='dc'?' showing-dc':''}`;
             pill.innerHTML='<span class="pill-ir">🌡 IR</span><span class="pill-dc">📷 DC</span>';
-            pill.title=hasDC?'Toggle IR / DC view':'DC not extracted (camera setting)';
-            pill.onclick=()=>{
-                if (!hasDC) return;
-                photoViewState[irName]=photoViewState[irName]==='ir'?'dc':'ir';
-                pill.classList.toggle('showing-dc',photoViewState[irName]==='dc');
-                img.src=photoViewState[irName]==='dc'?entry.dcUrl:entry.url;
-            };
+            pill.title=hasDC?'Toggle IR / DC view':'DC not available for this file';
+
+            // Use IIFE to freeze irName, entry, pill, img per iteration
+            // (prevents the classic closure-in-loop bug where all handlers
+            // share the last iteration's variables)
+            pill.onclick=(function(name, ent, p, el){
+                return function() {
+                    if (!ent.dcUrl) return;
+                    photoViewState[name] = photoViewState[name]==='ir' ? 'dc' : 'ir';
+                    p.classList.toggle('showing-dc', photoViewState[name]==='dc');
+                    el.src = photoViewState[name]==='dc' ? ent.dcUrl : ent.url;
+                };
+            })(irName, entry, pill, img);
+
             bar.appendChild(nl);bar.appendChild(pill);wrap.appendChild(bar);
 
-            // Image
-            const vw=document.createElement('div');vw.className='photo-viewer-wrap';
-            const img=document.createElement('img');
-            img.src=photoViewState[irName]==='dc'&&hasDC?entry.dcUrl:entry.url;
-            img.onclick=()=>{
-                const allNames=nodes.flatMap(n=>n?nodePhotoNames(n):[]);
-                openLightbox(allNames,allNames.indexOf(irName),photoViewState[irName]==='dc');
-            };
+            // Click image → lightbox, opening at the current IR/DC state
+            img.onclick=(function(name, ent){
+                return function() {
+                    const allNames=nodes.flatMap(n=>n?nodePhotoNames(n):[]);
+                    openLightbox(allNames, allNames.indexOf(name), photoViewState[name]==='dc');
+                };
+            })(irName, entry);
+
             vw.appendChild(img);wrap.appendChild(vw);
             area.appendChild(wrap);
         });
@@ -1351,30 +1583,137 @@ function openModal(nodeId) {
     document.getElementById('info-modal').style.display='flex';
 }
 
-function unmergeCurrent(){if(activeNodeDataArray[0]){const idx=stitchedPairs.findIndex(p=>p.includes(activeNodeDataArray[0].id));if(idx!==-1){stitchedPairs.splice(idx,1);closeModal();calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();if(currentMode==='auto3d')buildProcedural3D();}}}
+function unmergeCurrent(){if(activeNodeDataArray[0]){const idx=stitchedPairs.findIndex(p=>p.includes(activeNodeDataArray[0].id));if(idx!==-1){showConfirm('✂️ Un-stitch windows?','These two windows will be separated back into individual nodes.','UN-STITCH',()=>{stitchedPairs.splice(idx,1);closeModal();calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();if(currentMode==='auto3d')buildProcedural3D();});}}}
 function changeStatus(s){const note=document.getElementById('m-notes').value;activeNodeDataArray.forEach(d=>{if(d){d.notes=note;d.status=s;}});calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();if(currentMode==='auto3d')buildProcedural3D();closeModal();}
 function saveNotesOnly(){const note=document.getElementById('m-notes').value;activeNodeDataArray.forEach(d=>{if(d)d.notes=note;});calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();if(currentMode==='auto3d')buildProcedural3D();closeModal();}
-function unpinCurrent(){if(confirm('Remove 3D pin?')){activeNodeDataArray.forEach(d=>{if(d&&saved3DTags[d.id])delete saved3DTags[d.id];});render3DHotspots();saveCommandState();closeModal();}}
+function unpinCurrent(){showConfirm('🗑️ Remove 3D pin?','The window data stays safe — only the pin position on the 3D model is removed.','REMOVE PIN',()=>{activeNodeDataArray.forEach(d=>{if(d&&saved3DTags[d.id])delete saved3DTags[d.id];});render3DHotspots();saveCommandState();closeModal();});}
 function closeModal(){document.getElementById('info-modal').style.display='none';activeNodeDataArray=[];modalNodeId=null;}
 
 // ═══════════════════════════════════════════════════════
-// RESET
+// RESET  — uses custom confirm dialog (window.confirm is
+// silently blocked in some desktop PWA / file:// contexts)
 // ═══════════════════════════════════════════════════════
 function resetBoard(){
-    if (!confirm('Clear all data?')) return;
-    localStorage.removeItem('strataCommandState');
-    // Revoke all blob URLs
-    Object.values(imageBank).forEach(v=>{if(v.url)URL.revokeObjectURL(v.url);if(v.dcUrl)URL.revokeObjectURL(v.dcUrl);});
-    inspectionData={};imageBank={};stitchedPairs=[];projectInfo='Unknown Project';
-    elevations=[];dropAssignments={};saved3DTags={};activeTab='';manualLinks={};
-    activeNodeDataArray=[];modalNodeId=null;
-    document.getElementById('project-name').innerText='Awaiting Data...';
-    document.getElementById('top-reload-banner').style.display='none';
-    ['dashboard-screen','mapping-screen','btn-save-project','btn-edit-map','btn-reset','btn-start-mapping']
-        .forEach(id=>{document.getElementById(id).style.display='none';});
-    viewer.src='https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/LittlestTokyo.glb';
-    document.getElementById('model-status').innerHTML='Showing Default Test Model.';
-    updatePhotoStat();
+    showConfirm(
+        '🔄 Clear all data?',
+        'This will remove all inspection data, photos and settings. This cannot be undone.',
+        'CLEAR EVERYTHING',
+        ()=>{
+            localStorage.removeItem('strataCommandState');
+
+            // Stop the 3D animation loop before wiping state
+            if (auto3dAnimId) { cancelAnimationFrame(auto3dAnimId); auto3dAnimId=null; }
+
+            // Revoke all blob URLs to free memory
+            Object.values(imageBank).forEach(v=>{
+                if(v.url)   URL.revokeObjectURL(v.url);
+                if(v.dcUrl) URL.revokeObjectURL(v.dcUrl);
+            });
+
+            // Reset all state
+            inspectionData={};imageBank={};stitchedPairs=[];projectInfo='Unknown Project';
+            elevations=[];dropAssignments={};saved3DTags={};activeTab='';manualLinks={};
+            activeNodeDataArray=[];modalNodeId=null;
+            currentMode='2d';
+
+            // Reset UI
+            document.getElementById('project-name').innerText='Awaiting Data...';
+            document.getElementById('top-reload-banner').style.display='none';
+            ['dashboard-screen','mapping-screen','btn-save-project',
+             'btn-edit-map','btn-reset','btn-start-mapping']
+                .forEach(id=>{ document.getElementById(id).style.display='none'; });
+
+            // Reset stats bar
+            ['stat-total','stat-clear','stat-flagged','stat-confirmed','stat-ir']
+                .forEach(id=>{ document.getElementById(id).innerText='0'; });
+
+            // Reset 3D viewer
+            viewer.src='https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/LittlestTokyo.glb';
+            document.getElementById('model-status').innerHTML='Showing Default Test Model.';
+
+            // Reset the 3D renderer so it reinitialises cleanly next time
+            if (auto3dRenderer) {
+                auto3dRenderer.dispose();
+                auto3dRenderer=null; auto3dScene=null; auto3dCamera=null; auto3dControls=null;
+                document.getElementById('procedural-3d-container').innerHTML='';
+            }
+        }
+    );
+}
+
+/*
+ * Non-blocking toast notification — shown as a bar at the top of the screen.
+ * Fades out automatically after `duration` ms.
+ * Works in all contexts including desktop PWA and file:// pages.
+ */
+function showToast(message, duration=4000, isError=false) {
+    const existing = document.getElementById('app-toast');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.id = 'app-toast';
+    toast.style.cssText = `
+        position:fixed;top:0;left:0;width:100%;z-index:8999;
+        background:${isError?'#8b0000':'#003d1f'};
+        color:${isError?'#ffaaaa':'#aaffcc'};
+        border-bottom:2px solid ${isError?'#d9534f':'#28a745'};
+        padding:14px 20px;font-size:0.95rem;font-weight:bold;
+        text-align:center;cursor:pointer;
+        transition:opacity 0.4s;
+    `;
+    toast.innerText = message;
+    toast.onclick = () => toast.remove();
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 400);
+    }, duration);
+}
+
+function showConfirm(title, message, confirmLabel, onConfirm) {
+    // Remove any existing confirm overlay
+    const existing = document.getElementById('custom-confirm-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'custom-confirm-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);z-index:9000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);';
+
+    const box = document.createElement('div');
+    box.style.cssText = 'background:#1a1d27;border:1px solid #d9534f;border-radius:12px;padding:30px;max-width:420px;width:90%;box-shadow:0 15px 35px rgba(0,0,0,0.9);';
+
+    const t = document.createElement('h2');
+    t.style.cssText = 'margin:0 0 12px;color:#d9534f;font-size:1.4rem;font-weight:900;';
+    t.innerText = title;
+
+    const m = document.createElement('p');
+    m.style.cssText = 'margin:0 0 24px;color:#aaa;font-size:0.95rem;line-height:1.5;';
+    m.innerText = message;
+
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:12px;';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.style.cssText = 'flex:1;padding:12px;background:#333;color:#fff;border:1px solid #555;border-radius:6px;font-size:1rem;font-weight:bold;cursor:pointer;text-transform:uppercase;letter-spacing:1px;';
+    cancelBtn.innerText = 'CANCEL';
+    cancelBtn.onclick = () => overlay.remove();
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.style.cssText = 'flex:1;padding:12px;background:#d9534f;color:#fff;border:none;border-radius:6px;font-size:1rem;font-weight:bold;cursor:pointer;text-transform:uppercase;letter-spacing:1px;';
+    confirmBtn.innerText = confirmLabel;
+    confirmBtn.onclick = () => { overlay.remove(); onConfirm(); };
+
+    btnRow.appendChild(cancelBtn);
+    btnRow.appendChild(confirmBtn);
+    box.appendChild(t);
+    box.appendChild(m);
+    box.appendChild(btnRow);
+    overlay.appendChild(box);
+
+    // Click outside the box also cancels
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+    document.body.appendChild(overlay);
+    confirmBtn.focus();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1384,7 +1723,7 @@ function openMappingScreen(){document.getElementById('btn-start-mapping').style.
 function editMapping(){document.getElementById('dashboard-screen').style.display='none';document.getElementById('mapping-screen').style.display='block';document.getElementById('btn-save-project').style.display='none';document.getElementById('btn-edit-map').style.display='none';renderMappingList();}
 function addElevation(){const inp=document.getElementById('new-elevation-name'),val=inp.value.trim();if(val&&!elevations.includes(val)){elevations.push(val);if(elevations.length===1){activeTab=val;Object.keys(dropAssignments).forEach(d=>{if(!dropAssignments[d])dropAssignments[d]=val;});}inp.value='';saveCommandState();renderMappingList();}}
 function renderMappingList(){const list=document.getElementById('mapping-list');list.innerHTML='';const drops=Object.keys(inspectionData).sort();if(!elevations.length&&drops.length){const w=document.createElement('div');w.style='color:#f1c40f;margin-bottom:15px;font-weight:bold;';w.innerText='⚠️ Add at least one wall above.';list.appendChild(w);}drops.forEach(d=>{const row=document.createElement('div');row.className='mapping-row';row.innerHTML=`<strong style="font-size:1.2rem;color:#0cf;">DROP ${d}</strong>`;const sel=document.createElement('select');sel.onchange=e=>{dropAssignments[d]=e.target.value;saveCommandState();};if(!elevations.length){const o=document.createElement('option');o.value='';o.innerText='Awaiting Wall...';sel.appendChild(o);sel.disabled=true;}else{sel.disabled=false;elevations.forEach(elev=>{const o=document.createElement('option');o.value=elev;o.innerText=elev;if(dropAssignments[d]===elev)o.selected=true;sel.appendChild(o);});}row.appendChild(sel);list.appendChild(row);});}
-function generateDashboard(){if(!elevations.length){alert('⚠️ Add at least one wall first.');return;}document.getElementById('mapping-screen').style.display='none';document.getElementById('dashboard-screen').style.display='flex';document.getElementById('btn-save-project').style.display='inline-block';document.getElementById('btn-edit-map').style.display='inline-block';if(!elevations.includes(activeTab))activeTab=elevations[0];calculateBuildingGeometry();saveCommandState();if(currentMode==='2d'||currentMode==='auto3d')refreshCurrentView();if(currentMode==='auto3d')buildProcedural3D();}
+function generateDashboard(){if(!elevations.length){showToast('⚠️ Add at least one wall first.',5000,true);return;}document.getElementById('mapping-screen').style.display='none';document.getElementById('dashboard-screen').style.display='flex';document.getElementById('btn-save-project').style.display='inline-block';document.getElementById('btn-edit-map').style.display='inline-block';if(!elevations.includes(activeTab))activeTab=elevations[0];calculateBuildingGeometry();saveCommandState();if(currentMode==='2d'||currentMode==='auto3d')refreshCurrentView();if(currentMode==='auto3d')buildProcedural3D();}
 
 // ═══════════════════════════════════════════════════════
 // 3D TAGGING
@@ -1476,6 +1815,7 @@ function updateLbUI(){
     tog.classList.toggle('showing-dc',lbShowDC&&hasDC);
     tog.classList.toggle('no-dc',!hasDC);
     lbImg.src=(lbShowDC&&hasDC)?entry.dcUrl:entry.url;
+    lbImg.onerror=()=>{ lbImg.alt=`Blob URL broken for ${name} — re-upload ZIP`; };
     const isMulti=lbNames.length>1;
     document.getElementById('lightbox-prev').style.display=isMulti?'block':'none';
     document.getElementById('lightbox-next').style.display=isMulti?'block':'none';
