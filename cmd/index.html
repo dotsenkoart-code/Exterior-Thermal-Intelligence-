@@ -13,8 +13,10 @@
     <meta name="apple-mobile-web-app-title" content="Strata CMD">
     <meta name="mobile-web-app-capable" content="yes">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+    <!-- model-viewer removed: using Three.js GLTFLoader directly -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/exifr/dist/lite.umd.js"></script>
     <style>
@@ -270,12 +272,35 @@
 
         <div id="arena-true3d">
             <button class="btn-fullscreen" onclick="toggleFullScreen('arena-true3d')">⛶ FULL SCREEN</button>
-            <model-viewer id="main-3d-viewer" src="https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/LittlestTokyo.glb" alt="3D model" auto-rotate camera-controls tone-mapping="neutral" shadow-intensity="1"></model-viewer>
-            <div style="position:absolute;top:15px;left:15px;color:#fff;font-size:0.9rem;font-weight:bold;background:rgba(0,0,0,0.7);padding:12px;border-radius:8px;border:1px solid #d080ff;pointer-events:none;z-index:100;">
-                <strong>Drone Photogrammetry Engine</strong><br>
-                <span id="model-status" style="font-weight:normal;color:#ccc;">Showing Default Test Model.</span>
+            <canvas id="twin-canvas" style="width:100%;height:100%;display:block;"></canvas>
+
+            <!-- Info overlay -->
+            <div style="position:absolute;top:15px;left:15px;color:#fff;font-size:0.9rem;font-weight:bold;background:rgba(0,0,0,0.75);padding:12px;border-radius:8px;border:1px solid #d080ff;pointer-events:none;z-index:100;">
+                <strong>🏢 Digital Twin</strong><br>
+                <span id="model-status" style="font-weight:normal;color:#ccc;">Loading model...</span>
             </div>
-            <div class="floating-tools"><button class="float-btn tag-toggle" onclick="openMasterTagMenu()">📍 3D TAG MENU</button></div>
+
+            <!-- Load progress bar -->
+            <div id="twin-progress-wrap" style="position:absolute;bottom:80px;left:50%;transform:translateX(-50%);width:320px;z-index:200;background:rgba(0,0,0,0.8);border-radius:8px;padding:16px;border:1px solid #d080ff;">
+                <div style="color:#d080ff;font-size:0.85rem;font-weight:bold;margin-bottom:8px;text-align:center;" id="twin-progress-label">Loading Digital Twin...</div>
+                <div style="background:#222;border-radius:4px;height:8px;overflow:hidden;">
+                    <div id="twin-progress-bar" style="height:100%;background:linear-gradient(90deg,#d080ff,#0cf);width:0%;transition:width 0.2s;border-radius:4px;"></div>
+                </div>
+                <div style="color:#888;font-size:0.75rem;text-align:center;margin-top:6px;" id="twin-progress-pct">0%</div>
+            </div>
+
+            <!-- Manual URL input (fallback if CORS blocks Google Drive) -->
+            <div id="twin-url-panel" style="display:none;position:absolute;bottom:80px;left:50%;transform:translateX(-50%);width:380px;z-index:200;background:rgba(0,0,0,0.9);border-radius:8px;padding:16px;border:1px solid #f39c12;">
+                <div style="color:#f39c12;font-weight:bold;margin-bottom:8px;font-size:0.9rem;">⚠️ Cannot load from Google Drive (CORS). Paste a direct GLB URL:</div>
+                <input id="twin-url-input" type="text" placeholder="https://..." style="width:100%;padding:8px;background:#111;color:#fff;border:1px solid #555;border-radius:4px;font-size:0.85rem;margin-bottom:8px;">
+                <button onclick="loadTwinFromInput()" style="width:100%;padding:8px;background:#f39c12;color:#000;border:none;border-radius:4px;font-weight:bold;cursor:pointer;">LOAD MODEL</button>
+                <div style="color:#555;font-size:0.75rem;margin-top:6px;text-align:center;">Or upload the GLB directly using button 3 (ADD ZIP OR FOLDER)</div>
+            </div>
+
+            <div class="floating-tools">
+                <button class="float-btn tag-toggle" onclick="openMasterTagMenu()">📍 3D TAG MENU</button>
+                <button class="float-btn" onclick="resetTwinCamera()" style="border-color:#0cf;color:#0cf;">🎯 RESET VIEW</button>
+            </div>
         </div>
     </div>
 </div>
@@ -393,7 +418,7 @@ let imageBank = {};
 // Per-photo toggle state (modal + lightbox): cleanName → 'ir'|'dc'
 const photoViewState = {};
 
-const viewer = document.querySelector('#main-3d-viewer');
+const viewer = { src: '', style: {cursor:'default'}, autoRotate: false }; // legacy compat shim
 
 // ═══════════════════════════════════════════════════════
 // FLIR BINARY HELPERS
@@ -670,6 +695,203 @@ function updatePhotoStat() {
 // ═══════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// DIGITAL TWIN — Three.js GLB Viewer
+// ═══════════════════════════════════════════════════════
+const TWIN_GDRIVE_ID = '1GNPtIKo_YceqGftau6gmZ5KW8DAjtz53';
+const TWIN_GDRIVE_URL = `https://drive.google.com/uc?export=download&id=${TWIN_GDRIVE_ID}`;
+const TWIN_CORS_PROXY = `https://corsproxy.io/?${encodeURIComponent(TWIN_GDRIVE_URL)}`;
+
+let twinRenderer=null, twinScene=null, twinCamera=null, twinControls=null, twinAnimId=null;
+let twinHotspots=[];  // { mesh, nodeId } for raycasting
+let twinLoaded=false;
+
+function initTwin() {
+    const canvas = document.getElementById('twin-canvas');
+    if (!canvas||twinLoaded) return;
+
+    // Renderer
+    twinRenderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+    twinRenderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+    twinRenderer.outputEncoding = THREE.sRGBEncoding;
+    twinRenderer.toneMapping    = THREE.ACESFilmicToneMapping;
+    twinRenderer.toneMappingExposure = 1.0;
+
+    const arena = document.getElementById('arena-true3d');
+    twinRenderer.setSize(arena.clientWidth, arena.clientHeight);
+
+    // Scene + lights
+    twinScene = new THREE.Scene();
+    twinScene.background = new THREE.Color(0x0f111a);
+
+    const ambL = new THREE.AmbientLight(0xffffff, 0.6);
+    twinScene.add(ambL);
+    const dirL = new THREE.DirectionalLight(0xffffff, 1.0);
+    dirL.position.set(50, 100, 50);
+    twinScene.add(dirL);
+    const dirL2 = new THREE.DirectionalLight(0xffffff, 0.3);
+    dirL2.position.set(-50, 20, -50);
+    twinScene.add(dirL2);
+
+    // Camera
+    twinCamera = new THREE.PerspectiveCamera(45, arena.clientWidth/arena.clientHeight, 0.1, 2000);
+    twinCamera.position.set(0, 20, 80);
+
+    // Orbit controls
+    if (typeof THREE.OrbitControls === 'function') {
+        twinControls = new THREE.OrbitControls(twinCamera, canvas);
+        twinControls.enableDamping = true;
+        twinControls.dampingFactor = 0.08;
+        twinControls.screenSpacePanning = true;
+    }
+
+    // Resize handler
+    window.addEventListener('resize', () => {
+        if (document.getElementById('arena-true3d').style.display === 'none') return;
+        const a = document.getElementById('arena-true3d');
+        twinCamera.aspect = a.clientWidth/a.clientHeight;
+        twinCamera.updateProjectionMatrix();
+        twinRenderer.setSize(a.clientWidth, a.clientHeight);
+    });
+
+    // Raycaster for pin clicking
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let pointerDownPos = null;
+    canvas.addEventListener('pointerdown', e => { pointerDownPos = {x:e.clientX, y:e.clientY}; });
+    canvas.addEventListener('pointerup', e => {
+        if (!pointerDownPos) return;
+        const dx = e.clientX - pointerDownPos.x;
+        const dy = e.clientY - pointerDownPos.y;
+        if (Math.sqrt(dx*dx+dy*dy) > 5) return; // dragged, not clicked
+        const rect = canvas.getBoundingClientRect();
+        mouse.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
+        mouse.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
+        raycaster.setFromCamera(mouse, twinCamera);
+        const hits = raycaster.intersectObjects(twinHotspots.map(h=>h.mesh));
+        if (hits.length) {
+            const h = twinHotspots.find(h => h.mesh === hits[0].object);
+            if (h) openModal(h.nodeId);
+        }
+    });
+
+    // Animation loop
+    function animate() {
+        twinAnimId = requestAnimationFrame(animate);
+        if (twinControls) twinControls.update();
+        twinRenderer.render(twinScene, twinCamera);
+    }
+    animate();
+
+    // Load model
+    loadTwinModel(TWIN_CORS_PROXY);
+}
+
+function loadTwinFromInput() {
+    const url = document.getElementById('twin-url-input').value.trim();
+    if (!url) return;
+    document.getElementById('twin-url-panel').style.display = 'none';
+    document.getElementById('twin-progress-wrap').style.display = 'block';
+    loadTwinModel(url);
+}
+
+function loadTwinModel(url) {
+    const loader = new THREE.GLTFLoader();
+    const progress = document.getElementById('twin-progress-bar');
+    const pct      = document.getElementById('twin-progress-pct');
+    const label    = document.getElementById('twin-progress-label');
+    const wrap     = document.getElementById('twin-progress-wrap');
+
+    label.innerText = 'Loading Digital Twin...';
+    wrap.style.display = 'block';
+
+    loader.load(
+        url,
+        (gltf) => {
+            // Remove any previous model
+            twinScene.children
+                .filter(c => c.userData.isTwinModel)
+                .forEach(c => twinScene.remove(c));
+            twinHotspots = [];
+
+            const model = gltf.scene;
+            model.userData.isTwinModel = true;
+            twinScene.add(model);
+
+            // Centre and scale model to fit view
+            const box    = new THREE.Box3().setFromObject(model);
+            const centre = box.getCenter(new THREE.Vector3());
+            const size   = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const scale  = 60 / maxDim;
+            model.scale.setScalar(scale);
+            model.position.sub(centre.multiplyScalar(scale));
+
+            // Update camera target
+            if (twinControls) {
+                twinControls.target.set(0, 0, 0);
+                twinControls.update();
+            }
+            twinCamera.position.set(0, 15, 80);
+
+            wrap.style.display = 'none';
+            document.getElementById('model-status').innerHTML =
+                '<span style="color:#0cf;">✅ Digital Twin loaded</span>';
+            twinLoaded = true;
+
+            // Place inspection hotspot pins
+            placeTwinHotspots(box, scale, centre);
+        },
+        (xhr) => {
+            if (xhr.lengthComputable) {
+                const p = Math.round(xhr.loaded/xhr.total*100);
+                progress.style.width = p + '%';
+                pct.innerText = p + '%';
+                label.innerText = `Loading... ${Math.round(xhr.loaded/1024/1024)}MB / ${Math.round(xhr.total/1024/1024)}MB`;
+            }
+        },
+        (err) => {
+            console.warn('Twin load failed:', err);
+            wrap.style.display = 'none';
+            // Show URL input panel as fallback
+            document.getElementById('twin-url-panel').style.display = 'block';
+            document.getElementById('model-status').innerHTML =
+                '<span style="color:#f39c12;">⚠️ Could not load from Google Drive</span>';
+        }
+    );
+}
+
+function placeTwinHotspots(modelBox, modelScale, modelCentre) {
+    // Remove old hotspot meshes
+    twinHotspots.forEach(h => twinScene.remove(h.mesh));
+    twinHotspots = [];
+
+    // Get all tagged nodes from saved3DTags
+    Object.keys(saved3DTags).forEach(nodeId => {
+        const data = getNodeData(nodeId);
+        if (!data) return;
+
+        let color = 0x28a745;
+        if (data.status === 'status-confirmed') color = 0xd9534f;
+        else if (data.status === 'status-flagged') color = 0xf1c40f;
+
+        const pos = saved3DTags[nodeId].position.split(' ').map(Number);
+        const geo = new THREE.SphereGeometry(0.4, 12, 12);
+        const mat = new THREE.MeshStandardMaterial({color, emissive:color, emissiveIntensity:0.3});
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(pos[0], pos[1], pos[2]);
+        twinScene.add(mesh);
+        twinHotspots.push({mesh, nodeId});
+    });
+}
+
+function resetTwinCamera() {
+    if (!twinCamera||!twinControls) return;
+    twinCamera.position.set(0, 15, 80);
+    twinControls.target.set(0, 0, 0);
+    twinControls.update();
+}
+
 function initApp() {
     requestWakeLock();
     detectBlobSupport();
@@ -864,8 +1086,11 @@ async function handleFiles(files, forcedType=null) {
             const clean=file.name.replace(/\.[^.]+$/,'').toUpperCase();
             promises.push(processBlob(file, clean, file.webkitRelativePath));
         } else if (nm.endsWith('.glb')||nm.endsWith('.gltf')||ty.includes('model/gltf')) {
-            viewer.src=URL.createObjectURL(file);
-            document.getElementById('model-status').innerHTML=`<span style="color:#0cf;">Loaded:</span> ${file.name}`;
+            // GLB uploaded directly — load into twin viewer
+            const glbUrl = URL.createObjectURL(file);
+            document.getElementById('model-status').innerHTML=`<span style="color:#0cf;">Loading:</span> ${file.name}`;
+            if (!twinRenderer) initTwin();
+            loadTwinModel(glbUrl);
         }
     }
 
@@ -1461,6 +1686,7 @@ function switchView(mode) {
     document.getElementById('tabs-container').style.display=mode==='true3d'?'none' :'flex';
     if (mode==='2d'||mode==='auto3d') refreshCurrentView();
     if (mode==='auto3d') setTimeout(buildProcedural3D,100);
+    if (mode==='true3d') setTimeout(initTwin, 100);
 }
 
 function refreshCurrentView() {
@@ -1723,8 +1949,7 @@ function resetBoard(){
                 .forEach(id=>{ document.getElementById(id).innerText='0'; });
 
             // Reset 3D viewer
-            viewer.src='https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/LittlestTokyo.glb';
-            document.getElementById('model-status').innerHTML='Showing Default Test Model.';
+            document.getElementById('model-status').innerHTML='Load model via TRUE 3D TWIN tab.';
 
             // Reset the 3D renderer so it reinitialises cleanly next time
             if (auto3dRenderer) {
@@ -1845,7 +2070,12 @@ viewer.addEventListener('dblclick',event=>{
 function processDropTagging(dropId,anchors){const floors=Object.keys(inspectionData[dropId]).map(Number).sort((a,b)=>b-a);if(!floors.length)return;const maxF=floors[0],minF=floors[floors.length-1],fRange=maxF-minF,pT=parseCoord(anchors[0].position),pB=parseCoord(anchors[1].position),norm=`${anchors[0].normal.x} ${anchors[0].normal.y} ${anchors[0].normal.z}`,rLen=Math.sqrt(anchors[0].normal.z**2+anchors[0].normal.x**2),rX=rLen===0?1:anchors[0].normal.z/rLen,rZ=rLen===0?0:-anchors[0].normal.x/rLen,om={L:-1,C:0,R:1};floors.forEach(f=>{const t=fRange===0?0:(maxF-f)/fRange,cx=pT[0]+(pB[0]-pT[0])*t,cy=pT[1]+(pB[1]-pT[1])*t,cz=pT[2]+(pB[2]-pT[2])*t;Object.keys(inspectionData[dropId][f]).forEach(pos=>{const off=om[pos]??0;saved3DTags[`${dropId}-${f}-${pos}`]={position:`${cx+rX*off*0.8} ${cy} ${cz+rZ*off*0.8}`,normal:norm};});});render3DHotspots();saveCommandState();}
 function processWallTagging(wallName,anchors){const drops=Object.keys(dropAssignments).filter(d=>dropAssignments[d]===wallName).sort();if(!drops.length)return;const allF=[];drops.forEach(d=>allF.push(...Object.keys(inspectionData[d]).map(Number)));const maxF=Math.max(...allF),minF=Math.min(...allF),fRange=maxF-minF,dRange=drops.length>1?drops.length-1:1,TL=parseCoord(anchors[0].position),TR=parseCoord(anchors[1].position),BL=parseCoord(anchors[2].position),BR=parseCoord(anchors[3].position),norm=`${anchors[0].normal.x} ${anchors[0].normal.y} ${anchors[0].normal.z}`,vX=TR[0]-TL[0],vY=TR[1]-TL[1],vZ=TR[2]-TL[2],wW=Math.sqrt(vX*vX+vY*vY+vZ*vZ),rX=wW===0?1:vX/wW,rY=wW===0?0:vY/wW,rZ=wW===0?0:vZ/wW,sp=(wW/(drops.length||1))*0.3,om={L:-1,C:0,R:1};drops.forEach((dropId,dIdx)=>{const u=drops.length>1?dIdx/dRange:0.5;Object.keys(inspectionData[dropId]).map(Number).forEach(f=>{const v=fRange===0?0:(maxF-f)/fRange,cx=(1-u)*(1-v)*TL[0]+u*(1-v)*TR[0]+(1-u)*v*BL[0]+u*v*BR[0],cy=(1-u)*(1-v)*TL[1]+u*(1-v)*TR[1]+(1-u)*v*BL[1]+u*v*BR[1],cz=(1-u)*(1-v)*TL[2]+u*(1-v)*TR[2]+(1-u)*v*BL[2]+u*v*BR[2];Object.keys(inspectionData[dropId][f]).forEach(pos=>{const off=om[pos]??0;saved3DTags[`${dropId}-${f}-${pos}`]={position:`${cx+rX*off*sp} ${cy+rY*off*sp} ${cz+rZ*off*sp}`,normal:norm};});});});render3DHotspots();saveCommandState();}
 
-function render3DHotspots(){viewer.querySelectorAll('.hotspot-dot').forEach(el=>el.remove());Object.keys(saved3DTags).forEach(id=>{const data=getNodeData(id);if(!data)return;let fs=data.status;const pair=stitchedPairs.find(p=>p.includes(data.id));if(pair)fs=getCombinedStatus(pair[0],pair[1]);if(activeFilter!=='ALL'&&fs!==activeFilter)return;const btn=document.createElement('button');btn.slot=`hotspot-${id}`;btn.dataset.position=saved3DTags[id].position;btn.dataset.normal=saved3DTags[id].normal;btn.className=`hotspot-dot ${fs}`;btn.onclick=()=>openModal(id);const lbl=document.createElement('div');lbl.className='hotspot-label';lbl.innerText=id;btn.appendChild(lbl);viewer.appendChild(btn);});}
+function render3DHotspots(){
+    // Also refresh twin hotspots if loaded
+    if (twinLoaded && twinScene) {
+        const box = new THREE.Box3();
+        placeTwinHotspots(box, 1, new THREE.Vector3());
+    }viewer.querySelectorAll('.hotspot-dot').forEach(el=>el.remove());Object.keys(saved3DTags).forEach(id=>{const data=getNodeData(id);if(!data)return;let fs=data.status;const pair=stitchedPairs.find(p=>p.includes(data.id));if(pair)fs=getCombinedStatus(pair[0],pair[1]);if(activeFilter!=='ALL'&&fs!==activeFilter)return;const btn=document.createElement('button');btn.slot=`hotspot-${id}`;btn.dataset.position=saved3DTags[id].position;btn.dataset.normal=saved3DTags[id].normal;btn.className=`hotspot-dot ${fs}`;btn.onclick=()=>openModal(id);const lbl=document.createElement('div');lbl.className='hotspot-label';lbl.innerText=id;btn.appendChild(lbl);viewer.appendChild(btn);});}
 function toggleFullScreen(id){const el=document.getElementById(id);if(!document.fullscreenElement){if(el.requestFullscreen)el.requestFullscreen();}else{if(document.exitFullscreen)document.exitFullscreen();}}
 
 // ═══════════════════════════════════════════════════════
