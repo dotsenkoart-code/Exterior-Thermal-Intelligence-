@@ -274,27 +274,38 @@
             <button class="btn-fullscreen" onclick="toggleFullScreen('arena-true3d')">⛶ FULL SCREEN</button>
             <canvas id="twin-canvas" style="width:100%;height:100%;display:block;"></canvas>
 
-            <!-- Info overlay -->
+            <!-- Info overlay top-left -->
             <div style="position:absolute;top:15px;left:15px;color:#fff;font-size:0.9rem;font-weight:bold;background:rgba(0,0,0,0.75);padding:12px;border-radius:8px;border:1px solid #d080ff;pointer-events:none;z-index:100;">
                 <strong>🏢 Digital Twin</strong><br>
-                <span id="model-status" style="font-weight:normal;color:#ccc;">Loading model...</span>
+                <span id="model-status" style="font-weight:normal;color:#ccc;">No model loaded.</span>
             </div>
 
-            <!-- Load progress bar -->
-            <div id="twin-progress-wrap" style="position:absolute;bottom:80px;left:50%;transform:translateX(-50%);width:320px;z-index:200;background:rgba(0,0,0,0.8);border-radius:8px;padding:16px;border:1px solid #d080ff;">
+            <!-- Model URL manager — always visible, top-right -->
+            <div id="twin-url-manager" style="position:absolute;top:15px;right:70px;z-index:200;background:rgba(0,0,0,0.88);border-radius:8px;padding:12px 14px;border:1px solid #444;min-width:320px;max-width:420px;">
+                <div style="color:#d080ff;font-size:0.75rem;font-weight:bold;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">3D Model URL</div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <input id="twin-url-input"
+                           type="text"
+                           placeholder="Paste Google Drive or direct GLB link..."
+                           style="flex:1;padding:8px 10px;background:#111;color:#fff;border:1px solid #555;border-radius:4px;font-size:0.8rem;min-width:0;"
+                           onkeypress="if(event.key==='Enter')loadTwinFromInput()">
+                    <button onclick="loadTwinFromInput()"
+                            style="padding:8px 14px;background:#d080ff;color:#000;border:none;border-radius:4px;font-weight:bold;cursor:pointer;white-space:nowrap;font-size:0.8rem;">
+                        LOAD
+                    </button>
+                </div>
+                <div style="color:#555;font-size:0.7rem;margin-top:5px;">
+                    Google Drive: share → Anyone with link → paste URL here. Saved with project.
+                </div>
+            </div>
+
+            <!-- Progress bar — shown only while loading -->
+            <div id="twin-progress-wrap" style="display:none;position:absolute;bottom:80px;left:50%;transform:translateX(-50%);width:320px;z-index:200;background:rgba(0,0,0,0.85);border-radius:8px;padding:16px;border:1px solid #d080ff;">
                 <div style="color:#d080ff;font-size:0.85rem;font-weight:bold;margin-bottom:8px;text-align:center;" id="twin-progress-label">Loading Digital Twin...</div>
                 <div style="background:#222;border-radius:4px;height:8px;overflow:hidden;">
                     <div id="twin-progress-bar" style="height:100%;background:linear-gradient(90deg,#d080ff,#0cf);width:0%;transition:width 0.2s;border-radius:4px;"></div>
                 </div>
                 <div style="color:#888;font-size:0.75rem;text-align:center;margin-top:6px;" id="twin-progress-pct">0%</div>
-            </div>
-
-            <!-- Manual URL input (fallback if CORS blocks Google Drive) -->
-            <div id="twin-url-panel" style="display:none;position:absolute;bottom:80px;left:50%;transform:translateX(-50%);width:380px;z-index:200;background:rgba(0,0,0,0.9);border-radius:8px;padding:16px;border:1px solid #f39c12;">
-                <div style="color:#f39c12;font-weight:bold;margin-bottom:8px;font-size:0.9rem;">⚠️ Cannot load from Google Drive (CORS). Paste a direct GLB URL:</div>
-                <input id="twin-url-input" type="text" placeholder="https://..." style="width:100%;padding:8px;background:#111;color:#fff;border:1px solid #555;border-radius:4px;font-size:0.85rem;margin-bottom:8px;">
-                <button onclick="loadTwinFromInput()" style="width:100%;padding:8px;background:#f39c12;color:#000;border:none;border-radius:4px;font-weight:bold;cursor:pointer;">LOAD MODEL</button>
-                <div style="color:#555;font-size:0.75rem;margin-top:6px;text-align:center;">Or upload the GLB directly using button 3 (ADD ZIP OR FOLDER)</div>
             </div>
 
             <div class="floating-tools">
@@ -400,6 +411,7 @@ let manualLinks         = {};   // { nodeId: [cleanName, ...] } manager override
 let wakeLock            = null;
 let modalNodeId         = null;
 let photoMoveMode       = null; // { photoName, fromNodeId } when move is active
+let projectModelUrl     = '';   // Google Drive or direct URL for this project's 3D model
 
 /*
  * imageBank: { CLEAN_UPPER_NAME: { url, dcUrl, time, drop } }
@@ -698,9 +710,7 @@ function updatePhotoStat() {
 // ═══════════════════════════════════════════════════════
 // DIGITAL TWIN — Three.js GLB Viewer
 // ═══════════════════════════════════════════════════════
-const TWIN_GDRIVE_ID = '1GNPtIKo_YceqGftau6gmZ5KW8DAjtz53';
-const TWIN_GDRIVE_URL = `https://drive.google.com/uc?export=download&id=${TWIN_GDRIVE_ID}`;
-const TWIN_CORS_PROXY = `https://corsproxy.io/?${encodeURIComponent(TWIN_GDRIVE_URL)}`;
+// Model URL is stored per-project in projectModelUrl — no hardcoded IDs
 
 let twinRenderer=null, twinScene=null, twinCamera=null, twinControls=null, twinAnimId=null;
 let twinHotspots=[];  // { mesh, nodeId } for raycasting
@@ -783,20 +793,61 @@ function initTwin() {
     }
     animate();
 
-    // Load model
-    loadTwinModel(TWIN_CORS_PROXY);
+    // Restore saved model URL if project has one
+    if (projectModelUrl) {
+        const urlInp = document.getElementById('twin-url-input');
+        if (urlInp) urlInp.value = projectModelUrl;
+        const directUrl = gdriveToDirectUrl(projectModelUrl);
+        const isGdrive  = projectModelUrl.includes('drive.google.com');
+        const loadUrl   = isGdrive
+            ? `https://corsproxy.io/?${encodeURIComponent(directUrl)}`
+            : directUrl;
+        document.getElementById('twin-progress-wrap').style.display = 'block';
+        setTimeout(() => loadTwinModel(loadUrl, directUrl), 200);
+    } else {
+        document.getElementById('model-status').innerHTML =
+            '<span style="color:#888;">Paste a Google Drive or GLB URL above to load your model.</span>';
+    }
+}
+
+function gdriveToDirectUrl(url) {
+    // Convert any Google Drive share link to a direct download URL
+    // Handles: /file/d/ID/view, /open?id=ID, /uc?id=ID
+    const m = url.match(/(?:\/d\/|id=|open\?id=)([a-zA-Z0-9_-]{20,})/);
+    if (m) {
+        return `https://drive.google.com/uc?export=download&id=${m[1]}`;
+    }
+    return url; // already a direct URL
 }
 
 function loadTwinFromInput() {
-    const url = document.getElementById('twin-url-input').value.trim();
-    if (!url) return;
-    document.getElementById('twin-url-panel').style.display = 'none';
+    const raw = document.getElementById('twin-url-input').value.trim();
+    if (!raw) return;
+
+    // Convert Google Drive share link → direct download URL
+    const directUrl = gdriveToDirectUrl(raw);
+
+    // Save URL to project state so it persists with the project JSON
+    projectModelUrl = raw; // store original URL (friendlier for display)
+    saveCommandState();
+
+    // Try CORS proxy first for Google Drive URLs
+    const isGdrive = raw.includes('drive.google.com');
+    const loadUrl  = isGdrive
+        ? `https://corsproxy.io/?${encodeURIComponent(directUrl)}`
+        : directUrl;
+
     document.getElementById('twin-progress-wrap').style.display = 'block';
-    loadTwinModel(url);
+    document.getElementById('twin-progress-bar').style.width = '0%';
+    document.getElementById('twin-progress-pct').innerText = '0%';
+    if (!twinRenderer) initTwin();
+    loadTwinModel(loadUrl, directUrl);
 }
 
-function loadTwinModel(url) {
-    const loader = new THREE.GLTFLoader();
+function loadTwinModel(url, fallbackDirectUrl) {
+    if (!twinRenderer) { initTwin(); return; }
+
+    const loader   = new THREE.GLTFLoader();
     const progress = document.getElementById('twin-progress-bar');
     const pct      = document.getElementById('twin-progress-pct');
     const label    = document.getElementById('twin-progress-label');
@@ -804,6 +855,7 @@ function loadTwinModel(url) {
 
     label.innerText = 'Loading Digital Twin...';
     wrap.style.display = 'block';
+    progress.style.width = '0%';
 
     loader.load(
         url,
@@ -827,19 +879,13 @@ function loadTwinModel(url) {
             model.scale.setScalar(scale);
             model.position.sub(centre.multiplyScalar(scale));
 
-            // Update camera target
-            if (twinControls) {
-                twinControls.target.set(0, 0, 0);
-                twinControls.update();
-            }
+            if (twinControls) { twinControls.target.set(0,0,0); twinControls.update(); }
             twinCamera.position.set(0, 15, 80);
 
             wrap.style.display = 'none';
             document.getElementById('model-status').innerHTML =
                 '<span style="color:#0cf;">✅ Digital Twin loaded</span>';
             twinLoaded = true;
-
-            // Place inspection hotspot pins
             placeTwinHotspots(box, scale, centre);
         },
         (xhr) => {
@@ -851,12 +897,19 @@ function loadTwinModel(url) {
             }
         },
         (err) => {
-            console.warn('Twin load failed:', err);
+            console.warn('Twin load failed with URL:', url, err);
+            // If we were using a CORS proxy and have a fallback, try direct
+            if (fallbackDirectUrl && url !== fallbackDirectUrl) {
+                console.log('Retrying with direct URL...');
+                label.innerText = 'Retrying direct connection...';
+                progress.style.width = '0%';
+                loadTwinModel(fallbackDirectUrl, null);
+                return;
+            }
             wrap.style.display = 'none';
-            // Show URL input panel as fallback
-            document.getElementById('twin-url-panel').style.display = 'block';
             document.getElementById('model-status').innerHTML =
-                '<span style="color:#f39c12;">⚠️ Could not load from Google Drive</span>';
+                '<span style="color:#f39c12;">⚠️ Could not load model. Check URL and try again.</span>';
+            showToast('⚠️ Could not load 3D model. Try uploading the GLB file directly (button 3).', 7000, true);
         }
     );
 }
@@ -914,7 +967,7 @@ document.addEventListener('visibilitychange',()=>{
 function saveCommandState() {
     localStorage.setItem('strataCommandState',JSON.stringify({
         projectInfo,inspectionData,elevations,dropAssignments,
-        stitchedPairs,saved3DTags,manualLinks
+        stitchedPairs,saved3DTags,manualLinks,projectModelUrl
     }));
 }
 
@@ -930,6 +983,10 @@ function loadCommandState() {
         stitchedPairs  =s.stitchedPairs  ||[];
         saved3DTags    =s.saved3DTags    ||{};
         manualLinks    =s.manualLinks    ||{};
+        projectModelUrl=s.projectModelUrl||'';
+        // Restore model URL input field if it exists
+        const urlInput = document.getElementById('twin-url-input');
+        if (urlInput && projectModelUrl) urlInput.value = projectModelUrl;
         if (Object.keys(inspectionData).length>0) {
             document.getElementById('project-name').innerText='Project: '+projectInfo;
             document.getElementById('btn-reset').style.display        ='inline-block';
@@ -952,7 +1009,7 @@ function saveProject() {
     const a=document.createElement('a');
     a.href='data:text/json;charset=utf-8,'+encodeURIComponent(JSON.stringify({
         projectInfo,inspectionData,elevations,dropAssignments,
-        stitchedPairs,saved3DTags,manualLinks
+        stitchedPairs,saved3DTags,manualLinks,projectModelUrl
     }));
     a.download=`Strata_Project_${projectInfo.replace(/\s+/g,'_')}.json`;
     a.click();
@@ -1069,6 +1126,9 @@ async function handleFiles(files, forcedType=null) {
                         stitchedPairs  =p.stitchedPairs  ||[];
                         saved3DTags    =p.saved3DTags    ||{};
                         manualLinks    =p.manualLinks    ||{};
+        projectModelUrl=p.projectModelUrl||'';
+        const urlInp = document.getElementById('twin-url-input');
+        if (urlInp && projectModelUrl) urlInp.value = projectModelUrl;
                         document.getElementById('top-reload-banner').style.display='block';
                     } catch(e){}
                     res();
