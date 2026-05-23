@@ -744,16 +744,177 @@ function initTwin() {
     twinScene.add(dirL2);
 
     // Camera
-    twinCamera = new THREE.PerspectiveCamera(45, arena.clientWidth/arena.clientHeight, 0.1, 2000);
+    twinCamera = new THREE.PerspectiveCamera(45, arena.clientWidth/arena.clientHeight, 0.1, 5000);
     twinCamera.position.set(0, 20, 80);
 
-    // Orbit controls
-    if (typeof THREE.OrbitControls === 'function') {
-        twinControls = new THREE.OrbitControls(twinCamera, canvas);
-        twinControls.enableDamping = true;
-        twinControls.dampingFactor = 0.08;
-        twinControls.screenSpacePanning = true;
+    // ── Custom touch-optimized orbit controller ──────────────────
+    // Built from scratch for tablet use:
+    // • 1 finger / left mouse drag  → rotate around model centre
+    // • 2 finger pinch              → zoom
+    // • 2 finger pan / right drag   → pan
+    // • Double tap / double click   → reset to home view
+    // • Always pivots around model centre — no drift
+    const ctrl = {
+        target:    new THREE.Vector3(0,0,0),
+        spherical: new THREE.Spherical(80, Math.PI/3, 0),
+        panOffset: new THREE.Vector3(),
+        damping:   0.12,
+        // current animated state
+        _sph:      new THREE.Spherical(80, Math.PI/3, 0),
+        _pan:      new THREE.Vector3(),
+        update() {
+            // Damp toward target spherical
+            this._sph.radius += (this.spherical.radius - this._sph.radius) * this.damping;
+            this._sph.phi    += (this.spherical.phi    - this._sph.phi)    * this.damping;
+            this._sph.theta  += (this.spherical.theta  - this._sph.theta)  * this.damping;
+            this._pan.lerp(this.panOffset, this.damping);
+
+            // Clamp phi so model doesn't flip
+            this._sph.phi = Math.max(0.05, Math.min(Math.PI - 0.05, this._sph.phi));
+            this._sph.makeSafe();
+
+            const pos = new THREE.Vector3().setFromSpherical(this._sph);
+            const centre = this.target.clone().add(this._pan);
+            twinCamera.position.copy(centre).add(pos);
+            twinCamera.lookAt(centre);
+        }
+    };
+    twinControls = ctrl;
+
+    // Raycaster for pin clicking
+    const raycaster = new THREE.Raycaster();
+    const mouse3 = new THREE.Vector2();
+
+    // ── Pointer/touch state ──────────────────────────────────────
+    let ptrs = {};          // active pointers { id: {x,y} }
+    let lastTap = 0;        // for double-tap detection
+    let pointerDownPos = null;
+    let prevPinchDist  = null;
+    let prevMidpoint   = null;
+    let isDragging = false;
+
+    function ptrCount() { return Object.keys(ptrs).length; }
+    function pinchDist() {
+        const pts = Object.values(ptrs);
+        if (pts.length < 2) return null;
+        const dx = pts[0].x - pts[1].x, dy = pts[0].y - pts[1].y;
+        return Math.sqrt(dx*dx + dy*dy);
     }
+    function midpoint() {
+        const pts = Object.values(ptrs);
+        if (pts.length < 2) return null;
+        return { x:(pts[0].x+pts[1].x)/2, y:(pts[0].y+pts[1].y)/2 };
+    }
+
+    canvas.addEventListener('pointerdown', e => {
+        canvas.setPointerCapture(e.pointerId);
+        ptrs[e.pointerId] = {x:e.clientX, y:e.clientY};
+        pointerDownPos = {x:e.clientX, y:e.clientY};
+        isDragging = false;
+        if (ptrCount() === 2) {
+            prevPinchDist = pinchDist();
+            prevMidpoint  = midpoint();
+        }
+    });
+
+    canvas.addEventListener('pointermove', e => {
+        if (!ptrs[e.pointerId]) return;
+        const prev = {...ptrs[e.pointerId]};
+        ptrs[e.pointerId] = {x:e.clientX, y:e.clientY};
+
+        const dx = e.clientX - pointerDownPos.x;
+        const dy = e.clientY - pointerDownPos.y;
+        if (Math.sqrt(dx*dx+dy*dy) > 4) isDragging = true;
+
+        const rect = canvas.getBoundingClientRect();
+        const W = rect.width, H = rect.height;
+
+        if (ptrCount() === 1) {
+            // ── Rotate ──────────────────────────────────────────
+            const movX = e.clientX - prev.x;
+            const movY = e.clientY - prev.y;
+            ctrl.spherical.theta -= movX / W  * Math.PI * 1.5;
+            ctrl.spherical.phi   -= movY / H  * Math.PI * 1.2;
+
+        } else if (ptrCount() === 2) {
+            // ── Pinch zoom + two-finger pan ──────────────────────
+            const newDist = pinchDist();
+            const newMid  = midpoint();
+
+            if (prevPinchDist && newDist) {
+                const ratio = prevPinchDist / newDist;
+                ctrl.spherical.radius = Math.max(5, Math.min(500,
+                    ctrl.spherical.radius * ratio));
+            }
+
+            if (prevMidpoint && newMid) {
+                const panX = (newMid.x - prevMidpoint.x) / W;
+                const panY = (newMid.y - prevMidpoint.y) / H;
+                const right = new THREE.Vector3();
+                const up    = new THREE.Vector3();
+                twinCamera.getWorldDirection(new THREE.Vector3()); // ensure matrix up to date
+                right.setFromMatrixColumn(twinCamera.matrix, 0);
+                up.setFromMatrixColumn(twinCamera.matrix, 1);
+                const panSpeed = ctrl.spherical.radius * 0.8;
+                ctrl.panOffset.addScaledVector(right, -panX * panSpeed);
+                ctrl.panOffset.addScaledVector(up,     panY * panSpeed);
+            }
+
+            prevPinchDist = newDist;
+            prevMidpoint  = newMid;
+        }
+    });
+
+    canvas.addEventListener('pointerup', e => {
+        // ── Double tap to reset ──────────────────────────────────
+        const now = Date.now();
+        if (!isDragging && now - lastTap < 300) {
+            resetTwinCamera();
+        }
+        lastTap = now;
+
+        // ── Tap on hotspot pin ───────────────────────────────────
+        if (!isDragging && ptrCount() <= 1) {
+            const rect = canvas.getBoundingClientRect();
+            mouse3.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
+            mouse3.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouse3, twinCamera);
+            const hits = raycaster.intersectObjects(twinHotspots.map(h=>h.mesh));
+            if (hits.length) {
+                const h = twinHotspots.find(h => h.mesh === hits[0].object);
+                if (h) openModal(h.nodeId);
+            }
+        }
+
+        delete ptrs[e.pointerId];
+        if (ptrCount() < 2) { prevPinchDist = null; prevMidpoint = null; }
+        pointerDownPos = null;
+    });
+
+    // Mouse wheel zoom (desktop)
+    canvas.addEventListener('wheel', e => {
+        e.preventDefault();
+        ctrl.spherical.radius = Math.max(5, Math.min(500,
+            ctrl.spherical.radius * (e.deltaY > 0 ? 1.1 : 0.9)));
+    }, {passive:false});
+
+    // Right-click drag to pan (desktop)
+    let rmb = false, rmbPrev = null;
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+    canvas.addEventListener('mousedown', e => { if(e.button===2){rmb=true; rmbPrev={x:e.clientX,y:e.clientY};} });
+    canvas.addEventListener('mousemove', e => {
+        if (!rmb || !rmbPrev) return;
+        const rect = canvas.getBoundingClientRect();
+        const panX = (e.clientX - rmbPrev.x) / rect.width;
+        const panY = (e.clientY - rmbPrev.y) / rect.height;
+        const right = new THREE.Vector3().setFromMatrixColumn(twinCamera.matrix, 0);
+        const up    = new THREE.Vector3().setFromMatrixColumn(twinCamera.matrix, 1);
+        const speed = ctrl.spherical.radius * 0.8;
+        ctrl.panOffset.addScaledVector(right, -panX * speed);
+        ctrl.panOffset.addScaledVector(up,     panY * speed);
+        rmbPrev = {x:e.clientX, y:e.clientY};
+    });
+    canvas.addEventListener('mouseup', e => { if(e.button===2){rmb=false; rmbPrev=null;} });
 
     // Resize handler
     window.addEventListener('resize', () => {
@@ -764,31 +925,10 @@ function initTwin() {
         twinRenderer.setSize(a.clientWidth, a.clientHeight);
     });
 
-    // Raycaster for pin clicking
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-    let pointerDownPos = null;
-    canvas.addEventListener('pointerdown', e => { pointerDownPos = {x:e.clientX, y:e.clientY}; });
-    canvas.addEventListener('pointerup', e => {
-        if (!pointerDownPos) return;
-        const dx = e.clientX - pointerDownPos.x;
-        const dy = e.clientY - pointerDownPos.y;
-        if (Math.sqrt(dx*dx+dy*dy) > 5) return; // dragged, not clicked
-        const rect = canvas.getBoundingClientRect();
-        mouse.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
-        mouse.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
-        raycaster.setFromCamera(mouse, twinCamera);
-        const hits = raycaster.intersectObjects(twinHotspots.map(h=>h.mesh));
-        if (hits.length) {
-            const h = twinHotspots.find(h => h.mesh === hits[0].object);
-            if (h) openModal(h.nodeId);
-        }
-    });
-
     // Animation loop
     function animate() {
         twinAnimId = requestAnimationFrame(animate);
-        if (twinControls) twinControls.update();
+        ctrl.update();
         twinRenderer.render(twinScene, twinCamera);
     }
     animate();
@@ -879,8 +1019,16 @@ function loadTwinModel(url, fallbackDirectUrl) {
             model.scale.setScalar(scale);
             model.position.sub(centre.multiplyScalar(scale));
 
-            if (twinControls) { twinControls.target.set(0,0,0); twinControls.update(); }
-            twinCamera.position.set(0, 15, 80);
+            // Set orbit radius based on actual model size
+            const modelRadius = Math.max(size.x, size.y, size.z) * scale * 1.5;
+            if (twinControls) {
+                twinControls.target.set(0,0,0);
+                twinControls.spherical.set(modelRadius, Math.PI/3, 0);
+                twinControls._sph.set(modelRadius, Math.PI/3, 0);
+                twinControls.panOffset.set(0,0,0);
+                twinControls._pan.set(0,0,0);
+            }
+            twinCamera.position.set(0, modelRadius*0.3, modelRadius);
 
             wrap.style.display = 'none';
             document.getElementById('model-status').innerHTML =
@@ -940,8 +1088,11 @@ function placeTwinHotspots(modelBox, modelScale, modelCentre) {
 
 function resetTwinCamera() {
     if (!twinCamera||!twinControls) return;
-    twinCamera.position.set(0, 15, 80);
-    twinControls.target.set(0, 0, 0);
+    twinControls.spherical.set(80, Math.PI/3, 0);
+    twinControls._sph.set(80, Math.PI/3, 0);
+    twinControls.panOffset.set(0,0,0);
+    twinControls._pan.set(0,0,0);
+    twinControls.target.set(0,0,0);
     twinControls.update();
 }
 
