@@ -769,8 +769,8 @@ function initTwin() {
             this._sph.theta  += (this.spherical.theta  - this._sph.theta)  * this.damping;
             this._pan.lerp(this.panOffset, this.damping);
 
-            // Clamp phi so model doesn't flip
-            this._sph.phi = Math.max(0.05, Math.min(Math.PI - 0.05, this._sph.phi));
+            // Clamp animated phi
+            this._sph.phi = Math.max(0.05, Math.min(Math.PI * 0.95, this._sph.phi));
             this._sph.makeSafe();
 
             const pos = new THREE.Vector3().setFromSpherical(this._sph);
@@ -833,8 +833,10 @@ function initTwin() {
             // ── Rotate ──────────────────────────────────────────
             const movX = e.clientX - prev.x;
             const movY = e.clientY - prev.y;
-            ctrl.spherical.theta -= movX / W  * Math.PI * 1.5;
-            ctrl.spherical.phi   -= movY / H  * Math.PI * 1.2;
+            ctrl.spherical.theta -= movX / W * Math.PI * 2.0;
+            ctrl.spherical.phi   += movY / H * Math.PI * 1.5;
+            // Clamp phi so model doesn't flip upside down
+            ctrl.spherical.phi = Math.max(0.05, Math.min(Math.PI * 0.95, ctrl.spherical.phi));
 
         } else if (ptrCount() === 2) {
             // ── Pinch zoom + two-finger pan ──────────────────────
