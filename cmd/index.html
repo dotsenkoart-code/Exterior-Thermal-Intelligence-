@@ -92,7 +92,7 @@
         .status-confirmed { background:#d9534f; }
         .status-void      { background:transparent;border:2px solid transparent;cursor:default;pointer-events:none; }
 
-        #arena-auto3d, #arena-true3d { display:none;flex-grow:1;width:100%;background:#0f111a;border:1px solid #0cf;border-radius:12px;overflow:hidden;position:relative;box-shadow:0 0 30px rgba(0,204,255,0.1); }
+        #arena-true3d { display:none;flex-grow:1;width:100%;background:#0f111a;border:1px solid #0cf;border-radius:12px;overflow:hidden;position:relative;box-shadow:0 0 30px rgba(0,204,255,0.1); }
         #arena-true3d { background:radial-gradient(circle,#2a2d38 0%,#0f111a 100%);border-color:#5a2e7a;box-shadow:0 0 30px rgba(176,85,255,0.2); }
         model-viewer { width:100%;height:100%;outline:none; }
         .btn-fullscreen { position:absolute;top:15px;right:15px;background:rgba(0,0,0,0.7);color:#fff;border:1px solid #555;z-index:100;padding:10px 15px;border-radius:6px;font-weight:bold;cursor:pointer; }
@@ -137,11 +137,38 @@
         .toggle-pill.showing-dc .pill-ir { background:#222;color:#555; }
         .toggle-pill.showing-dc .pill-dc { background:#e0e0e0;color:#000; }
         .toggle-pill.no-dc { opacity:0.4;cursor:default;pointer-events:none; }
-        .photo-viewer-wrap { border-radius:8px;overflow:hidden;background:#000;border:2px solid #333; }
-        .photo-viewer-wrap img { width:100%;display:block;cursor:pointer; }
+        .photo-viewer-wrap { border-radius:8px;overflow:hidden;background:#000;border:2px solid #333;position:relative;aspect-ratio:4/3; }
+        .photo-viewer-wrap img { width:100%;height:100%;display:block;cursor:pointer;object-fit:contain; }
 
         .no-photo-banner { background:#111;color:#555;padding:20px;text-align:center;border-radius:8px;border:2px dashed #333;margin-bottom:12px;font-size:0.9rem;font-weight:bold; }
         .stale-banner { background:#1a1400;color:#f1c40f;padding:8px 12px;border-radius:6px;border:1px solid #f1c40f44;font-size:0.8rem;font-weight:bold;margin-bottom:10px;display:none; }
+        /* Repair Planner */
+        #repair-planner { display:none;flex-direction:column;height:100%;width:100%; }
+        .rp-header { display:flex;align-items:center;justify-content:space-between;margin-bottom:15px;flex-shrink:0; }
+        .rp-group { background:#161922;border:1px solid #2a2d38;border-radius:10px;margin-bottom:16px;overflow:hidden; }
+        .rp-group-header { display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;user-select:none;border-bottom:1px solid #2a2d38; }
+        .rp-group-title { font-size:1rem;font-weight:900;flex:1; }
+        .rp-group-count { background:rgba(0,0,0,0.4);color:#888;padding:3px 10px;border-radius:20px;font-size:0.8rem;font-weight:bold; }
+        .rp-group-body { padding:10px; }
+        .rp-card { display:flex;gap:12px;align-items:flex-start;background:#1a1d27;border-radius:8px;padding:12px;margin-bottom:8px;border:1px solid #333;cursor:pointer;transition:border-color 0.15s; }
+        .rp-card:hover { border-color:#0cf; }
+        .rp-thumb { width:80px;height:60px;border-radius:6px;object-fit:cover;background:#111;flex-shrink:0;border:1px solid #333; }
+        .rp-thumb-empty { width:80px;height:60px;border-radius:6px;background:#111;flex-shrink:0;border:1px dashed #333;display:flex;align-items:center;justify-content:center;color:#333;font-size:1.2rem; }
+        .rp-info { flex:1;min-width:0; }
+        .rp-id { font-size:1rem;font-weight:900;color:#0cf;margin-bottom:3px; }
+        .rp-location { font-size:0.75rem;color:#888;margin-bottom:6px; }
+        .rp-priority { display:inline-flex;gap:4px;margin-bottom:6px; }
+        .rp-pri-btn { padding:3px 10px;font-size:0.7rem;font-weight:bold;border-radius:4px;border:1px solid #444;cursor:pointer;background:#222;color:#666;transition:0.15s; }
+        .rp-pri-btn.active-high { background:#d9534f;color:#fff;border-color:#d9534f; }
+        .rp-pri-btn.active-med  { background:#f1c40f;color:#000;border-color:#f1c40f; }
+        .rp-pri-btn.active-low  { background:#28a745;color:#fff;border-color:#28a745; }
+        .rp-defect-tag { display:inline-flex;flex-wrap:wrap;gap:4px; }
+        .rp-tag { padding:2px 8px;font-size:0.68rem;font-weight:bold;border-radius:3px;background:#2a2d38;color:#aaa;border:1px solid #444; }
+        .rp-filter-bar { display:flex;gap:8px;flex-wrap:wrap;margin-bottom:15px;flex-shrink:0; }
+        .rp-filter-btn { padding:8px 16px;border-radius:6px;border:1px solid #444;background:#1a1d27;color:#888;font-size:0.8rem;font-weight:bold;cursor:pointer;transition:0.15s; }
+        .rp-filter-btn.active { background:#0cf;color:#000;border-color:#0cf; }
+        .rp-empty { padding:40px;text-align:center;color:#444;font-size:1rem; }
+
         /* Photo move mode */
         .photo-move-btn { padding:3px 10px;font-size:0.7rem;font-weight:bold;background:#1a2a3a;color:#0cf;border:1px solid #0cf;border-radius:4px;cursor:pointer;margin-left:8px;text-transform:uppercase;letter-spacing:0.5px; }
         .photo-move-btn:hover { background:#0cf;color:#000; }
@@ -197,6 +224,7 @@
     <div class="header-btns">
         <button class="btn btn-dark"   id="btn-reset"        style="display:none;" onclick="resetBoard()">🔄 CLEAR DATA</button>
         <button class="btn btn-dark"   id="btn-edit-map"     style="display:none;" onclick="editMapping()">🗺️ EDIT MAP</button>
+
         <button class="btn btn-purple" id="btn-save-project" style="display:none;" onclick="saveProject()">📦 SAVE PROJECT</button>
     </div>
 </div>
@@ -228,7 +256,7 @@
         <div class="view-controls">
             <span style="color:#888;font-weight:bold;font-size:0.9rem;margin-right:10px;">MODE:</span>
             <button class="view-toggle-btn active" id="btn-2d"     onclick="switchView('2d')">2D TABS</button>
-            <button class="view-toggle-btn"         id="btn-auto3d" onclick="switchView('auto3d')" style="background:#1d212f;border:1px solid #0cf;color:#0cf;">🏢 AUTO 3D</button>
+            <button class="view-toggle-btn"         id="btn-repair" onclick="switchView('repair')" style="background:#1a1200;border:1px solid #f39c12;color:#f39c12;">🔧 REPAIR PLANNER <span id="rp-badge" style="display:none;background:#f39c12;color:#000;border-radius:10px;padding:1px 7px;font-size:0.7rem;margin-left:3px;"></span></button>
             <button class="view-toggle-btn"         id="btn-true3d" onclick="switchView('true3d')">✨ TRUE 3D TWIN</button>
             <div style="flex:0.2;"></div>
             <button class="view-toggle-btn stitch-toggle" style="border:1px solid #555;" onclick="toggleStitchMode()">🔗 STITCH WINDOWS</button>
@@ -261,13 +289,26 @@
         <div class="tabs-container" id="tabs-container"></div>
         <div id="view-2d"><div id="building-container-2d"></div></div>
 
-        <div id="arena-auto3d">
-            <button class="btn-fullscreen" onclick="toggleFullScreen('arena-auto3d')">⛶ FULL SCREEN</button>
-            <div id="procedural-3d-container" style="width:100%;height:100%;cursor:grab;"></div>
-            <div style="position:absolute;top:15px;left:15px;color:#fff;font-size:0.9rem;font-weight:bold;background:rgba(0,0,0,0.7);padding:12px;border-radius:8px;border:1px solid #0cf;pointer-events:none;z-index:100;">
-                <strong>Auto-Generated 3D Elevation</strong><br>
-                <span style="font-weight:normal;color:#ccc;">Select tabs above to change walls.</span>
+        <div id="arena-repair" style="display:none;flex-direction:column;height:100%;width:100%;overflow:hidden;">
+            <!-- Summary bar -->
+            <div id="rp-summary-bar" style="display:flex;gap:8px;padding:12px 0 0 0;flex-shrink:0;"></div>
+            <!-- Filter bar -->
+            <div class="rp-filter-bar" id="rp-filter-bar" style="padding:10px 0 0 0;">
+                <button class="rp-filter-btn active" onclick="rpSetFilter('ALL')" data-filter="ALL">ALL</button>
+                <button class="rp-filter-btn" onclick="rpSetFilter('HIGH')"  data-filter="HIGH">🔴 HIGH</button>
+                <button class="rp-filter-btn" onclick="rpSetFilter('MED')"   data-filter="MED">🟡 MED</button>
+                <button class="rp-filter-btn" onclick="rpSetFilter('LOW')"   data-filter="LOW">🟢 LOW</button>
+                <button class="rp-filter-btn" onclick="rpSetFilter('NONE')"  data-filter="NONE">⬜ UNSET</button>
+                <div style="flex:1;"></div>
+                <!-- Group by -->
+                <div style="display:flex;gap:3px;background:#111;border:1px solid #444;border-radius:6px;padding:3px;">
+                    <button id="rp-grp-defect"    onclick="rpSetGroupBy('defect')"    style="padding:5px 10px;font-size:0.72rem;font-weight:bold;border:none;border-radius:4px;cursor:pointer;background:#f39c12;color:#000;">BY DEFECT</button>
+                    <button id="rp-grp-elevation" onclick="rpSetGroupBy('elevation')" style="padding:5px 10px;font-size:0.72rem;font-weight:bold;border:none;border-radius:4px;cursor:pointer;background:transparent;color:#888;">BY ELEVATION</button>
+                    <button id="rp-grp-drop"      onclick="rpSetGroupBy('drop')"      style="padding:5px 10px;font-size:0.72rem;font-weight:bold;border:none;border-radius:4px;cursor:pointer;background:transparent;color:#888;">BY DROP</button>
+                </div>
             </div>
+            <!-- Groups -->
+            <div id="rp-groups" style="flex:1;overflow-y:auto;padding-top:12px;"></div>
         </div>
 
         <div id="arena-true3d">
@@ -316,6 +357,8 @@
     </div>
 </div>
 
+<!-- Repair Planner is now the built-in tab replacing AUTO 3D -->
+
 <!-- WINDOW MODAL -->
 <div class="modal-overlay" id="info-modal">
     <div class="modal-box">
@@ -324,6 +367,7 @@
         <button class="btn btn-dark btn-block" id="btn-retag"   style="display:none;margin-bottom:10px;border-color:#0cf;color:#0cf;"       onclick="startReTag()">📍 RE-TAG POSITION</button>
         <button class="btn btn-dark btn-block" id="btn-unpin"   style="display:none;margin-bottom:10px;border-color:#d080ff;color:#d080ff;"  onclick="unpinCurrent()">🗑️ REMOVE 3D PIN</button>
         <button class="btn btn-dark btn-block" id="btn-unmerge" style="display:none;margin-bottom:15px;border-color:#f39c12;color:#f39c12;" onclick="unmergeCurrent()">✂️ UN-STITCH WINDOWS</button>
+        <button class="btn btn-dark btn-block" id="btn-add-planner" style="margin-bottom:8px;border-color:#f39c12;color:#f39c12;" onclick="toggleRepairPlannerEntry()">🔧 ADD TO REPAIR PLANNER</button>
         <div id="m-stale-banner" class="stale-banner">📷 Photo references exist but images not loaded. Re-upload your ZIP to restore photos.</div>
         <div id="m-photo-area"></div>
         <div class="data-row">
@@ -412,6 +456,8 @@ let wakeLock            = null;
 let modalNodeId         = null;
 let photoMoveMode       = null; // { photoName, fromNodeId } when move is active
 let projectModelUrl     = '';   // Google Drive or direct URL for this project's 3D model
+let repairPriorities    = {};   // { nodeId: 'HIGH'|'MED'|'LOW' }
+let repairTags          = {};   // { nodeId: [tag, ...] } custom defect tags per window
 
 /*
  * imageBank: { CLEAN_UPPER_NAME: { url, dcUrl, time, drop } }
@@ -500,8 +546,10 @@ function extractEmbeddedDC(buf) {
         if (idx===-1) break;
         const info=walkJpeg(idx);
         if (info&&info.w>=320&&info.h>=240) {
-            const sz=info.end-info.start;
-            if (!best||sz>best.sz) best={...info,sz};
+            // Pick by pixel area (w*h), not byte size
+            // This ensures we get the full-resolution DC, not a compressed thumbnail
+            const area=info.w*info.h;
+            if (!best||area>best.area) best={...info,area};
         }
         pos=idx+1;
     }
@@ -601,14 +649,15 @@ function parseExifTimestamp(buf) {
 // DC-only files (FLIR segment count < 3) are silently ignored —
 // all DC content is already embedded inside the IR file.
 // Returns true if ingested as IR, false if skipped.
-// Convert Uint8Array to base64 data URL — works in all contexts
-// (PWA webview, sandboxed iframe, local file) unlike blob URLs which
-// are blocked by WKWebView and claude.ai CSP.
+// Convert Uint8Array to base64 data URL.
+// Uses a safe chunked approach that avoids stack overflow on large files.
 function bytesToDataURL(bytes, mime) {
+    // Build binary string in small chunks to avoid call stack overflow
+    // from spreading large Uint8Arrays
     let bin = '';
-    const chunk = 8192;
-    for (let i = 0; i < bytes.length; i += chunk) {
-        bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
+    const len = bytes.length;
+    for (let i = 0; i < len; i++) {
+        bin += String.fromCharCode(bytes[i]);
     }
     return `data:${mime};base64,${btoa(bin)}`;
 }
@@ -783,6 +832,7 @@ function loadTwinModel(url, fallbackDirectUrl) {
             '<span style="color:#0cf;">✅ Digital Twin loaded</span>';
         twinLoaded = true;
         placeTwinHotspots(null, 1, null);
+        setupTwinTagging();
     }, {once: true});
 
     mv.addEventListener('error', () => {
@@ -837,7 +887,6 @@ function resetTwinCamera() {
 
 function initApp() {
     requestWakeLock();
-    detectBlobSupport();
     loadCommandState();
     initLightboxZoom();
     initGlobalDragDrop();
@@ -857,7 +906,8 @@ document.addEventListener('visibilitychange',()=>{
 function saveCommandState() {
     localStorage.setItem('strataCommandState',JSON.stringify({
         projectInfo,inspectionData,elevations,dropAssignments,
-        stitchedPairs,saved3DTags,manualLinks,projectModelUrl
+        stitchedPairs,saved3DTags,manualLinks,projectModelUrl,
+        repairPriorities,repairTags
     }));
 }
 
@@ -873,14 +923,17 @@ function loadCommandState() {
         stitchedPairs  =s.stitchedPairs  ||[];
         saved3DTags    =s.saved3DTags    ||{};
         manualLinks    =s.manualLinks    ||{};
-        projectModelUrl=s.projectModelUrl||'';
+        projectModelUrl   =s.projectModelUrl   ||'';
+        repairPriorities  =s.repairPriorities  ||{};
+        repairTags        =s.repairTags        ||{};
         // Restore model URL input field if it exists
         const urlInput = document.getElementById('twin-url-input');
         if (urlInput && projectModelUrl) urlInput.value = projectModelUrl;
         if (Object.keys(inspectionData).length>0) {
             document.getElementById('project-name').innerText='Project: '+projectInfo;
             document.getElementById('btn-reset').style.display        ='inline-block';
-            document.getElementById('btn-save-project').style.display ='inline-block';
+            document.getElementById('btn-save-project').style.display    ='inline-block';
+            
             if (elevations.length>0) {
                 document.getElementById('dashboard-screen').style.display='flex';
                 document.getElementById('btn-edit-map').style.display    ='inline-block';
@@ -899,7 +952,8 @@ function saveProject() {
     const a=document.createElement('a');
     a.href='data:text/json;charset=utf-8,'+encodeURIComponent(JSON.stringify({
         projectInfo,inspectionData,elevations,dropAssignments,
-        stitchedPairs,saved3DTags,manualLinks,projectModelUrl
+        stitchedPairs,saved3DTags,manualLinks,projectModelUrl,
+        repairPriorities,repairTags
     }));
     a.download=`Strata_Project_${projectInfo.replace(/\s+/g,'_')}.json`;
     a.click();
@@ -1016,7 +1070,9 @@ async function handleFiles(files, forcedType=null) {
                         stitchedPairs  =p.stitchedPairs  ||[];
                         saved3DTags    =p.saved3DTags    ||{};
                         manualLinks    =p.manualLinks    ||{};
-        projectModelUrl=p.projectModelUrl||'';
+        projectModelUrl   =p.projectModelUrl   ||'';
+        repairPriorities  =p.repairPriorities  ||{};
+        repairTags        =p.repairTags        ||{};
         const urlInp = document.getElementById('twin-url-input');
         if (urlInp && projectModelUrl) urlInp.value = projectModelUrl;
                         document.getElementById('top-reload-banner').style.display='block';
@@ -1103,8 +1159,8 @@ async function handleFiles(files, forcedType=null) {
         if (document.getElementById('dashboard-screen').style.display==='flex') {
             if (activeTab) Object.keys(dropAssignments).forEach(d=>{if(!dropAssignments[d])dropAssignments[d]=activeTab;});
             calculateBuildingGeometry();
-            if (currentMode==='2d'||currentMode==='auto3d') refreshCurrentView();
-            if (currentMode==='auto3d') buildProcedural3D();
+            if (currentMode==='2d') refreshCurrentView();
+            
         } else if (newCsvAdded||isProjectLoaded) {
             if (rowsParsed>0||isProjectLoaded) {
                 document.getElementById('btn-start-mapping').style.display='block';
@@ -1520,8 +1576,8 @@ function setFilter(f) {
         const el=document.getElementById('filter-card-'+k);
         if (el) el.classList.toggle('dimmed',activeFilter!=='ALL'&&(k==='all'||activeFilter!=='status-'+k));
     });
-    if (currentMode==='2d'||currentMode==='auto3d') refreshCurrentView();
-    if (currentMode==='auto3d') buildProcedural3D();
+    if (currentMode==='2d') refreshCurrentView();
+    
     render3DHotspots();
 }
 
@@ -1604,7 +1660,7 @@ function handleNodeClick(data,el) {
                 document.querySelectorAll('.stitch-toggle').forEach(b=>b.classList.remove('stitch-mode-on'));
                 calculateBuildingGeometry();saveCommandState();
                 if (currentMode==='2d') refreshCurrentView();
-                if (currentMode==='auto3d') buildProcedural3D();
+                
             });
             return;
         }
@@ -1615,7 +1671,7 @@ function handleNodeClick(data,el) {
             document.querySelectorAll('.stitch-toggle').forEach(b=>b.classList.remove('stitch-mode-on'));
             stitchSelection=[];saveCommandState();
             if (currentMode==='2d') refreshCurrentView();
-            if (currentMode==='auto3d') buildProcedural3D();
+            
         }
         return;
     }
@@ -1625,21 +1681,28 @@ function handleNodeClick(data,el) {
 function switchView(mode) {
     currentMode=mode;
     document.getElementById('btn-2d').classList.toggle('active',mode==='2d');
-    const ba=document.getElementById('btn-auto3d');
-    ba.style.background=mode==='auto3d'?'#0cf':'#1d212f';
-    ba.style.color      =mode==='auto3d'?'#000':'#0cf';
     document.getElementById('btn-true3d').classList.toggle('active',mode==='true3d');
-    document.getElementById('view-2d').style.display       =mode==='2d'    ?'flex' :'none';
-    document.getElementById('arena-auto3d').style.display  =mode==='auto3d'?'block':'none';
-    document.getElementById('arena-true3d').style.display  =mode==='true3d'?'block':'none';
-    document.getElementById('tabs-container').style.display=mode==='true3d'?'none' :'flex';
-    if (mode==='2d'||mode==='auto3d') refreshCurrentView();
-    if (mode==='auto3d') setTimeout(buildProcedural3D,100);
+
+    // Repair planner button highlight
+    const brp = document.getElementById('btn-repair');
+    if (brp) {
+        brp.style.background = mode==='repair' ? '#f39c12' : '#1a1200';
+        brp.style.color      = mode==='repair' ? '#000'    : '#f39c12';
+        brp.style.borderColor= '#f39c12';
+    }
+
+    document.getElementById('view-2d').style.display        = mode==='2d'     ? 'flex'  : 'none';
+    document.getElementById('arena-repair').style.display   = mode==='repair' ? 'flex'  : 'none';
+    document.getElementById('arena-true3d').style.display   = mode==='true3d' ? 'block' : 'none';
+    document.getElementById('tabs-container').style.display = mode==='true3d' ? 'none'  : 'flex';
+
+    if (mode==='2d') refreshCurrentView();
+    if (mode==='repair') renderRepairPlanner();
     if (mode==='true3d') setTimeout(initTwin, 100);
 }
 
 function refreshCurrentView() {
-    if (currentMode!=='2d'&&currentMode!=='auto3d') return;
+    if (currentMode!=='2d') return;
     const cont=document.getElementById('tabs-container');
     cont.innerHTML='';
     const used=new Set(Object.values(dropAssignments));
@@ -1648,7 +1711,7 @@ function refreshCurrentView() {
         const tab=document.createElement('div');
         tab.className=`tab ${activeTab===elev?'active':''}`;
         tab.innerText=elev;
-        tab.onclick=()=>{activeTab=elev;refreshCurrentView();if(currentMode==='auto3d')buildProcedural3D();};
+        tab.onclick=()=>{activeTab=elev;refreshCurrentView();};
         cont.appendChild(tab);
     });
     if (!used.has(activeTab)) activeTab=used.size?Array.from(used)[0]:'';
@@ -1750,11 +1813,16 @@ function buildPhotoArea(nodes) {
             const img=document.createElement('img');
             img.src=photoViewState[irName]==='dc'&&hasDC?entry.dcUrl:entry.url;
             img.onerror=()=>{
-                img.style.cssText='display:none';
-                const err=document.createElement('div');
-                err.style.cssText='background:#1a0000;color:#f66;padding:10px;font-size:0.8rem;border-radius:4px;';
-                err.innerText=`⚠️ Could not display ${irName} — try re-uploading ZIP`;
-                vw.appendChild(err);
+                // Data URL failed — try re-fetching from imageBank in case
+                // the entry was updated after initial load
+                const retry = imageBank[irName];
+                if (retry && img.src !== retry.url) {
+                    img.src = photoViewState[irName]==='dc' && retry.dcUrl
+                        ? retry.dcUrl : retry.url;
+                } else {
+                    img.style.cssText='opacity:0.3;filter:grayscale(1)';
+                    img.alt = irName;
+                }
             };
 
             // Toggle bar — references img which is now already declared above
@@ -1799,7 +1867,13 @@ function buildPhotoArea(nodes) {
                 };
             })(irName, entry);
 
-            vw.appendChild(img);wrap.appendChild(vw);
+            vw.appendChild(img);
+            // Zoom hint
+            const hint = document.createElement('div');
+            hint.style.cssText='text-align:center;color:#444;font-size:0.65rem;padding:3px 0 1px;';
+            hint.innerText='Tap photo to zoom';
+            wrap.appendChild(vw);
+            wrap.appendChild(hint);
             area.appendChild(wrap);
         });
     });
@@ -1816,6 +1890,173 @@ function buildPhotoArea(nodes) {
     slot.innerHTML='<span>🌡</span><span>Drop or click to manually add an IR photo</span>';
     setupDropSlot(slot, nodes[0]?.id);
     area.appendChild(slot);
+}
+
+function toggleRepairPlannerEntry() {
+    if (!modalNodeId) return;
+    const nodeId = modalNodeId;
+
+    if (repairPriorities[nodeId]) {
+        // Already in planner — remove it
+        delete repairPriorities[nodeId];
+        delete repairTags[nodeId];
+        saveCommandState();
+        updatePlannerBtn(nodeId);
+        showToast(`Removed ${nodeId} from Repair Planner`, 3000);
+    } else {
+        // Not in planner — add it with a defect type picker
+        addToRepairPlanner(nodeId);
+    }
+}
+
+function addToRepairPlanner(nodeId) {
+    // Show inline picker in modal
+    const existing = document.getElementById('rp-modal-picker');
+    if (existing) { existing.remove(); return; }
+
+    const picker = document.createElement('div');
+    picker.id = 'rp-modal-picker';
+    picker.style.cssText = 'background:#111;border:1px solid #f39c12;border-radius:8px;padding:14px;margin-bottom:12px;';
+    picker.innerHTML = `
+        <div style="color:#f39c12;font-size:0.8rem;font-weight:bold;text-transform:uppercase;margin-bottom:10px;">Defect Type</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;" id="rp-cat-btns">
+            ${DEFECT_CATEGORIES.map(c =>
+                `<button onclick="rpToggleCat(this,'${c.replace(/'/g,"\'")}',true)"
+                    style="padding:5px 12px;font-size:0.75rem;font-weight:bold;border-radius:4px;
+                    border:1px solid ${DEFECT_COLORS[c]||'#7f8c8d'}44;
+                    background:transparent;color:${DEFECT_COLORS[c]||'#aaa'};cursor:pointer;"
+                    data-cat="${c}">${c}</button>`
+            ).join('')}
+            <button onclick="rpAddCustomCat()" style="padding:5px 12px;font-size:0.75rem;font-weight:bold;border-radius:4px;border:1px dashed #555;background:transparent;color:#555;cursor:pointer;">+ Custom</button>
+        </div>
+        <div style="color:#f39c12;font-size:0.8rem;font-weight:bold;text-transform:uppercase;margin-bottom:8px;">Priority</div>
+        <div style="display:flex;gap:6px;margin-bottom:12px;">
+            <button onclick="rpPickPri(this,'HIGH')" data-pri="HIGH"
+                style="flex:1;padding:7px;font-size:0.8rem;font-weight:bold;border-radius:4px;border:1px solid #d9534f;background:transparent;color:#d9534f;cursor:pointer;">
+                🔴 HIGH</button>
+            <button onclick="rpPickPri(this,'MED')" data-pri="MED"
+                style="flex:1;padding:7px;font-size:0.8rem;font-weight:bold;border-radius:4px;border:1px solid #f1c40f;background:transparent;color:#f1c40f;cursor:pointer;">
+                🟡 MED</button>
+            <button onclick="rpPickPri(this,'LOW')" data-pri="LOW"
+                style="flex:1;padding:7px;font-size:0.8rem;font-weight:bold;border-radius:4px;border:1px solid #28a745;background:transparent;color:#28a745;cursor:pointer;">
+                🟢 LOW</button>
+        </div>
+        <button onclick="rpConfirmAdd('${nodeId}')"
+            style="width:100%;padding:10px;background:#f39c12;color:#000;border:none;border-radius:6px;font-weight:bold;font-size:0.9rem;cursor:pointer;">
+            ✅ ADD TO REPAIR PLANNER</button>`;
+
+    // Insert before the stale banner
+    const stale = document.getElementById('m-stale-banner');
+    stale.parentNode.insertBefore(picker, stale);
+    picker._selectedCats = [];
+    picker._selectedPri  = 'MED';
+    // Pre-select MED
+    picker.querySelector('[data-pri="MED"]').click();
+}
+
+function rpToggleCat(btn, cat) {
+    const picker = document.getElementById('rp-modal-picker');
+    if (!picker) return;
+    const idx = picker._selectedCats.indexOf(cat);
+    if (idx === -1) {
+        picker._selectedCats.push(cat);
+        btn.style.background = DEFECT_COLORS[cat] || '#7f8c8d';
+        btn.style.color = '#fff';
+    } else {
+        picker._selectedCats.splice(idx, 1);
+        btn.style.background = 'transparent';
+        btn.style.color = DEFECT_COLORS[cat] || '#aaa';
+    }
+}
+
+function rpAddCustomCat() {
+    const picker = document.getElementById('rp-modal-picker');
+    if (!picker) return;
+    // Show inline input instead of prompt()
+    const existing = picker.querySelector('#rp-custom-input-row');
+    if (existing) { existing.remove(); return; }
+    const row = document.createElement('div');
+    row.id = 'rp-custom-input-row';
+    row.style.cssText = 'display:flex;gap:6px;margin-top:6px;';
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.placeholder = 'Custom defect type...';
+    inp.style.cssText = 'flex:1;padding:6px 10px;background:#111;color:#fff;border:1px solid #f39c12;border-radius:4px;font-size:0.8rem;';
+    const ok = document.createElement('button');
+    ok.innerText = 'ADD';
+    ok.style.cssText = 'padding:6px 12px;background:#f39c12;color:#000;border:none;border-radius:4px;font-weight:bold;cursor:pointer;font-size:0.8rem;';
+    ok.onclick = () => {
+        const t = inp.value.trim();
+        if (!t) return;
+        if (!DEFECT_CATEGORIES.includes(t)) {
+            DEFECT_CATEGORIES.splice(DEFECT_CATEGORIES.length - 1, 0, t);
+            DEFECT_COLORS[t] = '#7f8c8d';
+        }
+        if (!picker._selectedCats.includes(t)) picker._selectedCats.push(t);
+        const btnsDiv = picker.querySelector('#rp-cat-btns');
+        const newBtn = document.createElement('button');
+        newBtn.style.cssText = 'padding:5px 12px;font-size:0.75rem;font-weight:bold;border-radius:4px;border:1px solid #7f8c8d;background:#7f8c8d;color:#fff;cursor:pointer;';
+        newBtn.dataset.cat = t;
+        newBtn.innerText = t;
+        newBtn.onclick = () => rpToggleCat(newBtn, t);
+        btnsDiv.insertBefore(newBtn, btnsDiv.lastElementChild);
+        row.remove();
+    };
+    inp.onkeypress = e => { if (e.key === 'Enter') ok.click(); };
+    row.appendChild(inp); row.appendChild(ok);
+    const btnsDiv = picker.querySelector('#rp-cat-btns');
+    btnsDiv.parentNode.insertBefore(row, btnsDiv.nextSibling);
+    inp.focus();
+}
+
+function rpPickPri(btn, pri) {
+    const picker = document.getElementById('rp-modal-picker');
+    if (!picker) return;
+    picker._selectedPri = pri;
+    picker.querySelectorAll('[data-pri]').forEach(b => {
+        const p = b.dataset.pri;
+        const colors = {HIGH:'#d9534f',MED:'#f1c40f',LOW:'#28a745'};
+        b.style.background = p === pri ? colors[p] : 'transparent';
+        b.style.color = p === pri ? (p==='MED'?'#000':'#fff') : colors[p];
+    });
+}
+
+function rpConfirmAdd(nodeId) {
+    const picker = document.getElementById('rp-modal-picker');
+    if (!picker) return;
+
+    const cats = picker._selectedCats.length ? picker._selectedCats : ['Other'];
+    const pri  = picker._selectedPri || 'MED';
+
+    repairPriorities[nodeId] = pri;
+    repairTags[nodeId] = cats;
+
+    picker.remove();
+    saveCommandState();
+    updatePlannerBtn(nodeId);
+    showToast(`✅ ${nodeId} added to Repair Planner`, 3000);
+}
+
+function updatePlannerBtn(nodeId) {
+    const btn = document.getElementById('btn-add-planner');
+    if (!btn) return;
+    const inPlanner = !!repairPriorities[nodeId];
+    btn.innerText = inPlanner ? '✅ IN REPAIR PLANNER (tap to remove)' : '🔧 ADD TO REPAIR PLANNER';
+    btn.style.borderColor = inPlanner ? '#28a745' : '#f39c12';
+    btn.style.color       = inPlanner ? '#28a745' : '#f39c12';
+    updatePlannerBadge();
+}
+
+function updatePlannerBadge() {
+    const count = Object.keys(repairPriorities).length;
+    const badge = document.getElementById('rp-badge');
+    if (!badge) return;
+    if (count > 0) {
+        badge.style.display = 'inline';
+        badge.innerText = count;
+    } else {
+        badge.style.display = 'none';
+    }
 }
 
 function openModal(nodeId) {
@@ -1851,16 +2092,467 @@ function openModal(nodeId) {
 
     buildPhotoArea(activeNodeDataArray);
     document.getElementById('info-modal').style.display='flex';
+    // Remove any open picker
+    const picker = document.getElementById('rp-modal-picker');
+    if (picker) picker.remove();
+    // Update planner button state
+    updatePlannerBtn(nodeId);
 }
 
-function unmergeCurrent(){if(activeNodeDataArray[0]){const idx=stitchedPairs.findIndex(p=>p.includes(activeNodeDataArray[0].id));if(idx!==-1){showConfirm('✂️ Un-stitch windows?','These two windows will be separated back into individual nodes.','UN-STITCH',()=>{stitchedPairs.splice(idx,1);closeModal();calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();if(currentMode==='auto3d')buildProcedural3D();});}}}
-function changeStatus(s){const note=document.getElementById('m-notes').value;activeNodeDataArray.forEach(d=>{if(d){d.notes=note;d.status=s;}});calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();if(currentMode==='auto3d')buildProcedural3D();closeModal();}
-function saveNotesOnly(){const note=document.getElementById('m-notes').value;activeNodeDataArray.forEach(d=>{if(d)d.notes=note;});calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();if(currentMode==='auto3d')buildProcedural3D();closeModal();}
+function unmergeCurrent(){if(activeNodeDataArray[0]){const idx=stitchedPairs.findIndex(p=>p.includes(activeNodeDataArray[0].id));if(idx!==-1){showConfirm('✂️ Un-stitch windows?','These two windows will be separated back into individual nodes.','UN-STITCH',()=>{stitchedPairs.splice(idx,1);closeModal();calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();});}}}
+function changeStatus(s){const note=document.getElementById('m-notes').value;activeNodeDataArray.forEach(d=>{if(d){d.notes=note;d.status=s;}});calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();closeModal();}
+function saveNotesOnly(){const note=document.getElementById('m-notes').value;activeNodeDataArray.forEach(d=>{if(d)d.notes=note;});calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();closeModal();}
 function unpinCurrent(){showConfirm('🗑️ Remove 3D pin?','The window data stays safe — only the pin position on the 3D model is removed.','REMOVE PIN',()=>{activeNodeDataArray.forEach(d=>{if(d&&saved3DTags[d.id])delete saved3DTags[d.id];});render3DHotspots();saveCommandState();closeModal();});}
 function closeModal(){document.getElementById('info-modal').style.display='none';activeNodeDataArray=[];modalNodeId=null;}
 
 // ═══════════════════════════════════════════════════════
+// REPAIR PLANNER
+// ═══════════════════════════════════════════════════════
+const DEFECT_CATEGORIES = [
+    'Sealant / Caulking',
+    'Spalling',
+    'Crack',
+    'Moisture',
+    'Other'
+];
+
+const DEFECT_COLORS = {
+    'Sealant / Caulking': '#e67e22',
+    'Spalling':           '#e74c3c',
+    'Crack':              '#9b59b6',
+    'Moisture':           '#2980b9',
+    'Other':              '#7f8c8d',
+};
+
+let rpActiveFilter = 'ALL';
+let rpGroupBy      = 'defect'; // 'defect' | 'elevation' | 'drop'
+
+function openRepairPlanner() {
+    switchView('repair');
+}
+
+function closeRepairPlanner() {
+    switchView('2d');
+}
+
+function rpSetFilter(f) {
+    rpActiveFilter = f;
+    document.querySelectorAll('.rp-filter-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.filter === f);
+    });
+    renderRepairPlanner();
+}
+
+function rpSetGroupBy(mode) {
+    rpGroupBy = mode;
+    // Update toggle button styles
+    ['defect','elevation','drop'].forEach(m => {
+        const btn = document.getElementById(`rp-grp-${m}`);
+        if (!btn) return;
+        btn.style.background = m === mode ? '#f39c12' : 'transparent';
+        btn.style.color      = m === mode ? '#000'    : '#888';
+    });
+    renderRepairPlanner();
+}
+
+function rpSetPriority(nodeId, priority) {
+    repairPriorities[nodeId] = priority;
+    saveCommandState();
+    renderRepairPlanner();
+}
+
+function rpGetDefectCategories(node) {
+    // Extract defect categories from node finds + custom tags
+    const cats = new Set();
+    const finds = (node.finds || '').toUpperCase();
+
+    if (finds.includes('SEALANT') || finds.includes('CAULK')) cats.add('Sealant / Caulking');
+    if (finds.includes('SPALL')) cats.add('Spalling');
+    if (finds.includes('CRACK')) cats.add('Crack');
+    if (finds.includes('MOISTURE') || finds.includes('WATER') || finds.includes('WET')) cats.add('Moisture');
+
+    // Custom tags assigned in planner
+    (repairTags[node.id] || []).forEach(t => cats.add(t));
+
+    // If nothing matched, use Other
+    if (cats.size === 0 && node.status !== 'status-clear') cats.add('Other');
+
+    return [...cats];
+}
+
+function rpOpenInlineEdit(nodeId, cardEl) {
+    // Remove any existing inline editor
+    document.querySelectorAll('.rp-inline-editor').forEach(el => el.remove());
+
+    const node = getNodeData(nodeId);
+    if (!node) return;
+
+    const currentCats = repairTags[nodeId] || rpGetDefectCategories(node);
+    const currentPri  = repairPriorities[nodeId] || 'MED';
+
+    const editor = document.createElement('div');
+    editor.className = 'rp-inline-editor';
+    editor.style.cssText = 'background:#111;border:1px solid #f39c12;border-radius:8px;padding:12px;margin-top:8px;';
+
+    editor.innerHTML = `
+        <div style="color:#f39c12;font-size:0.75rem;font-weight:bold;text-transform:uppercase;margin-bottom:8px;">Edit: ${nodeId}</div>
+        <div style="color:#888;font-size:0.7rem;margin-bottom:6px;">DEFECT TYPE</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;" id="rp-edit-cats-${nodeId}">
+            ${DEFECT_CATEGORIES.map(c => {
+                const active = currentCats.includes(c);
+                const tc = DEFECT_COLORS[c] || '#7f8c8d';
+                return `<button onclick="rpEditToggleCat(this,'${c.replace(/'/g,"\'")}','${nodeId}')"
+                    style="padding:4px 10px;font-size:0.72rem;font-weight:bold;border-radius:4px;
+                    border:1px solid ${tc};cursor:pointer;
+                    background:${active?tc:'transparent'};color:${active?'#fff':tc};"
+                    data-cat="${c}">${c}</button>`;
+            }).join('')}
+            <button onclick="rpEditAddCustom('${nodeId}')"
+                style="padding:4px 10px;font-size:0.72rem;font-weight:bold;border-radius:4px;
+                border:1px dashed #555;background:transparent;color:#555;cursor:pointer;">+ Custom</button>
+        </div>
+        <div id="rp-edit-custom-row-${nodeId}"></div>
+        <div style="color:#888;font-size:0.7rem;margin-bottom:6px;">PRIORITY</div>
+        <div style="display:flex;gap:6px;margin-bottom:10px;" id="rp-edit-pri-${nodeId}">
+            ${['HIGH','MED','LOW'].map(p => {
+                const colors={HIGH:'#d9534f',MED:'#f1c40f',LOW:'#28a745'};
+                const active = currentPri === p;
+                return `<button onclick="rpEditPickPri(this,'${p}','${nodeId}')" data-pri="${p}"
+                    style="flex:1;padding:6px;font-size:0.75rem;font-weight:bold;border-radius:4px;
+                    border:1px solid ${colors[p]};cursor:pointer;
+                    background:${active?colors[p]:'transparent'};
+                    color:${active?(p==='MED'?'#000':'#fff'):colors[p]};">${p}</button>`;
+            }).join('')}
+        </div>
+        <div style="display:flex;gap:6px;">
+            <button onclick="rpEditSave('${nodeId}',this.closest('.rp-inline-editor'))"
+                style="flex:1;padding:8px;background:#f39c12;color:#000;border:none;border-radius:4px;font-weight:bold;cursor:pointer;font-size:0.8rem;">
+                ✅ SAVE</button>
+            <button onclick="this.closest('.rp-inline-editor').remove()"
+                style="padding:8px 14px;background:#222;color:#888;border:1px solid #444;border-radius:4px;cursor:pointer;font-size:0.8rem;">
+                CANCEL</button>
+        </div>`;
+
+    editor._selectedCats = [...currentCats];
+    editor._selectedPri  = currentPri;
+    cardEl.appendChild(editor);
+}
+
+function rpEditToggleCat(btn, cat, nodeId) {
+    const editor = btn.closest('.rp-inline-editor');
+    if (!editor) return;
+    const idx = editor._selectedCats.indexOf(cat);
+    const tc = DEFECT_COLORS[cat] || '#7f8c8d';
+    if (idx === -1) {
+        editor._selectedCats.push(cat);
+        btn.style.background = tc; btn.style.color = '#fff';
+    } else {
+        editor._selectedCats.splice(idx, 1);
+        btn.style.background = 'transparent'; btn.style.color = tc;
+    }
+}
+
+function rpEditPickPri(btn, pri, nodeId) {
+    const editor = btn.closest('.rp-inline-editor');
+    if (!editor) return;
+    editor._selectedPri = pri;
+    const colors = {HIGH:'#d9534f',MED:'#f1c40f',LOW:'#28a745'};
+    editor.querySelectorAll('[data-pri]').forEach(b => {
+        const p = b.dataset.pri;
+        b.style.background = p===pri ? colors[p] : 'transparent';
+        b.style.color = p===pri ? (p==='MED'?'#000':'#fff') : colors[p];
+    });
+}
+
+function rpEditAddCustom(nodeId) {
+    const rowId = `rp-edit-custom-row-${nodeId}`;
+    const row = document.getElementById(rowId);
+    if (!row) return;
+    if (row.querySelector('input')) { row.innerHTML = ''; return; }
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.placeholder = 'Custom defect type...';
+    inp.style.cssText = 'width:100%;padding:6px 10px;background:#0a0a0a;color:#fff;border:1px solid #f39c12;border-radius:4px;font-size:0.8rem;margin-bottom:8px;box-sizing:border-box;';
+    const ok = document.createElement('button');
+    ok.innerText = 'ADD';
+    ok.style.cssText = 'padding:5px 12px;background:#f39c12;color:#000;border:none;border-radius:4px;font-weight:bold;cursor:pointer;font-size:0.75rem;margin-bottom:8px;';
+    ok.onclick = () => {
+        const t = inp.value.trim();
+        if (!t) return;
+        if (!DEFECT_CATEGORIES.includes(t)) {
+            DEFECT_CATEGORIES.splice(DEFECT_CATEGORIES.length-1, 0, t);
+            DEFECT_COLORS[t] = '#7f8c8d';
+        }
+        const editor = row.closest('.rp-inline-editor');
+        if (editor && !editor._selectedCats.includes(t)) editor._selectedCats.push(t);
+        const catsDiv = document.getElementById(`rp-edit-cats-${nodeId}`);
+        if (catsDiv) {
+            const newBtn = document.createElement('button');
+            newBtn.style.cssText = 'padding:4px 10px;font-size:0.72rem;font-weight:bold;border-radius:4px;border:1px solid #7f8c8d;background:#7f8c8d;color:#fff;cursor:pointer;';
+            newBtn.dataset.cat = t; newBtn.innerText = t;
+            newBtn.onclick = () => rpEditToggleCat(newBtn, t, nodeId);
+            catsDiv.insertBefore(newBtn, catsDiv.lastElementChild);
+        }
+        row.innerHTML = '';
+    };
+    inp.onkeypress = e => { if (e.key==='Enter') ok.click(); };
+    row.appendChild(inp); row.appendChild(ok);
+    inp.focus();
+}
+
+function rpEditSave(nodeId, editorEl) {
+    const cats = editorEl._selectedCats;
+    const pri  = editorEl._selectedPri || 'MED';
+    repairPriorities[nodeId] = pri;
+    repairTags[nodeId] = cats.length ? cats : ['Other'];
+    editorEl.remove();
+    saveCommandState();
+    renderRepairPlanner();
+    showToast(`✅ ${nodeId} updated`, 2000);
+}
+
+function rpAddCustomTag(nodeId) {
+    const tag = prompt('Enter custom defect type:');
+    if (!tag || !tag.trim()) return;
+    const t = tag.trim();
+    if (!repairTags[nodeId]) repairTags[nodeId] = [];
+    if (!repairTags[nodeId].includes(t)) repairTags[nodeId].push(t);
+    // Add to categories list if new
+    if (!DEFECT_CATEGORIES.includes(t)) DEFECT_CATEGORIES.splice(DEFECT_CATEGORIES.length - 1, 0, t);
+    saveCommandState();
+    renderRepairPlanner();
+}
+
+// ═══════════════════════════════════════════════════════
 // RESET  — uses custom confirm dialog (window.confirm is
+// silently blocked in some desktop PWA / file:// contexts)
+// ═══════════════════════════════════════════════════════
+function renderRepairPlanner() {
+    // Only show windows manually added to the planner
+    const allDefects = [];
+    Object.keys(repairPriorities).forEach(nodeId => {
+        const node = getNodeData(nodeId);
+        if (!node) return;
+
+        const parts = nodeId.split('-');
+        const drop = parts[0], floor = parseInt(parts[1]), pos = parts[2];
+
+        const pri = repairPriorities[nodeId] || 'NONE';
+        if (rpActiveFilter !== 'ALL' && pri !== rpActiveFilter) return;
+
+        const cats = rpGetDefectCategories(node);
+        const photos = nodePhotoNames(node);
+        const elev = dropAssignments[drop] || drop;
+
+        allDefects.push({ node, drop, floor, pos, cats, photos, elev, pri });
+    });
+
+    // Update badge on header button
+    updatePlannerBadge();
+
+    // Update subtitle + summary bar
+    const total = allDefects.length;
+    document.getElementById('rp-subtitle').innerText =
+        `${total} window${total!==1?'s':''} in planner`;
+
+    // Summary bar — inject before groups container if not already there
+    let summaryBar = document.getElementById('rp-summary-bar');
+    if (!summaryBar) {
+        summaryBar = document.createElement('div');
+        summaryBar.id = 'rp-summary-bar';
+        summaryBar.style.cssText = 'display:flex;gap:8px;margin-bottom:14px;flex-shrink:0;';
+        const groupsEl = document.getElementById('rp-groups');
+        groupsEl.parentNode.insertBefore(summaryBar, groupsEl);
+    }
+    summaryBar.innerHTML = `
+        <div style="flex:1;background:#2a0a0a;border:1px solid #d9534f44;border-radius:6px;padding:10px;text-align:center;">
+            <div style="font-size:1.4rem;font-weight:900;color:#d9534f;">${sumHigh}</div>
+            <div style="font-size:0.7rem;color:#888;text-transform:uppercase;font-weight:bold;">High</div>
+        </div>
+        <div style="flex:1;background:#2a2000;border:1px solid #f1c40f44;border-radius:6px;padding:10px;text-align:center;">
+            <div style="font-size:1.4rem;font-weight:900;color:#f1c40f;">${sumMed}</div>
+            <div style="font-size:0.7rem;color:#888;text-transform:uppercase;font-weight:bold;">Medium</div>
+        </div>
+        <div style="flex:1;background:#0a1a0a;border:1px solid #28a74544;border-radius:6px;padding:10px;text-align:center;">
+            <div style="font-size:1.4rem;font-weight:900;color:#28a745;">${sumLow}</div>
+            <div style="font-size:0.7rem;color:#888;text-transform:uppercase;font-weight:bold;">Low</div>
+        </div>
+        <div style="flex:1;background:#1a1d27;border:1px solid #33355544;border-radius:6px;padding:10px;text-align:center;">
+            <div style="font-size:1.4rem;font-weight:900;color:#555;">${sumNone}</div>
+            <div style="font-size:0.7rem;color:#888;text-transform:uppercase;font-weight:bold;">Unset</div>
+        </div>`;
+
+
+    // Sort all defects: by elevation → drop → floor desc → position L/C/R
+    const posOrder = {L:1,C:2,R:3};
+    allDefects.sort((a,b) => {
+        if (a.elev < b.elev) return -1;
+        if (a.elev > b.elev) return 1;
+        if (a.drop < b.drop) return -1;
+        if (a.drop > b.drop) return 1;
+        if (b.floor !== a.floor) return b.floor - a.floor; // floor desc = top down
+        return (posOrder[a.pos]||9) - (posOrder[b.pos]||9);
+    });
+
+    // Summary counts
+    const sumHigh = allDefects.filter(d => repairPriorities[d.node.id]==='HIGH').length;
+    const sumMed  = allDefects.filter(d => repairPriorities[d.node.id]==='MED').length;
+    const sumLow  = allDefects.filter(d => repairPriorities[d.node.id]==='LOW').length;
+    const sumNone = allDefects.filter(d => !repairPriorities[d.node.id]||repairPriorities[d.node.id]==='NONE').length;
+
+    // Build groups based on current groupBy mode
+    const groups = {};
+
+    if (rpGroupBy === 'defect') {
+        allDefects.forEach(d => {
+            const cats = d.cats.length ? d.cats : ['Other'];
+            cats.forEach(cat => {
+                if (!groups[cat]) groups[cat] = [];
+                if (!groups[cat].find(x => x.node.id === d.node.id))
+                    groups[cat].push(d);
+            });
+        });
+    } else if (rpGroupBy === 'elevation') {
+        allDefects.forEach(d => {
+            const key = d.elev || 'Unassigned';
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(d);
+        });
+    } else if (rpGroupBy === 'drop') {
+        allDefects.forEach(d => {
+            const key = `Drop ${d.drop}`;
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(d);
+        });
+    }
+
+    const container = document.getElementById('rp-groups');
+    container.innerHTML = '';
+
+    if (Object.keys(groups).length === 0) {
+        container.innerHTML = `<div class="rp-empty">
+            ${rpActiveFilter !== 'ALL'
+                ? '⬜ No windows match this priority filter.'
+                : '📋 No windows added yet.<br><br><span style="font-size:0.85rem;color:#555;">Open any window and tap<br><strong style="color:#f39c12;">+ Add to Repair Planner</strong></span>'}
+        </div>`;
+        return;
+    }
+
+    // Render in order
+    let catOrder;
+    if (rpGroupBy === 'defect') {
+        catOrder = [...DEFECT_CATEGORIES,
+            ...Object.keys(groups).filter(k => !DEFECT_CATEGORIES.includes(k))];
+    } else if (rpGroupBy === 'elevation') {
+        catOrder = Object.keys(groups).sort();
+    } else {
+        // By drop — sort alphabetically
+        catOrder = Object.keys(groups).sort((a,b) => a.localeCompare(b, undefined, {numeric:true}));
+    }
+
+    catOrder.forEach(cat => {
+        if (!groups[cat] || !groups[cat].length) return;
+        const items = groups[cat];
+        const color = rpGroupBy === 'defect'
+            ? (DEFECT_COLORS[cat] || '#7f8c8d')
+            : rpGroupBy === 'elevation' ? '#0cf' : '#d080ff';
+
+        const grp = document.createElement('div');
+        grp.className = 'rp-group';
+
+        const hdr = document.createElement('div');
+        hdr.className = 'rp-group-header';
+        hdr.style.borderLeft = `4px solid ${color}`;
+        hdr.innerHTML = `
+            <div style="width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0;"></div>
+            <div class="rp-group-title" style="color:${color};">${cat}</div>
+            <div class="rp-group-count">${items.length} window${items!==1?'s':''}</div>
+            <div style="color:#555;font-size:0.9rem;">▾</div>`;
+        hdr.onclick = () => {
+            const body = grp.querySelector('.rp-group-body');
+            const isHidden = body.style.display === 'none';
+            body.style.display = isHidden ? 'block' : 'none';
+            hdr.querySelector('div:last-child').innerText = isHidden ? '▾' : '▸';
+        };
+
+        const body = document.createElement('div');
+        body.className = 'rp-group-body';
+
+        items.forEach(({ node, drop, floor, pos, photos, elev, pri }) => {
+            const card = document.createElement('div');
+            card.className = 'rp-card';
+            card.onclick = (e) => {
+                if (e.target.closest('.rp-priority') || e.target.closest('button')) return;
+                openModal(node.id);
+            };
+
+            // Thumbnail
+            const thumb = document.createElement('div');
+            if (photos.length && imageBank[photos[0]]) {
+                const img = document.createElement('img');
+                img.className = 'rp-thumb';
+                img.src = imageBank[photos[0]].url;
+                img.onerror = () => { img.style.display='none'; };
+                thumb.appendChild(img);
+            } else {
+                thumb.className = 'rp-thumb-empty';
+                thumb.innerHTML = '📷';
+            }
+
+            // Info
+            const info = document.createElement('div');
+            info.className = 'rp-info';
+
+            // ID + open button
+            info.innerHTML = `
+                <div class="rp-id">${node.id}</div>
+                <div class="rp-location">
+                    ${elev} · Drop ${drop} · Floor ${floor} · ${pos === 'L' ? 'Left' : pos === 'R' ? 'Right' : 'Centre'}
+                    ${photos.length ? `· 📷 ${photos.length}` : '· No photos'}
+                </div>`;
+
+            // Priority buttons
+            const priRow = document.createElement('div');
+            priRow.className = 'rp-priority';
+            ['HIGH','MED','LOW'].forEach(p => {
+                const btn = document.createElement('button');
+                btn.className = `rp-pri-btn${pri===p?' active-'+p.toLowerCase():''}`;
+                btn.innerText = p;
+                btn.onclick = (e) => { e.stopPropagation(); rpSetPriority(node.id, p); };
+                priRow.appendChild(btn);
+            });
+            info.appendChild(priRow);
+
+            // Defect tags + edit button
+            const tagRow = document.createElement('div');
+            tagRow.className = 'rp-defect-tag';
+            rpGetDefectCategories(node).forEach(t => {
+                const tc = DEFECT_COLORS[t] || '#7f8c8d';
+                const tag = document.createElement('span');
+                tag.className = 'rp-tag';
+                tag.style.cssText = `background:${tc}22;color:${tc};border-color:${tc}55;`;
+                tag.innerText = t;
+                tagRow.appendChild(tag);
+            });
+            const editBtn = document.createElement('button');
+            editBtn.style.cssText = 'padding:2px 8px;font-size:0.65rem;background:#111;color:#f39c12;border:1px solid #f39c12;border-radius:3px;cursor:pointer;';
+            editBtn.innerText = '✏️ Edit';
+            editBtn.onclick = (e) => { e.stopPropagation(); rpOpenInlineEdit(node.id, card); };
+            tagRow.appendChild(editBtn);
+            info.appendChild(tagRow);
+
+            card.appendChild(thumb);
+            card.appendChild(info);
+            body.appendChild(card);
+        });
+
+        grp.appendChild(hdr);
+        grp.appendChild(body);
+        container.appendChild(grp);
+    });
+}
+
+
 // silently blocked in some desktop PWA / file:// contexts)
 // ═══════════════════════════════════════════════════════
 function resetBoard(){
@@ -1872,7 +2564,7 @@ function resetBoard(){
             localStorage.removeItem('strataCommandState');
 
             // Stop the 3D animation loop before wiping state
-            if (auto3dAnimId) { cancelAnimationFrame(auto3dAnimId); auto3dAnimId=null; }
+            
 
             // Revoke all blob URLs to free memory
             Object.values(imageBank).forEach(v=>{
@@ -1884,13 +2576,13 @@ function resetBoard(){
             inspectionData={};imageBank={};stitchedPairs=[];projectInfo='Unknown Project';
             elevations=[];dropAssignments={};saved3DTags={};activeTab='';manualLinks={};
             activeNodeDataArray=[];modalNodeId=null;
-            currentMode='2d';
+            currentMode='2d';repairPriorities={};repairTags={};
 
             // Reset UI
             document.getElementById('project-name').innerText='Awaiting Data...';
             document.getElementById('top-reload-banner').style.display='none';
             ['dashboard-screen','mapping-screen','btn-save-project',
-             'btn-edit-map','btn-reset','btn-start-mapping']
+             'btn-edit-map','btn-reset','btn-start-mapping','btn-repair-planner']
                 .forEach(id=>{ document.getElementById(id).style.display='none'; });
 
             // Reset stats bar
@@ -1901,11 +2593,7 @@ function resetBoard(){
             document.getElementById('model-status').innerHTML='Load model via TRUE 3D TWIN tab.';
 
             // Reset auto3D renderer
-            if (auto3dRenderer) {
-                auto3dRenderer.dispose();
-                auto3dRenderer=null; auto3dScene=null; auto3dCamera=null; auto3dControls=null;
-                document.getElementById('procedural-3d-container').innerHTML='';
-            }
+
             // Reset model-viewer
             const mv = document.getElementById('main-3d-viewer');
             if (mv) { mv.src = ''; }
@@ -1996,29 +2684,50 @@ function openMappingScreen(){document.getElementById('btn-start-mapping').style.
 function editMapping(){document.getElementById('dashboard-screen').style.display='none';document.getElementById('mapping-screen').style.display='block';document.getElementById('btn-save-project').style.display='none';document.getElementById('btn-edit-map').style.display='none';renderMappingList();}
 function addElevation(){const inp=document.getElementById('new-elevation-name'),val=inp.value.trim();if(val&&!elevations.includes(val)){elevations.push(val);if(elevations.length===1){activeTab=val;Object.keys(dropAssignments).forEach(d=>{if(!dropAssignments[d])dropAssignments[d]=val;});}inp.value='';saveCommandState();renderMappingList();}}
 function renderMappingList(){const list=document.getElementById('mapping-list');list.innerHTML='';const drops=Object.keys(inspectionData).sort();if(!elevations.length&&drops.length){const w=document.createElement('div');w.style='color:#f1c40f;margin-bottom:15px;font-weight:bold;';w.innerText='⚠️ Add at least one wall above.';list.appendChild(w);}drops.forEach(d=>{const row=document.createElement('div');row.className='mapping-row';row.innerHTML=`<strong style="font-size:1.2rem;color:#0cf;">DROP ${d}</strong>`;const sel=document.createElement('select');sel.onchange=e=>{dropAssignments[d]=e.target.value;saveCommandState();};if(!elevations.length){const o=document.createElement('option');o.value='';o.innerText='Awaiting Wall...';sel.appendChild(o);sel.disabled=true;}else{sel.disabled=false;elevations.forEach(elev=>{const o=document.createElement('option');o.value=elev;o.innerText=elev;if(dropAssignments[d]===elev)o.selected=true;sel.appendChild(o);});}row.appendChild(sel);list.appendChild(row);});}
-function generateDashboard(){if(!elevations.length){showToast('⚠️ Add at least one wall first.',5000,true);return;}document.getElementById('mapping-screen').style.display='none';document.getElementById('dashboard-screen').style.display='flex';document.getElementById('btn-save-project').style.display='inline-block';document.getElementById('btn-edit-map').style.display='inline-block';if(!elevations.includes(activeTab))activeTab=elevations[0];calculateBuildingGeometry();saveCommandState();if(currentMode==='2d'||currentMode==='auto3d')refreshCurrentView();if(currentMode==='auto3d')buildProcedural3D();}
+function generateDashboard(){if(!elevations.length){showToast('⚠️ Add at least one wall first.',5000,true);return;}document.getElementById('mapping-screen').style.display='none';document.getElementById('dashboard-screen').style.display='flex';document.getElementById('btn-save-project').style.display='inline-block';document.getElementById('btn-edit-map').style.display='inline-block';if(!elevations.includes(activeTab))activeTab=elevations[0];calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();}
 
 // ═══════════════════════════════════════════════════════
 // 3D TAGGING
 // ═══════════════════════════════════════════════════════
 function openMasterTagMenu(){document.getElementById('tag-master-modal').style.display='flex';const ss=document.getElementById('tag-single-select');ss.innerHTML='';const all=[];Object.keys(inspectionData).forEach(d=>Object.keys(inspectionData[d]).forEach(f=>Object.keys(inspectionData[d][f]).forEach(p=>all.push(inspectionData[d][f][p]))));all.sort((a,b)=>a.id.localeCompare(b.id)).forEach(data=>{const o=document.createElement('option');o.value=data.id;o.innerText=`${data.id} (${data.finds.split('|')[0]})`;ss.appendChild(o);});const ds=document.getElementById('tag-drop-select');ds.innerHTML='';Object.keys(inspectionData).sort().forEach(d=>{const o=document.createElement('option');o.value=d;o.innerText=`Drop ${d}`;ds.appendChild(o);});const ws=document.getElementById('tag-wall-select');ws.innerHTML='';elevations.forEach(e=>{const o=document.createElement('option');o.value=e;o.innerText=`Wall: ${e}`;ws.appendChild(o);});}
 function closeMasterTagMenu(){document.getElementById('tag-master-modal').style.display='none';}
-function activateTaggingUI(instr){closeMasterTagMenu();document.querySelectorAll('.tag-toggle').forEach(b=>b.classList.add('tag-mode-on'));viewer.autoRotate=false;viewer.style.cursor='crosshair';document.getElementById('tag-instruction-bar').style.display='block';document.getElementById('tag-instruction-text').innerText=instr;}
-function cancelBulkTag(){bulkTagState={mode:null,targetId:null,step:0,anchors:[]};document.querySelectorAll('.tag-toggle').forEach(b=>b.classList.remove('tag-mode-on'));viewer.autoRotate=true;viewer.style.cursor='default';document.getElementById('tag-instruction-bar').style.display='none';}
+function activateTaggingUI(instr){
+    closeMasterTagMenu();
+    document.querySelectorAll('.tag-toggle').forEach(b=>b.classList.add('tag-mode-on'));
+    const mv=document.getElementById('main-3d-viewer');
+    if(mv){mv.removeAttribute('auto-rotate');mv.style.cursor='crosshair';}
+    document.getElementById('tag-instruction-bar').style.display='block';
+    document.getElementById('tag-instruction-text').innerText=instr;
+}
+function cancelBulkTag(){
+    bulkTagState={mode:null,targetId:null,step:0,anchors:[]};
+    document.querySelectorAll('.tag-toggle').forEach(b=>b.classList.remove('tag-mode-on'));
+    const mv=document.getElementById('main-3d-viewer');
+    if(mv){mv.style.cursor='default';}
+    document.getElementById('tag-instruction-bar').style.display='none';
+}
 function startSingleTag(){bulkTagState={mode:'single',targetId:document.getElementById('tag-single-select').value,step:0,anchors:[]};activateTaggingUI(`Double-click exact location for ${bulkTagState.targetId}`);}
 function startDropTag(){bulkTagState={mode:'drop',targetId:document.getElementById('tag-drop-select').value,step:0,anchors:[]};activateTaggingUI(`Step 1/2: Double-click TOP centre of Drop ${bulkTagState.targetId}`);}
 function startWallTag(){bulkTagState={mode:'wall',targetId:document.getElementById('tag-wall-select').value,step:0,anchors:[]};activateTaggingUI(`Step 1/4: Double-click TOP-LEFT corner of Wall: ${bulkTagState.targetId}`);}
 function startReTag(){const id=activeNodeDataArray[0]?.id;if(!id)return;closeModal();bulkTagState={mode:'retag',targetId:id,step:0,anchors:[]};activateTaggingUI(`Double-click new location for ${id}`);}
 function parseCoord(c){return c&&c.x!==undefined?[c.x,c.y,c.z]:[0,0,0];}
 
-viewer.addEventListener('dblclick',event=>{
-    if (!bulkTagState.mode) return;
-    const hit=viewer.positionAndNormalFromPoint(event.clientX,event.clientY);if(!hit)return;
-    const ps=`${hit.position.x} ${hit.position.y} ${hit.position.z}`,ns=`${hit.normal.x} ${hit.normal.y} ${hit.normal.z}`;
-    if(bulkTagState.mode==='single'||bulkTagState.mode==='retag'){saved3DTags[bulkTagState.targetId]={position:ps,normal:ns};render3DHotspots();saveCommandState();cancelBulkTag();return;}
-    if(bulkTagState.mode==='drop'){bulkTagState.anchors.push(hit);bulkTagState.step++;if(bulkTagState.step===1)document.getElementById('tag-instruction-text').innerText=`Step 2/2: Double-click BOTTOM centre of Drop ${bulkTagState.targetId}`;else if(bulkTagState.step===2){processDropTagging(bulkTagState.targetId,bulkTagState.anchors);cancelBulkTag();}return;}
-    if(bulkTagState.mode==='wall'){bulkTagState.anchors.push(hit);bulkTagState.step++;const steps=['','Step 2/4: TOP-RIGHT corner','Step 3/4: BOTTOM-LEFT corner','Step 4/4: BOTTOM-RIGHT corner'];if(bulkTagState.step<4)document.getElementById('tag-instruction-text').innerText=steps[bulkTagState.step];else{processWallTagging(bulkTagState.targetId,bulkTagState.anchors);cancelBulkTag();}}
-});
+// 3D tagging via model-viewer dblclick — called from initTwin
+function setupTwinTagging() {
+    const mv = document.getElementById('main-3d-viewer');
+    if (!mv || mv._tagListenerSet) return;
+    mv._tagListenerSet = true;
+    mv.addEventListener('dblclick', event=>{
+        if (!bulkTagState.mode) return;
+        const hit = mv.positionAndNormalFromPoint(event.clientX, event.clientY);
+        if (!hit) return;
+        const ps=`${hit.position.x} ${hit.position.y} ${hit.position.z}`;
+        const ns=`${hit.normal.x} ${hit.normal.y} ${hit.normal.z}`;
+        if(bulkTagState.mode==='single'||bulkTagState.mode==='retag'){saved3DTags[bulkTagState.targetId]={position:ps,normal:ns};render3DHotspots();saveCommandState();cancelBulkTag();return;}
+        if(bulkTagState.mode==='drop'){bulkTagState.anchors.push(hit);bulkTagState.step++;if(bulkTagState.step===1)document.getElementById('tag-instruction-text').innerText=`Step 2/2: Double-click BOTTOM centre of Drop ${bulkTagState.targetId}`;else if(bulkTagState.step===2){processDropTagging(bulkTagState.targetId,bulkTagState.anchors);cancelBulkTag();}return;}
+        if(bulkTagState.mode==='wall'){bulkTagState.anchors.push(hit);bulkTagState.step++;const steps=['','Step 2/4: TOP-RIGHT corner','Step 3/4: BOTTOM-LEFT corner','Step 4/4: BOTTOM-RIGHT corner'];if(bulkTagState.step<4)document.getElementById('tag-instruction-text').innerText=steps[bulkTagState.step];else{processWallTagging(bulkTagState.targetId,bulkTagState.anchors);cancelBulkTag();}}
+    });
+}
 
 function processDropTagging(dropId,anchors){const floors=Object.keys(inspectionData[dropId]).map(Number).sort((a,b)=>b-a);if(!floors.length)return;const maxF=floors[0],minF=floors[floors.length-1],fRange=maxF-minF,pT=parseCoord(anchors[0].position),pB=parseCoord(anchors[1].position),norm=`${anchors[0].normal.x} ${anchors[0].normal.y} ${anchors[0].normal.z}`,rLen=Math.sqrt(anchors[0].normal.z**2+anchors[0].normal.x**2),rX=rLen===0?1:anchors[0].normal.z/rLen,rZ=rLen===0?0:-anchors[0].normal.x/rLen,om={L:-1,C:0,R:1};floors.forEach(f=>{const t=fRange===0?0:(maxF-f)/fRange,cx=pT[0]+(pB[0]-pT[0])*t,cy=pT[1]+(pB[1]-pT[1])*t,cz=pT[2]+(pB[2]-pT[2])*t;Object.keys(inspectionData[dropId][f]).forEach(pos=>{const off=om[pos]??0;saved3DTags[`${dropId}-${f}-${pos}`]={position:`${cx+rX*off*0.8} ${cy} ${cz+rZ*off*0.8}`,normal:norm};});});render3DHotspots();saveCommandState();}
 function processWallTagging(wallName,anchors){const drops=Object.keys(dropAssignments).filter(d=>dropAssignments[d]===wallName).sort();if(!drops.length)return;const allF=[];drops.forEach(d=>allF.push(...Object.keys(inspectionData[d]).map(Number)));const maxF=Math.max(...allF),minF=Math.min(...allF),fRange=maxF-minF,dRange=drops.length>1?drops.length-1:1,TL=parseCoord(anchors[0].position),TR=parseCoord(anchors[1].position),BL=parseCoord(anchors[2].position),BR=parseCoord(anchors[3].position),norm=`${anchors[0].normal.x} ${anchors[0].normal.y} ${anchors[0].normal.z}`,vX=TR[0]-TL[0],vY=TR[1]-TL[1],vZ=TR[2]-TL[2],wW=Math.sqrt(vX*vX+vY*vY+vZ*vZ),rX=wW===0?1:vX/wW,rY=wW===0?0:vY/wW,rZ=wW===0?0:vZ/wW,sp=(wW/(drops.length||1))*0.3,om={L:-1,C:0,R:1};drops.forEach((dropId,dIdx)=>{const u=drops.length>1?dIdx/dRange:0.5;Object.keys(inspectionData[dropId]).map(Number).forEach(f=>{const v=fRange===0?0:(maxF-f)/fRange,cx=(1-u)*(1-v)*TL[0]+u*(1-v)*TR[0]+(1-u)*v*BL[0]+u*v*BR[0],cy=(1-u)*(1-v)*TL[1]+u*(1-v)*TR[1]+(1-u)*v*BL[1]+u*v*BR[1],cz=(1-u)*(1-v)*TL[2]+u*(1-v)*TR[2]+(1-u)*v*BL[2]+u*v*BR[2];Object.keys(inspectionData[dropId][f]).forEach(pos=>{const off=om[pos]??0;saved3DTags[`${dropId}-${f}-${pos}`]={position:`${cx+rX*off*sp} ${cy+rY*off*sp} ${cz+rZ*off*sp}`,normal:norm};});});});render3DHotspots();saveCommandState();}
@@ -2027,40 +2736,31 @@ function render3DHotspots(){
     // Refresh twin hotspots if model is loaded
     if (twinLoaded) {
         placeTwinHotspots(null, 1, null);
-    }viewer.querySelectorAll('.hotspot-dot').forEach(el=>el.remove());Object.keys(saved3DTags).forEach(id=>{const data=getNodeData(id);if(!data)return;let fs=data.status;const pair=stitchedPairs.find(p=>p.includes(data.id));if(pair)fs=getCombinedStatus(pair[0],pair[1]);if(activeFilter!=='ALL'&&fs!==activeFilter)return;const btn=document.createElement('button');btn.slot=`hotspot-${id}`;btn.dataset.position=saved3DTags[id].position;btn.dataset.normal=saved3DTags[id].normal;btn.className=`hotspot-dot ${fs}`;btn.onclick=()=>openModal(id);const lbl=document.createElement('div');lbl.className='hotspot-label';lbl.innerText=id;btn.appendChild(lbl);viewer.appendChild(btn);});}
-function toggleFullScreen(id){const el=document.getElementById(id);if(!document.fullscreenElement){if(el.requestFullscreen)el.requestFullscreen();}else{if(document.exitFullscreen)document.exitFullscreen();}}
-
-// ═══════════════════════════════════════════════════════
-// AUTO 3D
-// ═══════════════════════════════════════════════════════
-let auto3dRenderer=null,auto3dScene=null,auto3dCamera=null,auto3dControls=null,auto3dAnimId=null;
-function buildProcedural3D(){
-    const container=document.getElementById('procedural-3d-container');
-    if (!auto3dRenderer){
-        const OC=getOrbitControls();
-        if(!OC){container.innerHTML='<div style="color:#f1c40f;padding:20px;font-weight:bold;">⚠️ THREE.OrbitControls failed to load.</div>';return;}
-        auto3dRenderer=new THREE.WebGLRenderer({antialias:true,alpha:true});container.appendChild(auto3dRenderer.domElement);
-        auto3dCamera=new THREE.PerspectiveCamera(60,container.clientWidth/container.clientHeight,0.1,2000);
-        auto3dControls=new OC(auto3dCamera,auto3dRenderer.domElement);auto3dControls.enableDamping=true;auto3dControls.dampingFactor=0.1;
-        const rc=new THREE.Raycaster(),mouse=new THREE.Vector2();let sx,sy;
-        container.addEventListener('pointerdown',e=>{sx=e.clientX;sy=e.clientY;});
-        container.addEventListener('pointermove',e=>{const r=auto3dRenderer.domElement.getBoundingClientRect();mouse.x=((e.clientX-r.left)/r.width)*2-1;mouse.y=-((e.clientY-r.top)/r.height)*2+1;rc.setFromCamera(mouse,auto3dCamera);if(auto3dScene){const hits=rc.intersectObjects(auto3dScene.children);container.style.cursor=hits.find(h=>h.object.userData.id)?'pointer':'grab';}});
-        container.addEventListener('pointerup',e=>{if(Math.abs(e.clientX-sx)+Math.abs(e.clientY-sy)>5)return;const r=auto3dRenderer.domElement.getBoundingClientRect();mouse.x=((e.clientX-r.left)/r.width)*2-1;mouse.y=-((e.clientY-r.top)/r.height)*2+1;rc.setFromCamera(mouse,auto3dCamera);if(auto3dScene){const hits=rc.intersectObjects(auto3dScene.children);const h=hits.find(x=>x.object.userData.id);if(h)openModal(h.object.userData.id);}});
-        window.addEventListener('resize',()=>{if(document.getElementById('arena-auto3d').style.display!=='none'){auto3dCamera.aspect=container.clientWidth/container.clientHeight;auto3dCamera.updateProjectionMatrix();auto3dRenderer.setSize(container.clientWidth,container.clientHeight);}});
     }
-    if(auto3dAnimId)cancelAnimationFrame(auto3dAnimId);
-    auto3dRenderer.setSize(container.clientWidth,container.clientHeight);auto3dCamera.aspect=container.clientWidth/container.clientHeight;auto3dCamera.updateProjectionMatrix();
-    if(auto3dScene){auto3dScene.children.forEach(c=>{if(c.geometry)c.geometry.dispose();if(c.material){if(Array.isArray(c.material))c.material.forEach(m=>m.dispose());else c.material.dispose();}});}
-    auto3dScene=new THREE.Scene();auto3dScene.add(new THREE.AmbientLight(0xffffff,0.6));const dl=new THREE.DirectionalLight(0xffffff,0.8);dl.position.set(0,50,50);auto3dScene.add(dl);
-    const drops=Object.keys(inspectionData).filter(d=>dropAssignments[d]===activeTab).sort();if(!drops.length)return;
-    let maxF=-Infinity,minF=Infinity;drops.forEach(d=>{Object.keys(inspectionData[d]).map(Number).forEach(f=>{maxF=Math.max(maxF,f);minF=Math.min(minF,f);});});if(maxF===-Infinity){maxF=1;minF=1;}
-    const ds=5,fs=1.5,ww=1.2,wh=1.0,ox={L:-1.4,C:0,R:1.4};
-    drops.forEach((drop,di)=>{const bx=di*ds-((drops.length-1)*ds)/2;for(let f=maxF;f>=minF;f--){if(!inspectionData[drop]?.[f])continue;Object.keys(inspectionData[drop][f]).forEach(pos=>{const data=inspectionData[drop][f][pos];let fst=data.status;const pair=stitchedPairs.find(p=>p.includes(data.id));if(pair)fst=getCombinedStatus(pair[0],pair[1]);let color=0x28a745;if(fst==='status-flagged')color=0xf1c40f;if(fst==='status-confirmed')color=0xd9534f;const xp=bx+(ox[pos]??0),geom=new THREE.BoxGeometry(ww,wh,0.2),mat=new THREE.MeshStandardMaterial({color,metalness:0.1,roughness:0.8});if(activeFilter!=='ALL'&&fst!==activeFilter){mat.transparent=true;mat.opacity=0.1;}const mesh=new THREE.Mesh(geom,mat);mesh.position.set(xp,f*fs,0);mesh.userData={id:data.id};if(nodeHasPhoto(data)){const edges=new THREE.LineSegments(new THREE.EdgesGeometry(geom),new THREE.LineBasicMaterial({color:0xffffff,linewidth:2}));mesh.add(edges);}auto3dScene.add(mesh);if(pair&&pair[0]===data.id){const dist=(ox[pair[1].split('-')[2]]??0)-(ox[pos]??0);if(dist>0){const bm=new THREE.Mesh(new THREE.BoxGeometry(dist,wh-0.1,0.15),mat);bm.position.set(xp+dist/2,f*fs,0);bm.userData={id:data.id};auto3dScene.add(bm);}}});}});
-    const wallW=drops.length*ds,wallH=(maxF-minF+2)*fs,cy=((maxF+minF)/2)*fs;
-    const wm=new THREE.Mesh(new THREE.PlaneGeometry(wallW+4,wallH+2),new THREE.MeshStandardMaterial({color:0x161922,side:THREE.DoubleSide}));wm.position.set(0,cy,-0.5);auto3dScene.add(wm);
-    auto3dCamera.position.set(0,cy,Math.max(wallW,wallH)*0.8+5);auto3dControls.target.set(0,cy,0);auto3dControls.update();
-    function animate(){auto3dAnimId=requestAnimationFrame(animate);auto3dRenderer.render(auto3dScene,auto3dCamera);auto3dControls.update();}animate();
+    // Update hotspots on the actual model-viewer element
+    const mv = document.getElementById('main-3d-viewer');
+    if (!mv) return;
+    mv.querySelectorAll('.hotspot-dot').forEach(el=>el.remove());
+    Object.keys(saved3DTags).forEach(id=>{
+        const data=getNodeData(id);if(!data)return;
+        let fs=data.status;
+        const pair=stitchedPairs.find(p=>p.includes(data.id));
+        if(pair)fs=getCombinedStatus(pair[0],pair[1]);
+        if(activeFilter!=='ALL'&&fs!==activeFilter)return;
+        const btn=document.createElement('button');
+        btn.slot=`hotspot-${id}`;
+        btn.dataset.position=saved3DTags[id].position;
+        btn.dataset.normal=saved3DTags[id].normal;
+        btn.className=`hotspot-dot ${fs}`;
+        btn.onclick=()=>openModal(id);
+        const lbl=document.createElement('div');
+        lbl.className='hotspot-label';
+        lbl.innerText=id;
+        btn.appendChild(lbl);
+        mv.appendChild(btn);
+    });
 }
+function toggleFullScreen(id){const el=document.getElementById(id);if(!document.fullscreenElement){if(el.requestFullscreen)el.requestFullscreen();}else{if(document.exitFullscreen)document.exitFullscreen();}}
 
 // ═══════════════════════════════════════════════════════
 // LIGHTBOX
@@ -2092,7 +2792,7 @@ function updateLbUI(){
     tog.classList.toggle('showing-dc',lbShowDC&&hasDC);
     tog.classList.toggle('no-dc',!hasDC);
     lbImg.src=(lbShowDC&&hasDC)?entry.dcUrl:entry.url;
-    lbImg.onerror=()=>{ lbImg.alt=`Could not display ${name} — try re-uploading ZIP`; };
+    lbImg.onerror=()=>{ lbImg.style.opacity='0.3'; lbImg.alt=name; };
     const isMulti=lbNames.length>1;
     document.getElementById('lightbox-prev').style.display=isMulti?'block':'none';
     document.getElementById('lightbox-next').style.display=isMulti?'block':'none';
