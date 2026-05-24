@@ -1240,13 +1240,11 @@ function loadCommandState() {
         if (urlInput && projectModelUrl) urlInput.value = projectModelUrl;
         if (Object.keys(inspectionData).length>0) {
             document.getElementById('project-name').innerText='Project: '+projectInfo;
-            document.getElementById('btn-reset').style.display        ='inline-block';
-            document.getElementById('btn-save-project').style.display    ='inline-block';
-    updateLoadPanelVisibility();
-            
+            document.getElementById('project-name').style.color='#0cf';
+            document.getElementById('btn-save-project').style.display='inline-block';
+            updateLoadPanelVisibility();
             if (elevations.length>0) {
                 document.getElementById('dashboard-screen').style.display='flex';
-                document.getElementById('btn-edit-map').style.display    ='inline-block';
                 if (!elevations.includes(activeTab)) activeTab=elevations[0];
                 calculateBuildingGeometry();
                 switchView('2d');
@@ -1263,7 +1261,7 @@ function saveProject() {
     a.href='data:text/json;charset=utf-8,'+encodeURIComponent(JSON.stringify({
         projectInfo,inspectionData,elevations,dropAssignments,
         stitchedPairs,saved3DTags,manualLinks,projectModelUrl,
-        repairPriorities,repairTags
+        repairPriorities,repairTags,repairFixed
     }));
     const now = new Date();
     const ts  = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}-${String(now.getMinutes()).padStart(2,'0')}`;
@@ -1389,8 +1387,16 @@ async function handleFiles(files, forcedType=null) {
         repairFixed       =p.repairFixed       ||{};
         const urlInp = document.getElementById('twin-url-input');
         if (urlInp && projectModelUrl) urlInp.value = projectModelUrl;
-                        document.getElementById('top-reload-banner').style.display='flex';
-                    } catch(e){}
+        // Show dashboard immediately
+        document.getElementById('project-name').innerText = 'Project: ' + projectInfo;
+        document.getElementById('project-name').style.color = '#0cf';
+        document.getElementById('btn-save-project').style.display = 'inline-block';
+        updateLoadPanelVisibility();
+        if (elevations.length > 0) {
+            document.getElementById('dashboard-screen').style.display = 'flex';
+            if (!elevations.includes(activeTab)) activeTab = elevations[0];
+        }
+                    } catch(e){ console.error('Project JSON load error:', e); showToast('⚠️ Failed to load project file: ' + e.message, 6000, true); }
                     res();
                 };
                 r.readAsText(file);
