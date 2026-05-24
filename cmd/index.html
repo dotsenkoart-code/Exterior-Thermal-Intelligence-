@@ -166,6 +166,9 @@
         .rp-group-body { padding:10px; }
         .rp-card { display:flex;gap:12px;align-items:flex-start;background:#1a1d27;border-radius:8px;padding:12px;margin-bottom:8px;border:1px solid #333;cursor:pointer;transition:border-color 0.15s; }
         .rp-card:hover { border-color:#0cf; }
+        .rp-card.rp-fixed { opacity:0.55;border-color:#28a745;background:#0a1a0a; }
+        .rp-card.rp-fixed .rp-id { text-decoration:line-through;color:#28a745; }
+        .rp-fixed-badge { display:inline-block;background:#28a745;color:#fff;font-size:0.65rem;font-weight:bold;padding:2px 8px;border-radius:3px;margin-left:6px; }
         .rp-thumb { width:80px;height:60px;border-radius:6px;object-fit:cover;background:#111;flex-shrink:0;border:1px solid #333; }
         .rp-thumb-empty { width:80px;height:60px;border-radius:6px;background:#111;flex-shrink:0;border:1px dashed #333;display:flex;align-items:center;justify-content:center;color:#333;font-size:1.2rem; }
         .rp-info { flex:1;min-width:0; }
@@ -317,12 +320,11 @@
         <div class="tabs-container" id="tabs-container"></div>
         <div id="view-2d"><div id="building-container-2d"></div></div>
 
-        <div id="arena-repair" style="display:none;flex-direction:column;height:100%;width:100%;overflow:hidden;position:relative;">
-            <!-- Fullscreen button -->
-            <button class="btn-fullscreen" onclick="toggleFullScreen('rp-grid-container')" style="position:absolute;top:8px;right:8px;z-index:100;">⛶ FULL SCREEN</button>
-
-            <!-- Summary bar -->
-            <div id="rp-summary-bar" style="display:flex;gap:6px;padding:8px 0 0 0;flex-shrink:0;"></div>
+        <div id="arena-repair" style="display:none;flex-direction:column;height:100%;width:100%;overflow:hidden;">
+            <!-- Summary bar — fullscreen button lives at the right end -->
+            <div id="rp-summary-bar" style="display:flex;gap:6px;padding:8px 0 0 0;flex-shrink:0;align-items:stretch;">
+                <button class="btn-fullscreen" onclick="toggleRPFullscreen()" id="rp-fs-btn" style="position:static;flex-shrink:0;padding:8px 12px;font-size:0.75rem;align-self:stretch;border-radius:6px;">⛶</button>
+            </div>
 
             <!-- Defect type toggle chips -->
             <div id="rp-defect-filter-bar" style="display:flex;gap:6px;flex-wrap:wrap;padding:8px 0 4px;flex-shrink:0;align-items:center;">
@@ -484,6 +486,7 @@ let photoMoveMode       = null; // { photoName, fromNodeId } when move is active
 let projectModelUrl     = '';   // Google Drive or direct URL for this project's 3D model
 let repairPriorities    = {};   // { nodeId: 'HIGH'|'MED'|'LOW' }
 let repairTags          = {};   // { nodeId: [tag, ...] } custom defect tags per window
+let repairFixed         = {};   // { nodeId: true } windows marked as fixed
 
 /*
  * imageBank: { CLEAN_UPPER_NAME: { url, dcUrl, time, drop } }
@@ -956,7 +959,7 @@ function saveCommandState() {
     localStorage.setItem('strataCommandState',JSON.stringify({
         projectInfo,inspectionData,elevations,dropAssignments,
         stitchedPairs,saved3DTags,manualLinks,projectModelUrl,
-        repairPriorities,repairTags
+        repairPriorities,repairTags,repairFixed
     }));
 }
 
@@ -975,6 +978,7 @@ function loadCommandState() {
         projectModelUrl   =s.projectModelUrl   ||'';
         repairPriorities  =s.repairPriorities  ||{};
         repairTags        =s.repairTags        ||{};
+        repairFixed       =s.repairFixed       ||{};
         // Restore model URL input field if it exists
         const urlInput = document.getElementById('twin-url-input');
         if (urlInput && projectModelUrl) urlInput.value = projectModelUrl;
@@ -1123,6 +1127,7 @@ async function handleFiles(files, forcedType=null) {
         projectModelUrl   =p.projectModelUrl   ||'';
         repairPriorities  =p.repairPriorities  ||{};
         repairTags        =p.repairTags        ||{};
+        repairFixed       =p.repairFixed       ||{};
         const urlInp = document.getElementById('twin-url-input');
         if (urlInp && projectModelUrl) urlInp.value = projectModelUrl;
                         document.getElementById('top-reload-banner').style.display='block';
@@ -2103,16 +2108,49 @@ function updatePlannerBtn(nodeId) {
     btn.innerText = inPlanner ? '✅ IN REPAIR PLANNER (tap to remove)' : '🔧 ADD TO REPAIR PLANNER';
     btn.style.borderColor = inPlanner ? '#28a745' : '#f39c12';
     btn.style.color       = inPlanner ? '#28a745' : '#f39c12';
+
+    // Show/update "Mark as Fixed" button if window is in planner
+    let fixBtn = document.getElementById('btn-mark-fixed');
+    if (inPlanner) {
+        if (!fixBtn) {
+            fixBtn = document.createElement('button');
+            fixBtn.id = 'btn-mark-fixed';
+            fixBtn.className = 'btn btn-dark btn-block';
+            fixBtn.style.marginBottom = '8px';
+            btn.parentNode.insertBefore(fixBtn, btn.nextSibling);
+        }
+        const isFixed = !!repairFixed[nodeId];
+        fixBtn.innerText  = isFixed ? '↩ Mark as Unfixed' : '✅ Mark as Fixed';
+        fixBtn.style.borderColor = isFixed ? '#555' : '#28a745';
+        fixBtn.style.color       = isFixed ? '#555' : '#28a745';
+        fixBtn.style.background  = isFixed ? '#0a1a0a' : 'transparent';
+        fixBtn.onclick = () => {
+            if (repairFixed[nodeId]) {
+                delete repairFixed[nodeId];
+            } else {
+                repairFixed[nodeId] = true;
+            }
+            saveCommandState();
+            updatePlannerBtn(nodeId);
+            renderRepairPlanner();
+        };
+    } else {
+        if (fixBtn) fixBtn.remove();
+    }
+
     updatePlannerBadge();
 }
 
 function updatePlannerBadge() {
-    const count = Object.keys(repairPriorities).length;
-    const badge = document.getElementById('rp-badge');
+    const total  = Object.keys(repairPriorities).length;
+    const fixed  = Object.keys(repairFixed).filter(id => repairFixed[id] && repairPriorities[id]).length;
+    const active = total - fixed;
+    const badge  = document.getElementById('rp-badge');
     if (!badge) return;
-    if (count > 0) {
+    if (total > 0) {
         badge.style.display = 'inline';
-        badge.innerText = count;
+        badge.innerText = fixed > 0 ? `${active} / ${fixed}✓` : `${total}`;
+        badge.title = `${active} pending, ${fixed} fixed`;
     } else {
         badge.style.display = 'none';
     }
@@ -2237,6 +2275,27 @@ function rpGetDefectCategories(node) {
     if (cats.size === 0 && node.status !== 'status-clear') cats.add('Other');
 
     return [...cats];
+}
+
+function toggleRepairFixed(nodeId, btn) {
+    if (repairFixed[nodeId]) {
+        delete repairFixed[nodeId];
+        btn.innerText = '✅ Mark as Fixed';
+        btn.style.borderColor = '#28a745';
+        btn.style.color = '#28a745';
+        btn.style.background = 'transparent';
+    } else {
+        repairFixed[nodeId] = true;
+        btn.innerText = '↩ Mark as Unfixed';
+        btn.style.borderColor = '#555';
+        btn.style.color = '#555';
+        btn.style.background = 'transparent';
+    }
+    // Update card appearance
+    const card = btn.closest('.rp-card');
+    if (card) card.classList.toggle('rp-fixed', !!repairFixed[nodeId]);
+    saveCommandState();
+    updatePlannerBadge();
 }
 
 function rpOpenInlineEdit(nodeId, cardEl) {
@@ -2390,14 +2449,18 @@ function renderRepairPlanner() {
     updatePlannerBadge();
 
     // ── Summary bar ──────────────────────────────────────
-    const sumHigh = Object.values(repairPriorities).filter(p=>p==='HIGH').length;
-    const sumMed  = Object.values(repairPriorities).filter(p=>p==='MED').length;
-    const sumLow  = Object.values(repairPriorities).filter(p=>p==='LOW').length;
-    const sumNone = Object.keys(repairPriorities).filter(id=>!repairPriorities[id]||repairPriorities[id]==='NONE').length;
-    const total   = Object.keys(repairPriorities).length;
+    const sumHigh  = Object.values(repairPriorities).filter(p=>p==='HIGH').length;
+    const sumMed   = Object.values(repairPriorities).filter(p=>p==='MED').length;
+    const sumLow   = Object.values(repairPriorities).filter(p=>p==='LOW').length;
+    const sumNone  = Object.keys(repairPriorities).filter(id=>!repairPriorities[id]||repairPriorities[id]==='NONE').length;
+    const total    = Object.keys(repairPriorities).length;
+    const sumFixed = Object.keys(repairFixed).filter(id => repairFixed[id] && repairPriorities[id]).length;
 
     const sb = document.getElementById('rp-summary-bar');
-    if (sb) sb.innerHTML = `
+    if (sb) {
+        // Keep the fullscreen button, replace only the stat tiles
+        const fsBtn = document.getElementById('rp-fs-btn');
+        sb.innerHTML = `
         <div style="flex:1;background:#2a0a0a;border:1px solid #d9534f44;border-radius:6px;padding:8px;text-align:center;">
             <div style="font-size:1.3rem;font-weight:900;color:#d9534f;">${sumHigh}</div>
             <div style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">High</div>
@@ -2417,7 +2480,23 @@ function renderRepairPlanner() {
         <div style="flex:1;background:#111;border:1px solid #0cf44;border-radius:6px;padding:8px;text-align:center;">
             <div style="font-size:1.3rem;font-weight:900;color:#0cf;">${total}</div>
             <div style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Total</div>
+        </div>
+        <div style="flex:1;background:#0a1a0a;border:1px solid #28a74588;border-radius:6px;padding:8px;text-align:center;">
+            <div style="font-size:1.3rem;font-weight:900;color:#28a745;">${sumFixed}</div>
+            <div style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">✓ Fixed</div>
         </div>`;
+        // Re-append the fullscreen button at the end
+        if (fsBtn) sb.appendChild(fsBtn);
+        else {
+            const btn = document.createElement('button');
+            btn.id = 'rp-fs-btn';
+            btn.className = 'btn-fullscreen';
+            btn.onclick = toggleRPFullscreen;
+            btn.innerText = '⛶';
+            btn.style.cssText = 'position:static;flex-shrink:0;padding:8px 12px;font-size:0.75rem;align-self:stretch;border-radius:6px;';
+            sb.appendChild(btn);
+        }
+    }
 
     // ── Defect type filter chips ─────────────────────────
     const usedCats = new Set();
@@ -2535,20 +2614,38 @@ function renderRepairPlanner() {
                             const mainCat = cats[0] || 'Other';
                             const defColor = DEFECT_COLORS[mainCat] || '#7f8c8d';
                             const priColor = priColors[pri];
-                            node.className = 'window-node';
-                            node.style.cssText = `background:${defColor}33;border:2px solid ${defColor};`;
+                            const isFixed  = !!repairFixed[nodeId];
+                            node.className = 'window-node' + (isFixed ? ' rp-fixed-node' : '');
+                            node.style.cssText = isFixed
+                                ? `background:#0a1a0a;border:2px solid #28a745;opacity:0.6;`
+                                : `background:${defColor}33;border:2px solid ${defColor};`;
                             node.onclick = () => openModal(nodeId);
+                            node.title = isFixed ? 'FIXED — tap to view' : 'Tap to view';
+
+                            // Position label
                             const lbl = document.createElement('div');
                             lbl.innerText = pos;
                             lbl.style.cssText = 'font-size:0.65rem;font-weight:bold;color:#fff;';
                             node.appendChild(lbl);
-                            const dot = document.createElement('div');
-                            dot.style.cssText = `width:7px;height:7px;border-radius:50%;background:${priColor};`;
-                            node.appendChild(dot);
-                            const catLbl = document.createElement('div');
-                            catLbl.style.cssText = `font-size:0.48rem;color:${defColor};font-weight:bold;text-align:center;line-height:1.1;`;
-                            catLbl.innerText = mainCat.split('/')[0].trim().toUpperCase();
-                            node.appendChild(catLbl);
+
+                            if (isFixed) {
+                                // Show checkmark instead of priority dot
+                                const chk = document.createElement('div');
+                                chk.innerText = '✓';
+                                chk.style.cssText = 'font-size:0.8rem;color:#28a745;font-weight:900;';
+                                node.appendChild(chk);
+                            } else {
+                                // Priority dot
+                                const dot = document.createElement('div');
+                                dot.style.cssText = `width:7px;height:7px;border-radius:50%;background:${priColor};`;
+                                node.appendChild(dot);
+                                // Defect label
+                                const catLbl = document.createElement('div');
+                                catLbl.style.cssText = `font-size:0.48rem;color:${defColor};font-weight:bold;text-align:center;line-height:1.1;`;
+                                catLbl.innerText = mainCat.split('/')[0].trim().toUpperCase();
+                                node.appendChild(catLbl);
+                            }
+
                             const names = nodePhotoNames(data);
                             if (names.length > 0) {
                                 const badge = document.createElement('div');
@@ -2797,6 +2894,37 @@ function render3DHotspots(){
         mv.appendChild(btn);
     });
 }
+function toggleRPFullscreen() {
+    const grid = document.getElementById('rp-grid-container');
+    const modal = document.getElementById('info-modal');
+    const btn   = document.getElementById('rp-fs-btn');
+
+    if (!document.fullscreenElement) {
+        // Going fullscreen — move modal inside grid so it works inside fullscreen
+        grid.appendChild(modal);
+        modal.style.position = 'fixed';
+        grid.requestFullscreen().catch(e => console.warn('Fullscreen failed:', e));
+        if (btn) btn.innerText = '✕ EXIT';
+    } else {
+        // Exiting — move modal back to body
+        document.body.appendChild(modal);
+        document.exitFullscreen();
+        if (btn) btn.innerText = '⛶';
+    }
+}
+
+// Ensure modal returns to body if fullscreen exits via Escape key
+document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) {
+        const modal = document.getElementById('info-modal');
+        if (modal && modal.parentElement !== document.body) {
+            document.body.appendChild(modal);
+        }
+        const btn = document.getElementById('rp-fs-btn');
+        if (btn) btn.innerText = '⛶';
+    }
+});
+
 function toggleFullScreen(id){const el=document.getElementById(id);if(!document.fullscreenElement){if(el.requestFullscreen)el.requestFullscreen();}else{if(document.exitFullscreen)document.exitFullscreen();}}
 
 // ═══════════════════════════════════════════════════════
