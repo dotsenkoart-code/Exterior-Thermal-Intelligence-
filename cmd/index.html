@@ -7,7 +7,7 @@
     <link rel="icon" type="image/png" sizes="192x192" href="icon-cmd192.png">
     <link rel="apple-touch-icon" href="icon-cmd192.png">
     <meta name="theme-color" content="#0f111a">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Strata CMD">
@@ -153,6 +153,24 @@
         #gear-popover .gear-item.warning:hover { border-color:#f39c12;color:#f39c12; }
         #gear-overlay { display:none;position:fixed;inset:0;z-index:2999; }
 
+        /* Pinch-to-zoom on 2D grid */
+        #building-container-2d {
+            transform-origin: top left;
+            touch-action: pan-x pan-y;
+            will-change: transform;
+        }
+        #zoom-controls {
+            position:fixed;bottom:20px;right:20px;z-index:500;
+            display:none;flex-direction:column;gap:6px;
+        }
+        #zoom-controls button {
+            width:40px;height:40px;border-radius:50%;
+            background:#1a1d27;border:1px solid #2a2d38;
+            color:#0cf;font-size:1.2rem;cursor:pointer;
+            display:flex;align-items:center;justify-content:center;
+        }
+        #zoom-controls button:hover { border-color:#0cf; }
+
         #rp-grid-container:fullscreen { background:#0f111a;padding:20px;overflow:auto; }
         #rp-grid-container:-webkit-full-screen { background:#0f111a;padding:20px;overflow:auto; }
         /* CSS fullscreen fallback for iOS/PWA */
@@ -209,6 +227,7 @@
         .photo-move-btn { padding:3px 10px;font-size:0.7rem;font-weight:bold;background:#1a2a3a;color:#0cf;border:1px solid #0cf;border-radius:4px;cursor:pointer;margin-left:8px;text-transform:uppercase;letter-spacing:0.5px; }
         .photo-move-btn:hover { background:#0cf;color:#000; }
         #photo-move-banner { display:none;position:fixed;top:0;left:0;width:100%;z-index:8000;background:#003d5a;color:#0cf;padding:14px 20px;font-size:1rem;font-weight:bold;text-align:center;border-bottom:2px solid #0cf;cursor:pointer; }
+        #modal-nav-bar button.mnf-active { background:#0cf !important;color:#000 !important;border-color:#0cf !important; }
         .window-node.in-planner { box-shadow: 0 0 0 2px #f39c12, 0 0 8px #f39c1288 !important; }
         .window-node.in-planner::after { content:'🔧'; position:absolute; top:1px; right:2px; font-size:0.5rem; line-height:1; opacity:0.9; }
 
@@ -275,6 +294,8 @@
     <div style="border-top:1px solid #2a2d38;margin:4px 0;"></div>
     <button class="gear-item warning" onclick="closeGearMenu();editMapping()">🗺️ Edit Map</button>
     <button class="gear-item danger"  onclick="closeGearMenu();resetBoard()">🔄 Clear Data</button>
+    <div style="border-top:1px solid #2a2d38;margin:4px 0;"></div>
+    <button class="gear-item" onclick="closeGearMenu();detectDuplicatePhotos()">🔍 Check Duplicate Photos</button>
 </div>
 
 <div class="header">
@@ -321,7 +342,7 @@
             <button class="view-toggle-btn tag-toggle" style="border:1px solid #d080ff;display:none;" id="btn-tag3d-main" onclick="openMasterTagMenu()">📍 3D TAG MENU</button>
         </div>
 
-        <div class="stats-bar">
+        <div class="stats-bar" style="align-items:center;">
             <div class="stat-card" id="filter-card-all"       style="border-color:#888;"    onclick="setFilter('ALL')">
                 <div class="stat-label" style="color:#fff;">ALL WINDOWS</div>
                 <div class="stat-value" id="stat-total"     style="color:#fff;">0</div>
@@ -341,6 +362,18 @@
             <div class="stat-card" style="border-color:#ff6b35;cursor:default;" title="IR photos currently loaded in memory">
                 <div class="stat-label" style="color:#ff6b35;">IR LOADED</div>
                 <div class="stat-value" id="stat-ir"        style="color:#ff6b35;">0</div>
+            </div>
+            <!-- Bulk select -->
+            <button id="btn-bulk-select" onclick="toggleBulkSelect()"
+                style="padding:8px 12px;font-size:0.72rem;font-weight:bold;border:1px solid #555;border-radius:6px;background:#111;color:#555;cursor:pointer;flex-shrink:0;white-space:nowrap;">
+                ☑ BULK
+            </button>
+            <div id="bulk-action-bar" style="display:none;gap:6px;align-items:center;flex-shrink:0;">
+                <span id="bulk-count" style="color:#0cf;font-size:0.75rem;font-weight:bold;white-space:nowrap;"></span>
+                <button onclick="bulkChangeStatus('status-clear')"     style="padding:6px 10px;font-size:0.7rem;font-weight:bold;border:1px solid #28a745;color:#28a745;background:#0a1a0a;border-radius:4px;cursor:pointer;">✅</button>
+                <button onclick="bulkChangeStatus('status-flagged')"   style="padding:6px 10px;font-size:0.7rem;font-weight:bold;border:1px solid #f1c40f;color:#f1c40f;background:#1a1500;border-radius:4px;cursor:pointer;">⚠️</button>
+                <button onclick="bulkChangeStatus('status-confirmed')" style="padding:6px 10px;font-size:0.7rem;font-weight:bold;border:1px solid #d9534f;color:#d9534f;background:#1a0a0a;border-radius:4px;cursor:pointer;">🚨</button>
+                <button onclick="toggleBulkSelect()" style="padding:6px 10px;font-size:0.7rem;border:1px solid #444;color:#555;background:#111;border-radius:4px;cursor:pointer;">✕</button>
             </div>
         </div>
 
@@ -420,6 +453,23 @@
     <div class="modal-box">
         <h2 class="modal-title"    id="m-id">A-12-L</h2>
         <div class="modal-subtitle" id="m-tech">Logged by Tech</div>
+
+        <!-- Navigation bar -->
+        <div id="modal-nav-bar" style="display:none;align-items:center;gap:6px;margin-bottom:12px;padding:8px;background:#111;border-radius:8px;border:1px solid #2a2d38;">
+            <button id="modal-prev-btn" onclick="modalNavigate(-1)"
+                style="padding:6px 12px;background:#1a1d27;color:#0cf;border:1px solid #0cf;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:bold;">◀</button>
+            <div style="flex:1;text-align:center;">
+                <div id="modal-nav-pos" style="color:#0cf;font-size:0.8rem;font-weight:bold;"></div>
+                <div style="display:flex;gap:4px;justify-content:center;margin-top:4px;">
+                    <button onclick="setModalNavFilter('all')"     id="mnf-all"     style="padding:2px 8px;font-size:0.6rem;font-weight:bold;border-radius:4px;cursor:pointer;border:1px solid #333;background:#111;color:#555;">ALL</button>
+                    <button onclick="setModalNavFilter('photos')"  id="mnf-photos"  style="padding:2px 8px;font-size:0.6rem;font-weight:bold;border-radius:4px;cursor:pointer;border:1px solid #0cf;background:#0cf22;color:#0cf;">HAS PHOTOS</button>
+                    <button onclick="setModalNavFilter('pending')" id="mnf-pending" style="padding:2px 8px;font-size:0.6rem;font-weight:bold;border-radius:4px;cursor:pointer;border:1px solid #333;background:#111;color:#555;">PENDING</button>
+                </div>
+            </div>
+            <button id="modal-next-btn" onclick="modalNavigate(1)"
+                style="padding:6px 12px;background:#1a1d27;color:#0cf;border:1px solid #0cf;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:bold;">▶</button>
+        </div>
+
         <button class="btn btn-dark btn-block" id="btn-retag"   style="display:none;margin-bottom:10px;border-color:#0cf;color:#0cf;"       onclick="startReTag()">📍 RE-TAG POSITION</button>
         <button class="btn btn-dark btn-block" id="btn-unpin"   style="display:none;margin-bottom:10px;border-color:#d080ff;color:#d080ff;"  onclick="unpinCurrent()">🗑️ REMOVE 3D PIN</button>
         <button class="btn btn-dark btn-block" id="btn-unmerge" style="display:none;margin-bottom:15px;border-color:#f39c12;color:#f39c12;" onclick="unmergeCurrent()">✂️ UN-STITCH WINDOWS</button>
@@ -468,6 +518,13 @@
     </div>
 </div>
 
+<!-- ZOOM CONTROLS -->
+<div id="zoom-controls">
+    <button onclick="adjustZoom(0.2)" title="Zoom in">+</button>
+    <button onclick="resetZoom()" title="Reset zoom" style="font-size:0.65rem;color:#555;">1:1</button>
+    <button onclick="adjustZoom(-0.2)" title="Zoom out">−</button>
+</div>
+
 <!-- 3D TAG MODAL -->
 <div class="modal-overlay" id="tag-master-modal">
     <div class="modal-box" style="border-color:#d080ff;">
@@ -512,6 +569,11 @@ let saved3DTags         = {};
 let manualLinks         = {};   // { nodeId: [cleanName, ...] } manager overrides (additive)
 let wakeLock            = null;
 let modalNodeId         = null;
+let modalNavSequence    = [];   // ordered list of nodeIds for Next navigation
+let modalNavFilter      = 'photos'; // 'all' | 'photos' | 'pending'
+let bulkSelectMode      = false;
+let bulkSelected        = new Set();
+let photoRotations      = {};  // { imgKey: 90 | 180 | 270 } manual rotation overrides
 let photoMoveMode       = null; // { photoName, fromNodeId } when move is active
 let cachedZip           = null; // JSZip reference kept in memory for image retry
 let projectModelUrl     = '';   // Google Drive or direct URL for this project's 3D model
@@ -1040,7 +1102,9 @@ function saveProject() {
         stitchedPairs,saved3DTags,manualLinks,projectModelUrl,
         repairPriorities,repairTags
     }));
-    a.download=`Strata_Project_${projectInfo.replace(/\s+/g,'_')}.json`;
+    const now = new Date();
+    const ts  = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}-${String(now.getMinutes()).padStart(2,'0')}`;
+    a.download=`Strata_${projectInfo.replace(/\s+/g,'_')}_${ts}.json`;
     a.click();
 }
 
@@ -1632,6 +1696,96 @@ function manualAssignLatest(nodeId) {
 // ═══════════════════════════════════════════════════════
 // STATS
 // ═══════════════════════════════════════════════════════
+// ── Bulk status change ───────────────────────────────────────
+function toggleBulkSelect() {
+    bulkSelectMode = !bulkSelectMode;
+    bulkSelected.clear();
+    const btn = document.getElementById('btn-bulk-select');
+    const bar = document.getElementById('bulk-action-bar');
+    const countEl = document.getElementById('bulk-count');
+    if (btn) {
+        btn.style.borderColor = bulkSelectMode ? '#0cf' : '#555';
+        btn.style.color       = bulkSelectMode ? '#0cf' : '#555';
+        btn.style.background  = bulkSelectMode ? '#0a1a2a' : '#111';
+    }
+    if (bar) bar.style.display = bulkSelectMode ? 'flex' : 'none';
+    if (countEl) countEl.innerText = '0 selected';
+    refreshCurrentView();
+}
+
+function bulkToggleNode(nodeId) {
+    if (!bulkSelectMode) return false;
+    if (bulkSelected.has(nodeId)) bulkSelected.delete(nodeId);
+    else bulkSelected.add(nodeId);
+    const countEl = document.getElementById('bulk-count');
+    if (countEl) countEl.innerText = `${bulkSelected.size} selected`;
+    return true; // consumed the click
+}
+
+function bulkChangeStatus(status) {
+    if (!bulkSelected.size) { showToast('No windows selected.', 2000, true); return; }
+    const label = status === 'status-clear' ? 'Clear' : status === 'status-flagged' ? 'Flagged' : 'Defect';
+    showConfirm(
+        `☑ Bulk status change`,
+        `Mark ${bulkSelected.size} selected window${bulkSelected.size>1?'s':''} as ${label}?`,
+        'APPLY',
+        () => {
+            bulkSelected.forEach(nodeId => {
+                const node = getNodeData(nodeId);
+                if (node) node.status = status;
+            });
+            saveCommandState();
+            calculateBuildingGeometry();
+            refreshCurrentView();
+            showToast(`✅ ${bulkSelected.size} windows marked as ${label}`, 3000);
+            toggleBulkSelect();
+        }
+    );
+}
+
+// ── Duplicate photo detector ─────────────────────────────────
+function detectDuplicatePhotos() {
+    const seen   = {};   // photoName → first nodeId that claimed it
+    const dupes  = [];   // { photo, nodes: [nodeId, ...] }
+
+    Object.keys(inspectionData).forEach(drop => {
+        Object.keys(inspectionData[drop]).forEach(floor => {
+            Object.keys(inspectionData[drop][floor]).forEach(pos => {
+                const node = inspectionData[drop][floor][pos];
+                const names = nodePhotoNames(node);
+                names.forEach(name => {
+                    if (seen[name]) {
+                        // Already seen — it's a duplicate
+                        const existing = dupes.find(d => d.photo === name);
+                        if (existing) {
+                            if (!existing.nodes.includes(node.id)) existing.nodes.push(node.id);
+                        } else {
+                            dupes.push({ photo: name, nodes: [seen[name], node.id] });
+                        }
+                    } else {
+                        seen[name] = node.id;
+                    }
+                });
+            });
+        });
+    });
+
+    if (dupes.length === 0) {
+        showToast('✅ No duplicate photos found.', 3000);
+        return;
+    }
+
+    // Show results in a toast-style panel
+    const msg = dupes.slice(0, 5).map(d =>
+        `${d.photo.split('_').pop()} → ${d.nodes.join(' & ')}`
+    ).join('
+');
+    const extra = dupes.length > 5 ? `
+…and ${dupes.length - 5} more` : '';
+    showToast(`⚠️ ${dupes.length} duplicate photo${dupes.length>1?'s':''} found:
+${msg}${extra}`, 8000, true);
+}
+
 function calculateBuildingGeometry() {
     globalStats={t:0,clear:0,f:0,c:0,maxFloor:-Infinity,minFloor:Infinity};
     Object.keys(inspectionData).forEach(drop=>{
@@ -1743,10 +1897,50 @@ function finishPhotoMove(targetNodeId) {
 }
 
 document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && photoMoveMode) cancelPhotoMove();
+    const modalOpen = document.getElementById('info-modal')?.style.display === 'flex';
+    const lightboxOpen = document.getElementById('lightbox-modal')?.style.display === 'flex';
+
+    // Escape
+    if (e.key === 'Escape') {
+        if (photoMoveMode) { cancelPhotoMove(); return; }
+        if (lightboxOpen)  { closeLightbox(); return; }
+        if (modalOpen)     { closeModal(); return; }
+    }
+
+    // Arrow keys in modal — navigate windows
+    if (modalOpen && !lightboxOpen) {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+            e.preventDefault(); modalNavigate(1); return;
+        }
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+            e.preventDefault(); modalNavigate(-1); return;
+        }
+    }
+
+    // Arrow keys in lightbox — navigate photos
+    if (lightboxOpen) {
+        if (e.key === 'ArrowRight') { e.preventDefault(); changeLightbox(1); return; }
+        if (e.key === 'ArrowLeft')  { e.preventDefault(); changeLightbox(-1); return; }
+    }
+
+    // + / - zoom on grid
+    if (!modalOpen && !lightboxOpen && currentMode === '2d') {
+        if (e.key === '+' || e.key === '=') { e.preventDefault(); adjustZoom(0.1); return; }
+        if (e.key === '-')                   { e.preventDefault(); adjustZoom(-0.1); return; }
+        if (e.key === '0')                   { e.preventDefault(); resetZoom(); return; }
+    }
 });
 
 function handleNodeClick(data,el) {
+    // Bulk select mode
+    if (bulkSelectMode) {
+        const consumed = bulkToggleNode(data.id);
+        if (consumed) {
+            el.style.outline = bulkSelected.has(data.id) ? '3px solid #0cf' : '';
+            return;
+        }
+    }
+
     // Photo move mode: tap a window to reassign the photo there
     if (photoMoveMode) {
         finishPhotoMove(data.id);
@@ -1806,7 +2000,11 @@ function switchView(mode) {
     const tagBtn = document.getElementById('btn-tag3d-main');
     if (tagBtn) tagBtn.style.display = mode==='true3d' ? '' : 'none';
 
-    if (mode==='2d') refreshCurrentView();
+    if (mode==='2d') { refreshCurrentView(); setTimeout(initPinchZoom, 100); }
+    if (mode==='repair') renderRepairPlanner();
+    // Show/hide zoom controls
+    const zc = document.getElementById('zoom-controls');
+    if (zc) zc.style.display = mode==='2d' ? 'flex' : 'none';
     if (mode==='repair') renderRepairPlanner();
     if (mode==='true3d') setTimeout(initTwin, 100);
 }
@@ -1998,7 +2196,27 @@ function buildPhotoArea(nodes) {
                 };
             })(irName, nodes.map(n => n?.id).filter(Boolean));
 
-            bar.appendChild(nl);bar.appendChild(pill);bar.appendChild(moveBtn);bar.appendChild(removeBtn);wrap.appendChild(bar);
+            // Rotation button — fix portrait/landscape mismatch
+            const rotBtn = document.createElement('button');
+            rotBtn.className = 'photo-move-btn';
+            rotBtn.style.cssText = 'padding:3px 8px;font-size:0.7rem;font-weight:bold;background:#1a1a0a;color:#f1c40f;border:1px solid #f1c40f44;border-radius:4px;cursor:pointer;margin-left:4px;';
+            const curRot = photoRotations[irName] || 0;
+            rotBtn.innerText = '↻';
+            rotBtn.title = `Rotate image (currently ${curRot}°)`;
+            rotBtn.onclick = (function(name) {
+                return function(e) {
+                    e.stopPropagation();
+                    photoRotations[name] = ((photoRotations[name] || 0) + 90) % 360;
+                    // Apply rotation to the visible img
+                    const imgs = document.querySelectorAll(`img[data-photo-key="${name}"]`);
+                    imgs.forEach(i => {
+                        i.style.transform = photoRotations[name] ? `rotate(${photoRotations[name]}deg)` : '';
+                    });
+                    rotBtn.title = `Rotate image (currently ${photoRotations[name]}°)`;
+                };
+            })(irName);
+
+            bar.appendChild(nl);bar.appendChild(pill);bar.appendChild(moveBtn);bar.appendChild(removeBtn);bar.appendChild(rotBtn);wrap.appendChild(bar);
 
             // Click image → lightbox, opening at the current IR/DC state
             img.onclick=(function(name, ent){
@@ -2233,6 +2451,96 @@ function updatePlannerBadge() {
     }
 }
 
+// ── Modal navigation ────────────────────────────────────────────
+function buildModalNavSequence(nodeId) {
+    const parts = nodeId.split('-');
+    const drop  = parts[0];
+    if (!inspectionData[drop]) return [];
+
+    const posOrder = ['L','C','R'];
+    const floors = Object.keys(inspectionData[drop]).map(Number).sort((a,b) => b-a);
+
+    const all = [];
+    floors.forEach(f => {
+        posOrder.forEach(p => {
+            if (inspectionData[drop][f]?.[p]) {
+                all.push(inspectionData[drop][f][p]);
+            }
+        });
+    });
+
+    // Apply filter
+    return all.filter(node => {
+        if (modalNavFilter === 'all') return true;
+        if (modalNavFilter === 'photos') return nodePhotoNames(node).length > 0;
+        if (modalNavFilter === 'pending') {
+            const s = node.status || 'status-void';
+            return s === 'status-void' || s === 'status-flagged';
+        }
+        return true;
+    }).map(n => n.id);
+}
+
+function updateModalNav(nodeId) {
+    modalNavSequence = buildModalNavSequence(nodeId);
+    const navBar  = document.getElementById('modal-nav-bar');
+    const posEl   = document.getElementById('modal-nav-pos');
+    const prevBtn = document.getElementById('modal-prev-btn');
+    const nextBtn = document.getElementById('modal-next-btn');
+    if (!navBar) return;
+
+    if (modalNavSequence.length <= 1) {
+        navBar.style.display = 'none';
+        return;
+    }
+
+    navBar.style.display = 'flex';
+    const idx = modalNavSequence.indexOf(nodeId);
+    const drop = nodeId.split('-')[0];
+    posEl.innerText = `Drop ${drop}  ·  ${idx + 1} of ${modalNavSequence.length}`;
+
+    prevBtn.disabled = idx <= 0;
+    prevBtn.style.opacity = idx <= 0 ? '0.3' : '1';
+    nextBtn.style.opacity = '1';
+
+    // Check if this is the last window
+    const isLast = idx >= modalNavSequence.length - 1;
+    nextBtn.innerText = isLast ? '✓ END' : '▶';
+    nextBtn.style.background = isLast ? '#0a1a0a' : '#1a1d27';
+    nextBtn.style.borderColor = isLast ? '#28a745' : '#0cf';
+    nextBtn.style.color = isLast ? '#28a745' : '#0cf';
+    nextBtn.disabled = isLast;
+
+    // Update filter pills
+    ['all','photos','pending'].forEach(f => {
+        const btn = document.getElementById(`mnf-${f}`);
+        if (!btn) return;
+        const active = f === modalNavFilter;
+        btn.style.background = active ? '#0cf' : '#111';
+        btn.style.color      = active ? '#000' : '#555';
+        btn.style.borderColor= active ? '#0cf' : '#333';
+    });
+}
+
+function modalNavigate(dir) {
+    if (!modalNodeId) return;
+    const idx = modalNavSequence.indexOf(modalNodeId);
+    const newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= modalNavSequence.length) return;
+    // Save notes before navigating
+    const notesEl = document.getElementById('m-notes');
+    if (notesEl) {
+        const node = getNodeData(modalNodeId);
+        if (node) { node.notes = notesEl.value; saveCommandState(); }
+    }
+    openModal(modalNavSequence[newIdx]);
+}
+
+function setModalNavFilter(filter) {
+    modalNavFilter = filter;
+    if (modalNodeId) updateModalNav(modalNodeId);
+}
+
 function openModal(nodeId) {
     const primary=getNodeData(nodeId);
     if (!primary){console.warn('openModal: no data for',nodeId);return;}
@@ -2277,6 +2585,9 @@ function openModal(nodeId) {
     const suggestResult = document.getElementById('suggest-result');
     if (suggestBtn) suggestBtn.style.display = hasPhotos ? 'none' : 'block';
     if (suggestResult) { suggestResult.style.display = 'none'; suggestResult.innerHTML = ''; }
+
+    // Update navigation bar
+    updateModalNav(nodeId);
 }
 
 function unmergeCurrent(){if(activeNodeDataArray[0]){const idx=stitchedPairs.findIndex(p=>p.includes(activeNodeDataArray[0].id));if(idx!==-1){showConfirm('✂️ Un-stitch windows?','These two windows will be separated back into individual nodes.','UN-STITCH',()=>{stitchedPairs.splice(idx,1);closeModal();calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();});}}}
@@ -2885,6 +3196,66 @@ function acceptPhotoSuggestion(photoNames, fromNodeId, toNodeId) {
 }
 
 // ═══════════════════════════════════════════════════════
+// PINCH-TO-ZOOM — 2D grid
+// ═══════════════════════════════════════════════════════
+let gridScale      = 1;
+let gridPinchStart = null;
+
+function getGridEl() { return document.getElementById('building-container-2d'); }
+
+function applyGridScale() {
+    const el = getGridEl();
+    if (!el) return;
+    el.style.transform = `scale(${gridScale})`;
+    const zc = document.getElementById('zoom-controls');
+    if (zc) zc.style.display = currentMode === '2d' ? 'flex' : 'none';
+}
+
+function adjustZoom(delta) {
+    gridScale = Math.min(3, Math.max(0.3, gridScale + delta));
+    applyGridScale();
+}
+
+function resetZoom() {
+    gridScale = 1;
+    applyGridScale();
+}
+
+function initPinchZoom() {
+    const container = document.getElementById('view-2d');
+    if (!container || container._pinchInit) return;
+    container._pinchInit = true;
+
+    container.addEventListener('touchstart', e => {
+        if (e.touches.length === 2) {
+            gridPinchStart = {
+                dist: Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                ),
+                scale: gridScale
+            };
+        }
+    }, { passive: true });
+
+    container.addEventListener('touchmove', e => {
+        if (e.touches.length === 2 && gridPinchStart) {
+            const dist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+            const ratio = dist / gridPinchStart.dist;
+            gridScale = Math.min(3, Math.max(0.3, gridPinchStart.scale * ratio));
+            applyGridScale();
+        }
+    }, { passive: true });
+
+    container.addEventListener('touchend', e => {
+        if (e.touches.length < 2) gridPinchStart = null;
+    }, { passive: true });
+}
+
+// ═══════════════════════════════════════════════════════
 // RESET  — uses custom confirm dialog (window.confirm is
 // silently blocked in some desktop PWA / file:// contexts)
 // ═══════════════════════════════════════════════════════
@@ -3351,29 +3722,34 @@ function render3DHotspots(){
 }
 function toggleRPFullscreen() {
     const grid    = document.getElementById('rp-grid-container');
+    const modal   = document.getElementById('info-modal');
     const exitBtn = document.getElementById('rp-fullscreen-exit');
     const fsBtn   = document.getElementById('rp-fs-btn');
     const isFullscreen = grid.classList.contains('rp-fullscreen')
                       || !!document.fullscreenElement;
 
     if (!isFullscreen) {
-        // Try native fullscreen first (works on desktop)
+        // Move modal into grid so it renders correctly in fullscreen context
+        grid.appendChild(modal);
+        modal.style.position = 'fixed';
+
+        // Try native fullscreen first
         if (grid.requestFullscreen) {
             grid.requestFullscreen().catch(() => {
-                // Native failed (iOS/PWA) — use CSS approach
                 grid.classList.add('rp-fullscreen');
                 if (exitBtn) exitBtn.style.display = 'flex';
             });
         } else if (grid.webkitRequestFullscreen) {
             grid.webkitRequestFullscreen();
         } else {
-            // CSS fallback
             grid.classList.add('rp-fullscreen');
             if (exitBtn) exitBtn.style.display = 'flex';
         }
         if (fsBtn) fsBtn.innerText = '✕ EXIT';
     } else {
-        // Exit fullscreen
+        // Move modal back to body before exiting
+        document.body.appendChild(modal);
+        modal.style.position = '';
         grid.classList.remove('rp-fullscreen');
         if (exitBtn) exitBtn.style.display = 'none';
         if (document.fullscreenElement) document.exitFullscreen();
@@ -3383,25 +3759,25 @@ function toggleRPFullscreen() {
 }
 
 // Handle native fullscreen exit (Escape key)
-document.addEventListener('fullscreenchange', () => {
-    if (!document.fullscreenElement) {
-        const grid    = document.getElementById('rp-grid-container');
-        const exitBtn = document.getElementById('rp-fullscreen-exit');
-        const fsBtn   = document.getElementById('rp-fs-btn');
-        grid.classList.remove('rp-fullscreen');
-        if (exitBtn) exitBtn.style.display = 'none';
-        if (fsBtn) fsBtn.innerText = '⛶';
+function exitRPFullscreenCleanup() {
+    const grid    = document.getElementById('rp-grid-container');
+    const modal   = document.getElementById('info-modal');
+    const exitBtn = document.getElementById('rp-fullscreen-exit');
+    const fsBtn   = document.getElementById('rp-fs-btn');
+    grid.classList.remove('rp-fullscreen');
+    if (exitBtn) exitBtn.style.display = 'none';
+    if (fsBtn) fsBtn.innerText = '⛶';
+    // Return modal to body if it was moved in
+    if (modal && modal.parentElement !== document.body) {
+        document.body.appendChild(modal);
+        modal.style.position = '';
     }
+}
+document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) exitRPFullscreenCleanup();
 });
 document.addEventListener('webkitfullscreenchange', () => {
-    if (!document.webkitFullscreenElement) {
-        const grid    = document.getElementById('rp-grid-container');
-        const exitBtn = document.getElementById('rp-fullscreen-exit');
-        const fsBtn   = document.getElementById('rp-fs-btn');
-        grid.classList.remove('rp-fullscreen');
-        if (exitBtn) exitBtn.style.display = 'none';
-        if (fsBtn) fsBtn.innerText = '⛶';
-    }
+    if (!document.webkitFullscreenElement) exitRPFullscreenCleanup();
 });
 
 function toggleFullScreen(id){const el=document.getElementById(id);if(!document.fullscreenElement){if(el.requestFullscreen)el.requestFullscreen();}else{if(document.exitFullscreen)document.exitFullscreen();}}
