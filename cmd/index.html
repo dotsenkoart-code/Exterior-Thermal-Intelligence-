@@ -24,6 +24,7 @@
         html, body { margin:0;padding:0;width:100vw;height:100vh;overflow:hidden;display:flex;flex-direction:column;background:#0f111a;color:#fff;font-family:'Segoe UI',Roboto,sans-serif; }
 
         .header { display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #0cf;padding:15px 20px;flex-shrink:0; }
+        .header.gear-visible { padding-left:60px; }
         .header h1 { margin:0;font-size:1.6rem;font-weight:900;letter-spacing:1px; }
         .header span { color:#0cf; }
         .header-btns { display:flex;gap:10px; }
@@ -142,6 +143,19 @@
 
         .no-photo-banner { background:#111;color:#555;padding:20px;text-align:center;border-radius:8px;border:2px dashed #333;margin-bottom:12px;font-size:0.9rem;font-weight:bold; }
         .stale-banner { background:#1a1400;color:#f1c40f;padding:8px 12px;border-radius:6px;border:1px solid #f1c40f44;font-size:0.8rem;font-weight:bold;margin-bottom:10px;display:none; }
+        /* Gear menu */
+        #gear-btn { position:fixed;top:12px;left:12px;z-index:3000;width:36px;height:36px;border-radius:50%;background:#161922;border:1px solid #2a2d38;color:#555;font-size:1rem;cursor:pointer;display:none;align-items:center;justify-content:center;transition:0.15s;box-shadow:0 2px 8px rgba(0,0,0,0.5); }
+        #gear-btn:hover { border-color:#0cf;color:#0cf; }
+        #gear-popover { display:none;position:fixed;top:54px;left:12px;z-index:3000;background:#1a1d27;border:1px solid #2a2d38;border-radius:10px;padding:10px;box-shadow:0 8px 24px rgba(0,0,0,0.8);min-width:240px;flex-direction:column;gap:8px; }
+        #gear-popover .gear-item { padding:12px 16px;border-radius:6px;border:1px dashed #2a2d38;background:#111;color:#aaa;font-size:0.85rem;font-weight:bold;cursor:pointer;text-align:left;transition:0.15s; }
+        #gear-popover .gear-item:hover { border-color:#0cf;color:#0cf; }
+        #gear-popover .gear-item.danger:hover { border-color:#e74c3c;color:#e74c3c; }
+        #gear-popover .gear-item.warning:hover { border-color:#f39c12;color:#f39c12; }
+        #gear-overlay { display:none;position:fixed;inset:0;z-index:2999; }
+
+        #rp-grid-container:fullscreen { background:#0f111a;padding:20px;overflow:auto; }
+        #rp-grid-container:-webkit-full-screen { background:#0f111a;padding:20px;overflow:auto; }
+
         /* Repair Planner */
         #repair-planner { display:none;flex-direction:column;height:100%;width:100%; }
         .rp-header { display:flex;align-items:center;justify-content:space-between;margin-bottom:15px;flex-shrink:0; }
@@ -216,26 +230,40 @@
     ⚠️ Photos are session-only. Re-upload your ZIP or folder to restore image links.
 </div>
 
-<div class="header">
-    <div>
-        <h1>STRATA COMMAND <span>| v9.5</span></h1>
-        <div id="project-name" style="font-weight:bold;color:#888;margin-top:5px;">Awaiting Data...</div>
-    </div>
-    <div class="header-btns">
-        <button class="btn btn-dark"   id="btn-reset"        style="display:none;" onclick="resetBoard()">🔄 CLEAR DATA</button>
-        <button class="btn btn-dark"   id="btn-edit-map"     style="display:none;" onclick="editMapping()">🗺️ EDIT MAP</button>
+<!-- Gear button — shown after project loads, top-left -->
+<button id="gear-btn" title="File options" onclick="toggleGearMenu()">⚙️</button>
 
+<!-- Gear overlay — closes popover when tapping outside -->
+<div id="gear-overlay" onclick="closeGearMenu()"></div>
+
+<!-- Gear popover -->
+<div id="gear-popover">
+    <div style="color:#555;font-size:0.65rem;text-transform:uppercase;font-weight:bold;padding:2px 4px 6px;">FILE OPTIONS</div>
+    <button class="gear-item" onclick="closeGearMenu();document.getElementById('csvInput').click()">📄 Load CSV or Project</button>
+    <button class="gear-item" onclick="closeGearMenu();document.getElementById('mediaInput').click()">🖼️ Add Individual Files</button>
+    <button class="gear-item" onclick="closeGearMenu();document.getElementById('folderInput').click()">📁 Add ZIP or Folder</button>
+    <div style="border-top:1px solid #2a2d38;margin:4px 0;"></div>
+    <button class="gear-item warning" onclick="closeGearMenu();editMapping()">🗺️ Edit Map</button>
+    <button class="gear-item danger"  onclick="closeGearMenu();resetBoard()">🔄 Clear Data</button>
+</div>
+
+<div class="header">
+    <div id="project-name" style="font-weight:bold;font-size:1.1rem;color:#0cf;">Awaiting Data...</div>
+    <div class="header-btns">
         <button class="btn btn-purple" id="btn-save-project" style="display:none;" onclick="saveProject()">📦 SAVE PROJECT</button>
     </div>
 </div>
 
 <div class="main-content">
-    <div style="display:flex;gap:15px;margin-bottom:20px;flex-shrink:0;">
-        <input type="file" id="csvInput"    multiple style="display:none;" onchange="handleFiles(this.files,'csv')">
+    <!-- Hidden file inputs — triggered from gear menu -->
+    <input type="file" id="csvInput"    multiple style="display:none;" onchange="handleFiles(this.files,'csv')">
+    <input type="file" id="mediaInput"  multiple style="display:none;" onchange="handleFiles(this.files,'media')">
+    <input type="file" id="folderInput" webkitdirectory directory multiple style="display:none;" onchange="handleFiles(this.files,'media')">
+
+    <!-- Load buttons — shown only before project is loaded -->
+    <div id="load-btn-panel" style="display:flex;gap:15px;margin-bottom:20px;flex-shrink:0;">
         <button class="btn btn-dark" style="flex:1;padding:20px;font-size:1.1rem;border:2px dashed #0cf;background:#161922;" onclick="document.getElementById('csvInput').click()">📄 1. LOAD CSV OR PROJECT</button>
-        <input type="file" id="mediaInput"  multiple style="display:none;" onchange="handleFiles(this.files,'media')">
         <button class="btn btn-dark" style="flex:1;padding:20px;font-size:1.1rem;border:2px dashed #d080ff;background:#161922;" onclick="document.getElementById('mediaInput').click()">🖼️ 2. ADD INDIVIDUAL FILES</button>
-        <input type="file" id="folderInput" webkitdirectory directory multiple style="display:none;" onchange="handleFiles(this.files,'media')">
         <button class="btn btn-dark" style="flex:1;padding:20px;font-size:1.1rem;border:2px dashed #f39c12;background:#161922;" onclick="document.getElementById('folderInput').click()">📁 3. ADD ZIP OR FOLDER</button>
     </div>
 
@@ -289,26 +317,24 @@
         <div class="tabs-container" id="tabs-container"></div>
         <div id="view-2d"><div id="building-container-2d"></div></div>
 
-        <div id="arena-repair" style="display:none;flex-direction:column;height:100%;width:100%;overflow:hidden;">
+        <div id="arena-repair" style="display:none;flex-direction:column;height:100%;width:100%;overflow:hidden;position:relative;">
+            <!-- Fullscreen button -->
+            <button class="btn-fullscreen" onclick="toggleFullScreen('rp-grid-container')" style="position:absolute;top:8px;right:8px;z-index:100;">⛶ FULL SCREEN</button>
+
             <!-- Summary bar -->
-            <div id="rp-summary-bar" style="display:flex;gap:8px;padding:12px 0 0 0;flex-shrink:0;"></div>
-            <!-- Filter bar -->
-            <div class="rp-filter-bar" id="rp-filter-bar" style="padding:10px 0 0 0;">
-                <button class="rp-filter-btn active" onclick="rpSetFilter('ALL')" data-filter="ALL">ALL</button>
-                <button class="rp-filter-btn" onclick="rpSetFilter('HIGH')"  data-filter="HIGH">🔴 HIGH</button>
-                <button class="rp-filter-btn" onclick="rpSetFilter('MED')"   data-filter="MED">🟡 MED</button>
-                <button class="rp-filter-btn" onclick="rpSetFilter('LOW')"   data-filter="LOW">🟢 LOW</button>
-                <button class="rp-filter-btn" onclick="rpSetFilter('NONE')"  data-filter="NONE">⬜ UNSET</button>
-                <div style="flex:1;"></div>
-                <!-- Group by -->
-                <div style="display:flex;gap:3px;background:#111;border:1px solid #444;border-radius:6px;padding:3px;">
-                    <button id="rp-grp-defect"    onclick="rpSetGroupBy('defect')"    style="padding:5px 10px;font-size:0.72rem;font-weight:bold;border:none;border-radius:4px;cursor:pointer;background:#f39c12;color:#000;">BY DEFECT</button>
-                    <button id="rp-grp-elevation" onclick="rpSetGroupBy('elevation')" style="padding:5px 10px;font-size:0.72rem;font-weight:bold;border:none;border-radius:4px;cursor:pointer;background:transparent;color:#888;">BY ELEVATION</button>
-                    <button id="rp-grp-drop"      onclick="rpSetGroupBy('drop')"      style="padding:5px 10px;font-size:0.72rem;font-weight:bold;border:none;border-radius:4px;cursor:pointer;background:transparent;color:#888;">BY DROP</button>
-                </div>
+            <div id="rp-summary-bar" style="display:flex;gap:6px;padding:8px 0 0 0;flex-shrink:0;"></div>
+
+            <!-- Defect type toggle chips -->
+            <div id="rp-defect-filter-bar" style="display:flex;gap:6px;flex-wrap:wrap;padding:8px 0 4px;flex-shrink:0;align-items:center;">
+                <span style="color:#555;font-size:0.7rem;font-weight:bold;text-transform:uppercase;margin-right:2px;">DEFECT:</span>
+                <button class="rp-filter-btn active" onclick="rpSetDefectFilter('ALL')" data-defect="ALL" style="padding:5px 12px;">ALL</button>
             </div>
-            <!-- Groups -->
-            <div id="rp-groups" style="flex:1;overflow-y:auto;padding-top:12px;"></div>
+
+            <!-- Elevation tabs — same as 2D view -->
+            <div id="rp-tabs" style="display:flex;gap:6px;flex-wrap:wrap;padding:6px 0;flex-shrink:0;border-bottom:1px solid #2a2d38;margin-bottom:8px;"></div>
+
+            <!-- Grid — same structure as building-container-2d -->
+            <div id="rp-grid-container" style="flex:1;overflow:auto;display:flex;gap:10px;align-items:flex-start;padding-bottom:16px;background:#0f111a;"></div>
         </div>
 
         <div id="arena-true3d">
@@ -885,6 +911,29 @@ function resetTwinCamera() {
     if (mv) mv.cameraOrbit = 'auto auto auto';
 }
 
+function toggleGearMenu() {
+    const pop = document.getElementById('gear-popover');
+    const ov  = document.getElementById('gear-overlay');
+    const open = pop.style.display === 'flex';
+    pop.style.display = open ? 'none' : 'flex';
+    ov.style.display  = open ? 'none' : 'block';
+}
+function closeGearMenu() {
+    document.getElementById('gear-popover').style.display = 'none';
+    document.getElementById('gear-overlay').style.display = 'none';
+}
+
+// Show/hide load panel and gear button based on whether project is loaded
+function updateLoadPanelVisibility() {
+    const hasData = Object.keys(inspectionData).length > 0;
+    const loadPanel = document.getElementById('load-btn-panel');
+    const gearBtn   = document.getElementById('gear-btn');
+    const header    = document.querySelector('.header');
+    if (loadPanel) loadPanel.style.display = hasData ? 'none' : 'flex';
+    if (gearBtn)   gearBtn.style.display   = hasData ? 'flex' : 'none';
+    if (header)    header.classList.toggle('gear-visible', hasData);
+}
+
 function initApp() {
     requestWakeLock();
     loadCommandState();
@@ -933,6 +982,7 @@ function loadCommandState() {
             document.getElementById('project-name').innerText='Project: '+projectInfo;
             document.getElementById('btn-reset').style.display        ='inline-block';
             document.getElementById('btn-save-project').style.display    ='inline-block';
+    updateLoadPanelVisibility();
             
             if (elevations.length>0) {
                 document.getElementById('dashboard-screen').style.display='flex';
@@ -1151,7 +1201,7 @@ async function handleFiles(files, forcedType=null) {
     }
 
     document.getElementById('project-name').innerText='Project: '+projectInfo;
-    document.getElementById('btn-reset').style.display='inline-block';
+    
     updatePhotoStat();
 
     // Always refresh dashboard if visible — covers ZIP-then-CSV and CSV-then-ZIP workflows
@@ -1694,7 +1744,16 @@ function switchView(mode) {
     document.getElementById('view-2d').style.display        = mode==='2d'     ? 'flex'  : 'none';
     document.getElementById('arena-repair').style.display   = mode==='repair' ? 'flex'  : 'none';
     document.getElementById('arena-true3d').style.display   = mode==='true3d' ? 'block' : 'none';
-    document.getElementById('tabs-container').style.display = mode==='true3d' ? 'none'  : 'flex';
+    document.getElementById('tabs-container').style.display = mode==='2d'     ? 'flex'  : 'none';
+
+    // Stats bar + stitch — only relevant in 2D tabs
+    const statsBar = document.querySelector('.stats-bar');
+    if (statsBar) statsBar.style.display = mode==='2d' ? 'flex' : 'none';
+    document.querySelectorAll('.stitch-toggle').forEach(b => b.style.display = mode==='2d' ? '' : 'none');
+
+    // 3D tag menu — only relevant in true3d
+    const tagBtn = document.getElementById('btn-tag3d-main');
+    if (tagBtn) tagBtn.style.display = mode==='true3d' ? '' : 'none';
 
     if (mode==='2d') refreshCurrentView();
     if (mode==='repair') renderRepairPlanner();
@@ -2124,8 +2183,10 @@ const DEFECT_COLORS = {
     'Other':              '#7f8c8d',
 };
 
-let rpActiveFilter = 'ALL';
-let rpGroupBy      = 'defect'; // 'defect' | 'elevation' | 'drop'
+let rpActiveFilter  = 'ALL';
+let rpGroupBy       = 'defect';
+let rpActiveElev    = '';
+let rpDefectFilter  = 'ALL'; // 'defect' | 'elevation' | 'drop'
 
 function openRepairPlanner() {
     switchView('repair');
@@ -2137,21 +2198,19 @@ function closeRepairPlanner() {
 
 function rpSetFilter(f) {
     rpActiveFilter = f;
-    document.querySelectorAll('.rp-filter-btn').forEach(b => {
+    document.querySelectorAll('[data-filter]').forEach(b => {
         b.classList.toggle('active', b.dataset.filter === f);
     });
     renderRepairPlanner();
 }
 
+function rpSetDefectFilter(cat) {
+    rpDefectFilter = cat;
+    renderRepairPlanner();
+}
+
 function rpSetGroupBy(mode) {
-    rpGroupBy = mode;
-    // Update toggle button styles
-    ['defect','elevation','drop'].forEach(m => {
-        const btn = document.getElementById(`rp-grp-${m}`);
-        if (!btn) return;
-        btn.style.background = m === mode ? '#f39c12' : 'transparent';
-        btn.style.color      = m === mode ? '#000'    : '#888';
-    });
+    // groupBy replaced by elevation tabs + defect filter chips
     renderRepairPlanner();
 }
 
@@ -2328,229 +2387,207 @@ function rpAddCustomTag(nodeId) {
 // silently blocked in some desktop PWA / file:// contexts)
 // ═══════════════════════════════════════════════════════
 function renderRepairPlanner() {
-    // Only show windows manually added to the planner
-    const allDefects = [];
-    Object.keys(repairPriorities).forEach(nodeId => {
-        const node = getNodeData(nodeId);
-        if (!node) return;
-
-        const parts = nodeId.split('-');
-        const drop = parts[0], floor = parseInt(parts[1]), pos = parts[2];
-
-        const pri = repairPriorities[nodeId] || 'NONE';
-        if (rpActiveFilter !== 'ALL' && pri !== rpActiveFilter) return;
-
-        const cats = rpGetDefectCategories(node);
-        const photos = nodePhotoNames(node);
-        const elev = dropAssignments[drop] || drop;
-
-        allDefects.push({ node, drop, floor, pos, cats, photos, elev, pri });
-    });
-
-    // Update badge on header button
     updatePlannerBadge();
 
-    // Update subtitle + summary bar
-    const total = allDefects.length;
-    document.getElementById('rp-subtitle').innerText =
-        `${total} window${total!==1?'s':''} in planner`;
+    // ── Summary bar ──────────────────────────────────────
+    const sumHigh = Object.values(repairPriorities).filter(p=>p==='HIGH').length;
+    const sumMed  = Object.values(repairPriorities).filter(p=>p==='MED').length;
+    const sumLow  = Object.values(repairPriorities).filter(p=>p==='LOW').length;
+    const sumNone = Object.keys(repairPriorities).filter(id=>!repairPriorities[id]||repairPriorities[id]==='NONE').length;
+    const total   = Object.keys(repairPriorities).length;
 
-    // Summary bar — inject before groups container if not already there
-    let summaryBar = document.getElementById('rp-summary-bar');
-    if (!summaryBar) {
-        summaryBar = document.createElement('div');
-        summaryBar.id = 'rp-summary-bar';
-        summaryBar.style.cssText = 'display:flex;gap:8px;margin-bottom:14px;flex-shrink:0;';
-        const groupsEl = document.getElementById('rp-groups');
-        groupsEl.parentNode.insertBefore(summaryBar, groupsEl);
-    }
-    summaryBar.innerHTML = `
-        <div style="flex:1;background:#2a0a0a;border:1px solid #d9534f44;border-radius:6px;padding:10px;text-align:center;">
-            <div style="font-size:1.4rem;font-weight:900;color:#d9534f;">${sumHigh}</div>
-            <div style="font-size:0.7rem;color:#888;text-transform:uppercase;font-weight:bold;">High</div>
+    const sb = document.getElementById('rp-summary-bar');
+    if (sb) sb.innerHTML = `
+        <div style="flex:1;background:#2a0a0a;border:1px solid #d9534f44;border-radius:6px;padding:8px;text-align:center;">
+            <div style="font-size:1.3rem;font-weight:900;color:#d9534f;">${sumHigh}</div>
+            <div style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">High</div>
         </div>
-        <div style="flex:1;background:#2a2000;border:1px solid #f1c40f44;border-radius:6px;padding:10px;text-align:center;">
-            <div style="font-size:1.4rem;font-weight:900;color:#f1c40f;">${sumMed}</div>
-            <div style="font-size:0.7rem;color:#888;text-transform:uppercase;font-weight:bold;">Medium</div>
+        <div style="flex:1;background:#2a2000;border:1px solid #f1c40f44;border-radius:6px;padding:8px;text-align:center;">
+            <div style="font-size:1.3rem;font-weight:900;color:#f1c40f;">${sumMed}</div>
+            <div style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Med</div>
         </div>
-        <div style="flex:1;background:#0a1a0a;border:1px solid #28a74544;border-radius:6px;padding:10px;text-align:center;">
-            <div style="font-size:1.4rem;font-weight:900;color:#28a745;">${sumLow}</div>
-            <div style="font-size:0.7rem;color:#888;text-transform:uppercase;font-weight:bold;">Low</div>
+        <div style="flex:1;background:#0a1a0a;border:1px solid #28a74544;border-radius:6px;padding:8px;text-align:center;">
+            <div style="font-size:1.3rem;font-weight:900;color:#28a745;">${sumLow}</div>
+            <div style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Low</div>
         </div>
-        <div style="flex:1;background:#1a1d27;border:1px solid #33355544;border-radius:6px;padding:10px;text-align:center;">
-            <div style="font-size:1.4rem;font-weight:900;color:#555;">${sumNone}</div>
-            <div style="font-size:0.7rem;color:#888;text-transform:uppercase;font-weight:bold;">Unset</div>
+        <div style="flex:1;background:#1a1d27;border:1px solid #33355544;border-radius:6px;padding:8px;text-align:center;">
+            <div style="font-size:1.3rem;font-weight:900;color:#555;">${sumNone}</div>
+            <div style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Unset</div>
+        </div>
+        <div style="flex:1;background:#111;border:1px solid #0cf44;border-radius:6px;padding:8px;text-align:center;">
+            <div style="font-size:1.3rem;font-weight:900;color:#0cf;">${total}</div>
+            <div style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Total</div>
         </div>`;
 
-
-    // Sort all defects: by elevation → drop → floor desc → position L/C/R
-    const posOrder = {L:1,C:2,R:3};
-    allDefects.sort((a,b) => {
-        if (a.elev < b.elev) return -1;
-        if (a.elev > b.elev) return 1;
-        if (a.drop < b.drop) return -1;
-        if (a.drop > b.drop) return 1;
-        if (b.floor !== a.floor) return b.floor - a.floor; // floor desc = top down
-        return (posOrder[a.pos]||9) - (posOrder[b.pos]||9);
+    // ── Defect type filter chips ─────────────────────────
+    const usedCats = new Set();
+    Object.keys(repairPriorities).forEach(nodeId => {
+        (repairTags[nodeId] || ['Other']).forEach(t => usedCats.add(t));
     });
-
-    // Summary counts
-    const sumHigh = allDefects.filter(d => repairPriorities[d.node.id]==='HIGH').length;
-    const sumMed  = allDefects.filter(d => repairPriorities[d.node.id]==='MED').length;
-    const sumLow  = allDefects.filter(d => repairPriorities[d.node.id]==='LOW').length;
-    const sumNone = allDefects.filter(d => !repairPriorities[d.node.id]||repairPriorities[d.node.id]==='NONE').length;
-
-    // Build groups based on current groupBy mode
-    const groups = {};
-
-    if (rpGroupBy === 'defect') {
-        allDefects.forEach(d => {
-            const cats = d.cats.length ? d.cats : ['Other'];
-            cats.forEach(cat => {
-                if (!groups[cat]) groups[cat] = [];
-                if (!groups[cat].find(x => x.node.id === d.node.id))
-                    groups[cat].push(d);
-            });
-        });
-    } else if (rpGroupBy === 'elevation') {
-        allDefects.forEach(d => {
-            const key = d.elev || 'Unassigned';
-            if (!groups[key]) groups[key] = [];
-            groups[key].push(d);
-        });
-    } else if (rpGroupBy === 'drop') {
-        allDefects.forEach(d => {
-            const key = `Drop ${d.drop}`;
-            if (!groups[key]) groups[key] = [];
-            groups[key].push(d);
+    const defectBar = document.getElementById('rp-defect-filter-bar');
+    if (defectBar) {
+        defectBar.innerHTML = '<span style="color:#555;font-size:0.7rem;font-weight:bold;text-transform:uppercase;margin-right:4px;align-self:center;">DEFECT:</span>';
+        ['ALL', ...DEFECT_CATEGORIES.filter(c => usedCats.has(c)),
+            ...[...usedCats].filter(c => !DEFECT_CATEGORIES.includes(c))
+        ].forEach(cat => {
+            const tc = cat === 'ALL' ? '#0cf' : (DEFECT_COLORS[cat] || '#7f8c8d');
+            const isActive = rpDefectFilter === cat;
+            const btn = document.createElement('button');
+            btn.className = 'rp-filter-btn' + (isActive ? ' active' : '');
+            btn.dataset.defect = cat;
+            btn.style.cssText = `padding:5px 12px;border-color:${tc};color:${isActive?'#000':tc};background:${isActive?tc:'transparent'};`;
+            btn.innerText = cat;
+            btn.onclick = () => rpSetDefectFilter(cat);
+            defectBar.appendChild(btn);
         });
     }
 
-    const container = document.getElementById('rp-groups');
-    container.innerHTML = '';
+    // ── Elevation tabs ───────────────────────────────────
+    const used = new Set(Object.values(dropAssignments));
+    const tabCont = document.getElementById('rp-tabs');
+    if (tabCont) {
+        // Auto-select first valid elevation only if current is invalid
+        if (!rpActiveElev || !used.has(rpActiveElev)) {
+            rpActiveElev = elevations.find(e => used.has(e) &&
+                Object.keys(repairPriorities).some(id => dropAssignments[id.split('-')[0]] === e)
+            ) || elevations.find(e => used.has(e)) || '';
+        }
 
-    if (Object.keys(groups).length === 0) {
-        container.innerHTML = `<div class="rp-empty">
-            ${rpActiveFilter !== 'ALL'
-                ? '⬜ No windows match this priority filter.'
-                : '📋 No windows added yet.<br><br><span style="font-size:0.85rem;color:#555;">Open any window and tap<br><strong style="color:#f39c12;">+ Add to Repair Planner</strong></span>'}
-        </div>`;
+        tabCont.innerHTML = '';
+        elevations.forEach(elev => {
+            if (!used.has(elev)) return;
+            const hasRepair = Object.keys(repairPriorities).some(id => dropAssignments[id.split('-')[0]] === elev);
+            const tab = document.createElement('div');
+            tab.className = 'tab' + (rpActiveElev === elev ? ' active' : '');
+            tab.style.opacity = hasRepair ? '1' : '0.4';
+            tab.innerText = elev;
+            tab.onclick = () => { rpActiveElev = elev; renderRepairPlanner(); };
+            tabCont.appendChild(tab);
+        });
+    }
+
+    // ── Grid ─────────────────────────────────────────────
+    const gridCont = document.getElementById('rp-grid-container');
+    if (!gridCont) return;
+    gridCont.innerHTML = '';
+
+    if (total === 0) {
+        gridCont.innerHTML = '<div style="padding:40px;color:#444;font-size:1rem;text-align:center;">📋 No windows in Repair Planner yet.<br><br><span style="font-size:0.85rem;color:#333;">Open any window and tap<br><strong style="color:#f39c12;">+ ADD TO REPAIR PLANNER</strong></span></div>';
         return;
     }
 
-    // Render in order
-    let catOrder;
-    if (rpGroupBy === 'defect') {
-        catOrder = [...DEFECT_CATEGORIES,
-            ...Object.keys(groups).filter(k => !DEFECT_CATEGORIES.includes(k))];
-    } else if (rpGroupBy === 'elevation') {
-        catOrder = Object.keys(groups).sort();
-    } else {
-        // By drop — sort alphabetically
-        catOrder = Object.keys(groups).sort((a,b) => a.localeCompare(b, undefined, {numeric:true}));
+    if (!rpActiveElev) return;
+
+    const drops = Object.keys(inspectionData)
+        .filter(d => dropAssignments[d] === rpActiveElev).sort();
+    if (!drops.length) {
+        gridCont.innerHTML = '<div style="padding:40px;color:#444;">No drops assigned to this elevation.</div>';
+        return;
     }
 
-    catOrder.forEach(cat => {
-        if (!groups[cat] || !groups[cat].length) return;
-        const items = groups[cat];
-        const color = rpGroupBy === 'defect'
-            ? (DEFECT_COLORS[cat] || '#7f8c8d')
-            : rpGroupBy === 'elevation' ? '#0cf' : '#d080ff';
+    let maxF = -Infinity, minF = Infinity;
+    drops.forEach(d => Object.keys(inspectionData[d]).map(Number).forEach(f => {
+        maxF = Math.max(maxF, f); minF = Math.min(minF, f);
+    }));
 
-        const grp = document.createElement('div');
-        grp.className = 'rp-group';
+    // Floor axis
+    const ax = document.createElement('div');
+    ax.className = 'drop-column floor-axis-column';
+    const axH = document.createElement('div');
+    axH.className = 'drop-header floor-axis-header';
+    axH.innerText = 'FL';
+    ax.appendChild(axH);
+    for (let f = maxF; f >= minF; f--) {
+        const r = document.createElement('div');
+        r.className = 'floor-row';
+        r.innerHTML = `<div class="floor-label">${f}F</div>`;
+        ax.appendChild(r);
+    }
+    gridCont.appendChild(ax);
 
-        const hdr = document.createElement('div');
-        hdr.className = 'rp-group-header';
-        hdr.style.borderLeft = `4px solid ${color}`;
-        hdr.innerHTML = `
-            <div style="width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0;"></div>
-            <div class="rp-group-title" style="color:${color};">${cat}</div>
-            <div class="rp-group-count">${items.length} window${items!==1?'s':''}</div>
-            <div style="color:#555;font-size:0.9rem;">▾</div>`;
-        hdr.onclick = () => {
-            const body = grp.querySelector('.rp-group-body');
-            const isHidden = body.style.display === 'none';
-            body.style.display = isHidden ? 'block' : 'none';
-            hdr.querySelector('div:last-child').innerText = isHidden ? '▾' : '▸';
-        };
+    const posOrder = {L:1, C:2, R:3};
+    const priColors = {HIGH:'#d9534f', MED:'#f1c40f', LOW:'#28a745', NONE:'#555'};
 
-        const body = document.createElement('div');
-        body.className = 'rp-group-body';
+    drops.forEach(dropStr => {
+        const col = document.createElement('div');
+        col.className = 'drop-column';
+        col.innerHTML = `<div class="drop-header">DROP ${dropStr}</div>`;
 
-        items.forEach(({ node, drop, floor, pos, photos, elev, pri }) => {
-            const card = document.createElement('div');
-            card.className = 'rp-card';
-            card.onclick = (e) => {
-                if (e.target.closest('.rp-priority') || e.target.closest('button')) return;
-                openModal(node.id);
-            };
+        for (let f = maxF; f >= minF; f--) {
+            const row = document.createElement('div');
+            row.className = 'floor-row';
+            const grp = document.createElement('div');
+            grp.className = 'window-group';
 
-            // Thumbnail
-            const thumb = document.createElement('div');
-            if (photos.length && imageBank[photos[0]]) {
-                const img = document.createElement('img');
-                img.className = 'rp-thumb';
-                img.src = imageBank[photos[0]].url;
-                img.onerror = () => { img.style.display='none'; };
-                thumb.appendChild(img);
+            if (inspectionData[dropStr]?.[f]) {
+                Object.keys(inspectionData[dropStr][f])
+                    .sort((a,b) => (posOrder[a]||9)-(posOrder[b]||9))
+                    .forEach(pos => {
+                        const data = inspectionData[dropStr][f][pos];
+                        const nodeId = data.id;
+                        const inPlanner = !!repairPriorities[nodeId];
+                        const cats = repairTags[nodeId] || [];
+                        const pri = repairPriorities[nodeId] || 'NONE';
+                        const passesDefect = rpDefectFilter === 'ALL' || cats.includes(rpDefectFilter);
+                        const node = document.createElement('div');
+
+                        if (inPlanner && passesDefect) {
+                            const mainCat = cats[0] || 'Other';
+                            const defColor = DEFECT_COLORS[mainCat] || '#7f8c8d';
+                            const priColor = priColors[pri];
+                            node.className = 'window-node';
+                            node.style.cssText = `background:${defColor}33;border:2px solid ${defColor};`;
+                            node.onclick = () => openModal(nodeId);
+                            const lbl = document.createElement('div');
+                            lbl.innerText = pos;
+                            lbl.style.cssText = 'font-size:0.65rem;font-weight:bold;color:#fff;';
+                            node.appendChild(lbl);
+                            const dot = document.createElement('div');
+                            dot.style.cssText = `width:7px;height:7px;border-radius:50%;background:${priColor};`;
+                            node.appendChild(dot);
+                            const catLbl = document.createElement('div');
+                            catLbl.style.cssText = `font-size:0.48rem;color:${defColor};font-weight:bold;text-align:center;line-height:1.1;`;
+                            catLbl.innerText = mainCat.split('/')[0].trim().toUpperCase();
+                            node.appendChild(catLbl);
+                            const names = nodePhotoNames(data);
+                            if (names.length > 0) {
+                                const badge = document.createElement('div');
+                                badge.className = 'photo-badge';
+                                badge.innerText = `📷 ${names.length}`;
+                                node.appendChild(badge);
+                            }
+                        } else if (inPlanner && !passesDefect) {
+                            // In planner but filtered — dimmed
+                            node.className = 'window-node status-void';
+                            node.style.opacity = '0.2';
+                            const lbl = document.createElement('div');
+                            lbl.innerText = pos;
+                            node.appendChild(lbl);
+                        } else {
+                            // Not in planner — ghost placeholder
+                            node.className = 'window-node status-void';
+                            node.style.opacity = '0.08';
+                            node.style.cursor = 'default';
+                            const lbl = document.createElement('div');
+                            lbl.innerText = pos;
+                            lbl.style.color = '#222';
+                            node.appendChild(lbl);
+                        }
+                        grp.appendChild(node);
+                    });
             } else {
-                thumb.className = 'rp-thumb-empty';
-                thumb.innerHTML = '📷';
+                const v = document.createElement('div');
+                v.className = 'window-node status-void';
+                v.style.opacity = '0.05';
+                grp.appendChild(v);
             }
-
-            // Info
-            const info = document.createElement('div');
-            info.className = 'rp-info';
-
-            // ID + open button
-            info.innerHTML = `
-                <div class="rp-id">${node.id}</div>
-                <div class="rp-location">
-                    ${elev} · Drop ${drop} · Floor ${floor} · ${pos === 'L' ? 'Left' : pos === 'R' ? 'Right' : 'Centre'}
-                    ${photos.length ? `· 📷 ${photos.length}` : '· No photos'}
-                </div>`;
-
-            // Priority buttons
-            const priRow = document.createElement('div');
-            priRow.className = 'rp-priority';
-            ['HIGH','MED','LOW'].forEach(p => {
-                const btn = document.createElement('button');
-                btn.className = `rp-pri-btn${pri===p?' active-'+p.toLowerCase():''}`;
-                btn.innerText = p;
-                btn.onclick = (e) => { e.stopPropagation(); rpSetPriority(node.id, p); };
-                priRow.appendChild(btn);
-            });
-            info.appendChild(priRow);
-
-            // Defect tags + edit button
-            const tagRow = document.createElement('div');
-            tagRow.className = 'rp-defect-tag';
-            rpGetDefectCategories(node).forEach(t => {
-                const tc = DEFECT_COLORS[t] || '#7f8c8d';
-                const tag = document.createElement('span');
-                tag.className = 'rp-tag';
-                tag.style.cssText = `background:${tc}22;color:${tc};border-color:${tc}55;`;
-                tag.innerText = t;
-                tagRow.appendChild(tag);
-            });
-            const editBtn = document.createElement('button');
-            editBtn.style.cssText = 'padding:2px 8px;font-size:0.65rem;background:#111;color:#f39c12;border:1px solid #f39c12;border-radius:3px;cursor:pointer;';
-            editBtn.innerText = '✏️ Edit';
-            editBtn.onclick = (e) => { e.stopPropagation(); rpOpenInlineEdit(node.id, card); };
-            tagRow.appendChild(editBtn);
-            info.appendChild(tagRow);
-
-            card.appendChild(thumb);
-            card.appendChild(info);
-            body.appendChild(card);
-        });
-
-        grp.appendChild(hdr);
-        grp.appendChild(body);
-        container.appendChild(grp);
+            row.appendChild(grp);
+            col.appendChild(row);
+        }
+        gridCont.appendChild(col);
     });
 }
+
 
 
 // silently blocked in some desktop PWA / file:// contexts)
@@ -2582,7 +2619,7 @@ function resetBoard(){
             document.getElementById('project-name').innerText='Awaiting Data...';
             document.getElementById('top-reload-banner').style.display='none';
             ['dashboard-screen','mapping-screen','btn-save-project',
-             'btn-edit-map','btn-reset','btn-start-mapping','btn-repair-planner']
+             'btn-start-mapping']
                 .forEach(id=>{ document.getElementById(id).style.display='none'; });
 
             // Reset stats bar
@@ -2684,7 +2721,7 @@ function openMappingScreen(){document.getElementById('btn-start-mapping').style.
 function editMapping(){document.getElementById('dashboard-screen').style.display='none';document.getElementById('mapping-screen').style.display='block';document.getElementById('btn-save-project').style.display='none';document.getElementById('btn-edit-map').style.display='none';renderMappingList();}
 function addElevation(){const inp=document.getElementById('new-elevation-name'),val=inp.value.trim();if(val&&!elevations.includes(val)){elevations.push(val);if(elevations.length===1){activeTab=val;Object.keys(dropAssignments).forEach(d=>{if(!dropAssignments[d])dropAssignments[d]=val;});}inp.value='';saveCommandState();renderMappingList();}}
 function renderMappingList(){const list=document.getElementById('mapping-list');list.innerHTML='';const drops=Object.keys(inspectionData).sort();if(!elevations.length&&drops.length){const w=document.createElement('div');w.style='color:#f1c40f;margin-bottom:15px;font-weight:bold;';w.innerText='⚠️ Add at least one wall above.';list.appendChild(w);}drops.forEach(d=>{const row=document.createElement('div');row.className='mapping-row';row.innerHTML=`<strong style="font-size:1.2rem;color:#0cf;">DROP ${d}</strong>`;const sel=document.createElement('select');sel.onchange=e=>{dropAssignments[d]=e.target.value;saveCommandState();};if(!elevations.length){const o=document.createElement('option');o.value='';o.innerText='Awaiting Wall...';sel.appendChild(o);sel.disabled=true;}else{sel.disabled=false;elevations.forEach(elev=>{const o=document.createElement('option');o.value=elev;o.innerText=elev;if(dropAssignments[d]===elev)o.selected=true;sel.appendChild(o);});}row.appendChild(sel);list.appendChild(row);});}
-function generateDashboard(){if(!elevations.length){showToast('⚠️ Add at least one wall first.',5000,true);return;}document.getElementById('mapping-screen').style.display='none';document.getElementById('dashboard-screen').style.display='flex';document.getElementById('btn-save-project').style.display='inline-block';document.getElementById('btn-edit-map').style.display='inline-block';if(!elevations.includes(activeTab))activeTab=elevations[0];calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();}
+function generateDashboard(){if(!elevations.length){showToast('⚠️ Add at least one wall first.',5000,true);return;}document.getElementById('mapping-screen').style.display='none';document.getElementById('dashboard-screen').style.display='flex';document.getElementById('btn-save-project').style.display='inline-block';if(!elevations.includes(activeTab))activeTab=elevations[0];calculateBuildingGeometry();saveCommandState();updateLoadPanelVisibility();if(currentMode==='2d')refreshCurrentView();}
 
 // ═══════════════════════════════════════════════════════
 // 3D TAGGING
