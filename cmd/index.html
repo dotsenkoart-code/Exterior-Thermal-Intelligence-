@@ -470,9 +470,10 @@
 
 <div class="main-content">
     <!-- Hidden file inputs — triggered from gear menu -->
-    <input type="file" id="csvInput"    multiple style="display:none;" onchange="handleFiles(this.files,'csv')">
-    <input type="file" id="mediaInput"  multiple style="display:none;" onchange="handleFiles(this.files,'media')">
+    <input type="file" id="csvInput"    multiple accept=".csv,.json" style="display:none;" onchange="handleFiles(this.files,'csv')">
+    <input type="file" id="mediaInput"  multiple accept=".jpg,.jpeg,.png,.zip" style="display:none;" onchange="handleFiles(this.files,'media')">
     <input type="file" id="folderInput" webkitdirectory directory multiple style="display:none;" onchange="handleFiles(this.files,'media')">
+    <input type="file" id="jsonInput"   accept=".json" style="display:none;" onchange="handleFiles(this.files,'json')">
 
     <!-- Load buttons — shown only before project is loaded -->
     <div id="load-btn-panel" style="display:flex;gap:15px;margin-bottom:20px;flex-shrink:0;">
@@ -1490,13 +1491,26 @@ async function handleFiles(files, forcedType=null) {
 
     // Always refresh dashboard if visible — covers ZIP-then-CSV and CSV-then-ZIP workflows
     if (Object.keys(inspectionData).length>0) {
-        if (document.getElementById('dashboard-screen').style.display==='flex') {
+        if (isProjectLoaded) {
+            // JSON project file loaded — show dashboard directly
+            document.getElementById('project-name').innerText = 'Project: ' + projectInfo;
+            document.getElementById('project-name').style.color = '#0cf';
+            document.getElementById('btn-save-project').style.display = 'inline-block';
+            updateLoadPanelVisibility();
+            if (elevations.length > 0) {
+                document.getElementById('dashboard-screen').style.display = 'flex';
+                if (!elevations.includes(activeTab)) activeTab = elevations[0];
+                calculateBuildingGeometry();
+                switchView('2d');
+            } else {
+                document.getElementById('btn-start-mapping').style.display = 'block';
+            }
+        } else if (document.getElementById('dashboard-screen').style.display==='flex') {
             if (activeTab) Object.keys(dropAssignments).forEach(d=>{if(!dropAssignments[d])dropAssignments[d]=activeTab;});
             calculateBuildingGeometry();
             if (currentMode==='2d') refreshCurrentView();
-            
-        } else if (newCsvAdded||isProjectLoaded) {
-            if (rowsParsed>0||isProjectLoaded) {
+        } else if (newCsvAdded) {
+            if (rowsParsed>0) {
                 document.getElementById('btn-start-mapping').style.display='block';
             } else { showToast('⚠️ File read but no valid Strata data found.',6000,true); }
         }
