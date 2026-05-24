@@ -2,6 +2,169 @@
 <html>
 <head>
     <title>Strata Command Center | v9.5</title>
+    <!--
+    ╔══════════════════════════════════════════════════════════════════════════╗
+    ║           VERTICALITY INC — STRATA COMMAND CENTER v9.5                 ║
+    ║           Thermal Rope Access Inspection & Repair Platform              ║
+    ╠══════════════════════════════════════════════════════════════════════════╣
+    ║  ARCHITECTURE: Single HTML file, no build step, no dependencies        ║
+    ║  except CDN scripts (Three.js, JSZip, model-viewer). Runs offline.     ║
+    ║  All state lives in JS globals. Persistence via localStorage + JSON    ║
+    ║  file export. Photos stored as base64 data URLs in imageBank (session) ║
+    ╠══════════════════════════════════════════════════════════════════════════╣
+    ║  CORE DATA MODEL                                                        ║
+    ║  ─────────────────────────────────────────────────────────────────────  ║
+    ║  inspectionData[drop][floor][pos] = node {                             ║
+    ║    id, photos[], time, finds, status, notes, tech                      ║
+    ║  }                                                                      ║
+    ║  imageBank[DROP_CLEANNAME] = { url, dcUrl, time, drop }               ║
+    ║    KEY FORMAT: 'H_FLIR0001' (drop-prefixed to avoid collisions)        ║
+    ║  manualLinks[nodeId] = [cleanName, ...]  — photo overrides             ║
+    ║  repairPriorities[nodeId] = 'HIGH'|'MED'|'LOW'|'NONE'                 ║
+    ║  repairTags[nodeId] = [tag, ...]          — defect type tags           ║
+    ║  repairFixed[nodeId] = true               — repair completed           ║
+    ║  photoRotations[imgKey] = 90|180|270      — IR/DC orientation fix      ║
+    ║  saved3DTags[nodeId] = { position, normal } — 3D hotspot coords       ║
+    ║  stitchedPairs = [[nodeId, nodeId], ...]  — merged window pairs        ║
+    ║  dropAssignments[drop] = elevationName    — which wall each drop is on ║
+    ║  elevations = ['North Face', ...]         — ordered wall names         ║
+    ║  projectInfo = 'Building Name'            — project title              ║
+    ║  projectModelUrl = 'https://...'          — GLB/Cesium URL             ║
+    ║  cachedZip = JSZip ref                    — kept for image retry       ║
+    ╠══════════════════════════════════════════════════════════════════════════╣
+    ║  CSV FORMAT (5 cols): Project, Tech, DropID, FieldGuess, Timestamp    ║
+    ║  Drop ID format: 'A-12-L' (drop-floor-position)                       ║
+    ║  ZIP structure: 'Drop A/FLIR0110.jpg'                                  ║
+    ║  FLIR file types:                                                       ║
+    ║    3-segment (~185KB): IR + embedded DC — use both                     ║
+    ║    2-segment (~155KB): IR only — no DC                                 ║
+    ║    1-segment (~50KB):  DC only — discard                               ║
+    ╠══════════════════════════════════════════════════════════════════════════╣
+    ║  VIEW MODES: '2d' | 'repair' | 'true3d'                               ║
+    ║  currentMode drives switchView() which shows/hides panels              ║
+    ║  activeTab = current elevation name shown in 2D grid                   ║
+    ║  activeFilter = 'ALL'|'status-clear'|'status-flagged'|'status-confirmed'║
+    ╠══════════════════════════════════════════════════════════════════════════╣
+    ║  KEY FUNCTIONS — quick reference                                        ║
+    ║  ─────────────────────────────────────────────────────────────────────  ║
+    ║  INIT & PERSISTENCE                              ~L879                 ║
+    ║    initApp()          — runs on page load, restores localStorage       ║
+    ║    loadCommandState() — restores full state from localStorage          ║
+    ║    saveCommandState() — persists state to localStorage                 ║
+    ║    saveProject()      — exports timestamped JSON file                  ║
+    ║    loadProject()      — imports JSON file, restores all state          ║
+    ║                                                                         ║
+    ║  FILE HANDLING                                   ~L1112                ║
+    ║    handleFiles()      — routes CSV/media/ZIP to correct handler        ║
+    ║    processZIP()       — loads ZIP, runs concurrency pool               ║
+    ║    ingestFromBytes()  — processes one FLIR file into imageBank         ║
+    ║    retryLoadImage()   — re-extracts failed image from cachedZip        ║
+    ║                                                                         ║
+    ║  BRACKET ZIPLINE ENGINE                          ~L1341                ║
+    ║    runBracketZipline()     — assigns photos to windows via timestamps  ║
+    ║    detectOffset()          — finds camera/phone clock offset           ║
+    ║    parseExifTimestamp()    — reads EXIF time from ArrayBuffer          ║
+    ║    bytesToDataURL()        — converts bytes to base64 data URL         ║
+    ║    extractEmbeddedDC()     — extracts DC photo from FLIR binary        ║
+    ║                                                                         ║
+    ║  2D GRID                                         ~L1826                ║
+    ║    refreshCurrentView()   — redraws active elevation tab               ║
+    ║    generateWallDOM()      — builds drop columns and window nodes       ║
+    ║    calculateBuildingGeometry() — updates stats bar counts              ║
+    ║    switchView(mode)       — switches between 2d/repair/true3d          ║
+    ║    setFilter(status)      — filters grid by window status              ║
+    ║                                                                         ║
+    ║  MODAL                                           ~L2093                ║
+    ║    openModal(nodeId)      — opens window detail modal                  ║
+    ║    closeModal()           — closes modal, clears state                 ║
+    ║    buildPhotoArea()       — renders photo gallery with IR/DC toggle    ║
+    ║    updatePlannerBtn()     — syncs planner button + mark fixed button   ║
+    ║    modalNavigate(dir)     — next/prev window within drop               ║
+    ║    changeStatus(status)   — sets window status, saves state            ║
+    ║                                                                         ║
+    ║  REPAIR PLANNER                                  ~L2600                ║
+    ║    renderRepairPlanner()  — builds full grid view in repair tab        ║
+    ║    toggleRepairPlannerEntry() — add/remove window from planner         ║
+    ║    rpSetDefectFilter(cat) — filter grid by defect type                 ║
+    ║    toggleRPFullscreen()   — CSS+native fullscreen with modal relay     ║
+    ║    updatePlannerBadge()   — updates nav button badge count             ║
+    ║                                                                         ║
+    ║  PHOTO SUGGESTION ENGINE                         ~L2839                ║
+    ║    runPhotoSuggestion()   — finds donor, detects gap, shows picker     ║
+    ║    acceptPhotoSuggestion()— moves photos between nodes, saves state    ║
+    ║    renderSplitPicker()    — interactive thumbnail split UI             ║
+    ║                                                                         ║
+    ║  BULK OPERATIONS                                 ~L1699                ║
+    ║    toggleBulkSelect()     — enters/exits bulk select mode              ║
+    ║    bulkChangeStatus()     — applies status to all selected windows     ║
+    ║    detectDuplicatePhotos()— scans all nodes for shared photo refs      ║
+    ║                                                                         ║
+    ║  PHOTO MOVE MODE                                 ~L1848                ║
+    ║    startPhotoMove()       — enters move mode, highlights valid targets ║
+    ║    finishPhotoMove()      — reassigns photo to tapped window           ║
+    ║    cancelPhotoMove()      — exits move mode without changes            ║
+    ║                                                                         ║
+    ║  3D TWIN                                         ~L882                 ║
+    ║    initTwin()             — loads GLB into model-viewer element        ║
+    ║    render3DHotspots()     — places hotspot buttons on model-viewer     ║
+    ║    setupTwinTagging()     — attaches dblclick for pin placement        ║
+    ║    gdriveToDirectUrl()    — converts Google Drive share link to CDN    ║
+    ║                                                                         ║
+    ║  PINCH ZOOM                                      ~L3199                ║
+    ║    initPinchZoom()        — attaches touch handlers to view-2d         ║
+    ║    adjustZoom(delta)      — changes gridScale, applies transform       ║
+    ║    resetZoom()            — resets to 1:1                              ║
+    ║                                                                         ║
+    ║  MAPPING SCREEN                                  ~L3641                ║
+    ║    editMapping()          — opens wall/drop assignment screen          ║
+    ║    generateDashboard()    — validates map, builds inspectionData nodes ║
+    ║                                                                         ║
+    ║  LIGHTBOX                                        ~L3786                ║
+    ║    openLightbox(names,idx)— full-screen photo viewer with zoom/pan     ║
+    ║    changeLightbox(dir)    — next/prev photo in lightbox                ║
+    ║    toggleLightboxView()   — IR↔DC toggle in lightbox                  ║
+    ╠══════════════════════════════════════════════════════════════════════════╣
+    ║  HTML STRUCTURE                                                         ║
+    ║  ─────────────────────────────────────────────────────────────────────  ║
+    ║  #top-reload-banner   — auto-shows after project load if photos missing║
+    ║  #gear-btn            — ⚙️ top-left, shows after project loads         ║
+    ║  #gear-popover        — file options menu                              ║
+    ║  .header              — project name + SAVE PROJECT button             ║
+    ║  #dashboard-screen    — main app container (flex column)               ║
+    ║    .stats-bar         — ALL/CLEAR/PENDING/DEFECTS/IR LOADED + BULK    ║
+    ║    #tabs-container    — elevation tabs (2d mode only)                  ║
+    ║    #view-2d           — building grid container                        ║
+    ║      #building-container-2d — drop columns rendered here              ║
+    ║    #arena-repair      — repair planner panel                           ║
+    ║      #rp-summary-bar  — HIGH/MED/LOW/UNSET/TOTAL/FIXED + ⛶ button    ║
+    ║      #rp-defect-filter-bar — defect type chips                         ║
+    ║      #rp-tabs         — elevation tabs for repair planner              ║
+    ║      #rp-grid-container — repair grid (fullscreen target)             ║
+    ║    #arena-true3d      — 3D twin panel                                  ║
+    ║      #main-3d-viewer  — model-viewer element                           ║
+    ║  #info-modal          — window detail modal (moves into grid on FS)    ║
+    ║  #lightbox-modal      — full-screen photo viewer                       ║
+    ║  #mapping-screen      — wall/drop assignment UI                        ║
+    ║  #zoom-controls       — +/1:1/- buttons (2d mode, bottom-right)       ║
+    ╠══════════════════════════════════════════════════════════════════════════╣
+    ║  KNOWN LIMITATIONS (v1 — see brutal review in session history)         ║
+    ║  • No undo — destructive actions are permanent                         ║
+    ║  • localStorage ~5-10MB limit — large projects may hit ceiling         ║
+    ║  • No input validation — malformed CSVs can corrupt state              ║
+    ║  • Single file — growing complexity, hard to maintain long-term        ║
+    ║  • Photos session-only — must re-upload ZIP each session               ║
+    ║  • Fullscreen modal CSS hack — not reliable on all browsers            ║
+    ╠══════════════════════════════════════════════════════════════════════════╣
+    ║  QUICK ORIENTATION FOR NEW SESSION                                      ║
+    ║  1. Read STATE section (~L553) — all globals defined here              ║
+    ║  2. Read the function you need to modify using line numbers above      ║
+    ║  3. Always verify brace balance after edits:                           ║
+    ║     python3 -c "import re; c=open('file.html').read();                 ║
+    ║     s=re.findall(r'<script[^>]*>(.*?)</script>',c,re.DOTALL)[-1];     ║
+    ║     print(s.count(chr(123))-s.count(chr(125)))"                       ║
+    ║  4. Test: ends correctly, no duplicate declarations, braces=0          ║
+    ╚══════════════════════════════════════════════════════════════════════════╝
+    -->
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="manifest" href="manifest_cmd.json">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-cmd192.png">
