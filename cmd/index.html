@@ -29,7 +29,7 @@
         .header span { color:#0cf; }
         .header-btns { display:flex;gap:10px; }
 
-        .top-banner { background:#1a1400;color:#f1c40f;padding:10px 20px;font-size:0.85rem;font-weight:bold;border-bottom:1px solid #f1c40f44;display:none;text-align:center;flex-shrink:0; }
+        .top-banner { background:#1a0a00;color:#f39c12;padding:10px 20px;font-size:0.85rem;font-weight:bold;border-bottom:2px solid #f39c12;display:none;text-align:center;flex-shrink:0;position:fixed;top:0;left:0;width:100%;z-index:2500;align-items:center;justify-content:center;gap:4px;box-sizing:border-box; }
 
         .main-content { display:flex;flex-direction:column;flex-grow:1;padding:15px 20px;overflow-y:auto;overflow-x:hidden; }
 
@@ -155,6 +155,25 @@
 
         #rp-grid-container:fullscreen { background:#0f111a;padding:20px;overflow:auto; }
         #rp-grid-container:-webkit-full-screen { background:#0f111a;padding:20px;overflow:auto; }
+        /* CSS fullscreen fallback for iOS/PWA */
+        #rp-grid-container.rp-fullscreen {
+            position:fixed !important;
+            inset:0 !important;
+            z-index:8000 !important;
+            background:#0f111a !important;
+            padding:20px !important;
+            overflow:auto !important;
+            display:flex !important;
+        }
+        #rp-grid-container.rp-fullscreen ~ #rp-fullscreen-exit {
+            display:flex !important;
+        }
+        #rp-fullscreen-exit {
+            display:none;
+            position:fixed;
+            top:16px;right:16px;
+            z-index:8001;
+        }
 
         /* Repair Planner */
         #repair-planner { display:none;flex-direction:column;height:100%;width:100%; }
@@ -190,7 +209,8 @@
         .photo-move-btn { padding:3px 10px;font-size:0.7rem;font-weight:bold;background:#1a2a3a;color:#0cf;border:1px solid #0cf;border-radius:4px;cursor:pointer;margin-left:8px;text-transform:uppercase;letter-spacing:0.5px; }
         .photo-move-btn:hover { background:#0cf;color:#000; }
         #photo-move-banner { display:none;position:fixed;top:0;left:0;width:100%;z-index:8000;background:#003d5a;color:#0cf;padding:14px 20px;font-size:1rem;font-weight:bold;text-align:center;border-bottom:2px solid #0cf;cursor:pointer; }
-        .window-node.move-target-hover { outline:3px solid #0cf!important;transform:scale(1.1)!important;z-index:20!important; }
+        .window-node.in-planner { box-shadow: 0 0 0 2px #f39c12, 0 0 8px #f39c1288 !important; }
+        .window-node.in-planner::after { content:'🔧'; position:absolute; top:1px; right:2px; font-size:0.5rem; line-height:1; opacity:0.9; }
 
         .drop-slot { min-height:70px;border:2px dashed #333;border-radius:8px;display:flex;align-items:center;justify-content:center;gap:10px;color:#444;font-size:0.8rem;font-weight:bold;cursor:pointer;transition:0.2s;margin-top:10px;padding:12px;text-align:center; }
         .drop-slot:hover, .drop-slot.drag-over { border-color:#0cf;color:#0cf;background:rgba(0,204,255,0.05); }
@@ -229,8 +249,15 @@
     &nbsp;&nbsp;— tap here or press ESC to cancel
 </div>
 
-<div id="top-reload-banner" class="top-banner">
-    ⚠️ Photos are session-only. Re-upload your ZIP or folder to restore image links.
+<div id="top-reload-banner" class="top-banner" style="display:none;cursor:default;">
+    <span>📷 Photos not loaded — </span>
+    <button onclick="document.getElementById('folderInput').click()" 
+        style="background:#f39c12;color:#000;border:none;border-radius:4px;padding:4px 12px;font-weight:bold;cursor:pointer;font-size:0.85rem;margin:0 6px;">
+        📁 Re-upload ZIP
+    </button>
+    <span style="color:#888;font-size:0.85rem;">to restore all photo links</span>
+    <button onclick="document.getElementById('top-reload-banner').style.display='none'" 
+        style="background:transparent;color:#555;border:none;cursor:pointer;font-size:1rem;margin-left:10px;padding:0 4px;">✕</button>
 </div>
 
 <!-- Gear button — shown after project loads, top-left -->
@@ -337,6 +364,7 @@
 
             <!-- Grid — same structure as building-container-2d -->
             <div id="rp-grid-container" style="flex:1;overflow:auto;display:flex;gap:10px;align-items:flex-start;padding-bottom:16px;background:#0f111a;"></div>
+            <button id="rp-fullscreen-exit" onclick="toggleRPFullscreen()" class="btn-fullscreen" style="display:none;">✕ EXIT FULL SCREEN</button>
         </div>
 
         <div id="arena-true3d">
@@ -396,6 +424,8 @@
         <button class="btn btn-dark btn-block" id="btn-unpin"   style="display:none;margin-bottom:10px;border-color:#d080ff;color:#d080ff;"  onclick="unpinCurrent()">🗑️ REMOVE 3D PIN</button>
         <button class="btn btn-dark btn-block" id="btn-unmerge" style="display:none;margin-bottom:15px;border-color:#f39c12;color:#f39c12;" onclick="unmergeCurrent()">✂️ UN-STITCH WINDOWS</button>
         <button class="btn btn-dark btn-block" id="btn-add-planner" style="margin-bottom:8px;border-color:#f39c12;color:#f39c12;" onclick="toggleRepairPlannerEntry()">🔧 ADD TO REPAIR PLANNER</button>
+        <button class="btn btn-dark btn-block" id="btn-suggest" style="display:none;margin-bottom:8px;border-color:#d080ff;color:#d080ff;" onclick="runPhotoSuggestion()">💡 SUGGEST PHOTOS FOR THIS WINDOW</button>
+        <div id="suggest-result" style="display:none;background:#111;border:1px solid #d080ff;border-radius:8px;padding:12px;margin-bottom:8px;"></div>
         <div id="m-stale-banner" class="stale-banner">📷 Photo references exist but images not loaded. Re-upload your ZIP to restore photos.</div>
         <div id="m-photo-area"></div>
         <div class="data-row">
@@ -483,6 +513,7 @@ let manualLinks         = {};   // { nodeId: [cleanName, ...] } manager override
 let wakeLock            = null;
 let modalNodeId         = null;
 let photoMoveMode       = null; // { photoName, fromNodeId } when move is active
+let cachedZip           = null; // JSZip reference kept in memory for image retry
 let projectModelUrl     = '';   // Google Drive or direct URL for this project's 3D model
 let repairPriorities    = {};   // { nodeId: 'HIGH'|'MED'|'LOW' }
 let repairTags          = {};   // { nodeId: [tag, ...] } custom defect tags per window
@@ -1057,6 +1088,7 @@ async function handleFiles(files, forcedType=null) {
         if (nm.endsWith('.zip')||ty.includes('zip')) {
             promises.push(new Promise(res=>{
                 JSZip.loadAsync(file).then(async zip=>{
+                    cachedZip = zip; // keep reference for image retry on failed loads
                     // Collect all tasks first, then run with limited concurrency.
                     // Running 1000+ heavy ArrayBuffer ops simultaneously crashes
                     // the browser — process 8 at a time.
@@ -1130,7 +1162,7 @@ async function handleFiles(files, forcedType=null) {
         repairFixed       =p.repairFixed       ||{};
         const urlInp = document.getElementById('twin-url-input');
         if (urlInp && projectModelUrl) urlInp.value = projectModelUrl;
-                        document.getElementById('top-reload-banner').style.display='block';
+                        document.getElementById('top-reload-banner').style.display='flex';
                     } catch(e){}
                     res();
                 };
@@ -1166,6 +1198,11 @@ async function handleFiles(files, forcedType=null) {
     // Both imageBank (photos) and inspectionData (CSV nodes) may have been
     // updated in this call or a previous one. Running it every time means
     // loading CSV after ZIP, or ZIP after CSV, both produce correct links.
+    // Hide the reload banner — photos are now loaded
+    const reloadBanner = document.getElementById('top-reload-banner');
+    if (reloadBanner && Object.keys(imageBank).length > 0) {
+        reloadBanner.style.display = 'none';
+    }
     const linked=runBracketZipline();
 
     // ── DIAGNOSTIC ──────────────────────────────────────
@@ -1203,6 +1240,15 @@ async function handleFiles(files, forcedType=null) {
         showToast(`✅ CSV loaded. Upload your ZIP to link photos.`,4000);
     } else if (isProjectLoaded) {
         showToast(`✅ Project loaded. Re-upload your ZIP to restore photos.`,5000);
+        // Show the reload banner if any window has photo refs
+        const hasPhotoRefs = Object.values(inspectionData).some(drop =>
+            Object.values(drop).some(floor =>
+                Object.values(floor).some(node => (node.photos||[]).length > 0)
+            )
+        );
+        if (hasPhotoRefs && Object.keys(imageBank).length === 0) {
+            document.getElementById('top-reload-banner').style.display = 'flex';
+        }
     }
 
     document.getElementById('project-name').innerText='Project: '+projectInfo;
@@ -1814,6 +1860,7 @@ function generateWallDOM(elevName) {
                     const pair=stitchedPairs.find(p=>p.includes(data.id));
                     if (pair){fs=getCombinedStatus(pair[0],pair[1]);isSL=pair[0]===data.id;isSR=pair[1]===data.id;}
                     node.className=`window-node ${fs}`;
+                    if (repairPriorities[data.id]) node.classList.add('in-planner');
                     if (activeFilter!=='ALL'&&fs!==activeFilter) node.classList.add('node-filtered-out');
                     node.onclick=()=>handleNodeClick(data,node);
 
@@ -1877,15 +1924,14 @@ function buildPhotoArea(nodes) {
             const img=document.createElement('img');
             img.src=photoViewState[irName]==='dc'&&hasDC?entry.dcUrl:entry.url;
             img.onerror=()=>{
-                // Data URL failed — try re-fetching from imageBank in case
-                // the entry was updated after initial load
+                // First try re-fetching from imageBank (in case it was updated)
                 const retry = imageBank[irName];
                 if (retry && img.src !== retry.url) {
                     img.src = photoViewState[irName]==='dc' && retry.dcUrl
                         ? retry.dcUrl : retry.url;
                 } else {
-                    img.style.cssText='opacity:0.3;filter:grayscale(1)';
-                    img.alt = irName;
+                    // Silently retry from cached ZIP
+                    retryLoadImage(irName, img);
                 }
             };
 
@@ -1921,7 +1967,38 @@ function buildPhotoArea(nodes) {
                 };
             })(irName, nodes[0]?.id);
 
-            bar.appendChild(nl);bar.appendChild(pill);bar.appendChild(moveBtn);wrap.appendChild(bar);
+            // Remove button — unlinks this photo from the window entirely
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'photo-move-btn';
+            removeBtn.style.cssText = 'padding:3px 10px;font-size:0.7rem;font-weight:bold;background:#1a0a0a;color:#e74c3c;border:1px solid #e74c3c;border-radius:4px;cursor:pointer;margin-left:4px;text-transform:uppercase;letter-spacing:0.5px;';
+            removeBtn.innerText = '🗑 Remove';
+            removeBtn.title = 'Remove this photo from this window (does not delete the file)';
+            removeBtn.onclick = (function(name, nodeIds) {
+                return function(e) {
+                    e.stopPropagation();
+                    showConfirm(
+                        '🗑 Remove photo?',
+                        `Remove ${name.split('_').pop()} from this window? The photo stays in memory and can be manually re-assigned.`,
+                        'REMOVE',
+                        () => {
+                            nodeIds.forEach(nodeId => {
+                                const node = getNodeData(nodeId);
+                                if (node) node.photos = (node.photos||[]).filter(p => p !== name);
+                                if (manualLinks[nodeId]) {
+                                    manualLinks[nodeId] = (manualLinks[nodeId]||[]).filter(p => p !== name);
+                                    if (!manualLinks[nodeId].length) delete manualLinks[nodeId];
+                                }
+                            });
+                            saveCommandState();
+                            calculateBuildingGeometry();
+                            refreshCurrentView();
+                            openModal(modalNodeId);
+                        }
+                    );
+                };
+            })(irName, nodes.map(n => n?.id).filter(Boolean));
+
+            bar.appendChild(nl);bar.appendChild(pill);bar.appendChild(moveBtn);bar.appendChild(removeBtn);wrap.appendChild(bar);
 
             // Click image → lightbox, opening at the current IR/DC state
             img.onclick=(function(name, ent){
@@ -1961,14 +2038,13 @@ function toggleRepairPlannerEntry() {
     const nodeId = modalNodeId;
 
     if (repairPriorities[nodeId]) {
-        // Already in planner — remove it
         delete repairPriorities[nodeId];
         delete repairTags[nodeId];
         saveCommandState();
         updatePlannerBtn(nodeId);
+        if (currentMode==='2d') refreshCurrentView();
         showToast(`Removed ${nodeId} from Repair Planner`, 3000);
     } else {
-        // Not in planner — add it with a defect type picker
         addToRepairPlanner(nodeId);
     }
 }
@@ -2098,6 +2174,7 @@ function rpConfirmAdd(nodeId) {
     picker.remove();
     saveCommandState();
     updatePlannerBtn(nodeId);
+    if (currentMode==='2d') refreshCurrentView();
     showToast(`✅ ${nodeId} added to Repair Planner`, 3000);
 }
 
@@ -2194,6 +2271,12 @@ function openModal(nodeId) {
     if (picker) picker.remove();
     // Update planner button state
     updatePlannerBtn(nodeId);
+    // Show suggest button only if this window has zero photos
+    const hasPhotos = activeNodeDataArray.some(n => nodePhotoNames(n).length > 0);
+    const suggestBtn = document.getElementById('btn-suggest');
+    const suggestResult = document.getElementById('suggest-result');
+    if (suggestBtn) suggestBtn.style.display = hasPhotos ? 'none' : 'block';
+    if (suggestResult) { suggestResult.style.display = 'none'; suggestResult.innerHTML = ''; }
 }
 
 function unmergeCurrent(){if(activeNodeDataArray[0]){const idx=stitchedPairs.findIndex(p=>p.includes(activeNodeDataArray[0].id));if(idx!==-1){showConfirm('✂️ Un-stitch windows?','These two windows will be separated back into individual nodes.','UN-STITCH',()=>{stitchedPairs.splice(idx,1);closeModal();calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();});}}}
@@ -2442,6 +2525,366 @@ function rpAddCustomTag(nodeId) {
 }
 
 // ═══════════════════════════════════════════════════════
+// PHOTO SUGGESTION ENGINE
+// ═══════════════════════════════════════════════════════
+function runPhotoSuggestion() {
+    if (!modalNodeId) return;
+    const parts = modalNodeId.split('-');
+    const drop  = parts[0];
+    const floor = parseInt(parts[1]);
+    const pos   = parts[2];
+
+    const result = document.getElementById('suggest-result');
+    result.style.display = 'block';
+    result.innerHTML = '<div style="color:#888;font-size:0.85rem;">Analysing drop...</div>';
+
+    // ── 1. Build ordered photo list for this drop ─────────────────
+    // Get all images in imageBank for this drop, sorted by filename (numeric)
+    const dropImages = Object.keys(imageBank)
+        .filter(k => imageBank[k].drop === drop)
+        .sort((a, b) => {
+            // Extract numeric part of filename for sort: H_FLIR0481 → 481
+            const numA = parseInt(a.replace(/\D/g, '')) || 0;
+            const numB = parseInt(b.replace(/\D/g, '')) || 0;
+            return numA - numB;
+        });
+
+    if (!dropImages.length) {
+        result.innerHTML = '<div style="color:#888;">No photos loaded for this drop. Re-upload ZIP first.</div>';
+        return;
+    }
+
+    // ── 2. Calculate average photos per window for this drop ──────
+    const dropData = inspectionData[drop] || {};
+    let totalPhotos = 0, totalWindows = 0, windowPhotoMap = {};
+
+    Object.keys(dropData).forEach(f => {
+        Object.keys(dropData[f]).forEach(p => {
+            const node = dropData[f][p];
+            const names = nodePhotoNames(node);
+            windowPhotoMap[node.id] = names;
+            totalPhotos += names.length;
+            totalWindows++;
+        });
+    });
+
+    const avg = totalWindows > 0 ? totalPhotos / totalWindows : 0;
+
+    // ── 3. Find neighboring windows with excess photos ────────────
+    // Priority order for donor search:
+    //   1. Same floor, prev position (L→C→R left of me, same floor)
+    //   2. Same floor, next position (right of me, same floor)
+    //   3. Flat sequence prev (cross-floor)
+    //   4. Flat sequence next (cross-floor)
+    // Expand search to ±3 in sequence to handle multiple missed stamps
+
+    const posOrder = ['L','C','R'];
+    const floors = Object.keys(dropData).map(Number).sort((a,b) => b-a);
+
+    // Build full ordered sequence of windows for this drop (top→bottom, L→C→R)
+    const windowSequence = [];
+    floors.forEach(f => {
+        posOrder.forEach(p => {
+            if (dropData[f]?.[p]) windowSequence.push(dropData[f][p]);
+        });
+    });
+
+    const myIdx = windowSequence.findIndex(n => n.id === modalNodeId);
+    if (myIdx === -1) {
+        result.innerHTML = '<div style="color:#888;">Window not found in sequence.</div>';
+        return;
+    }
+
+    // Build candidate list — same-floor neighbors first, then cross-floor up to ±3
+    const candidateNodes = [];
+
+    // Same-floor neighbors (left and right positions on same floor)
+    const posIdx = posOrder.indexOf(pos);
+    if (posIdx > 0 && dropData[floor]?.[posOrder[posIdx-1]]) {
+        candidateNodes.push({ node: dropData[floor][posOrder[posIdx-1]], samFloor: true, dir: 'prev' });
+    }
+    if (posIdx < posOrder.length-1 && dropData[floor]?.[posOrder[posIdx+1]]) {
+        candidateNodes.push({ node: dropData[floor][posOrder[posIdx+1]], samFloor: true, dir: 'next' });
+    }
+
+    // Cross-floor neighbors — up to ±3 in flat sequence
+    for (let offset = 1; offset <= 3; offset++) {
+        if (myIdx - offset >= 0) {
+            const n = windowSequence[myIdx - offset];
+            if (!candidateNodes.find(c => c.node.id === n.id))
+                candidateNodes.push({ node: n, sameFloor: false, dir: 'prev' });
+        }
+        if (myIdx + offset < windowSequence.length) {
+            const n = windowSequence[myIdx + offset];
+            if (!candidateNodes.find(c => c.node.id === n.id))
+                candidateNodes.push({ node: n, sameFloor: false, dir: 'next' });
+        }
+    }
+
+    // Score candidates: must have photos > avg, pick highest count
+    const scoredCandidates = candidateNodes.map(c => ({
+        ...c,
+        photos: windowPhotoMap[c.node.id] || [],
+        excess: (windowPhotoMap[c.node.id] || []).length - Math.ceil(avg)
+    })).filter(c => c.photos.length > 1 && c.excess > 0);
+
+    // Sort: same-floor first, then by photo count descending
+    scoredCandidates.sort((a,b) => {
+        if (a.sameFloor && !b.sameFloor) return -1;
+        if (!a.sameFloor && b.sameFloor) return 1;
+        return b.photos.length - a.photos.length;
+    });
+
+    if (!scoredCandidates.length) {
+        result.innerHTML = `<div style="color:#888;">No neighboring windows have excess photos to suggest from.<br><br>Average for this drop: <strong style="color:#0cf;">${avg.toFixed(1)} photos/window</strong></div>`;
+        return;
+    }
+
+    const donor = scoredCandidates[0];
+    const donorNode = donor.node;
+    const donorIdx = windowSequence.findIndex(n => n.id === donorNode.id);
+    const donorPhotos = donor.photos.sort((a,b) => {
+        const numA = parseInt(a.replace(/[^0-9]/g,'')) || 0;
+        const numB = parseInt(b.replace(/[^0-9]/g,'')) || 0;
+        return numA - numB;
+    });
+
+    // ── 5. Find split point using time gaps ───────────────────────
+    const photoTimes = donorPhotos.map(name => ({
+        name,
+        time: imageBank[name]?.time ?? null
+    }));
+
+    let splitIdx = -1;
+    let maxGap   = 0;
+
+    // splitIsAfter: are we AFTER the donor in descent sequence?
+    // If yes → our photos are the TAIL of donor's set (higher filename numbers)
+    // If no  → our photos are the HEAD of donor's set (lower filename numbers)
+    const splitIsAfter = myIdx > donorIdx;
+
+    if (photoTimes.every(p => p.time !== null)) {
+        for (let i = 0; i < photoTimes.length - 1; i++) {
+            const gap = Math.abs(photoTimes[i+1].time - photoTimes[i].time);
+            if (gap > maxGap) {
+                maxGap   = gap;
+                splitIdx = i;
+            }
+        }
+    }
+
+    // Fallback: split based on expected count
+    if (splitIdx === -1 || maxGap < 3) {
+        // Use avg to determine how many belong to donor
+        const donorExpected = Math.round(avg);
+        splitIdx = Math.min(donorExpected - 1, donorPhotos.length - 2);
+        splitIdx = Math.max(0, splitIdx);
+        maxGap = null;
+    }
+
+    // ── 6. Build interactive split picker ────────────────────────
+    // Show ALL donor photos in a single row with a draggable divider.
+    // The gap gives the initial split position but user can slide it.
+    // No pre-deciding direction — user sees the photos and picks the split.
+
+    // Initial split at the largest gap
+    let currentSplit = splitIdx; // photos 0..currentSplit stay, currentSplit+1.. move
+
+    const numDonorPhotos = donorPhotos.length;
+
+    function renderSplitPicker() {
+        const thumbW = 68, gap = 4;
+        const splitResult = document.getElementById('suggest-result');
+
+        const gapStr = maxGap !== null
+            ? `largest gap: ${maxGap}s after photo ${splitIdx + 1}`
+            : `no timestamp data — adjust manually`;
+
+        // Build thumbs HTML
+        let thumbsHTML = '';
+        donorPhotos.forEach((name, i) => {
+            const img = imageBank[name];
+            const label = name.split('_').pop() || name;
+            const isLeft = i <= currentSplit;
+            const border = isLeft
+                ? '2px solid #555'
+                : '2px solid #d080ff';
+            const bg = isLeft ? '#0a0a0a' : '#1a0a2a';
+            if (img && img.url) {
+                thumbsHTML += `<div style="position:relative;flex-shrink:0;cursor:pointer;" onclick="window._splitAdjust(${i})">
+                    <img src="${img.url}"
+                        style="width:${thumbW}px;height:52px;object-fit:cover;border-radius:4px;border:${border};background:#111;display:block;"
+                        title="${label}" onerror="this.style.display='none'">
+                    <div style="position:absolute;bottom:0;left:0;right:0;text-align:center;font-size:0.45rem;color:${isLeft?'#555':'#d080ff'};background:rgba(0,0,0,0.7);border-radius:0 0 3px 3px;padding:1px;">${label}</div>
+                </div>`;
+            } else {
+                thumbsHTML += `<div style="width:${thumbW}px;height:52px;flex-shrink:0;border-radius:4px;border:${border};background:${bg};display:inline-flex;align-items:center;justify-content:center;color:#444;font-size:0.5rem;cursor:pointer;" onclick="window._splitAdjust(${i})">${label}</div>`;
+            }
+            // Divider after currentSplit
+            if (i === currentSplit) {
+                thumbsHTML += `<div style="width:3px;flex-shrink:0;background:#d080ff;border-radius:2px;align-self:stretch;position:relative;cursor:col-resize;" title="Drag or tap photos to move divider">
+                    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#d080ff;color:#000;font-size:0.55rem;font-weight:bold;padding:2px 3px;border-radius:2px;white-space:nowrap;">◀ ▶</div>
+                </div>`;
+            }
+        });
+
+        const stayCount = currentSplit + 1;
+        const moveCount = numDonorPhotos - stayCount;
+
+        splitResult.innerHTML = `
+            <div style="color:#d080ff;font-size:0.8rem;font-weight:bold;margin-bottom:6px;">
+                💡 <span style="color:#0cf;">${donorNode.id}</span> has ${numDonorPhotos} photos — split for ${modalNodeId}
+            </div>
+            <div style="color:#555;font-size:0.68rem;margin-bottom:8px;">
+                Auto-split from ${gapStr}. Tap any photo to move the divider ◀▶
+            </div>
+
+            <div style="color:#666;font-size:0.65rem;font-weight:bold;margin-bottom:4px;display:flex;justify-content:space-between;">
+                <span style="color:#888;">STAYS IN ${donorNode.id} (${stayCount})</span>
+                <span style="color:#d080ff;">MOVES TO ${modalNodeId} (${moveCount})</span>
+            </div>
+
+            <div id="split-thumb-row" style="display:flex;gap:${gap}px;align-items:stretch;overflow-x:auto;padding:6px 0;margin-bottom:10px;min-height:60px;">
+                ${thumbsHTML}
+            </div>
+
+            <div style="display:flex;gap:8px;margin-top:4px;">
+                <button id="split-shift-left"
+                    onclick="window._splitAdjust(window._splitIdx - 1)"
+                    style="padding:8px 14px;background:#222;color:#888;border:1px solid #444;border-radius:6px;cursor:pointer;font-size:0.85rem;"
+                    ${currentSplit === 0 ? 'disabled style="opacity:0.3;cursor:default;"' : ''}>◀ Shift left</button>
+                <button id="split-shift-right"
+                    onclick="window._splitAdjust(window._splitIdx + 1)"
+                    style="padding:8px 14px;background:#222;color:#888;border:1px solid #444;border-radius:6px;cursor:pointer;font-size:0.85rem;"
+                    ${currentSplit >= numDonorPhotos - 1 ? 'disabled style="opacity:0.3;cursor:default;"' : ''}>Shift right ▶</button>
+                <button onclick="window._acceptSplit()"
+                    style="flex:1;padding:8px;background:#d080ff;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">
+                    ✅ Move ${moveCount} photo${moveCount!==1?'s':''} to ${modalNodeId}
+                </button>
+                <button onclick="document.getElementById('suggest-result').style.display='none';delete window._splitAdjust;delete window._acceptSplit;delete window._splitIdx;"
+                    style="padding:8px 14px;background:#222;color:#888;border:1px solid #444;border-radius:6px;cursor:pointer;font-size:0.85rem;">✕</button>
+            </div>`;
+    }
+
+    // Global helpers so onclick attributes can reach them
+    window._splitIdx = currentSplit;
+    window._splitAdjust = function(newIdx) {
+        newIdx = Math.max(0, Math.min(numDonorPhotos - 1, newIdx));
+        currentSplit = newIdx;
+        window._splitIdx = newIdx;
+        renderSplitPicker();
+    };
+    window._acceptSplit = function() {
+        const stayInDonor = donorPhotos.slice(0, currentSplit + 1);
+        const moveToMe    = donorPhotos.slice(currentSplit + 1);
+        if (!moveToMe.length) {
+            showToast('Move the divider so at least one photo is on the right side.', 3000, true);
+            return;
+        }
+        acceptPhotoSuggestion(moveToMe, donorNode.id, modalNodeId);
+        delete window._splitAdjust;
+        delete window._acceptSplit;
+        delete window._splitIdx;
+    };
+
+    renderSplitPicker();
+}
+
+// ── Image retry ─────────────────────────────────────────────────
+// Called when an image fails to display (onerror). Tries to re-extract
+// the file from the cached ZIP and re-process it into imageBank.
+async function retryLoadImage(imgKey, imgEl) {
+    if (!cachedZip) {
+        imgEl.alt = 'Re-upload ZIP to view';
+        imgEl.style.opacity = '0.3';
+        return;
+    }
+
+    // imgKey format: 'H_FLIR0001' → drop='H', filename='FLIR0001'
+    const parts   = imgKey.split('_');
+    const drop    = parts[0];
+    const clean   = parts.slice(1).join('_');
+    const folder  = `Drop ${drop}`;
+
+    // Find the entry in the cached ZIP
+    let entry = null;
+    cachedZip.forEach((rel, e) => {
+        if (entry) return;
+        const filePart = e.name.split('/').pop().replace(/\.[^.]+$/, '').toUpperCase();
+        const dropPart = extractDropFromPath(e.name);
+        if (filePart === clean && dropPart === drop) entry = e;
+    });
+
+    if (!entry) {
+        // Try alternate extensions
+        cachedZip.forEach((rel, e) => {
+            if (entry) return;
+            const base = e.name.split('/').pop().replace(/\.[^.]+$/, '').toUpperCase();
+            if (base === clean) entry = e;
+        });
+    }
+
+    if (!entry) {
+        imgEl.alt = `${imgKey} not found in ZIP`;
+        imgEl.style.opacity = '0.3';
+        return;
+    }
+
+    try {
+        imgEl.style.opacity = '0.3';
+        imgEl.alt = 'Reloading...';
+        const bytes = await entry.async('uint8array');
+        const success = await ingestFromBytes(bytes, imgKey, drop);
+        if (success && imageBank[imgKey]?.url) {
+            imgEl.src = imageBank[imgKey].url;
+            imgEl.style.opacity = '1';
+            imgEl.alt = '';
+        } else {
+            imgEl.alt = 'Could not reload';
+            imgEl.style.opacity = '0.3';
+        }
+    } catch(e) {
+        console.warn('retryLoadImage failed:', imgKey, e);
+        imgEl.alt = 'Reload failed';
+        imgEl.style.opacity = '0.3';
+    }
+}
+
+function acceptPhotoSuggestion(photoNames, fromNodeId, toNodeId) {
+    if (!photoNames || !photoNames.length) return;
+
+    // Remove from donor node
+    const fromNode = getNodeData(fromNodeId);
+    if (fromNode) {
+        fromNode.photos = (fromNode.photos || []).filter(p => !photoNames.includes(p));
+    }
+    if (manualLinks[fromNodeId]) {
+        manualLinks[fromNodeId] = (manualLinks[fromNodeId] || []).filter(p => !photoNames.includes(p));
+        if (!manualLinks[fromNodeId].length) delete manualLinks[fromNodeId];
+    }
+
+    // Add to target node
+    const toNode = getNodeData(toNodeId);
+    if (toNode) {
+        if (!toNode.photos) toNode.photos = [];
+        photoNames.forEach(name => {
+            if (!toNode.photos.includes(name)) toNode.photos.push(name);
+        });
+    }
+    if (!manualLinks[toNodeId]) manualLinks[toNodeId] = [];
+    photoNames.forEach(name => {
+        if (!manualLinks[toNodeId].includes(name)) manualLinks[toNodeId].push(name);
+    });
+
+    saveCommandState();
+    calculateBuildingGeometry();
+    refreshCurrentView();
+    showToast(`✅ Moved ${photoNames.length} photos to ${toNodeId}`, 3000);
+    // Reopen modal to show new state
+    openModal(toNodeId);
+}
+
+// ═══════════════════════════════════════════════════════
 // RESET  — uses custom confirm dialog (window.confirm is
 // silently blocked in some desktop PWA / file:// contexts)
 // ═══════════════════════════════════════════════════════
@@ -2535,11 +2978,23 @@ function renderRepairPlanner() {
         tabCont.innerHTML = '';
         elevations.forEach(elev => {
             if (!used.has(elev)) return;
-            const hasRepair = Object.keys(repairPriorities).some(id => dropAssignments[id.split('-')[0]] === elev);
+            // Count repairs in this elevation
+            const elevTotal = Object.keys(repairPriorities)
+                .filter(id => dropAssignments[id.split('-')[0]] === elev).length;
+            const elevFixed = Object.keys(repairFixed)
+                .filter(id => repairFixed[id] && repairPriorities[id] && dropAssignments[id.split('-')[0]] === elev).length;
+            const elevPending = elevTotal - elevFixed;
+
             const tab = document.createElement('div');
             tab.className = 'tab' + (rpActiveElev === elev ? ' active' : '');
-            tab.style.opacity = hasRepair ? '1' : '0.4';
-            tab.innerText = elev;
+            tab.style.opacity = elevTotal > 0 ? '1' : '0.4';
+
+            // Label: elevation name + counts
+            if (elevTotal > 0) {
+                tab.innerHTML = `${elev} <span style="font-size:0.65rem;font-weight:normal;opacity:0.8;">${elevPending}${elevFixed > 0 ? ' · <span style=\"color:#28a745\">' + elevFixed + '✓</span>' : ''}</span>`;
+            } else {
+                tab.innerText = elev;
+            }
             tab.onclick = () => { rpActiveElev = elev; renderRepairPlanner(); };
             tabCont.appendChild(tab);
         });
@@ -2707,7 +3162,7 @@ function resetBoard(){
             });
 
             // Reset all state
-            inspectionData={};imageBank={};stitchedPairs=[];projectInfo='Unknown Project';
+            inspectionData={};imageBank={};stitchedPairs=[];projectInfo='Unknown Project';cachedZip=null;
             elevations=[];dropAssignments={};saved3DTags={};activeTab='';manualLinks={};
             activeNodeDataArray=[];modalNodeId=null;
             currentMode='2d';repairPriorities={};repairTags={};
@@ -2895,33 +3350,57 @@ function render3DHotspots(){
     });
 }
 function toggleRPFullscreen() {
-    const grid = document.getElementById('rp-grid-container');
-    const modal = document.getElementById('info-modal');
-    const btn   = document.getElementById('rp-fs-btn');
+    const grid    = document.getElementById('rp-grid-container');
+    const exitBtn = document.getElementById('rp-fullscreen-exit');
+    const fsBtn   = document.getElementById('rp-fs-btn');
+    const isFullscreen = grid.classList.contains('rp-fullscreen')
+                      || !!document.fullscreenElement;
 
-    if (!document.fullscreenElement) {
-        // Going fullscreen — move modal inside grid so it works inside fullscreen
-        grid.appendChild(modal);
-        modal.style.position = 'fixed';
-        grid.requestFullscreen().catch(e => console.warn('Fullscreen failed:', e));
-        if (btn) btn.innerText = '✕ EXIT';
+    if (!isFullscreen) {
+        // Try native fullscreen first (works on desktop)
+        if (grid.requestFullscreen) {
+            grid.requestFullscreen().catch(() => {
+                // Native failed (iOS/PWA) — use CSS approach
+                grid.classList.add('rp-fullscreen');
+                if (exitBtn) exitBtn.style.display = 'flex';
+            });
+        } else if (grid.webkitRequestFullscreen) {
+            grid.webkitRequestFullscreen();
+        } else {
+            // CSS fallback
+            grid.classList.add('rp-fullscreen');
+            if (exitBtn) exitBtn.style.display = 'flex';
+        }
+        if (fsBtn) fsBtn.innerText = '✕ EXIT';
     } else {
-        // Exiting — move modal back to body
-        document.body.appendChild(modal);
-        document.exitFullscreen();
-        if (btn) btn.innerText = '⛶';
+        // Exit fullscreen
+        grid.classList.remove('rp-fullscreen');
+        if (exitBtn) exitBtn.style.display = 'none';
+        if (document.fullscreenElement) document.exitFullscreen();
+        if (document.webkitFullscreenElement) document.webkitExitFullscreen();
+        if (fsBtn) fsBtn.innerText = '⛶';
     }
 }
 
-// Ensure modal returns to body if fullscreen exits via Escape key
+// Handle native fullscreen exit (Escape key)
 document.addEventListener('fullscreenchange', () => {
     if (!document.fullscreenElement) {
-        const modal = document.getElementById('info-modal');
-        if (modal && modal.parentElement !== document.body) {
-            document.body.appendChild(modal);
-        }
-        const btn = document.getElementById('rp-fs-btn');
-        if (btn) btn.innerText = '⛶';
+        const grid    = document.getElementById('rp-grid-container');
+        const exitBtn = document.getElementById('rp-fullscreen-exit');
+        const fsBtn   = document.getElementById('rp-fs-btn');
+        grid.classList.remove('rp-fullscreen');
+        if (exitBtn) exitBtn.style.display = 'none';
+        if (fsBtn) fsBtn.innerText = '⛶';
+    }
+});
+document.addEventListener('webkitfullscreenchange', () => {
+    if (!document.webkitFullscreenElement) {
+        const grid    = document.getElementById('rp-grid-container');
+        const exitBtn = document.getElementById('rp-fullscreen-exit');
+        const fsBtn   = document.getElementById('rp-fs-btn');
+        grid.classList.remove('rp-fullscreen');
+        if (exitBtn) exitBtn.style.display = 'none';
+        if (fsBtn) fsBtn.innerText = '⛶';
     }
 });
 
@@ -2957,7 +3436,7 @@ function updateLbUI(){
     tog.classList.toggle('showing-dc',lbShowDC&&hasDC);
     tog.classList.toggle('no-dc',!hasDC);
     lbImg.src=(lbShowDC&&hasDC)?entry.dcUrl:entry.url;
-    lbImg.onerror=()=>{ lbImg.style.opacity='0.3'; lbImg.alt=name; };
+    lbImg.onerror=()=>{ retryLoadImage(name, lbImg); };
     const isMulti=lbNames.length>1;
     document.getElementById('lightbox-prev').style.display=isMulti?'block':'none';
     document.getElementById('lightbox-next').style.display=isMulti?'block':'none';
