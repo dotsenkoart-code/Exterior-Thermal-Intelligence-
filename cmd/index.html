@@ -1311,6 +1311,41 @@ async function handleFiles(files, forcedType=null) {
         const nm=(file.name||'').toLowerCase();
         const ty=(file.type||'').toLowerCase();
 
+        // JSON project file — check filename first, before any forcedType override
+        if (nm.endsWith('.json')||forcedType==='json') {
+            isProjectLoaded=true;
+            promises.push(new Promise(res=>{
+                const r=new FileReader();
+                r.onload=ev=>{
+                    try {
+                        const p=JSON.parse(ev.target.result);
+                        console.log('[JSON] Parsing project:', p.projectInfo, 'elevations:', p.elevations?.length, 'drops:', Object.keys(p.inspectionData||{}).length);
+                        projectInfo       = p.projectInfo       ||'Unknown Project';
+                        inspectionData    = p.inspectionData    ||{};
+                        elevations        = p.elevations        ||[];
+                        dropAssignments   = p.dropAssignments   ||{};
+                        stitchedPairs     = p.stitchedPairs     ||[];
+                        saved3DTags       = p.saved3DTags       ||{};
+                        manualLinks       = p.manualLinks       ||{};
+                        projectModelUrl   = p.projectModelUrl   ||'';
+                        repairPriorities  = p.repairPriorities  ||{};
+                        repairTags        = p.repairTags        ||{};
+                        repairFixed       = p.repairFixed       ||{};
+                        const urlInp = document.getElementById('twin-url-input');
+                        if (urlInp && projectModelUrl) urlInp.value = projectModelUrl;
+                        console.log('[JSON] Loaded OK. inspectionData drops:', Object.keys(inspectionData));
+                    } catch(e) {
+                        console.error('[JSON] Parse error:', e);
+                        showToast('⚠️ Failed to read project file: ' + e.message, 8000, true);
+                    }
+                    res();
+                };
+                r.onerror = e => { console.error('[JSON] FileReader error:', e); res(); };
+                r.readAsText(file);
+            }));
+            continue;
+        }
+
         if (nm.endsWith('.zip')||ty.includes('zip')) {
             promises.push(new Promise(res=>{
                 JSZip.loadAsync(file).then(async zip=>{
@@ -1367,40 +1402,6 @@ async function handleFiles(files, forcedType=null) {
 
                     res();
                 }).catch(err=>{showToast('⚠️ ZIP error: '+err.message, 6000, true);res();});
-            }));
-        } else if (nm.endsWith('.json')) {
-            isProjectLoaded=true;
-            promises.push(new Promise(res=>{
-                const r=new FileReader();
-                r.onload=ev=>{
-                    try {
-                        const p=JSON.parse(ev.target.result);
-                        projectInfo    =p.projectInfo    ||'Unknown Project';
-                        inspectionData =p.inspectionData ||{};
-                        elevations     =p.elevations     ||[];
-                        dropAssignments=p.dropAssignments||{};
-                        stitchedPairs  =p.stitchedPairs  ||[];
-                        saved3DTags    =p.saved3DTags    ||{};
-                        manualLinks    =p.manualLinks    ||{};
-        projectModelUrl   =p.projectModelUrl   ||'';
-        repairPriorities  =p.repairPriorities  ||{};
-        repairTags        =p.repairTags        ||{};
-        repairFixed       =p.repairFixed       ||{};
-        const urlInp = document.getElementById('twin-url-input');
-        if (urlInp && projectModelUrl) urlInp.value = projectModelUrl;
-        // Show dashboard immediately
-        document.getElementById('project-name').innerText = 'Project: ' + projectInfo;
-        document.getElementById('project-name').style.color = '#0cf';
-        document.getElementById('btn-save-project').style.display = 'inline-block';
-        updateLoadPanelVisibility();
-        if (elevations.length > 0) {
-            document.getElementById('dashboard-screen').style.display = 'flex';
-            if (!elevations.includes(activeTab)) activeTab = elevations[0];
-        }
-                    } catch(e){ console.error('Project JSON load error:', e); showToast('⚠️ Failed to load project file: ' + e.message, 6000, true); }
-                    res();
-                };
-                r.readAsText(file);
             }));
         } else if (forcedType==='csv'||nm.endsWith('.csv')||ty.includes('csv')||ty==='application/vnd.ms-excel') {
             newCsvAdded=true;
@@ -1829,7 +1830,12 @@ function initGlobalDragDrop() {
     document.body.addEventListener('drop',async e=>{
         e.preventDefault();
         if (!e.dataTransfer.files.length) return;
-        await handleFiles(e.dataTransfer.files,'media');
+        // Detect type from first file — don't force 'media' for JSON/CSV
+        const firstName = (e.dataTransfer.files[0].name||'').toLowerCase();
+        const forceType = firstName.endsWith('.json') ? 'json'
+                        : firstName.endsWith('.csv')  ? 'csv'
+                        : 'media';
+        await handleFiles(e.dataTransfer.files, forceType);
         if (modalNodeId&&document.getElementById('info-modal').style.display==='flex') openModal(modalNodeId);
     });
 }
