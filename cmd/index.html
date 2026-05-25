@@ -2048,12 +2048,9 @@ function detectDuplicatePhotos() {
     // Show results in a toast-style panel
     const msg = dupes.slice(0, 5).map(d =>
         `${d.photo.split('_').pop()} -> ${d.nodes.join(' & ')}`
-    ).join('
-');
-    const extra = dupes.length > 5 ? `
-?and ${dupes.length - 5} more` : '';
-    showToast(`[WARN] ${dupes.length} duplicate photo${dupes.length>1?'s':''} found:
-${msg}${extra}`, 8000, true);
+    ).join('\n');
+    const extra = dupes.length > 5 ? `\n...and ${dupes.length - 5} more` : '';
+    showToast(`[WARN] ${dupes.length} duplicate photo${dupes.length>1?'s':''} found:\n${msg}${extra}`, 8000, true);
 }
 
 function calculateBuildingGeometry() {
