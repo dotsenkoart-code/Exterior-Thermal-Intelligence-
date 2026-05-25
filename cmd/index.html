@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="utf-8">
     <title>Strata Command Center | v9.5</title>
     <!--
     ╔══════════════════════════════════════════════════════════════════════════╗
@@ -165,6 +166,7 @@
     ║  4. Test: ends correctly, no duplicate declarations, braces=0          ║
     ╚══════════════════════════════════════════════════════════════════════════╝
     -->
+    <meta charset="utf-8">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="manifest" href="manifest_cmd.json">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-cmd192.png">
@@ -451,7 +453,8 @@
 <!-- Gear popover -->
 <div id="gear-popover">
     <div style="color:#555;font-size:0.65rem;text-transform:uppercase;font-weight:bold;padding:2px 4px 6px;">FILE OPTIONS</div>
-    <button class="gear-item" onclick="closeGearMenu();document.getElementById('csvInput').click()">📄 Load CSV or Project</button>
+    <button class="gear-item" onclick="closeGearMenu();document.getElementById('projectInput').click()">📦 Load Project File (.json)</button>
+    <button class="gear-item" onclick="closeGearMenu();document.getElementById('csvInput').click()">📄 Load CSV</button>
     <button class="gear-item" onclick="closeGearMenu();document.getElementById('mediaInput').click()">🖼️ Add Individual Files</button>
     <button class="gear-item" onclick="closeGearMenu();document.getElementById('folderInput').click()">📁 Add ZIP or Folder</button>
     <div style="border-top:1px solid #2a2d38;margin:4px 0;"></div>
@@ -470,14 +473,16 @@
 
 <div class="main-content">
     <!-- Hidden file inputs — triggered from gear menu -->
-    <input type="file" id="csvInput"    multiple accept=".csv,.json" style="display:none;" onchange="handleFiles(this.files,'csv')">
-    <input type="file" id="mediaInput"  multiple accept=".jpg,.jpeg,.png,.zip" style="display:none;" onchange="handleFiles(this.files,'media')">
-    <input type="file" id="folderInput" webkitdirectory directory multiple style="display:none;" onchange="handleFiles(this.files,'media')">
-    <input type="file" id="jsonInput"   accept=".json" style="display:none;" onchange="handleFiles(this.files,'json')">
+    <input type="file" id="csvInput"       multiple accept=".csv" style="display:none;" onchange="handleFiles(this.files,'csv')">
+    <input type="file" id="mediaInput"     multiple accept=".jpg,.jpeg,.png,.zip" style="display:none;" onchange="handleFiles(this.files,'media')">
+    <input type="file" id="folderInput"    webkitdirectory directory multiple style="display:none;" onchange="handleFiles(this.files,'media')">
+    <input type="file" id="jsonInput"      accept=".json" style="display:none;" onchange="loadProjectFile(this)">
+    <input type="file" id="projectInput"   accept=".json" style="display:none;" onchange="loadProjectFile(this)">
 
     <!-- Load buttons — shown only before project is loaded -->
     <div id="load-btn-panel" style="display:flex;gap:15px;margin-bottom:20px;flex-shrink:0;">
-        <button class="btn btn-dark" style="flex:1;padding:20px;font-size:1.1rem;border:2px dashed #0cf;background:#161922;" onclick="document.getElementById('csvInput').click()">📄 1. LOAD CSV OR PROJECT</button>
+        <button class="btn btn-dark" style="flex:1;padding:20px;font-size:1.1rem;border:2px dashed #0cf;background:#161922;" onclick="document.getElementById('projectInput').click()">📦 1. LOAD PROJECT</button>
+        <button class="btn btn-dark" style="flex:1;padding:20px;font-size:1.1rem;border:2px dashed #0cf;background:#161922;" onclick="document.getElementById('csvInput').click()">📄 2. LOAD CSV</button>
         <button class="btn btn-dark" style="flex:1;padding:20px;font-size:1.1rem;border:2px dashed #d080ff;background:#161922;" onclick="document.getElementById('mediaInput').click()">🖼️ 2. ADD INDIVIDUAL FILES</button>
         <button class="btn btn-dark" style="flex:1;padding:20px;font-size:1.1rem;border:2px dashed #f39c12;background:#161922;" onclick="document.getElementById('folderInput').click()">📁 3. ADD ZIP OR FOLDER</button>
     </div>
@@ -712,10 +717,10 @@
     </div>
 </div>
 
-<script>
-// ═══════════════════════════════════════════════════════
+<script charset="utf-8">
+// =======================================================
 // STATE
-// ═══════════════════════════════════════════════════════
+// =======================================================
 let inspectionData      = {};
 let projectInfo         = 'Unknown Project';
 let activeNodeDataArray = [];
@@ -749,24 +754,24 @@ let repairFixed         = {};   // { nodeId: true } windows marked as fixed
  * imageBank: { CLEAN_UPPER_NAME: { url, dcUrl, time, drop } }
  *   url   = blob URL of the file as stored (IR palette or DC-only)
  *   dcUrl = blob URL of embedded DC extracted from IR file, or null
- *           undefined means the file was DC-only (no FLIR segments ≥ 3)
+ *           undefined means the file was DC-only (no FLIR segments ? 3)
  *   time  = seconds-since-midnight from EXIF (or file date fallback)
  *   drop  = detected drop ID from folder path, or null
  *
- * node.photos = [ cleanName, ... ]  — assigned by Bracket Zipline
+ * node.photos = [ cleanName, ... ]  ? assigned by Bracket Zipline
  *   All photos whose EXIF timestamp falls in the bracket
  *   [stamp[n], stamp[n+1]) are assigned to node n.
  */
 let imageBank = {};
 
-// Per-photo toggle state (modal + lightbox): cleanName → 'ir'|'dc'
+// Per-photo toggle state (modal + lightbox): cleanName -> 'ir'|'dc'
 const photoViewState = {};
 
 const viewer = { src: '', style: {cursor:'default'}, autoRotate: false }; // legacy compat shim
 
-// ═══════════════════════════════════════════════════════
+// =======================================================
 // FLIR BINARY HELPERS
-// ═══════════════════════════════════════════════════════
+// =======================================================
 
 // Count FLIR APP1 segments: IR=3, DC-only=1, non-FLIR=0
 function countFlirSegments(buf) {
@@ -846,7 +851,7 @@ function extractEmbeddedDC(buf) {
 /*
  * Parse DateTimeOriginal directly from a JPEG ArrayBuffer.
  * Returns seconds-since-midnight (integer), or null if not found.
- * Reads the raw bytes itself — no exifr dependency.
+ * Reads the raw bytes itself ? no exifr dependency.
  */
 function parseExifTimestamp(buf) {
     const b = new Uint8Array(buf);
@@ -896,7 +901,7 @@ function parseExifTimestamp(buf) {
                 for (let j=0; j<n; j++) {
                     const off = ifdOff+2+j*12;
                     if (tBase+off+12 > len) break;
-                    tags[t16(off)] = off; // tag → offset of entry
+                    tags[t16(off)] = off; // tag -> offset of entry
                 }
                 return tags;
             }
@@ -906,7 +911,7 @@ function parseExifTimestamp(buf) {
 
             let dateStr = null;
 
-            // Try ExifIFD → DateTimeOriginal (0x9003) first
+            // Try ExifIFD -> DateTimeOriginal (0x9003) first
             if (ifd0[0x8769] !== undefined) {
                 const exifOff = t32(ifd0[0x8769]+8);
                 const exif    = readIFD(exifOff);
@@ -932,7 +937,7 @@ function parseExifTimestamp(buf) {
 }
 
 // Ingest one IR image blob into imageBank.
-// DC-only files (FLIR segment count < 3) are silently ignored —
+// DC-only files (FLIR segment count < 3) are silently ignored ?
 // all DC content is already embedded inside the IR file.
 // Returns true if ingested as IR, false if skipped.
 // Convert Uint8Array to base64 data URL.
@@ -949,7 +954,7 @@ function bytesToDataURL(bytes, mime) {
 }
 
 async function ingestFromBytes(bytes, cleanName, dropId) {
-    // Make an owned copy — safe from JSZip internal mutations
+    // Make an owned copy ? safe from JSZip internal mutations
     const owned = new Uint8Array(bytes);
     const buf   = owned.buffer;
 
@@ -968,7 +973,7 @@ async function ingestFromBytes(bytes, cleanName, dropId) {
 
     // Use base64 data URLs instead of blob URLs.
     // Blob URLs are blocked in WKWebView (iOS PWA) and sandboxed iframes.
-    // Data URLs are embedded strings — no URL scheme, no CSP, no origin issues.
+    // Data URLs are embedded strings ? no URL scheme, no CSP, no origin issues.
     const url   = bytesToDataURL(owned, 'image/jpeg');
     const dcBlob = extractEmbeddedDC(buf);
     let   dcUrl  = null;
@@ -981,9 +986,9 @@ async function ingestFromBytes(bytes, cleanName, dropId) {
     return true;
 }
 
-// ═══════════════════════════════════════════════════════
+// =======================================================
 // EXIF / PATH HELPERS
-// ═══════════════════════════════════════════════════════
+// =======================================================
 function parseExifDate(eDate, fallback) {
     if (!eDate) return fallback;
     if (eDate instanceof Date && !isNaN(eDate)) return eDate;
@@ -1004,9 +1009,9 @@ function extractDropFromPath(p) {
 
 function dateToSec(d) { return d.getHours()*3600+d.getMinutes()*60+d.getSeconds(); }
 
-// ═══════════════════════════════════════════════════════
+// =======================================================
 // NODE HELPERS
-// ═══════════════════════════════════════════════════════
+// =======================================================
 function getNodeData(id) {
     if (!id||typeof id!=='string') return null;
     const p=id.split('-');
@@ -1039,20 +1044,20 @@ function updatePhotoStat() {
     document.getElementById('stat-ir').innerText = Object.keys(imageBank).length;
 }
 
-// ═══════════════════════════════════════════════════════
+// =======================================================
 // INIT
-// ═══════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════
-// DIGITAL TWIN — Three.js GLB Viewer
-// ═══════════════════════════════════════════════════════
-// Model URL is stored per-project in projectModelUrl — no hardcoded IDs
+// =======================================================
+// =======================================================
+// DIGITAL TWIN ? Three.js GLB Viewer
+// =======================================================
+// Model URL is stored per-project in projectModelUrl ? no hardcoded IDs
 
 let twinAnimId=null;
 let twinHotspots=[];  // { mesh, nodeId } for raycasting
 let twinLoaded=false;
 
 function initTwin() {
-    // model-viewer handles all rendering — nothing to initialise
+    // model-viewer handles all rendering ? nothing to initialise
     // Just restore saved URL if project has one
     const mv = document.getElementById('main-3d-viewer');
     if (!mv) return;
@@ -1086,7 +1091,7 @@ function loadTwinFromInput() {
     const raw = document.getElementById('twin-url-input').value.trim();
     if (!raw) return;
 
-    // Convert Google Drive share link → direct download URL
+    // Convert Google Drive share link -> direct download URL
     const directUrl = gdriveToDirectUrl(raw);
 
     // Save URL to project state so it persists with the project JSON
@@ -1115,7 +1120,7 @@ function loadTwinModel(url, fallbackDirectUrl) {
 
     mv.addEventListener('load', () => {
         document.getElementById('model-status').innerHTML =
-            '<span style="color:#0cf;">✅ Digital Twin loaded</span>';
+            '<span style="color:#0cf;">[OK] Digital Twin loaded</span>';
         twinLoaded = true;
         placeTwinHotspots(null, 1, null);
         setupTwinTagging();
@@ -1127,8 +1132,8 @@ function loadTwinModel(url, fallbackDirectUrl) {
             return;
         }
         document.getElementById('model-status').innerHTML =
-            '<span style="color:#f39c12;">⚠️ Could not load model. Check URL.</span>';
-        showToast('⚠️ Could not load 3D model. Try uploading GLB directly (button 3).', 7000, true);
+            '<span style="color:#f39c12;">[WARN] Could not load model. Check URL.</span>';
+        showToast('[WARN] Could not load 3D model. Try uploading GLB directly (button 3).', 7000, true);
     }, {once: true});
 }
 
@@ -1201,7 +1206,7 @@ function initApp() {
     initGlobalDragDrop();
 }
 
-// Blob URL detection removed — app now uses data URLs universally
+// Blob URL detection removed ? app now uses data URLs universally
 async function requestWakeLock() {
     try { if ('wakeLock' in navigator) wakeLock=await navigator.wakeLock.request('screen'); } catch(e){}
 }
@@ -1209,9 +1214,9 @@ document.addEventListener('visibilitychange',()=>{
     if (wakeLock&&document.visibilityState==='visible') requestWakeLock();
 });
 
-// ═══════════════════════════════════════════════════════
+// =======================================================
 // PERSISTENCE
-// ═══════════════════════════════════════════════════════
+// =======================================================
 function saveCommandState() {
     localStorage.setItem('strataCommandState',JSON.stringify({
         projectInfo,inspectionData,elevations,dropAssignments,
@@ -1270,13 +1275,85 @@ function saveProject() {
     a.click();
 }
 
-// ═══════════════════════════════════════════════════════
+// =======================================================
 // FILE HANDLING
-// ═══════════════════════════════════════════════════════
+// =======================================================
 function setLoading(on,text='',detail='') {
     document.getElementById('loading-overlay').style.display=on?'flex':'none';
     document.getElementById('loading-text').innerText  =text;
     document.getElementById('loading-detail').innerText=detail;
+}
+
+// Direct project loader ? bypasses all file routing logic
+function loadProjectFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    console.log('[loadProject] File:', file.name, 'size:', file.size, 'type:', file.type);
+    setLoading(true, 'Loading project...', '');
+    const r = new FileReader();
+    r.onload = ev => {
+        try {
+            const p = JSON.parse(ev.target.result);
+            console.log('[loadProject] Parsed OK:', p.projectInfo,
+                'elevations:', p.elevations?.length,
+                'drops:', Object.keys(p.inspectionData||{}).length);
+
+            projectInfo      = p.projectInfo      || 'Unknown Project';
+            inspectionData   = p.inspectionData   || {};
+            elevations       = p.elevations       || [];
+            dropAssignments  = p.dropAssignments  || {};
+            stitchedPairs    = p.stitchedPairs    || [];
+            saved3DTags      = p.saved3DTags      || {};
+            manualLinks      = p.manualLinks      || {};
+            projectModelUrl  = p.projectModelUrl  || '';
+            repairPriorities = p.repairPriorities || {};
+            repairTags       = p.repairTags       || {};
+            repairFixed      = p.repairFixed      || {};
+
+            const urlInp = document.getElementById('twin-url-input');
+            if (urlInp && projectModelUrl) urlInp.value = projectModelUrl;
+
+            document.getElementById('project-name').innerText = 'Project: ' + projectInfo;
+            document.getElementById('project-name').style.color = '#0cf';
+            document.getElementById('btn-save-project').style.display = 'inline-block';
+            updateLoadPanelVisibility();
+
+            if (elevations.length > 0) {
+                document.getElementById('dashboard-screen').style.display = 'flex';
+                if (!elevations.includes(activeTab)) activeTab = elevations[0];
+                calculateBuildingGeometry();
+                switchView('2d');
+            } else {
+                document.getElementById('btn-start-mapping').style.display = 'block';
+            }
+
+            saveCommandState();
+
+            // Show reload banner if photos were previously linked
+            const hasPhotoRefs = Object.values(inspectionData).some(drop =>
+                Object.values(drop).some(floor =>
+                    Object.values(floor).some(node => (node.photos||[]).length > 0)
+                )
+            );
+            if (hasPhotoRefs) {
+                document.getElementById('top-reload-banner').style.display = 'flex';
+            }
+
+            showToast('[OK] Project loaded: ' + projectInfo, 4000);
+        } catch(e) {
+            console.error('[loadProject] Parse error:', e);
+            showToast('[WARN] Could not read project file: ' + e.message, 8000, true);
+        }
+        setLoading(false);
+        input.value = '';
+    };
+    r.onerror = e => {
+        console.error('[loadProject] FileReader error:', e);
+        showToast('[WARN] Could not read file.', 6000, true);
+        setLoading(false);
+        input.value = '';
+    };
+    r.readAsText(file);
 }
 
 async function handleFiles(files, forcedType=null) {
@@ -1286,7 +1363,7 @@ async function handleFiles(files, forcedType=null) {
     const promises=[];
     let newIR=0, newCsvAdded=false, isProjectLoaded=false, rowsParsed=0;
 
-    // Process one image from raw bytes (Uint8Array) — avoids JSZip blob lifetime issues
+    // Process one image from raw bytes (Uint8Array) ? avoids JSZip blob lifetime issues
     async function processBytes(bytes, cleanName, pathHint) {
         const drop = extractDropFromPath(pathHint);
         // Prefix clean name with drop ID to avoid collisions when multiple
@@ -1311,7 +1388,7 @@ async function handleFiles(files, forcedType=null) {
         const nm=(file.name||'').toLowerCase();
         const ty=(file.type||'').toLowerCase();
 
-        // JSON project file — check filename first, before any forcedType override
+        // JSON project file ? check filename first, before any forcedType override
         if (nm.endsWith('.json')||forcedType==='json') {
             isProjectLoaded=true;
             promises.push(new Promise(res=>{
@@ -1336,7 +1413,7 @@ async function handleFiles(files, forcedType=null) {
                         console.log('[JSON] Loaded OK. inspectionData drops:', Object.keys(inspectionData));
                     } catch(e) {
                         console.error('[JSON] Parse error:', e);
-                        showToast('⚠️ Failed to read project file: ' + e.message, 8000, true);
+                        showToast('[WARN] Failed to read project file: ' + e.message, 8000, true);
                     }
                     res();
                 };
@@ -1352,10 +1429,10 @@ async function handleFiles(files, forcedType=null) {
                     cachedZip = zip; // keep reference for image retry on failed loads
                     // Collect all tasks first, then run with limited concurrency.
                     // Running 1000+ heavy ArrayBuffer ops simultaneously crashes
-                    // the browser — process 8 at a time.
-                    // Collect entry metadata inside forEach (safe — no async here).
+                    // the browser ? process 8 at a time.
+                    // Collect entry metadata inside forEach (safe ? no async here).
                     // We store entry references with their clean name and path.
-                    // We do NOT call entry.async() here — we call it later one
+                    // We do NOT call entry.async() here ? we call it later one
                     // at a time inside the concurrency pool to avoid firing 3000+
                     // simultaneous decompression operations which crashes the browser.
                     const csvTasks=[];
@@ -1377,7 +1454,7 @@ async function handleFiles(files, forcedType=null) {
                     // Wait for all CSVs first (fast)
                     await Promise.all(csvTasks);
 
-                    // Process images fully sequentially — one at a time.
+                    // Process images fully sequentially ? one at a time.
                     // Concurrency causes memory issues on tablets (OOM-kills
                     // tasks for drops G/H/I/J). Sequential + yield lets the
                     // device GC between images and process all 3092 reliably.
@@ -1401,7 +1478,7 @@ async function handleFiles(files, forcedType=null) {
                     }
 
                     res();
-                }).catch(err=>{showToast('⚠️ ZIP error: '+err.message, 6000, true);res();});
+                }).catch(err=>{showToast('[WARN] ZIP error: '+err.message, 6000, true);res();});
             }));
         } else if (forcedType==='csv'||nm.endsWith('.csv')||ty.includes('csv')||ty==='application/vnd.ms-excel') {
             newCsvAdded=true;
@@ -1414,7 +1491,7 @@ async function handleFiles(files, forcedType=null) {
             const clean=file.name.replace(/\.[^.]+$/,'').toUpperCase();
             promises.push(processBlob(file, clean, file.webkitRelativePath));
         } else if (nm.endsWith('.glb')||nm.endsWith('.gltf')||ty.includes('model/gltf')) {
-            // GLB uploaded directly — load into model-viewer
+            // GLB uploaded directly ? load into model-viewer
             const glbUrl = URL.createObjectURL(file);
             document.getElementById('model-status').innerHTML=`<span style="color:#0cf;">Loading:</span> ${file.name}`;
             loadTwinModel(glbUrl, null);
@@ -1433,14 +1510,14 @@ async function handleFiles(files, forcedType=null) {
     // Both imageBank (photos) and inspectionData (CSV nodes) may have been
     // updated in this call or a previous one. Running it every time means
     // loading CSV after ZIP, or ZIP after CSV, both produce correct links.
-    // Hide the reload banner — photos are now loaded
+    // Hide the reload banner ? photos are now loaded
     const reloadBanner = document.getElementById('top-reload-banner');
     if (reloadBanner && Object.keys(imageBank).length > 0) {
         reloadBanner.style.display = 'none';
     }
     const linked=runBracketZipline();
 
-    // ── DIAGNOSTIC ──────────────────────────────────────
+    // -- DIAGNOSTIC --------------------------------------
     // Log imageBank state so we can see exactly what was loaded
     const ibKeys = Object.keys(imageBank);
     const dropCounts = {};
@@ -1456,7 +1533,7 @@ async function handleFiles(files, forcedType=null) {
         const linked_nodes = nodes.filter(n => n.photos && n.photos.length > 0);
         console.log(`[Diag] Drop ${drop}: ${imgs.length} imgs in bank, ${nodes.length} nodes, ${linked_nodes.length} linked`);
     });
-    // ── END DIAGNOSTIC ───────────────────────────────────
+    // -- END DIAGNOSTIC -----------------------------------
 
     setLoading(false);
 
@@ -1465,16 +1542,16 @@ async function handleFiles(files, forcedType=null) {
         const reasons=window._diagSkipReasons||{};
         const reasonStr=Object.entries(reasons).map(([k,v])=>`${k}x${v}`).join(', ');
         if (linked===0)
-            showToast(`⚠️ ${newIR} IR loaded, 0 bracketed. Skipped: ${skipped} (${reasonStr||'none'}).`,10000,true);
+            showToast(`[WARN] ${newIR} IR loaded, 0 bracketed. Skipped: ${skipped} (${reasonStr||'none'}).`,10000,true);
         else
-            showToast(`✅ ${newIR} IR loaded, ${linked} photo(s) linked to windows.`,6000);
+            showToast(`[OK] ${newIR} IR loaded, ${linked} photo(s) linked to windows.`,6000);
         window._diagSkipped=0; window._diagSkipReasons={};
     } else if (newCsvAdded&&linked>0) {
-        showToast(`✅ CSV loaded. ${linked} photo(s) linked to windows.`,5000);
+        showToast(`[OK] CSV loaded. ${linked} photo(s) linked to windows.`,5000);
     } else if (newCsvAdded&&Object.keys(imageBank).length===0) {
-        showToast(`✅ CSV loaded. Upload your ZIP to link photos.`,4000);
+        showToast(`[OK] CSV loaded. Upload your ZIP to link photos.`,4000);
     } else if (isProjectLoaded) {
-        showToast(`✅ Project loaded. Re-upload your ZIP to restore photos.`,5000);
+        showToast(`[OK] Project loaded. Re-upload your ZIP to restore photos.`,5000);
         // Show the reload banner if any window has photo refs
         const hasPhotoRefs = Object.values(inspectionData).some(drop =>
             Object.values(drop).some(floor =>
@@ -1490,10 +1567,10 @@ async function handleFiles(files, forcedType=null) {
     
     updatePhotoStat();
 
-    // Always refresh dashboard if visible — covers ZIP-then-CSV and CSV-then-ZIP workflows
+    // Always refresh dashboard if visible ? covers ZIP-then-CSV and CSV-then-ZIP workflows
     if (Object.keys(inspectionData).length>0) {
         if (isProjectLoaded) {
-            // JSON project file loaded — show dashboard directly
+            // JSON project file loaded ? show dashboard directly
             document.getElementById('project-name').innerText = 'Project: ' + projectInfo;
             document.getElementById('project-name').style.color = '#0cf';
             document.getElementById('btn-save-project').style.display = 'inline-block';
@@ -1513,7 +1590,7 @@ async function handleFiles(files, forcedType=null) {
         } else if (newCsvAdded) {
             if (rowsParsed>0) {
                 document.getElementById('btn-start-mapping').style.display='block';
-            } else { showToast('⚠️ File read but no valid Strata data found.',6000,true); }
+            } else { showToast('[WARN] File read but no valid Strata data found.',6000,true); }
         }
     }
 
@@ -1521,38 +1598,38 @@ async function handleFiles(files, forcedType=null) {
     ['csvInput','mediaInput','folderInput'].forEach(id=>{document.getElementById(id).value='';});
 }
 
-// ═══════════════════════════════════════════════════════
+// =======================================================
 // BRACKET ZIPLINE ENGINE
-// ═══════════════════════════════════════════════════════
+// =======================================================
 /*
  * THE BRACKET RULE
- * ─────────────────
+ * -----------------
  * The tech stamps the time for window N, THEN takes photos.
  * So photo timestamps always satisfy:
  *
- *   stamp[n]  ≤  photo.time  <  stamp[n+1]
+ *   stamp[n]  ?  photo.time  <  stamp[n+1]
  *
  * For the LAST node in a drop, the upper bound is end-of-day (86400s).
  *
  * MISSING STAMPS ('--')
- * ──────────────────────
+ * ----------------------
  * If a node has no timestamp, it cannot define a bracket.
- * Its slot is skipped — photos that would have fallen there
+ * Its slot is skipped ? photos that would have fallen there
  * are absorbed into the previous node's bracket, which simply
  * extends further (matching the real-world situation where
  * the tech forgot to stamp and just kept shooting).
  *
  * SYNC PHOTO
- * ───────────
- * Taken before stamp[0]. Falls before all brackets → no match → ignored.
+ * -----------
+ * Taken before stamp[0]. Falls before all brackets -> no match -> ignored.
  *
  * MULTIPLE PHOTOS PER BRACKET
- * ────────────────────────────
+ * ----------------------------
  * All IR photos whose timestamp falls within a bracket are appended
  * to node.photos[]. The modal shows them all as a scrollable gallery.
  *
  * CAMERA CLOCK OFFSET
- * ────────────────────
+ * --------------------
  * The camera clock may differ from the phone clock (which drives the
  * CSV timestamps). We calculate a global offset per drop as:
  *
@@ -1563,7 +1640,7 @@ async function handleFiles(files, forcedType=null) {
  * bracket matching.
  *
  * DC-ONLY FILES
- * ─────────────
+ * -------------
  * Ignored by the engine. DC is always extracted from the IR file.
  * A DC-only file means the camera was in Mode 2 but the toggle will
  * still work because the IR file contains the embedded DC.
@@ -1574,7 +1651,7 @@ function runBracketZipline() {
     let totalLinked = 0;
 
     Object.keys(inspectionData).forEach(drop => {
-        // ── 1. Build time-ordered list of stamped nodes ──────────
+        // -- 1. Build time-ordered list of stamped nodes ----------
         // node.times[] holds all stamps for a node (duplicate stamps allowed).
         // Each stamp creates its own bracket entry pointing to the same node,
         // so photos taken after any re-stamp still link to the correct window.
@@ -1601,7 +1678,7 @@ function runBracketZipline() {
                         }
                     });
             });
-        // Sort the combined list by timeSec (nulls treated as "very early" → before all brackets)
+        // Sort the combined list by timeSec (nulls treated as "very early" -> before all brackets)
         allNodes.sort((a,b) => {
             if (a.timeSec === null && b.timeSec === null) return 0;
             if (a.timeSec === null) return -1;
@@ -1611,7 +1688,7 @@ function runBracketZipline() {
 
         if (!allNodes.length) return;
 
-        // ── 2. Collect all IR images for this drop ───────────────
+        // -- 2. Collect all IR images for this drop ---------------
         // imageBank contains only IR files. Images with no EXIF timestamp (time=null)
         // cannot be bracket-matched and are excluded from auto-linking.
         const images = Object.keys(imageBank)
@@ -1621,14 +1698,14 @@ function runBracketZipline() {
 
         if (!images.length) return;
 
-        // ── 3. Build bracket list from stamped nodes only ────────
+        // -- 3. Build bracket list from stamped nodes only --------
         // A bracket is [startSec, endSec) with the node it belongs to.
         // We walk allNodes and collect only those with a timestamp.
         // The bracket for node[i] ends at the timestamp of node[i+1]
         // (the next stamped node), or 86400 for the last.
         const brackets = [];
         for (let i = 0; i < allNodes.length; i++) {
-            if (allNodes[i].timeSec === null) continue; // no stamp → skip
+            if (allNodes[i].timeSec === null) continue; // no stamp -> skip
 
             // Find the next stamped node's time as the upper bound
             let endSec = 86400;
@@ -1643,14 +1720,14 @@ function runBracketZipline() {
 
         if (!brackets.length) return;
 
-        // ── 4. Find camera clock offset vs phone clock ───────────
+        // -- 4. Find camera clock offset vs phone clock -----------
         //
-        // Search ±30 minutes in 5-second steps first (realistic drift).
-        // Only widen to ±6 hours if zero matches found (wrong timezone).
-        // This prevents the false-positive wrapping bug where ±6hr brute
+        // Search ?30 minutes in 5-second steps first (realistic drift).
+        // Only widen to ?6 hours if zero matches found (wrong timezone).
+        // This prevents the false-positive wrapping bug where ?6hr brute
         // force finds a spurious match at the search boundary.
 
-        // Identify sync photos by their raw time — photos taken before the
+        // Identify sync photos by their raw time ? photos taken before the
         // first stamp are sync shots and must not influence offset selection.
         // We use the raw time at offset=0 to flag them: any photo whose
         // time falls before brackets[0].start is a sync photo candidate.
@@ -1699,12 +1776,12 @@ function runBracketZipline() {
         const offset = bestOffset;
         console.log(`[Zipline] Drop ${drop}: ${images.length} photos, ${brackets.length} brackets, offset=${offset}s (${(offset/60).toFixed(1)}min), matches=${bestMatches}/${images.length}`);
 
-        // ── 5. Clear existing Zipline assignments for this drop ──
+        // -- 5. Clear existing Zipline assignments for this drop --
         // This prevents double-linking when photos are re-uploaded.
         // Manual links are preserved.
         allNodes.forEach(({node}) => { node.photos = []; });
 
-        // ── 6. Bracket-match every IR image ─────────────────────
+        // -- 6. Bracket-match every IR image ---------------------
         images.forEach(img => {
             // Adjust for camera clock offset
             let t = img.time - offset;
@@ -1712,8 +1789,8 @@ function runBracketZipline() {
             if (t >= 86400) t -= 86400;
 
             // Find the bracket that contains this adjusted time
-            // bracket.start ≤ t < bracket.end
-            // If t < brackets[0].start it's the sync photo → skip
+            // bracket.start ? t < bracket.end
+            // If t < brackets[0].start it's the sync photo -> skip
             for (const bracket of brackets) {
                 if (t >= bracket.start && t < bracket.end) {
                     if (!bracket.node.photos) bracket.node.photos = [];
@@ -1722,16 +1799,16 @@ function runBracketZipline() {
                     break;
                 }
             }
-            // If no bracket matched: sync photo or out-of-range → silently ignored
+            // If no bracket matched: sync photo or out-of-range -> silently ignored
         });
     });
 
     return totalLinked;
 }
 
-// ═══════════════════════════════════════════════════════
+// =======================================================
 // CSV PARSER
-// ═══════════════════════════════════════════════════════
+// =======================================================
 function parseCSV(text) {
     const rows=text.trim().split(/\r\n|\n|\r/);
     let valid=0;
@@ -1822,19 +1899,23 @@ function parseCSV(text) {
     return valid;
 }
 
-// ═══════════════════════════════════════════════════════
+// =======================================================
 // DRAG-DROP
-// ═══════════════════════════════════════════════════════
+// =======================================================
 function initGlobalDragDrop() {
     document.body.addEventListener('dragover',e=>e.preventDefault());
     document.body.addEventListener('drop',async e=>{
         e.preventDefault();
         if (!e.dataTransfer.files.length) return;
-        // Detect type from first file — don't force 'media' for JSON/CSV
+        // Detect type from first file ? don't force 'media' for JSON/CSV
         const firstName = (e.dataTransfer.files[0].name||'').toLowerCase();
-        const forceType = firstName.endsWith('.json') ? 'json'
-                        : firstName.endsWith('.csv')  ? 'csv'
-                        : 'media';
+        if (firstName.endsWith('.json')) {
+            // Use dedicated project loader for JSON files
+            const fakeInput = { files: e.dataTransfer.files, value: '' };
+            loadProjectFile({ files: e.dataTransfer.files, value: '' });
+            return;
+        }
+        const forceType = firstName.endsWith('.csv') ? 'csv' : 'media';
         await handleFiles(e.dataTransfer.files, forceType);
         if (modalNodeId&&document.getElementById('info-modal').style.display==='flex') openModal(modalNodeId);
     });
@@ -1882,10 +1963,10 @@ function manualAssignLatest(nodeId) {
     openModal(nodeId);
 }
 
-// ═══════════════════════════════════════════════════════
+// =======================================================
 // STATS
-// ═══════════════════════════════════════════════════════
-// ── Bulk status change ───────────────────────────────────────
+// =======================================================
+// -- Bulk status change ---------------------------------------
 function toggleBulkSelect() {
     bulkSelectMode = !bulkSelectMode;
     bulkSelected.clear();
@@ -1915,7 +1996,7 @@ function bulkChangeStatus(status) {
     if (!bulkSelected.size) { showToast('No windows selected.', 2000, true); return; }
     const label = status === 'status-clear' ? 'Clear' : status === 'status-flagged' ? 'Flagged' : 'Defect';
     showConfirm(
-        `☑ Bulk status change`,
+        `? Bulk status change`,
         `Mark ${bulkSelected.size} selected window${bulkSelected.size>1?'s':''} as ${label}?`,
         'APPLY',
         () => {
@@ -1926,15 +2007,15 @@ function bulkChangeStatus(status) {
             saveCommandState();
             calculateBuildingGeometry();
             refreshCurrentView();
-            showToast(`✅ ${bulkSelected.size} windows marked as ${label}`, 3000);
+            showToast(`[OK] ${bulkSelected.size} windows marked as ${label}`, 3000);
             toggleBulkSelect();
         }
     );
 }
 
-// ── Duplicate photo detector ─────────────────────────────────
+// -- Duplicate photo detector ---------------------------------
 function detectDuplicatePhotos() {
-    const seen   = {};   // photoName → first nodeId that claimed it
+    const seen   = {};   // photoName -> first nodeId that claimed it
     const dupes  = [];   // { photo, nodes: [nodeId, ...] }
 
     Object.keys(inspectionData).forEach(drop => {
@@ -1944,7 +2025,7 @@ function detectDuplicatePhotos() {
                 const names = nodePhotoNames(node);
                 names.forEach(name => {
                     if (seen[name]) {
-                        // Already seen — it's a duplicate
+                        // Already seen ? it's a duplicate
                         const existing = dupes.find(d => d.photo === name);
                         if (existing) {
                             if (!existing.nodes.includes(node.id)) existing.nodes.push(node.id);
@@ -1960,18 +2041,18 @@ function detectDuplicatePhotos() {
     });
 
     if (dupes.length === 0) {
-        showToast('✅ No duplicate photos found.', 3000);
+        showToast('[OK] No duplicate photos found.', 3000);
         return;
     }
 
     // Show results in a toast-style panel
     const msg = dupes.slice(0, 5).map(d =>
-        `${d.photo.split('_').pop()} → ${d.nodes.join(' & ')}`
+        `${d.photo.split('_').pop()} -> ${d.nodes.join(' & ')}`
     ).join('
 ');
     const extra = dupes.length > 5 ? `
-…and ${dupes.length - 5} more` : '';
-    showToast(`⚠️ ${dupes.length} duplicate photo${dupes.length>1?'s':''} found:
+?and ${dupes.length - 5} more` : '';
+    showToast(`[WARN] ${dupes.length} duplicate photo${dupes.length>1?'s':''} found:
 ${msg}${extra}`, 8000, true);
 }
 
@@ -2011,9 +2092,9 @@ function calculateBuildingGeometry() {
     render3DHotspots();
 }
 
-// ═══════════════════════════════════════════════════════
+// =======================================================
 // FILTER / STITCH / VIEWS
-// ═══════════════════════════════════════════════════════
+// =======================================================
 function setFilter(f) {
     activeFilter=(activeFilter===f&&f!=='ALL')?'ALL':f;
     ['all','clear','flagged','confirmed'].forEach(k=>{
@@ -2029,20 +2110,20 @@ function toggleStitchMode() {
     isStitchMode=!isStitchMode;
     document.querySelectorAll('.stitch-toggle').forEach(b=>b.classList.toggle('stitch-mode-on',isStitchMode));
     stitchSelection=[];
-    if (isStitchMode) showToast('🔗 STITCH MODE ACTIVE — click the right window then the left window to join them.');
+    if (isStitchMode) showToast('? STITCH MODE ACTIVE ? click the right window then the left window to join them.');
     if (currentMode==='2d') refreshCurrentView();
 }
 
-// ═══════════════════════════════════════════════════════
+// =======================================================
 // PHOTO MOVE MODE
-// ═══════════════════════════════════════════════════════
+// =======================================================
 function startPhotoMove(photoName, fromNodeId) {
     photoMoveMode = { photoName, fromNodeId };
     closeModal();
     const banner = document.getElementById('photo-move-banner');
     const fname = photoName.split('_').slice(1).join('_') || photoName; // strip drop prefix for display
     document.getElementById('photo-move-text').innerText =
-        `📷 Moving ${fname} — tap the correct window`;
+        `[CAM] Moving ${fname} ? tap the correct window`;
     banner.style.display = 'block';
 }
 
@@ -2096,7 +2177,7 @@ document.addEventListener('keydown', e => {
         if (modalOpen)     { closeModal(); return; }
     }
 
-    // Arrow keys in modal — navigate windows
+    // Arrow keys in modal ? navigate windows
     if (modalOpen && !lightboxOpen) {
         if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
             e.preventDefault(); modalNavigate(1); return;
@@ -2106,7 +2187,7 @@ document.addEventListener('keydown', e => {
         }
     }
 
-    // Arrow keys in lightbox — navigate photos
+    // Arrow keys in lightbox ? navigate photos
     if (lightboxOpen) {
         if (e.key === 'ArrowRight') { e.preventDefault(); changeLightbox(1); return; }
         if (e.key === 'ArrowLeft')  { e.preventDefault(); changeLightbox(-1); return; }
@@ -2139,7 +2220,7 @@ function handleNodeClick(data,el) {
     if (isStitchMode) {
         const idx=stitchedPairs.findIndex(p=>p.includes(data.id));
         if (idx!==-1) {
-            showConfirm('✂️ Un-stitch windows?','These two windows will be separated back into individual nodes.','UN-STITCH',()=>{
+            showConfirm('?? Un-stitch windows?','These two windows will be separated back into individual nodes.','UN-STITCH',()=>{
                 stitchedPairs.splice(idx,1);stitchSelection=[];isStitchMode=false;
                 document.querySelectorAll('.stitch-toggle').forEach(b=>b.classList.remove('stitch-mode-on'));
                 calculateBuildingGeometry();saveCommandState();
@@ -2180,12 +2261,12 @@ function switchView(mode) {
     document.getElementById('arena-true3d').style.display   = mode==='true3d' ? 'block' : 'none';
     document.getElementById('tabs-container').style.display = mode==='2d'     ? 'flex'  : 'none';
 
-    // Stats bar + stitch — only relevant in 2D tabs
+    // Stats bar + stitch ? only relevant in 2D tabs
     const statsBar = document.querySelector('.stats-bar');
     if (statsBar) statsBar.style.display = mode==='2d' ? 'flex' : 'none';
     document.querySelectorAll('.stitch-toggle').forEach(b => b.style.display = mode==='2d' ? '' : 'none');
 
-    // 3D tag menu — only relevant in true3d
+    // 3D tag menu ? only relevant in true3d
     const tagBtn = document.getElementById('btn-tag3d-main');
     if (tagBtn) tagBtn.style.display = mode==='true3d' ? '' : 'none';
 
@@ -2259,8 +2340,8 @@ function generateWallDOM(elevName) {
                     if (names.length>0||data.flirIR) {
                         const badge=document.createElement('div');
                         badge.className='photo-badge'+(names.length===0?' missing':'');
-                        badge.innerText=names.length>0?`📷 ${names.length}`:'📷 ?';
-                        badge.title=names.length>0?`${names.length} photo(s) linked`:'Reference exists — re-upload ZIP';
+                        badge.innerText=names.length>0?`[CAM] ${names.length}`:'[CAM] ?';
+                        badge.title=names.length>0?`${names.length} photo(s) linked`:'Reference exists ? re-upload ZIP';
                         node.appendChild(badge);
                     }
 
@@ -2278,9 +2359,9 @@ function generateWallDOM(elevName) {
     return frag;
 }
 
-// ═══════════════════════════════════════════════════════
+// =======================================================
 // MODAL
-// ═══════════════════════════════════════════════════════
+// =======================================================
 function buildPhotoArea(nodes) {
     const area=document.getElementById('m-photo-area');
     area.innerHTML='';
@@ -2306,7 +2387,7 @@ function buildPhotoArea(nodes) {
 
             const wrap=document.createElement('div');wrap.className='photo-entry';
 
-            // Image element — declared FIRST so pill.onclick can safely reference it
+            // Image element ? declared FIRST so pill.onclick can safely reference it
             const vw=document.createElement('div');vw.className='photo-viewer-wrap';
             const img=document.createElement('img');
             img.src=photoViewState[irName]==='dc'&&hasDC?entry.dcUrl:entry.url;
@@ -2322,12 +2403,12 @@ function buildPhotoArea(nodes) {
                 }
             };
 
-            // Toggle bar — references img which is now already declared above
+            // Toggle bar ? references img which is now already declared above
             const bar=document.createElement('div');bar.className='photo-toggle-bar';
             const nl=document.createElement('div');nl.className='photo-name-label';nl.innerText=irName;
             const pill=document.createElement('div');
             pill.className=`toggle-pill${hasDC?'':' no-dc'}${photoViewState[irName]==='dc'?' showing-dc':''}`;
-            pill.innerHTML='<span class="pill-ir">🌡 IR</span><span class="pill-dc">📷 DC</span>';
+            pill.innerHTML='<span class="pill-ir">? IR</span><span class="pill-dc">[CAM] DC</span>';
             pill.title=hasDC?'Toggle IR / DC view':'DC not available for this file';
 
             // Use IIFE to freeze irName, entry, pill, img per iteration
@@ -2342,10 +2423,10 @@ function buildPhotoArea(nodes) {
                 };
             })(irName, entry, pill, img);
 
-            // Move button — lets manager reassign this photo to a different window
+            // Move button ? lets manager reassign this photo to a different window
             const moveBtn = document.createElement('button');
             moveBtn.className = 'photo-move-btn';
-            moveBtn.innerText = '↗ Move';
+            moveBtn.innerText = '? Move';
             moveBtn.title = 'Reassign this photo to a different window';
             moveBtn.onclick = (function(name, fromId) {
                 return function(e) {
@@ -2354,17 +2435,17 @@ function buildPhotoArea(nodes) {
                 };
             })(irName, nodes[0]?.id);
 
-            // Remove button — unlinks this photo from the window entirely
+            // Remove button ? unlinks this photo from the window entirely
             const removeBtn = document.createElement('button');
             removeBtn.className = 'photo-move-btn';
             removeBtn.style.cssText = 'padding:3px 10px;font-size:0.7rem;font-weight:bold;background:#1a0a0a;color:#e74c3c;border:1px solid #e74c3c;border-radius:4px;cursor:pointer;margin-left:4px;text-transform:uppercase;letter-spacing:0.5px;';
-            removeBtn.innerText = '🗑 Remove';
+            removeBtn.innerText = '? Remove';
             removeBtn.title = 'Remove this photo from this window (does not delete the file)';
             removeBtn.onclick = (function(name, nodeIds) {
                 return function(e) {
                     e.stopPropagation();
                     showConfirm(
-                        '🗑 Remove photo?',
+                        '? Remove photo?',
                         `Remove ${name.split('_').pop()} from this window? The photo stays in memory and can be manually re-assigned.`,
                         'REMOVE',
                         () => {
@@ -2385,13 +2466,13 @@ function buildPhotoArea(nodes) {
                 };
             })(irName, nodes.map(n => n?.id).filter(Boolean));
 
-            // Rotation button — fix portrait/landscape mismatch
+            // Rotation button ? fix portrait/landscape mismatch
             const rotBtn = document.createElement('button');
             rotBtn.className = 'photo-move-btn';
             rotBtn.style.cssText = 'padding:3px 8px;font-size:0.7rem;font-weight:bold;background:#1a1a0a;color:#f1c40f;border:1px solid #f1c40f44;border-radius:4px;cursor:pointer;margin-left:4px;';
             const curRot = photoRotations[irName] || 0;
-            rotBtn.innerText = '↻';
-            rotBtn.title = `Rotate image (currently ${curRot}°)`;
+            rotBtn.innerText = 'rotate';
+            rotBtn.title = `Rotate image (currently ${curRot}?)`;
             rotBtn.onclick = (function(name) {
                 return function(e) {
                     e.stopPropagation();
@@ -2401,13 +2482,13 @@ function buildPhotoArea(nodes) {
                     imgs.forEach(i => {
                         i.style.transform = photoRotations[name] ? `rotate(${photoRotations[name]}deg)` : '';
                     });
-                    rotBtn.title = `Rotate image (currently ${photoRotations[name]}°)`;
+                    rotBtn.title = `Rotate image (currently ${photoRotations[name]}?)`;
                 };
             })(irName);
 
             bar.appendChild(nl);bar.appendChild(pill);bar.appendChild(moveBtn);bar.appendChild(removeBtn);bar.appendChild(rotBtn);wrap.appendChild(bar);
 
-            // Click image → lightbox, opening at the current IR/DC state
+            // Click image -> lightbox, opening at the current IR/DC state
             img.onclick=(function(name, ent){
                 return function() {
                     const allNames=nodes.flatMap(n=>n?nodePhotoNames(n):[]);
@@ -2435,7 +2516,7 @@ function buildPhotoArea(nodes) {
 
     // Manual drop slot
     const slot=document.createElement('div');slot.className='drop-slot';
-    slot.innerHTML='<span>🌡</span><span>Drop or click to manually add an IR photo</span>';
+    slot.innerHTML='<span>?</span><span>Drop or click to manually add an IR photo</span>';
     setupDropSlot(slot, nodes[0]?.id);
     area.appendChild(slot);
 }
@@ -2480,17 +2561,17 @@ function addToRepairPlanner(nodeId) {
         <div style="display:flex;gap:6px;margin-bottom:12px;">
             <button onclick="rpPickPri(this,'HIGH')" data-pri="HIGH"
                 style="flex:1;padding:7px;font-size:0.8rem;font-weight:bold;border-radius:4px;border:1px solid #d9534f;background:transparent;color:#d9534f;cursor:pointer;">
-                🔴 HIGH</button>
+                ? HIGH</button>
             <button onclick="rpPickPri(this,'MED')" data-pri="MED"
                 style="flex:1;padding:7px;font-size:0.8rem;font-weight:bold;border-radius:4px;border:1px solid #f1c40f;background:transparent;color:#f1c40f;cursor:pointer;">
-                🟡 MED</button>
+                ? MED</button>
             <button onclick="rpPickPri(this,'LOW')" data-pri="LOW"
                 style="flex:1;padding:7px;font-size:0.8rem;font-weight:bold;border-radius:4px;border:1px solid #28a745;background:transparent;color:#28a745;cursor:pointer;">
-                🟢 LOW</button>
+                ? LOW</button>
         </div>
         <button onclick="rpConfirmAdd('${nodeId}')"
             style="width:100%;padding:10px;background:#f39c12;color:#000;border:none;border-radius:6px;font-weight:bold;font-size:0.9rem;cursor:pointer;">
-            ✅ ADD TO REPAIR PLANNER</button>`;
+            [OK] ADD TO REPAIR PLANNER</button>`;
 
     // Insert before the stale banner
     const stale = document.getElementById('m-stale-banner');
@@ -2582,14 +2663,14 @@ function rpConfirmAdd(nodeId) {
     saveCommandState();
     updatePlannerBtn(nodeId);
     if (currentMode==='2d') refreshCurrentView();
-    showToast(`✅ ${nodeId} added to Repair Planner`, 3000);
+    showToast(`[OK] ${nodeId} added to Repair Planner`, 3000);
 }
 
 function updatePlannerBtn(nodeId) {
     const btn = document.getElementById('btn-add-planner');
     if (!btn) return;
     const inPlanner = !!repairPriorities[nodeId];
-    btn.innerText = inPlanner ? '✅ IN REPAIR PLANNER (tap to remove)' : '🔧 ADD TO REPAIR PLANNER';
+    btn.innerText = inPlanner ? '[OK] IN REPAIR PLANNER (tap to remove)' : '[FIX] ADD TO REPAIR PLANNER';
     btn.style.borderColor = inPlanner ? '#28a745' : '#f39c12';
     btn.style.color       = inPlanner ? '#28a745' : '#f39c12';
 
@@ -2604,7 +2685,7 @@ function updatePlannerBtn(nodeId) {
             btn.parentNode.insertBefore(fixBtn, btn.nextSibling);
         }
         const isFixed = !!repairFixed[nodeId];
-        fixBtn.innerText  = isFixed ? '↩ Mark as Unfixed' : '✅ Mark as Fixed';
+        fixBtn.innerText  = isFixed ? '? Mark as Unfixed' : '[OK] Mark as Fixed';
         fixBtn.style.borderColor = isFixed ? '#555' : '#28a745';
         fixBtn.style.color       = isFixed ? '#555' : '#28a745';
         fixBtn.style.background  = isFixed ? '#0a1a0a' : 'transparent';
@@ -2633,14 +2714,14 @@ function updatePlannerBadge() {
     if (!badge) return;
     if (total > 0) {
         badge.style.display = 'inline';
-        badge.innerText = fixed > 0 ? `${active} / ${fixed}✓` : `${total}`;
+        badge.innerText = fixed > 0 ? `${active} / ${fixed}?` : `${total}`;
         badge.title = `${active} pending, ${fixed} fixed`;
     } else {
         badge.style.display = 'none';
     }
 }
 
-// ── Modal navigation ────────────────────────────────────────────
+// -- Modal navigation --------------------------------------------
 function buildModalNavSequence(nodeId) {
     const parts = nodeId.split('-');
     const drop  = parts[0];
@@ -2686,7 +2767,7 @@ function updateModalNav(nodeId) {
     navBar.style.display = 'flex';
     const idx = modalNavSequence.indexOf(nodeId);
     const drop = nodeId.split('-')[0];
-    posEl.innerText = `Drop ${drop}  ·  ${idx + 1} of ${modalNavSequence.length}`;
+    posEl.innerText = `Drop ${drop}  ?  ${idx + 1} of ${modalNavSequence.length}`;
 
     prevBtn.disabled = idx <= 0;
     prevBtn.style.opacity = idx <= 0 ? '0.3' : '1';
@@ -2694,7 +2775,7 @@ function updateModalNav(nodeId) {
 
     // Check if this is the last window
     const isLast = idx >= modalNavSequence.length - 1;
-    nextBtn.innerText = isLast ? '✓ END' : '▶';
+    nextBtn.innerText = isLast ? '? END' : '?';
     nextBtn.style.background = isLast ? '#0a1a0a' : '#1a1d27';
     nextBtn.style.borderColor = isLast ? '#28a745' : '#0cf';
     nextBtn.style.color = isLast ? '#28a745' : '#0cf';
@@ -2779,15 +2860,15 @@ function openModal(nodeId) {
     updateModalNav(nodeId);
 }
 
-function unmergeCurrent(){if(activeNodeDataArray[0]){const idx=stitchedPairs.findIndex(p=>p.includes(activeNodeDataArray[0].id));if(idx!==-1){showConfirm('✂️ Un-stitch windows?','These two windows will be separated back into individual nodes.','UN-STITCH',()=>{stitchedPairs.splice(idx,1);closeModal();calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();});}}}
+function unmergeCurrent(){if(activeNodeDataArray[0]){const idx=stitchedPairs.findIndex(p=>p.includes(activeNodeDataArray[0].id));if(idx!==-1){showConfirm('?? Un-stitch windows?','These two windows will be separated back into individual nodes.','UN-STITCH',()=>{stitchedPairs.splice(idx,1);closeModal();calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();});}}}
 function changeStatus(s){const note=document.getElementById('m-notes').value;activeNodeDataArray.forEach(d=>{if(d){d.notes=note;d.status=s;}});calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();closeModal();}
 function saveNotesOnly(){const note=document.getElementById('m-notes').value;activeNodeDataArray.forEach(d=>{if(d)d.notes=note;});calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();closeModal();}
-function unpinCurrent(){showConfirm('🗑️ Remove 3D pin?','The window data stays safe — only the pin position on the 3D model is removed.','REMOVE PIN',()=>{activeNodeDataArray.forEach(d=>{if(d&&saved3DTags[d.id])delete saved3DTags[d.id];});render3DHotspots();saveCommandState();closeModal();});}
+function unpinCurrent(){showConfirm('?? Remove 3D pin?','The window data stays safe ? only the pin position on the 3D model is removed.','REMOVE PIN',()=>{activeNodeDataArray.forEach(d=>{if(d&&saved3DTags[d.id])delete saved3DTags[d.id];});render3DHotspots();saveCommandState();closeModal();});}
 function closeModal(){document.getElementById('info-modal').style.display='none';activeNodeDataArray=[];modalNodeId=null;}
 
-// ═══════════════════════════════════════════════════════
+// =======================================================
 // REPAIR PLANNER
-// ═══════════════════════════════════════════════════════
+// =======================================================
 const DEFECT_CATEGORIES = [
     'Sealant / Caulking',
     'Spalling',
@@ -2863,13 +2944,13 @@ function rpGetDefectCategories(node) {
 function toggleRepairFixed(nodeId, btn) {
     if (repairFixed[nodeId]) {
         delete repairFixed[nodeId];
-        btn.innerText = '✅ Mark as Fixed';
+        btn.innerText = '[OK] Mark as Fixed';
         btn.style.borderColor = '#28a745';
         btn.style.color = '#28a745';
         btn.style.background = 'transparent';
     } else {
         repairFixed[nodeId] = true;
-        btn.innerText = '↩ Mark as Unfixed';
+        btn.innerText = '? Mark as Unfixed';
         btn.style.borderColor = '#555';
         btn.style.color = '#555';
         btn.style.background = 'transparent';
@@ -2928,7 +3009,7 @@ function rpOpenInlineEdit(nodeId, cardEl) {
         <div style="display:flex;gap:6px;">
             <button onclick="rpEditSave('${nodeId}',this.closest('.rp-inline-editor'))"
                 style="flex:1;padding:8px;background:#f39c12;color:#000;border:none;border-radius:4px;font-weight:bold;cursor:pointer;font-size:0.8rem;">
-                ✅ SAVE</button>
+                [OK] SAVE</button>
             <button onclick="this.closest('.rp-inline-editor').remove()"
                 style="padding:8px 14px;background:#222;color:#888;border:1px solid #444;border-radius:4px;cursor:pointer;font-size:0.8rem;">
                 CANCEL</button>
@@ -3009,7 +3090,7 @@ function rpEditSave(nodeId, editorEl) {
     editorEl.remove();
     saveCommandState();
     renderRepairPlanner();
-    showToast(`✅ ${nodeId} updated`, 2000);
+    showToast(`[OK] ${nodeId} updated`, 2000);
 }
 
 function rpAddCustomTag(nodeId) {
@@ -3024,9 +3105,9 @@ function rpAddCustomTag(nodeId) {
     renderRepairPlanner();
 }
 
-// ═══════════════════════════════════════════════════════
+// =======================================================
 // PHOTO SUGGESTION ENGINE
-// ═══════════════════════════════════════════════════════
+// =======================================================
 function runPhotoSuggestion() {
     if (!modalNodeId) return;
     const parts = modalNodeId.split('-');
@@ -3038,12 +3119,12 @@ function runPhotoSuggestion() {
     result.style.display = 'block';
     result.innerHTML = '<div style="color:#888;font-size:0.85rem;">Analysing drop...</div>';
 
-    // ── 1. Build ordered photo list for this drop ─────────────────
+    // -- 1. Build ordered photo list for this drop -----------------
     // Get all images in imageBank for this drop, sorted by filename (numeric)
     const dropImages = Object.keys(imageBank)
         .filter(k => imageBank[k].drop === drop)
         .sort((a, b) => {
-            // Extract numeric part of filename for sort: H_FLIR0481 → 481
+            // Extract numeric part of filename for sort: H_FLIR0481 -> 481
             const numA = parseInt(a.replace(/\D/g, '')) || 0;
             const numB = parseInt(b.replace(/\D/g, '')) || 0;
             return numA - numB;
@@ -3054,7 +3135,7 @@ function runPhotoSuggestion() {
         return;
     }
 
-    // ── 2. Calculate average photos per window for this drop ──────
+    // -- 2. Calculate average photos per window for this drop ------
     const dropData = inspectionData[drop] || {};
     let totalPhotos = 0, totalWindows = 0, windowPhotoMap = {};
 
@@ -3070,18 +3151,18 @@ function runPhotoSuggestion() {
 
     const avg = totalWindows > 0 ? totalPhotos / totalWindows : 0;
 
-    // ── 3. Find neighboring windows with excess photos ────────────
+    // -- 3. Find neighboring windows with excess photos ------------
     // Priority order for donor search:
-    //   1. Same floor, prev position (L→C→R left of me, same floor)
+    //   1. Same floor, prev position (L->C->R left of me, same floor)
     //   2. Same floor, next position (right of me, same floor)
     //   3. Flat sequence prev (cross-floor)
     //   4. Flat sequence next (cross-floor)
-    // Expand search to ±3 in sequence to handle multiple missed stamps
+    // Expand search to ?3 in sequence to handle multiple missed stamps
 
     const posOrder = ['L','C','R'];
     const floors = Object.keys(dropData).map(Number).sort((a,b) => b-a);
 
-    // Build full ordered sequence of windows for this drop (top→bottom, L→C→R)
+    // Build full ordered sequence of windows for this drop (top->bottom, L->C->R)
     const windowSequence = [];
     floors.forEach(f => {
         posOrder.forEach(p => {
@@ -3095,7 +3176,7 @@ function runPhotoSuggestion() {
         return;
     }
 
-    // Build candidate list — same-floor neighbors first, then cross-floor up to ±3
+    // Build candidate list ? same-floor neighbors first, then cross-floor up to ?3
     const candidateNodes = [];
 
     // Same-floor neighbors (left and right positions on same floor)
@@ -3107,7 +3188,7 @@ function runPhotoSuggestion() {
         candidateNodes.push({ node: dropData[floor][posOrder[posIdx+1]], samFloor: true, dir: 'next' });
     }
 
-    // Cross-floor neighbors — up to ±3 in flat sequence
+    // Cross-floor neighbors ? up to ?3 in flat sequence
     for (let offset = 1; offset <= 3; offset++) {
         if (myIdx - offset >= 0) {
             const n = windowSequence[myIdx - offset];
@@ -3149,7 +3230,7 @@ function runPhotoSuggestion() {
         return numA - numB;
     });
 
-    // ── 5. Find split point using time gaps ───────────────────────
+    // -- 5. Find split point using time gaps -----------------------
     const photoTimes = donorPhotos.map(name => ({
         name,
         time: imageBank[name]?.time ?? null
@@ -3159,8 +3240,8 @@ function runPhotoSuggestion() {
     let maxGap   = 0;
 
     // splitIsAfter: are we AFTER the donor in descent sequence?
-    // If yes → our photos are the TAIL of donor's set (higher filename numbers)
-    // If no  → our photos are the HEAD of donor's set (lower filename numbers)
+    // If yes -> our photos are the TAIL of donor's set (higher filename numbers)
+    // If no  -> our photos are the HEAD of donor's set (lower filename numbers)
     const splitIsAfter = myIdx > donorIdx;
 
     if (photoTimes.every(p => p.time !== null)) {
@@ -3182,10 +3263,10 @@ function runPhotoSuggestion() {
         maxGap = null;
     }
 
-    // ── 6. Build interactive split picker ────────────────────────
+    // -- 6. Build interactive split picker ------------------------
     // Show ALL donor photos in a single row with a draggable divider.
     // The gap gives the initial split position but user can slide it.
-    // No pre-deciding direction — user sees the photos and picks the split.
+    // No pre-deciding direction ? user sees the photos and picks the split.
 
     // Initial split at the largest gap
     let currentSplit = splitIdx; // photos 0..currentSplit stay, currentSplit+1.. move
@@ -3198,7 +3279,7 @@ function runPhotoSuggestion() {
 
         const gapStr = maxGap !== null
             ? `largest gap: ${maxGap}s after photo ${splitIdx + 1}`
-            : `no timestamp data — adjust manually`;
+            : `no timestamp data ? adjust manually`;
 
         // Build thumbs HTML
         let thumbsHTML = '';
@@ -3223,7 +3304,7 @@ function runPhotoSuggestion() {
             // Divider after currentSplit
             if (i === currentSplit) {
                 thumbsHTML += `<div style="width:3px;flex-shrink:0;background:#d080ff;border-radius:2px;align-self:stretch;position:relative;cursor:col-resize;" title="Drag or tap photos to move divider">
-                    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#d080ff;color:#000;font-size:0.55rem;font-weight:bold;padding:2px 3px;border-radius:2px;white-space:nowrap;">◀ ▶</div>
+                    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#d080ff;color:#000;font-size:0.55rem;font-weight:bold;padding:2px 3px;border-radius:2px;white-space:nowrap;">? ?</div>
                 </div>`;
             }
         });
@@ -3233,10 +3314,10 @@ function runPhotoSuggestion() {
 
         splitResult.innerHTML = `
             <div style="color:#d080ff;font-size:0.8rem;font-weight:bold;margin-bottom:6px;">
-                💡 <span style="color:#0cf;">${donorNode.id}</span> has ${numDonorPhotos} photos — split for ${modalNodeId}
+                ? <span style="color:#0cf;">${donorNode.id}</span> has ${numDonorPhotos} photos ? split for ${modalNodeId}
             </div>
             <div style="color:#555;font-size:0.68rem;margin-bottom:8px;">
-                Auto-split from ${gapStr}. Tap any photo to move the divider ◀▶
+                Auto-split from ${gapStr}. Tap any photo to move the divider ??
             </div>
 
             <div style="color:#666;font-size:0.65rem;font-weight:bold;margin-bottom:4px;display:flex;justify-content:space-between;">
@@ -3252,17 +3333,17 @@ function runPhotoSuggestion() {
                 <button id="split-shift-left"
                     onclick="window._splitAdjust(window._splitIdx - 1)"
                     style="padding:8px 14px;background:#222;color:#888;border:1px solid #444;border-radius:6px;cursor:pointer;font-size:0.85rem;"
-                    ${currentSplit === 0 ? 'disabled style="opacity:0.3;cursor:default;"' : ''}>◀ Shift left</button>
+                    ${currentSplit === 0 ? 'disabled style="opacity:0.3;cursor:default;"' : ''}>? Shift left</button>
                 <button id="split-shift-right"
                     onclick="window._splitAdjust(window._splitIdx + 1)"
                     style="padding:8px 14px;background:#222;color:#888;border:1px solid #444;border-radius:6px;cursor:pointer;font-size:0.85rem;"
-                    ${currentSplit >= numDonorPhotos - 1 ? 'disabled style="opacity:0.3;cursor:default;"' : ''}>Shift right ▶</button>
+                    ${currentSplit >= numDonorPhotos - 1 ? 'disabled style="opacity:0.3;cursor:default;"' : ''}>Shift right ?</button>
                 <button onclick="window._acceptSplit()"
                     style="flex:1;padding:8px;background:#d080ff;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">
-                    ✅ Move ${moveCount} photo${moveCount!==1?'s':''} to ${modalNodeId}
+                    [OK] Move ${moveCount} photo${moveCount!==1?'s':''} to ${modalNodeId}
                 </button>
                 <button onclick="document.getElementById('suggest-result').style.display='none';delete window._splitAdjust;delete window._acceptSplit;delete window._splitIdx;"
-                    style="padding:8px 14px;background:#222;color:#888;border:1px solid #444;border-radius:6px;cursor:pointer;font-size:0.85rem;">✕</button>
+                    style="padding:8px 14px;background:#222;color:#888;border:1px solid #444;border-radius:6px;cursor:pointer;font-size:0.85rem;">?</button>
             </div>`;
     }
 
@@ -3290,7 +3371,7 @@ function runPhotoSuggestion() {
     renderSplitPicker();
 }
 
-// ── Image retry ─────────────────────────────────────────────────
+// -- Image retry -------------------------------------------------
 // Called when an image fails to display (onerror). Tries to re-extract
 // the file from the cached ZIP and re-process it into imageBank.
 async function retryLoadImage(imgKey, imgEl) {
@@ -3300,7 +3381,7 @@ async function retryLoadImage(imgKey, imgEl) {
         return;
     }
 
-    // imgKey format: 'H_FLIR0001' → drop='H', filename='FLIR0001'
+    // imgKey format: 'H_FLIR0001' -> drop='H', filename='FLIR0001'
     const parts   = imgKey.split('_');
     const drop    = parts[0];
     const clean   = parts.slice(1).join('_');
@@ -3379,14 +3460,14 @@ function acceptPhotoSuggestion(photoNames, fromNodeId, toNodeId) {
     saveCommandState();
     calculateBuildingGeometry();
     refreshCurrentView();
-    showToast(`✅ Moved ${photoNames.length} photos to ${toNodeId}`, 3000);
+    showToast(`[OK] Moved ${photoNames.length} photos to ${toNodeId}`, 3000);
     // Reopen modal to show new state
     openModal(toNodeId);
 }
 
-// ═══════════════════════════════════════════════════════
-// PINCH-TO-ZOOM — 2D grid
-// ═══════════════════════════════════════════════════════
+// =======================================================
+// PINCH-TO-ZOOM ? 2D grid
+// =======================================================
 let gridScale      = 1;
 let gridPinchStart = null;
 
@@ -3444,14 +3525,14 @@ function initPinchZoom() {
     }, { passive: true });
 }
 
-// ═══════════════════════════════════════════════════════
-// RESET  — uses custom confirm dialog (window.confirm is
+// =======================================================
+// RESET  ? uses custom confirm dialog (window.confirm is
 // silently blocked in some desktop PWA / file:// contexts)
-// ═══════════════════════════════════════════════════════
+// =======================================================
 function renderRepairPlanner() {
     updatePlannerBadge();
 
-    // ── Summary bar ──────────────────────────────────────
+    // -- Summary bar --------------------------------------
     const sumHigh  = Object.values(repairPriorities).filter(p=>p==='HIGH').length;
     const sumMed   = Object.values(repairPriorities).filter(p=>p==='MED').length;
     const sumLow   = Object.values(repairPriorities).filter(p=>p==='LOW').length;
@@ -3486,7 +3567,7 @@ function renderRepairPlanner() {
         </div>
         <div style="flex:1;background:#0a1a0a;border:1px solid #28a74588;border-radius:6px;padding:8px;text-align:center;">
             <div style="font-size:1.3rem;font-weight:900;color:#28a745;">${sumFixed}</div>
-            <div style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">✓ Fixed</div>
+            <div style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">? Fixed</div>
         </div>`;
         // Re-append the fullscreen button at the end
         if (fsBtn) sb.appendChild(fsBtn);
@@ -3495,13 +3576,13 @@ function renderRepairPlanner() {
             btn.id = 'rp-fs-btn';
             btn.className = 'btn-fullscreen';
             btn.onclick = toggleRPFullscreen;
-            btn.innerText = '⛶';
+            btn.innerText = '?';
             btn.style.cssText = 'position:static;flex-shrink:0;padding:8px 12px;font-size:0.75rem;align-self:stretch;border-radius:6px;';
             sb.appendChild(btn);
         }
     }
 
-    // ── Defect type filter chips ─────────────────────────
+    // -- Defect type filter chips -------------------------
     const usedCats = new Set();
     Object.keys(repairPriorities).forEach(nodeId => {
         (repairTags[nodeId] || ['Other']).forEach(t => usedCats.add(t));
@@ -3524,7 +3605,7 @@ function renderRepairPlanner() {
         });
     }
 
-    // ── Elevation tabs ───────────────────────────────────
+    // -- Elevation tabs -----------------------------------
     const used = new Set(Object.values(dropAssignments));
     const tabCont = document.getElementById('rp-tabs');
     if (tabCont) {
@@ -3551,7 +3632,7 @@ function renderRepairPlanner() {
 
             // Label: elevation name + counts
             if (elevTotal > 0) {
-                tab.innerHTML = `${elev} <span style="font-size:0.65rem;font-weight:normal;opacity:0.8;">${elevPending}${elevFixed > 0 ? ' · <span style=\"color:#28a745\">' + elevFixed + '✓</span>' : ''}</span>`;
+                tab.innerHTML = `${elev} <span style="font-size:0.65rem;font-weight:normal;opacity:0.8;">${elevPending}${elevFixed > 0 ? ' ? <span style=\"color:#28a745\">' + elevFixed + '?</span>' : ''}</span>`;
             } else {
                 tab.innerText = elev;
             }
@@ -3560,13 +3641,13 @@ function renderRepairPlanner() {
         });
     }
 
-    // ── Grid ─────────────────────────────────────────────
+    // -- Grid ---------------------------------------------
     const gridCont = document.getElementById('rp-grid-container');
     if (!gridCont) return;
     gridCont.innerHTML = '';
 
     if (total === 0) {
-        gridCont.innerHTML = '<div style="padding:40px;color:#444;font-size:1rem;text-align:center;">📋 No windows in Repair Planner yet.<br><br><span style="font-size:0.85rem;color:#333;">Open any window and tap<br><strong style="color:#f39c12;">+ ADD TO REPAIR PLANNER</strong></span></div>';
+        gridCont.innerHTML = '<div style="padding:40px;color:#444;font-size:1rem;text-align:center;">? No windows in Repair Planner yet.<br><br><span style="font-size:0.85rem;color:#333;">Open any window and tap<br><strong style="color:#f39c12;">+ ADD TO REPAIR PLANNER</strong></span></div>';
         return;
     }
 
@@ -3635,7 +3716,7 @@ function renderRepairPlanner() {
                                 ? `background:#0a1a0a;border:2px solid #28a745;opacity:0.6;`
                                 : `background:${defColor}33;border:2px solid ${defColor};`;
                             node.onclick = () => openModal(nodeId);
-                            node.title = isFixed ? 'FIXED — tap to view' : 'Tap to view';
+                            node.title = isFixed ? 'FIXED ? tap to view' : 'Tap to view';
 
                             // Position label
                             const lbl = document.createElement('div');
@@ -3646,7 +3727,7 @@ function renderRepairPlanner() {
                             if (isFixed) {
                                 // Show checkmark instead of priority dot
                                 const chk = document.createElement('div');
-                                chk.innerText = '✓';
+                                chk.innerText = '?';
                                 chk.style.cssText = 'font-size:0.8rem;color:#28a745;font-weight:900;';
                                 node.appendChild(chk);
                             } else {
@@ -3665,18 +3746,18 @@ function renderRepairPlanner() {
                             if (names.length > 0) {
                                 const badge = document.createElement('div');
                                 badge.className = 'photo-badge';
-                                badge.innerText = `📷 ${names.length}`;
+                                badge.innerText = `[CAM] ${names.length}`;
                                 node.appendChild(badge);
                             }
                         } else if (inPlanner && !passesDefect) {
-                            // In planner but filtered — dimmed
+                            // In planner but filtered ? dimmed
                             node.className = 'window-node status-void';
                             node.style.opacity = '0.2';
                             const lbl = document.createElement('div');
                             lbl.innerText = pos;
                             node.appendChild(lbl);
                         } else {
-                            // Not in planner — ghost placeholder
+                            // Not in planner ? ghost placeholder
                             node.className = 'window-node status-void';
                             node.style.opacity = '0.08';
                             node.style.cursor = 'default';
@@ -3703,10 +3784,10 @@ function renderRepairPlanner() {
 
 
 // silently blocked in some desktop PWA / file:// contexts)
-// ═══════════════════════════════════════════════════════
+// =======================================================
 function resetBoard(){
     showConfirm(
-        '🔄 Clear all data?',
+        '? Clear all data?',
         'This will remove all inspection data, photos and settings. This cannot be undone.',
         'CLEAR EVERYTHING',
         ()=>{
@@ -3752,7 +3833,7 @@ function resetBoard(){
 }
 
 /*
- * Non-blocking toast notification — shown as a bar at the top of the screen.
+ * Non-blocking toast notification ? shown as a bar at the top of the screen.
  * Fades out automatically after `duration` ms.
  * Works in all contexts including desktop PWA and file:// pages.
  */
@@ -3826,18 +3907,18 @@ function showConfirm(title, message, confirmLabel, onConfirm) {
     confirmBtn.focus();
 }
 
-// ═══════════════════════════════════════════════════════
+// =======================================================
 // MAPPING
-// ═══════════════════════════════════════════════════════
+// =======================================================
 function openMappingScreen(){document.getElementById('btn-start-mapping').style.display='none';document.getElementById('mapping-screen').style.display='block';renderMappingList();}
 function editMapping(){document.getElementById('dashboard-screen').style.display='none';document.getElementById('mapping-screen').style.display='block';document.getElementById('btn-save-project').style.display='none';document.getElementById('btn-edit-map').style.display='none';renderMappingList();}
 function addElevation(){const inp=document.getElementById('new-elevation-name'),val=inp.value.trim();if(val&&!elevations.includes(val)){elevations.push(val);if(elevations.length===1){activeTab=val;Object.keys(dropAssignments).forEach(d=>{if(!dropAssignments[d])dropAssignments[d]=val;});}inp.value='';saveCommandState();renderMappingList();}}
-function renderMappingList(){const list=document.getElementById('mapping-list');list.innerHTML='';const drops=Object.keys(inspectionData).sort();if(!elevations.length&&drops.length){const w=document.createElement('div');w.style='color:#f1c40f;margin-bottom:15px;font-weight:bold;';w.innerText='⚠️ Add at least one wall above.';list.appendChild(w);}drops.forEach(d=>{const row=document.createElement('div');row.className='mapping-row';row.innerHTML=`<strong style="font-size:1.2rem;color:#0cf;">DROP ${d}</strong>`;const sel=document.createElement('select');sel.onchange=e=>{dropAssignments[d]=e.target.value;saveCommandState();};if(!elevations.length){const o=document.createElement('option');o.value='';o.innerText='Awaiting Wall...';sel.appendChild(o);sel.disabled=true;}else{sel.disabled=false;elevations.forEach(elev=>{const o=document.createElement('option');o.value=elev;o.innerText=elev;if(dropAssignments[d]===elev)o.selected=true;sel.appendChild(o);});}row.appendChild(sel);list.appendChild(row);});}
-function generateDashboard(){if(!elevations.length){showToast('⚠️ Add at least one wall first.',5000,true);return;}document.getElementById('mapping-screen').style.display='none';document.getElementById('dashboard-screen').style.display='flex';document.getElementById('btn-save-project').style.display='inline-block';if(!elevations.includes(activeTab))activeTab=elevations[0];calculateBuildingGeometry();saveCommandState();updateLoadPanelVisibility();if(currentMode==='2d')refreshCurrentView();}
+function renderMappingList(){const list=document.getElementById('mapping-list');list.innerHTML='';const drops=Object.keys(inspectionData).sort();if(!elevations.length&&drops.length){const w=document.createElement('div');w.style='color:#f1c40f;margin-bottom:15px;font-weight:bold;';w.innerText='[WARN] Add at least one wall above.';list.appendChild(w);}drops.forEach(d=>{const row=document.createElement('div');row.className='mapping-row';row.innerHTML=`<strong style="font-size:1.2rem;color:#0cf;">DROP ${d}</strong>`;const sel=document.createElement('select');sel.onchange=e=>{dropAssignments[d]=e.target.value;saveCommandState();};if(!elevations.length){const o=document.createElement('option');o.value='';o.innerText='Awaiting Wall...';sel.appendChild(o);sel.disabled=true;}else{sel.disabled=false;elevations.forEach(elev=>{const o=document.createElement('option');o.value=elev;o.innerText=elev;if(dropAssignments[d]===elev)o.selected=true;sel.appendChild(o);});}row.appendChild(sel);list.appendChild(row);});}
+function generateDashboard(){if(!elevations.length){showToast('[WARN] Add at least one wall first.',5000,true);return;}document.getElementById('mapping-screen').style.display='none';document.getElementById('dashboard-screen').style.display='flex';document.getElementById('btn-save-project').style.display='inline-block';if(!elevations.includes(activeTab))activeTab=elevations[0];calculateBuildingGeometry();saveCommandState();updateLoadPanelVisibility();if(currentMode==='2d')refreshCurrentView();}
 
-// ═══════════════════════════════════════════════════════
+// =======================================================
 // 3D TAGGING
-// ═══════════════════════════════════════════════════════
+// =======================================================
 function openMasterTagMenu(){document.getElementById('tag-master-modal').style.display='flex';const ss=document.getElementById('tag-single-select');ss.innerHTML='';const all=[];Object.keys(inspectionData).forEach(d=>Object.keys(inspectionData[d]).forEach(f=>Object.keys(inspectionData[d][f]).forEach(p=>all.push(inspectionData[d][f][p]))));all.sort((a,b)=>a.id.localeCompare(b.id)).forEach(data=>{const o=document.createElement('option');o.value=data.id;o.innerText=`${data.id} (${data.finds.split('|')[0]})`;ss.appendChild(o);});const ds=document.getElementById('tag-drop-select');ds.innerHTML='';Object.keys(inspectionData).sort().forEach(d=>{const o=document.createElement('option');o.value=d;o.innerText=`Drop ${d}`;ds.appendChild(o);});const ws=document.getElementById('tag-wall-select');ws.innerHTML='';elevations.forEach(e=>{const o=document.createElement('option');o.value=e;o.innerText=`Wall: ${e}`;ws.appendChild(o);});}
 function closeMasterTagMenu(){document.getElementById('tag-master-modal').style.display='none';}
 function activateTaggingUI(instr){
@@ -3861,7 +3942,7 @@ function startWallTag(){bulkTagState={mode:'wall',targetId:document.getElementBy
 function startReTag(){const id=activeNodeDataArray[0]?.id;if(!id)return;closeModal();bulkTagState={mode:'retag',targetId:id,step:0,anchors:[]};activateTaggingUI(`Double-click new location for ${id}`);}
 function parseCoord(c){return c&&c.x!==undefined?[c.x,c.y,c.z]:[0,0,0];}
 
-// 3D tagging via model-viewer dblclick — called from initTwin
+// 3D tagging via model-viewer dblclick ? called from initTwin
 function setupTwinTagging() {
     const mv = document.getElementById('main-3d-viewer');
     if (!mv || mv._tagListenerSet) return;
@@ -3934,7 +4015,7 @@ function toggleRPFullscreen() {
             grid.classList.add('rp-fullscreen');
             if (exitBtn) exitBtn.style.display = 'flex';
         }
-        if (fsBtn) fsBtn.innerText = '✕ EXIT';
+        if (fsBtn) fsBtn.innerText = '? EXIT';
     } else {
         // Move modal back to body before exiting
         document.body.appendChild(modal);
@@ -3943,7 +4024,7 @@ function toggleRPFullscreen() {
         if (exitBtn) exitBtn.style.display = 'none';
         if (document.fullscreenElement) document.exitFullscreen();
         if (document.webkitFullscreenElement) document.webkitExitFullscreen();
-        if (fsBtn) fsBtn.innerText = '⛶';
+        if (fsBtn) fsBtn.innerText = '?';
     }
 }
 
@@ -3955,7 +4036,7 @@ function exitRPFullscreenCleanup() {
     const fsBtn   = document.getElementById('rp-fs-btn');
     grid.classList.remove('rp-fullscreen');
     if (exitBtn) exitBtn.style.display = 'none';
-    if (fsBtn) fsBtn.innerText = '⛶';
+    if (fsBtn) fsBtn.innerText = '?';
     // Return modal to body if it was moved in
     if (modal && modal.parentElement !== document.body) {
         document.body.appendChild(modal);
@@ -3971,9 +4052,9 @@ document.addEventListener('webkitfullscreenchange', () => {
 
 function toggleFullScreen(id){const el=document.getElementById(id);if(!document.fullscreenElement){if(el.requestFullscreen)el.requestFullscreen();}else{if(document.exitFullscreen)document.exitFullscreen();}}
 
-// ═══════════════════════════════════════════════════════
+// =======================================================
 // LIGHTBOX
-// ═══════════════════════════════════════════════════════
+// =======================================================
 let lbScale=1,lbPanning=false,lbPX=0,lbPY=0,lbSX=0,lbSY=0,lbPtrs=[],lbInitDist=null,lbInitScale=1;
 let lbNames=[],lbIndex=0,lbShowDC=false;
 const lbImg=document.getElementById('lightbox-img');
@@ -4006,7 +4087,7 @@ function updateLbUI(){
     document.getElementById('lightbox-prev').style.display=isMulti?'block':'none';
     document.getElementById('lightbox-next').style.display=isMulti?'block':'none';
     document.getElementById('lightbox-counter').innerText=
-        `${lbIndex+1} / ${lbNames.length} — ${name}${lbShowDC&&hasDC?' (DC)':' (IR)'}`;
+        `${lbIndex+1} / ${lbNames.length} ? ${name}${lbShowDC&&hasDC?' (DC)':' (IR)'}`;
 }
 function toggleLightboxView(){const e=imageBank[lbNames[lbIndex]];if(!e||!e.dcUrl)return;lbShowDC=!lbShowDC;updateLbUI();}
 function changeLightbox(dir){lbIndex=(lbIndex+dir+lbNames.length)%lbNames.length;updateLbUI();}
