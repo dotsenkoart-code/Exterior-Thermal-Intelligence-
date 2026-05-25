@@ -325,12 +325,14 @@
             display:none;flex-direction:column;gap:6px;
         }
         #zoom-controls button {
-            width:40px;height:40px;border-radius:50%;
+            width:44px;height:44px;border-radius:50%;
             background:#1a1d27;border:1px solid #2a2d38;
             color:#0cf;font-size:1.2rem;cursor:pointer;
             display:flex;align-items:center;justify-content:center;
         }
         #zoom-controls button:hover { border-color:#0cf; }
+        #view-2d.fs-2d { position:fixed;inset:0;z-index:4000;background:#0f111a;overflow:auto;flex-direction:column; }
+        #view-2d.fs-2d ~ #zoom-controls #btn-2d-fs { color:#e74c3c;border-color:#e74c3c; }
 
         #rp-grid-container:fullscreen { background:#0f111a;padding:20px;overflow:auto; }
         #rp-grid-container:-webkit-full-screen { background:#0f111a;padding:20px;overflow:auto; }
@@ -685,9 +687,7 @@
 
 <!-- ZOOM CONTROLS -->
 <div id="zoom-controls">
-    <button onclick="adjustZoom(0.2)" title="Zoom in">+</button>
-    <button onclick="resetZoom()" title="Reset zoom" style="font-size:0.65rem;color:#555;">1:1</button>
-    <button onclick="adjustZoom(-0.2)" title="Zoom out">−</button>
+    <button onclick="toggle2DFullscreen()" id="btn-2d-fs" title="Full screen grid">&#x26F6;</button>
 </div>
 
 <!-- 3D TAG MODAL -->
@@ -2116,7 +2116,7 @@ function startPhotoMove(photoName, fromNodeId) {
     const banner = document.getElementById('photo-move-banner');
     const fname = photoName.split('_').slice(1).join('_') || photoName; // strip drop prefix for display
     document.getElementById('photo-move-text').innerText =
-        `[CAM] Moving ${fname} ? tap the correct window`;
+        `Moving ${fname} — tap the destination window`;
     banner.style.display = 'block';
 }
 
@@ -2186,11 +2186,9 @@ document.addEventListener('keydown', e => {
         if (e.key === 'ArrowLeft')  { e.preventDefault(); changeLightbox(-1); return; }
     }
 
-    // + / - zoom on grid
+    // F key = fullscreen 2D grid
     if (!modalOpen && !lightboxOpen && currentMode === '2d') {
-        if (e.key === '+' || e.key === '=') { e.preventDefault(); adjustZoom(0.1); return; }
-        if (e.key === '-')                   { e.preventDefault(); adjustZoom(-0.1); return; }
-        if (e.key === '0')                   { e.preventDefault(); resetZoom(); return; }
+        if (e.key === 'f' || e.key === 'F') { e.preventDefault(); toggle2DFullscreen(); return; }
     }
 });
 
@@ -2333,7 +2331,7 @@ function generateWallDOM(elevName) {
                     if (names.length>0||data.flirIR) {
                         const badge=document.createElement('div');
                         badge.className='photo-badge'+(names.length===0?' missing':'');
-                        badge.innerText=names.length>0?`[CAM] ${names.length}`:'[CAM] ?';
+                        badge.innerText=names.length>0?`● ${names.length}`:'';
                         badge.title=names.length>0?`${names.length} photo(s) linked`:'Reference exists ? re-upload ZIP';
                         node.appendChild(badge);
                     }
@@ -2401,7 +2399,7 @@ function buildPhotoArea(nodes) {
             const nl=document.createElement('div');nl.className='photo-name-label';nl.innerText=irName;
             const pill=document.createElement('div');
             pill.className=`toggle-pill${hasDC?'':' no-dc'}${photoViewState[irName]==='dc'?' showing-dc':''}`;
-            pill.innerHTML='<span class="pill-ir">? IR</span><span class="pill-dc">[CAM] DC</span>';
+            pill.innerHTML='<span class="pill-ir">IR</span><span class="pill-dc">DC</span>';
             pill.title=hasDC?'Toggle IR / DC view':'DC not available for this file';
 
             // Use IIFE to freeze irName, entry, pill, img per iteration
@@ -2419,7 +2417,7 @@ function buildPhotoArea(nodes) {
             // Move button ? lets manager reassign this photo to a different window
             const moveBtn = document.createElement('button');
             moveBtn.className = 'photo-move-btn';
-            moveBtn.innerText = '? Move';
+            moveBtn.innerText = 'Move';
             moveBtn.title = 'Reassign this photo to a different window';
             moveBtn.onclick = (function(name, fromId) {
                 return function(e) {
@@ -2432,7 +2430,7 @@ function buildPhotoArea(nodes) {
             const removeBtn = document.createElement('button');
             removeBtn.className = 'photo-move-btn';
             removeBtn.style.cssText = 'padding:3px 10px;font-size:0.7rem;font-weight:bold;background:#1a0a0a;color:#e74c3c;border:1px solid #e74c3c;border-radius:4px;cursor:pointer;margin-left:4px;text-transform:uppercase;letter-spacing:0.5px;';
-            removeBtn.innerText = '? Remove';
+            removeBtn.innerText = 'Remove';
             removeBtn.title = 'Remove this photo from this window (does not delete the file)';
             removeBtn.onclick = (function(name, nodeIds) {
                 return function(e) {
@@ -2465,7 +2463,7 @@ function buildPhotoArea(nodes) {
             rotBtn.style.cssText = 'padding:3px 8px;font-size:0.7rem;font-weight:bold;background:#1a1a0a;color:#f1c40f;border:1px solid #f1c40f44;border-radius:4px;cursor:pointer;margin-left:4px;';
             const curRot = photoRotations[irName] || 0;
             rotBtn.innerText = 'rotate';
-            rotBtn.title = `Rotate image (currently ${curRot}?)`;
+            rotBtn.title = `Rotate 90 degrees (currently ${curRot} degrees)`;
             rotBtn.onclick = (function(name) {
                 return function(e) {
                     e.stopPropagation();
@@ -2509,7 +2507,7 @@ function buildPhotoArea(nodes) {
 
     // Manual drop slot
     const slot=document.createElement('div');slot.className='drop-slot';
-    slot.innerHTML='<span>?</span><span>Drop or click to manually add an IR photo</span>';
+    slot.innerHTML='<span>+</span><span>Drop or click to manually add an IR photo</span>';
     setupDropSlot(slot, nodes[0]?.id);
     area.appendChild(slot);
 }
@@ -2663,7 +2661,8 @@ function updatePlannerBtn(nodeId) {
     const btn = document.getElementById('btn-add-planner');
     if (!btn) return;
     const inPlanner = !!repairPriorities[nodeId];
-    btn.innerText = inPlanner ? '[OK] IN REPAIR PLANNER (tap to remove)' : '[FIX] ADD TO REPAIR PLANNER';
+    btn.innerText = inPlanner ? 'ADDED TO REPAIR PLANNER — tap to remove' : '+ ADD TO REPAIR PLANNER';
+    btn.style.fontWeight = 'bold';
     btn.style.borderColor = inPlanner ? '#28a745' : '#f39c12';
     btn.style.color       = inPlanner ? '#28a745' : '#f39c12';
 
@@ -2678,10 +2677,11 @@ function updatePlannerBtn(nodeId) {
             btn.parentNode.insertBefore(fixBtn, btn.nextSibling);
         }
         const isFixed = !!repairFixed[nodeId];
-        fixBtn.innerText  = isFixed ? '? Mark as Unfixed' : '[OK] Mark as Fixed';
-        fixBtn.style.borderColor = isFixed ? '#555' : '#28a745';
-        fixBtn.style.color       = isFixed ? '#555' : '#28a745';
-        fixBtn.style.background  = isFixed ? '#0a1a0a' : 'transparent';
+        fixBtn.innerText  = isFixed ? 'REPAIR COMPLETE — tap to undo' : 'MARK REPAIR AS COMPLETE';
+        fixBtn.style.borderColor = isFixed ? '#28a745' : '#28a745';
+        fixBtn.style.color       = isFixed ? '#000'    : '#28a745';
+        fixBtn.style.background  = isFixed ? '#28a745' : 'transparent';
+        fixBtn.style.fontWeight  = 'bold';
         fixBtn.onclick = () => {
             if (repairFixed[nodeId]) {
                 delete repairFixed[nodeId];
@@ -2707,7 +2707,7 @@ function updatePlannerBadge() {
     if (!badge) return;
     if (total > 0) {
         badge.style.display = 'inline';
-        badge.innerText = fixed > 0 ? `${active} / ${fixed}?` : `${total}`;
+        badge.innerText = fixed > 0 ? `${active} pending / ${fixed} done` : `${total}`;
         badge.title = `${active} pending, ${fixed} fixed`;
     } else {
         badge.style.display = 'none';
@@ -2760,7 +2760,7 @@ function updateModalNav(nodeId) {
     navBar.style.display = 'flex';
     const idx = modalNavSequence.indexOf(nodeId);
     const drop = nodeId.split('-')[0];
-    posEl.innerText = `Drop ${drop}  ?  ${idx + 1} of ${modalNavSequence.length}`;
+    posEl.innerText = `Drop ${drop}   ${idx + 1} of ${modalNavSequence.length}`;
 
     prevBtn.disabled = idx <= 0;
     prevBtn.style.opacity = idx <= 0 ? '0.3' : '1';
@@ -2937,13 +2937,13 @@ function rpGetDefectCategories(node) {
 function toggleRepairFixed(nodeId, btn) {
     if (repairFixed[nodeId]) {
         delete repairFixed[nodeId];
-        btn.innerText = '[OK] Mark as Fixed';
+        btn.innerText = 'MARK REPAIR AS COMPLETE';
         btn.style.borderColor = '#28a745';
         btn.style.color = '#28a745';
         btn.style.background = 'transparent';
     } else {
         repairFixed[nodeId] = true;
-        btn.innerText = '? Mark as Unfixed';
+        btn.innerText = 'REPAIR COMPLETE — tap to undo';
         btn.style.borderColor = '#555';
         btn.style.color = '#555';
         btn.style.background = 'transparent';
@@ -3484,6 +3484,18 @@ function resetZoom() {
     applyGridScale();
 }
 
+function toggle2DFullscreen() {
+    const view = document.getElementById('view-2d');
+    const btn  = document.getElementById('btn-2d-fs');
+    if (view.classList.contains('fs-2d')) {
+        view.classList.remove('fs-2d');
+        if (btn) { btn.innerHTML = '&#x26F6;'; btn.style.color='#0cf'; btn.style.borderColor='#2a2d38'; }
+    } else {
+        view.classList.add('fs-2d');
+        if (btn) { btn.innerHTML = '&#x2715;'; btn.style.color='#e74c3c'; btn.style.borderColor='#e74c3c'; }
+    }
+}
+
 function initPinchZoom() {
     const container = document.getElementById('view-2d');
     if (!container || container._pinchInit) return;
@@ -3560,7 +3572,7 @@ function renderRepairPlanner() {
         </div>
         <div style="flex:1;background:#0a1a0a;border:1px solid #28a74588;border-radius:6px;padding:8px;text-align:center;">
             <div style="font-size:1.3rem;font-weight:900;color:#28a745;">${sumFixed}</div>
-            <div style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">? Fixed</div>
+            <div style="font-size:0.65rem;color:#28a745;text-transform:uppercase;font-weight:bold;">REPAIRED</div>
         </div>`;
         // Re-append the fullscreen button at the end
         if (fsBtn) sb.appendChild(fsBtn);
@@ -3625,7 +3637,7 @@ function renderRepairPlanner() {
 
             // Label: elevation name + counts
             if (elevTotal > 0) {
-                tab.innerHTML = `${elev} <span style="font-size:0.65rem;font-weight:normal;opacity:0.8;">${elevPending}${elevFixed > 0 ? ' ? <span style=\"color:#28a745\">' + elevFixed + '?</span>' : ''}</span>`;
+                tab.innerHTML = `${elev} <span style="font-size:0.65rem;font-weight:normal;opacity:0.8;">${elevPending} pending${elevFixed > 0 ? ' <span style=\"color:#28a745;\">' + elevFixed + ' done</span>' : ''}</span>`;
             } else {
                 tab.innerText = elev;
             }
@@ -3640,7 +3652,7 @@ function renderRepairPlanner() {
     gridCont.innerHTML = '';
 
     if (total === 0) {
-        gridCont.innerHTML = '<div style="padding:40px;color:#444;font-size:1rem;text-align:center;">? No windows in Repair Planner yet.<br><br><span style="font-size:0.85rem;color:#333;">Open any window and tap<br><strong style="color:#f39c12;">+ ADD TO REPAIR PLANNER</strong></span></div>';
+        gridCont.innerHTML = '<div style="padding:40px;color:#444;font-size:1rem;text-align:center;">No windows in Repair Planner yet.<br><br><span style="font-size:0.85rem;color:#333;">Open any window and tap<br><strong style="color:#f39c12;">+ ADD TO REPAIR PLANNER</strong></span></div>';
         return;
     }
 
@@ -3739,7 +3751,7 @@ function renderRepairPlanner() {
                             if (names.length > 0) {
                                 const badge = document.createElement('div');
                                 badge.className = 'photo-badge';
-                                badge.innerText = `[CAM] ${names.length}`;
+                                badge.innerText = `● ${names.length}`;
                                 node.appendChild(badge);
                             }
                         } else if (inPlanner && !passesDefect) {
@@ -4080,7 +4092,7 @@ function updateLbUI(){
     document.getElementById('lightbox-prev').style.display=isMulti?'block':'none';
     document.getElementById('lightbox-next').style.display=isMulti?'block':'none';
     document.getElementById('lightbox-counter').innerText=
-        `${lbIndex+1} / ${lbNames.length} ? ${name}${lbShowDC&&hasDC?' (DC)':' (IR)'}`;
+        `${lbIndex+1} / ${lbNames.length}  ${name}${lbShowDC&&hasDC?' (DC)':' (IR)'}`;
 }
 function toggleLightboxView(){const e=imageBank[lbNames[lbIndex]];if(!e||!e.dcUrl)return;lbShowDC=!lbShowDC;updateLbUI();}
 function changeLightbox(dir){lbIndex=(lbIndex+dir+lbNames.length)%lbNames.length;updateLbUI();}
