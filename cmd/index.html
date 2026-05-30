@@ -190,6 +190,8 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.122/Build/Cesium/Cesium.js"></script>
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.122/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/exifr/dist/lite.umd.js"></script>
     <style>
@@ -580,16 +582,19 @@
         </div>
 
         <div id="arena-true3d">
-            <button class="btn-fullscreen" onclick="toggleFullScreen('arena-true3d')">⛶ FULL SCREEN</button>
+            <button class="btn-fullscreen" onclick="toggleFullScreen('arena-true3d')">&#x26F6; FULL SCREEN</button>
 
-            <!-- model-viewer: handles all touch/mouse/pinch natively -->
+            <!-- CesiumJS 3D Tiles viewer -->
+            <div id="cesium-container" style="width:100%;height:100%;position:absolute;top:0;left:0;"></div>
+
+            <!-- Fallback model-viewer for GLB files -->
             <model-viewer id="main-3d-viewer"
                 alt="Building Digital Twin"
                 camera-controls
                 touch-action="none"
                 tone-mapping="neutral"
                 shadow-intensity="0"
-                style="width:100%;height:100%;background:#0f111a;">
+                style="width:100%;height:100%;background:#0f111a;display:none;">
             </model-viewer>
 
             <!-- Info overlay -->
@@ -1060,13 +1065,82 @@ function updatePhotoStat() {
 // =======================================================
 // Model URL is stored per-project in projectModelUrl ? no hardcoded IDs
 
+// =======================================================
+// CESIUM ION 3D TILES VIEWER
+// =======================================================
+const CESIUM_ION_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI1ZDBiNzFkZi02MmFjLTRhZjUtYjQ3OC1jZGFkZjE1ZTAyNWYiLCJpZCI6NDM4MTE3LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODAxMDUwNDV9.Betef3c_KcqB_wDU9MhIvJ2yalxv88LamkvOZVHme6A';
+const CESIUM_ASSET_ID  = 4862320;
+let cesiumViewer = null;
+
+async function initCesiumViewer() {
+    if (cesiumViewer) return;
+    if (typeof Cesium === 'undefined') {
+        document.getElementById('model-status').innerHTML =
+            '<span style="color:#f39c12;">CesiumJS loading...</span>';
+        setTimeout(initCesiumViewer, 1000);
+        return;
+    }
+
+    try {
+        Cesium.Ion.defaultAccessToken = CESIUM_ION_TOKEN;
+        const container = document.getElementById('cesium-container');
+        if (!container) return;
+
+        cesiumViewer = new Cesium.Viewer('cesium-container', {
+            animation: false,
+            baseLayerPicker: false,
+            fullscreenButton: false,
+            geocoder: false,
+            homeButton: false,
+            infoBox: false,
+            sceneModePicker: false,
+            selectionIndicator: false,
+            timeline: false,
+            navigationHelpButton: false,
+            navigationInstructionsInitiallyVisible: false,
+            shouldAnimate: true,
+            baseLayer: Cesium.ImageryLayer.fromProviderAsync(
+                Cesium.IonImageryProvider.fromAssetId(2)
+            )
+        });
+
+        // Dark sky background
+        cesiumViewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#0f111a');
+        cesiumViewer.scene.skyBox.show = false;
+        cesiumViewer.scene.skyAtmosphere.show = false;
+        cesiumViewer.scene.sun.show = false;
+        cesiumViewer.scene.moon.show = false;
+
+        // Load the building tileset
+        const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(CESIUM_ASSET_ID);
+        cesiumViewer.scene.primitives.add(tileset);
+
+        // Fly to the tileset
+        await cesiumViewer.zoomTo(tileset);
+
+        document.getElementById('model-status').innerHTML =
+            '<span style="color:#0cf;">[OK] Textile Building 3D Twin loaded</span>';
+
+        // Show the Cesium container, hide model-viewer
+        document.getElementById('cesium-container').style.display = 'block';
+        document.getElementById('main-3d-viewer').style.display = 'none';
+
+    } catch(e) {
+        console.error('Cesium init error:', e);
+        document.getElementById('model-status').innerHTML =
+            '<span style="color:#f39c12;">[WARN] Could not load 3D twin: ' + e.message + '</span>';
+    }
+}
+
 let twinAnimId=null;
 let twinHotspots=[];  // { mesh, nodeId } for raycasting
 let twinLoaded=false;
 
 function initTwin() {
-    // model-viewer handles all rendering ? nothing to initialise
-    // Just restore saved URL if project has one
+    // Try Cesium ion first for the Textile Building twin
+    initCesiumViewer();
+
+    // Also restore any saved GLB URL
     const mv = document.getElementById('main-3d-viewer');
     if (!mv) return;
 
