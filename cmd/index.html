@@ -268,8 +268,7 @@
         .status-confirmed { background:#d9534f; }
         .status-void      { background:transparent;border:2px solid transparent;cursor:default;pointer-events:none; }
 
-        #arena-true3d { display:none;flex-grow:1;width:100%;background:#0f111a;border:1px solid #0cf;border-radius:12px;overflow:hidden;position:relative;box-shadow:0 0 30px rgba(0,204,255,0.1); }
-        #arena-true3d { background:radial-gradient(circle,#2a2d38 0%,#0f111a 100%);border-color:#5a2e7a;box-shadow:0 0 30px rgba(176,85,255,0.2); }
+        #arena-true3d { display:none;flex-grow:1;width:100%;background:#0f111a;border:1px solid #5a2e7a;border-radius:12px;overflow:hidden;position:relative;box-shadow:0 0 30px rgba(176,85,255,0.2);min-height:400px; }
         model-viewer { width:100%;height:100%;outline:none; }
         .btn-fullscreen { position:absolute;top:15px;right:15px;background:rgba(0,0,0,0.7);color:#fff;border:1px solid #555;z-index:100;padding:10px 15px;border-radius:6px;font-weight:bold;cursor:pointer; }
         .floating-tools { position:absolute;bottom:25px;left:50%;transform:translateX(-50%);display:flex;gap:15px;z-index:100; }
@@ -585,7 +584,7 @@
             <button class="btn-fullscreen" onclick="toggleFullScreen('arena-true3d')">&#x26F6; FULL SCREEN</button>
 
             <!-- CesiumJS 3D Tiles viewer -->
-            <div id="cesium-container" style="width:100%;height:100%;position:absolute;top:0;left:0;"></div>
+            <div id="cesium-container" style="width:100%;height:100%;position:absolute;top:0;left:0;z-index:1;border-radius:12px;overflow:hidden;"></div>
 
             <!-- Fallback model-viewer for GLB files -->
             <model-viewer id="main-3d-viewer"
@@ -604,21 +603,21 @@
             </div>
 
             <!-- Model URL manager -->
-            <div id="twin-url-manager" style="position:absolute;top:15px;right:70px;z-index:200;background:rgba(0,0,0,0.88);border-radius:8px;padding:12px 14px;border:1px solid #444;min-width:320px;max-width:420px;">
-                <div style="color:#d080ff;font-size:0.75rem;font-weight:bold;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">3D Model URL</div>
+            <div id="twin-url-manager" style="position:absolute;top:15px;right:70px;z-index:200;background:rgba(0,0,0,0.88);border-radius:8px;padding:12px 14px;border:1px solid #5a2e7a;min-width:280px;max-width:360px;">
+                <div style="color:#d080ff;font-size:0.75rem;font-weight:bold;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Twin ID</div>
                 <div style="display:flex;gap:8px;align-items:center;">
-                    <input id="twin-url-input"
-                           type="text"
-                           placeholder="Paste Google Drive or direct GLB link..."
-                           style="flex:1;padding:8px 10px;background:#111;color:#fff;border:1px solid #555;border-radius:4px;font-size:0.8rem;min-width:0;"
-                           onkeypress="if(event.key==='Enter')loadTwinFromInput()">
-                    <button onclick="loadTwinFromInput()"
+                    <input id="cesium-asset-input"
+                           type="number"
+                           placeholder="e.g. 4862320"
+                           style="flex:1;padding:8px 10px;background:#111;color:#fff;border:1px solid #555;border-radius:4px;font-size:0.9rem;min-width:0;"
+                           onkeypress="if(event.key==='Enter')loadCesiumAsset()">
+                    <button onclick="loadCesiumAsset()"
                             style="padding:8px 14px;background:#d080ff;color:#000;border:none;border-radius:4px;font-weight:bold;cursor:pointer;white-space:nowrap;font-size:0.8rem;">
                         LOAD
                     </button>
                 </div>
-                <div style="color:#555;font-size:0.7rem;margin-top:5px;">
-                    Paste Google Drive link or direct GLB URL. Saved with project.
+                <div style="color:#555;font-size:0.65rem;margin-top:5px;">
+                    Enter your Twin ID. Saved with project.
                 </div>
             </div>
 
@@ -758,7 +757,8 @@ let bulkSelected        = new Set();
 let photoRotations      = {};  // { imgKey: 90 | 180 | 270 } manual rotation overrides
 let photoMoveMode       = null; // { photoName, fromNodeId } when move is active
 let cachedZip           = null; // JSZip reference kept in memory for image retry
-let projectModelUrl     = '';   // Google Drive or direct URL for this project's 3D model
+let projectModelUrl     = '';   // legacy — kept for backward compat
+let cesiumAssetId       = 0;    // Twin ID for this project's 3D twin
 let repairPriorities    = {};   // { nodeId: 'HIGH'|'MED'|'LOW' }
 let repairTags          = {};   // { nodeId: [tag, ...] } custom defect tags per window
 let repairFixed         = {};   // { nodeId: true } windows marked as fixed
@@ -1073,18 +1073,26 @@ const CESIUM_ASSET_ID  = 4862320;
 let cesiumViewer = null;
 
 async function initCesiumViewer() {
-    if (cesiumViewer) return;
+    // If already initialized, just make sure it resizes correctly
+    if (cesiumViewer) {
+        try { cesiumViewer.resize(); } catch(e) {}
+        return;
+    }
     if (typeof Cesium === 'undefined') {
         document.getElementById('model-status').innerHTML =
             '<span style="color:#f39c12;">CesiumJS loading...</span>';
         setTimeout(initCesiumViewer, 1000);
         return;
     }
+    // Make sure container has dimensions before initializing
+    const container = document.getElementById('cesium-container');
+    if (!container || container.offsetWidth === 0) {
+        setTimeout(initCesiumViewer, 500);
+        return;
+    }
 
     try {
         Cesium.Ion.defaultAccessToken = CESIUM_ION_TOKEN;
-        const container = document.getElementById('cesium-container');
-        if (!container) return;
 
         cesiumViewer = new Cesium.Viewer('cesium-container', {
             animation: false,
@@ -1112,14 +1120,20 @@ async function initCesiumViewer() {
         cesiumViewer.scene.moon.show = false;
 
         // Load the building tileset
-        const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(CESIUM_ASSET_ID);
+        const assetToLoad = cesiumAssetId || CESIUM_ASSET_ID;
+        if (!assetToLoad) {
+            document.getElementById('model-status').innerHTML =
+                '<span style="color:#888;">Enter a Twin ID to load your 3D twin.</span>';
+            return;
+        }
+        const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(assetToLoad);
         cesiumViewer.scene.primitives.add(tileset);
 
         // Fly to the tileset
         await cesiumViewer.zoomTo(tileset);
 
         document.getElementById('model-status').innerHTML =
-            '<span style="color:#0cf;">[OK] Textile Building 3D Twin loaded</span>';
+            '<span style="color:#0cf;">[OK] 3D Twin loaded — Twin ID ' + assetToLoad + ')</span>';
 
         // Show the Cesium container, hide model-viewer
         document.getElementById('cesium-container').style.display = 'block';
@@ -1137,7 +1151,10 @@ let twinHotspots=[];  // { mesh, nodeId } for raycasting
 let twinLoaded=false;
 
 function initTwin() {
-    // Try Cesium ion first for the Textile Building twin
+    // Populate asset ID input from saved state
+    const assetInp = document.getElementById('cesium-asset-input');
+    if (assetInp && cesiumAssetId) assetInp.value = cesiumAssetId;
+    // Try Cesium ion first
     initCesiumViewer();
 
     // Also restore any saved GLB URL
@@ -1169,26 +1186,30 @@ function gdriveToDirectUrl(url) {
     return url; // already a direct URL
 }
 
-function loadTwinFromInput() {
-    const raw = document.getElementById('twin-url-input').value.trim();
-    if (!raw) return;
-
-    // Convert Google Drive share link -> direct download URL
-    const directUrl = gdriveToDirectUrl(raw);
-
-    // Save URL to project state so it persists with the project JSON
-    projectModelUrl = raw; // store original URL (friendlier for display)
+function loadCesiumAsset() {
+    const input = document.getElementById('cesium-asset-input');
+    if (!input) return;
+    const id = parseInt(input.value.trim());
+    if (!id || isNaN(id)) {
+        showToast('[WARN] Please enter a valid Twin ID number.', 4000, true);
+        return;
+    }
+    cesiumAssetId = id;
     saveCommandState();
 
-    // Try CORS proxy first for Google Drive URLs
-    const isGdrive = raw.includes('drive.google.com');
-    const loadUrl  = isGdrive
-        ? `https://corsproxy.io/?${encodeURIComponent(directUrl)}`
-        : directUrl;
+    // Reset viewer so it reloads with new asset
+    if (cesiumViewer) {
+        try { cesiumViewer.destroy(); } catch(e) {}
+        cesiumViewer = null;
+    }
+    document.getElementById('model-status').innerHTML =
+        '<span style="color:#888;">Loading Twin ID ' + id + '...</span>';
+    initCesiumViewer();
+    showToast('[OK] Loading Twin ID ' + id + '...', 3000);
+}
 
-    document.getElementById('twin-progress-wrap').style.display = 'none';
-    if (!twinLoaded) initTwin();
-    loadTwinModel(loadUrl, directUrl);
+function loadTwinFromInput() {
+    loadCesiumAsset();
 }
 
 function loadTwinModel(url, fallbackDirectUrl) {
@@ -1303,7 +1324,7 @@ function saveCommandState() {
     localStorage.setItem('strataCommandState',JSON.stringify({
         projectInfo,inspectionData,elevations,dropAssignments,
         stitchedPairs,saved3DTags,manualLinks,projectModelUrl,
-        repairPriorities,repairTags,repairFixed
+        repairPriorities,repairTags,repairFixed,cesiumAssetId
     }));
 }
 
@@ -1323,9 +1344,10 @@ function loadCommandState() {
         repairPriorities  =s.repairPriorities  ||{};
         repairTags        =s.repairTags        ||{};
         repairFixed       =s.repairFixed       ||{};
+        cesiumAssetId     =s.cesiumAssetId     ||0;
         // Restore model URL input field if it exists
-        const urlInput = document.getElementById('twin-url-input');
-        if (urlInput && projectModelUrl) urlInput.value = projectModelUrl;
+        const assetInp2 = document.getElementById('cesium-asset-input');
+        if (assetInp2 && cesiumAssetId) assetInp2.value = cesiumAssetId;
         if (Object.keys(inspectionData).length>0) {
             document.getElementById('project-name').innerText='Project: '+projectInfo;
             document.getElementById('project-name').style.color='#0cf';
@@ -1391,9 +1413,10 @@ function loadProjectFile(input) {
             repairPriorities = p.repairPriorities || {};
             repairTags       = p.repairTags       || {};
             repairFixed      = p.repairFixed      || {};
+            cesiumAssetId    = p.cesiumAssetId    || 0;
 
-            const urlInp = document.getElementById('twin-url-input');
-            if (urlInp && projectModelUrl) urlInp.value = projectModelUrl;
+            const assetInp = document.getElementById('cesium-asset-input');
+            if (assetInp && cesiumAssetId) assetInp.value = cesiumAssetId;
 
             document.getElementById('project-name').innerText = 'Project: ' + projectInfo;
             document.getElementById('project-name').style.color = '#0cf';
@@ -2353,7 +2376,7 @@ function switchView(mode) {
     const zc = document.getElementById('zoom-controls');
     if (zc) zc.style.display = mode==='2d' ? 'flex' : 'none';
     if (mode==='repair') renderRepairPlanner();
-    if (mode==='true3d') setTimeout(initTwin, 100);
+    if (mode==='true3d') setTimeout(initTwin, 300); // delay ensures panel is visible and has dimensions
 }
 
 function refreshCurrentView() {
