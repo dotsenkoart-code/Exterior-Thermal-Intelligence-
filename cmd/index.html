@@ -1135,13 +1135,17 @@ async function initCesiumViewer() {
         cesiumViewer.scene.primitives.add(tileset);
 
         // Fly camera to the building
+        // Force highest quality LOD — load full detail immediately
+        tileset.maximumScreenSpaceError = 1; // default 16, lower = more detail
+        tileset.preferLeaves = true; // load highest detail tiles first
+
         await cesiumViewer.zoomTo(tileset);
 
-        // Tilt camera for better building view
+        // Zoom camera in tight for best initial quality
         const boundingSphere = tileset.boundingSphere;
         cesiumViewer.camera.viewBoundingSphere(
             boundingSphere,
-            new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-45), boundingSphere.radius * 2.5)
+            new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-35), boundingSphere.radius * 1.2)
         );
 
         document.getElementById('model-status').innerHTML =
