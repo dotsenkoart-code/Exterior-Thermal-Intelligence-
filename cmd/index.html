@@ -1073,7 +1073,7 @@ const CESIUM_ASSET_ID  = 4862320;
 let cesiumViewer = null;
 
 async function initCesiumViewer() {
-    // If already initialized, just make sure it resizes correctly
+    // If already initialized, resize and return
     if (cesiumViewer) {
         try { cesiumViewer.resize(); } catch(e) {}
         return;
@@ -1084,65 +1084,75 @@ async function initCesiumViewer() {
         setTimeout(initCesiumViewer, 1000);
         return;
     }
-    // Make sure container has dimensions before initializing
     const container = document.getElementById('cesium-container');
     if (!container || container.offsetWidth === 0) {
         setTimeout(initCesiumViewer, 500);
         return;
     }
 
+    const assetToLoad = cesiumAssetId || CESIUM_ASSET_ID;
+    if (!assetToLoad) {
+        document.getElementById('model-status').innerHTML =
+            '<span style="color:#888;">Enter your Twin ID to load the 3D model.</span>';
+        return;
+    }
+
+    document.getElementById('model-status').innerHTML =
+        '<span style="color:#888;">Initializing viewer...</span>';
+
     try {
         Cesium.Ion.defaultAccessToken = CESIUM_ION_TOKEN;
 
+        // Minimal viewer — no imagery, no terrain, no extras
+        // This avoids Bing Maps / terrain token errors
         cesiumViewer = new Cesium.Viewer('cesium-container', {
-            animation: false,
-            baseLayerPicker: false,
-            fullscreenButton: false,
-            geocoder: false,
-            homeButton: false,
-            infoBox: false,
-            sceneModePicker: false,
-            selectionIndicator: false,
-            timeline: false,
-            navigationHelpButton: false,
+            animation:                      false,
+            baseLayerPicker:                false,
+            fullscreenButton:               false,
+            geocoder:                       false,
+            homeButton:                     false,
+            infoBox:                        false,
+            sceneModePicker:                false,
+            selectionIndicator:             false,
+            timeline:                       false,
+            navigationHelpButton:           false,
             navigationInstructionsInitiallyVisible: false,
-            shouldAnimate: true,
-            baseLayer: Cesium.ImageryLayer.fromProviderAsync(
-                Cesium.IonImageryProvider.fromAssetId(2)
-            )
+            imageryProvider:                false,
+            baseLayer:                      false,
+            skyBox:                         false,
+            skyAtmosphere:                  false,
+            globe:                          false
         });
 
-        // Dark sky background
+        // Dark background
         cesiumViewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#0f111a');
-        cesiumViewer.scene.skyBox.show = false;
-        cesiumViewer.scene.skyAtmosphere.show = false;
-        cesiumViewer.scene.sun.show = false;
-        cesiumViewer.scene.moon.show = false;
 
-        // Load the building tileset
-        const assetToLoad = cesiumAssetId || CESIUM_ASSET_ID;
-        if (!assetToLoad) {
-            document.getElementById('model-status').innerHTML =
-                '<span style="color:#888;">Enter a Twin ID to load your 3D twin.</span>';
-            return;
-        }
+        document.getElementById('model-status').innerHTML =
+            '<span style="color:#888;">Loading 3D model...</span>';
+
+        // Load the tileset
         const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(assetToLoad);
         cesiumViewer.scene.primitives.add(tileset);
 
-        // Fly to the tileset
+        // Fly camera to the building
         await cesiumViewer.zoomTo(tileset);
 
-        document.getElementById('model-status').innerHTML =
-            '<span style="color:#0cf;">[OK] 3D Twin loaded — Twin ID ' + assetToLoad + ')</span>';
+        // Tilt camera for better building view
+        const boundingSphere = tileset.boundingSphere;
+        cesiumViewer.camera.viewBoundingSphere(
+            boundingSphere,
+            new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-45), boundingSphere.radius * 2.5)
+        );
 
-        // Show the Cesium container, hide model-viewer
-        document.getElementById('cesium-container').style.display = 'block';
-        document.getElementById('main-3d-viewer').style.display = 'none';
+        document.getElementById('model-status').innerHTML =
+            '<span style="color:#0cf;">[OK] 3D Twin loaded — Twin ID ' + assetToLoad + '</span>';
 
     } catch(e) {
         console.error('Cesium init error:', e);
         document.getElementById('model-status').innerHTML =
-            '<span style="color:#f39c12;">[WARN] Could not load 3D twin: ' + e.message + '</span>';
+            '<span style="color:#f39c12;">[WARN] ' + e.message + '</span>';
+        // Destroy failed viewer so retry is possible
+        try { if (cesiumViewer) { cesiumViewer.destroy(); cesiumViewer = null; } } catch(err) {}
     }
 }
 
