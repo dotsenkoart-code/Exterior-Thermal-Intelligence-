@@ -2,10 +2,10 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Strata Command Center | v9.6</title>
+    <title>Strata Command Center | v9.7</title>
     <!--
     ╔══════════════════════════════════════════════════════════════════════════╗
-    ║           VERTICALITY INC — STRATA COMMAND CENTER v9.6                 ║
+    ║           VERTICALITY INC — STRATA COMMAND CENTER v9.7                 ║
     ║           Thermal Rope Access Inspection & Repair Platform              ║
     ╠══════════════════════════════════════════════════════════════════════════╣
     ║  ARCHITECTURE: Single HTML file, no build step, no dependencies        ║
@@ -26,6 +26,8 @@
     ║  repairFixed[nodeId] = true               — repair completed           ║
     ║  photoRotations[imgKey] = 90|180|270      — IR/DC orientation fix      ║
     ║  saved3DTags[nodeId] = { position, normal } — 3D hotspot coords       ║
+    ║  manualDefects[id] = { id, label, drop, floor, elevation, finds,       ║
+    ║    notes, status, photos[], embeddedPhotoData{} } — custom defects     ║
     ║  stitchedPairs = [[nodeId, nodeId], ...]  — merged window pairs        ║
     ║  dropAssignments[drop] = elevationName    — which wall each drop is on ║
     ║  elevations = ['North Face', ...]         — ordered wall names         ║
@@ -41,7 +43,7 @@
     ║    2-segment (~155KB): IR only — no DC                                 ║
     ║    1-segment (~50KB):  DC only — discard                               ║
     ╠══════════════════════════════════════════════════════════════════════════╣
-    ║  VIEW MODES: '2d' | 'repair' | 'true3d'                               ║
+    ║  VIEW MODES: '2d' | 'repair' | 'true3d' | 'report'                   ║
     ║  currentMode drives switchView() which shows/hides panels              ║
     ║  activeTab = current elevation name shown in 2D grid                   ║
     ║  activeFilter = 'ALL'|'status-clear'|'status-flagged'|'status-confirmed'║
@@ -72,7 +74,7 @@
     ║    refreshCurrentView()   — redraws active elevation tab               ║
     ║    generateWallDOM()      — builds drop columns and window nodes       ║
     ║    calculateBuildingGeometry() — updates stats bar counts              ║
-    ║    switchView(mode)       — switches between 2d/repair/true3d          ║
+    ║    switchView(mode)       — switches between 2d/repair/true3d/report   ║
     ║    setFilter(status)      — filters grid by window status              ║
     ║                                                                         ║
     ║  MODAL                                           ~L2093                ║
@@ -111,6 +113,22 @@
     ║    setupTwinTagging()     — attaches dblclick for pin placement        ║
     ║    gdriveToDirectUrl()    — converts Google Drive share link to CDN    ║
     ║                                                                         ║
+    ║  REPORT BUILDER                                  (appended)            ║
+    ║    renderReportBuilder()  — renders report workspace in #arena-report  ║
+    ║    rbBuildReportHTML()    — generates report HTML string (PDF + export)║
+    ║    generateReportPDF()    — opens print window with report HTML        ║
+    ║    exportClientPackage()  — exports JSON with findings + reportHtml    ║
+    ║    rbConfirmReport()      — confirms exec summary, unlocks export      ║
+    ║    rbDoSort(s)            — sorts/groups defect cards (sev/elev/type)  ║
+    ║    rbCandidates()         — returns all defects eligible for report    ║
+    ║                                                                         ║
+    ║  MANUAL DEFECTS                                  (appended)            ║
+    ║    openAddDefectForm()    — floating overlay: pick drop+floor+label    ║
+    ║    mdSaveDefect()         — creates manualDefects entry + opens modal  ║
+    ║    mdPopulateFloors()     — populates floor dropdown from inspData     ║
+    ║    restoreManualDefectPhotos() — re-populates imageBank from JSON      ║
+    ║    setupManualPhotoSlot() — accepts any image (not just FLIR)          ║
+    ╠══════════════════════════════════════════════════════════════════════════╣
     ║  PINCH ZOOM                                      ~L3199                ║
     ║    initPinchZoom()        — attaches touch handlers to view-2d         ║
     ║    adjustZoom(delta)      — changes gridScale, applies transform       ║
@@ -141,6 +159,7 @@
     ║      #rp-defect-filter-bar — defect type chips                         ║
     ║      #rp-tabs         — elevation tabs for repair planner              ║
     ║      #rp-grid-container — repair grid (fullscreen target)             ║
+    ║    #arena-report      — report builder panel                           ║
     ║    #arena-true3d      — 3D twin panel                                  ║
     ║      #main-3d-viewer  — model-viewer element                           ║
     ║  #info-modal          — window detail modal (moves into grid on FS)    ║
@@ -148,12 +167,13 @@
     ║  #mapping-screen      — wall/drop assignment UI                        ║
     ║  #zoom-controls       — +/1:1/- buttons (2d mode, bottom-right)       ║
     ╠══════════════════════════════════════════════════════════════════════════╣
-    ║  KNOWN LIMITATIONS (v1 — see brutal review in session history)         ║
+    ║  KNOWN LIMITATIONS                                                      ║
     ║  • No undo — destructive actions are permanent                         ║
     ║  • localStorage ~5-10MB limit — large projects may hit ceiling         ║
     ║  • No input validation — malformed CSVs can corrupt state              ║
     ║  • Single file — growing complexity, hard to maintain long-term        ║
-    ║  • Photos session-only — must re-upload ZIP each session               ║
+    ║  • Window photos session-only — must re-upload ZIP each session        ║
+    ║  • Manual defect photos persist in project JSON (not localStorage)     ║
     ║  • Fullscreen modal CSS hack — not reliable on all browsers            ║
     ╠══════════════════════════════════════════════════════════════════════════╣
     ║  QUICK ORIENTATION FOR NEW SESSION                                      ║
@@ -183,7 +203,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Strata v9.6">
+    <meta name="apple-mobile-web-app-title" content="Strata v9.7">
     <meta name="mobile-web-app-capable" content="yes">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -232,6 +252,8 @@
         #btn-true3d.active { background:#b055ff;color:#fff; }
         .stitch-mode-on { border-color:#f39c12!important;background:rgba(243,156,18,0.4)!important;color:#fff!important;box-shadow:0 0 15px rgba(243,156,18,0.8)!important; }
         .tag-mode-on    { border-color:#d080ff!important;background:rgba(176,85,255,0.4)!important;color:#fff!important;box-shadow:0 0 15px rgba(176,85,255,0.8)!important; }
+        #btn-report { background:#0a1f18;border:1px solid #1fd0a5;color:#1fd0a5; }
+        #btn-report.active { background:#1fd0a5;color:#000; }
 
         .tabs-container { display:flex;gap:5px;overflow-x:auto;padding-bottom:5px;border-bottom:2px solid #333;margin-bottom:15px;flex-shrink:0; }
         .tab { padding:12px 25px;background:#1a1d27;color:#888;border-radius:8px 8px 0 0;cursor:pointer;font-weight:bold;font-size:1rem;border:1px solid #333;border-bottom:none;transition:0.2s;white-space:nowrap; }
@@ -517,6 +539,7 @@
             <button class="view-toggle-btn active" id="btn-2d"     onclick="switchView('2d')">2D TABS</button>
             <button class="view-toggle-btn"         id="btn-repair" onclick="switchView('repair')" style="background:#1a1200;border:1px solid #f39c12;color:#f39c12;">🔧 REPAIR PLANNER <span id="rp-badge" style="display:none;background:#f39c12;color:#000;border-radius:10px;padding:1px 7px;font-size:0.7rem;margin-left:3px;"></span></button>
             <button class="view-toggle-btn"         id="btn-true3d" onclick="switchView('true3d')">✨ TRUE 3D TWIN</button>
+            <button class="view-toggle-btn" id="btn-report" onclick="switchView('report')" style="background:#0a1f18;border:1px solid #1fd0a5;color:#1fd0a5;">📄 REPORT</button>
             <div style="flex:0.2;"></div>
             <button class="view-toggle-btn stitch-toggle" style="border:1px solid #555;" onclick="toggleStitchMode()">🔗 STITCH WINDOWS</button>
             <button class="view-toggle-btn tag-toggle" style="border:1px solid #d080ff;display:none;" id="btn-tag3d-main" onclick="openMasterTagMenu()">📍 3D TAG MENU</button>
@@ -626,6 +649,8 @@
                 <button class="float-btn" onclick="resetTwinCamera()" style="border-color:#0cf;color:#0cf;">🎯 RESET VIEW</button>
             </div>
         </div>
+
+        <div id="arena-report" style="display:none;flex-direction:column;height:100%;width:100%;overflow:auto;padding:15px;"></div>
     </div>
 </div>
 
@@ -761,7 +786,8 @@ let projectModelUrl     = '';   // legacy — kept for backward compat
 let cesiumAssetId       = 0;    // Twin ID for this project's 3D twin
 let repairPriorities    = {};   // { nodeId: 'HIGH'|'MED'|'LOW' }
 let repairTags          = {};   // { nodeId: [tag, ...] } custom defect tags per window
-let repairFixed         = {};   // { nodeId: true } windows marked as fixed
+let repairFixed         = {};
+let manualDefects        = {};
 
 /*
  * imageBank: { CLEAN_UPPER_NAME: { url, dcUrl, time, drop } }
@@ -1027,6 +1053,7 @@ function dateToSec(d) { return d.getHours()*3600+d.getMinutes()*60+d.getSeconds(
 // =======================================================
 function getNodeData(id) {
     if (!id||typeof id!=='string') return null;
+    if (id.startsWith('MANUAL-')) return manualDefects[id]??null;
     const p=id.split('-');
     if (p.length!==3) return null;
     return inspectionData[p[0]]?.[p[1]]?.[p[2]]??null;
@@ -1319,6 +1346,7 @@ function updateLoadPanelVisibility() {
 function initApp() {
     requestWakeLock();
     loadCommandState();
+    restoreManualDefectPhotos();
     initLightboxZoom();
     initGlobalDragDrop();
 }
@@ -1335,10 +1363,11 @@ document.addEventListener('visibilitychange',()=>{
 // PERSISTENCE
 // =======================================================
 function saveCommandState() {
+    const _mdL={}; Object.entries(manualDefects).forEach(function(e){var k=e[0],v=e[1];var r=Object.assign({},v);delete r.embeddedPhotoData;_mdL[k]=r;});
     localStorage.setItem('strataCommandState',JSON.stringify({
         projectInfo,inspectionData,elevations,dropAssignments,
         stitchedPairs,saved3DTags,manualLinks,projectModelUrl,
-        repairPriorities,repairTags,repairFixed,cesiumAssetId
+        repairPriorities,repairTags,repairFixed,cesiumAssetId,manualDefects:_mdL
     }));
 }
 
@@ -1359,6 +1388,7 @@ function loadCommandState() {
         repairTags        =s.repairTags        ||{};
         repairFixed       =s.repairFixed       ||{};
         cesiumAssetId     =s.cesiumAssetId     ||0;
+        manualDefects     =s.manualDefects     ||{};
         // Restore model URL input field if it exists
         const assetInp2 = document.getElementById('cesium-asset-input');
         if (assetInp2 && cesiumAssetId) assetInp2.value = cesiumAssetId;
@@ -1385,7 +1415,7 @@ function saveProject() {
     a.href='data:text/json;charset=utf-8,'+encodeURIComponent(JSON.stringify({
         projectInfo,inspectionData,elevations,dropAssignments,
         stitchedPairs,saved3DTags,manualLinks,projectModelUrl,
-        repairPriorities,repairTags,repairFixed
+        repairPriorities,repairTags,repairFixed,manualDefects
     }));
     const now = new Date();
     const ts  = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}-${String(now.getMinutes()).padStart(2,'0')}`;
@@ -1427,6 +1457,7 @@ function loadProjectFile(input) {
             repairPriorities = p.repairPriorities || {};
             repairTags       = p.repairTags       || {};
             repairFixed      = p.repairFixed      || {};
+            manualDefects    = p.manualDefects    || {};
             cesiumAssetId    = p.cesiumAssetId    || 0;
 
             const assetInp = document.getElementById('cesium-asset-input');
@@ -2201,6 +2232,7 @@ function calculateBuildingGeometry() {
         else if (c==='status-confirmed') globalStats.c++;
         else globalStats.clear++;
     });
+    Object.values(manualDefects).forEach(function(nd){globalStats.t++;if(nd.status==='status-flagged')globalStats.f++;else if(nd.status==='status-confirmed')globalStats.c++;else globalStats.clear++;});
     document.getElementById('stat-total').innerText    =globalStats.t;
     document.getElementById('stat-clear').innerText    =globalStats.clear;
     document.getElementById('stat-flagged').innerText  =globalStats.f;
@@ -2390,7 +2422,10 @@ function switchView(mode) {
     const zc = document.getElementById('zoom-controls');
     if (zc) zc.style.display = mode==='2d' ? 'flex' : 'none';
     if (mode==='repair') renderRepairPlanner();
-    if (mode==='true3d') setTimeout(initTwin, 300); // delay ensures panel is visible and has dimensions
+    if (mode==='true3d') setTimeout(initTwin, 300);
+    var arRep=document.getElementById('arena-report'); if(arRep)arRep.style.display=mode==='report'?'flex':'none';
+    var bRep=document.getElementById('btn-report'); if(bRep)bRep.classList.toggle('active',mode==='report');
+    if(mode==='report')renderReportBuilder();
 }
 
 function refreshCurrentView() {
@@ -2430,7 +2465,13 @@ function generateWallDOM(elevName) {
     const order={L:1,C:2,R:3};
     drops.forEach(dropStr=>{
         const col=document.createElement('div');col.className='drop-column';
-        col.innerHTML=`<div class="drop-header">DROP ${dropStr}</div>`;
+        var _hdr=document.createElement('div');_hdr.className='drop-header';_hdr.style.cssText='justify-content:space-between;gap:4px;padding:0 4px;';
+        var _hdrT=document.createElement('span');_hdrT.innerText='DROP '+dropStr;
+        var _addB=document.createElement('button');_addB.innerText='+';_addB.title='Add custom defect';
+        _addB.style.cssText='padding:1px 7px;background:transparent;border:1px solid #1fd0a5;color:#1fd0a5;border-radius:4px;font-size:0.7rem;font-weight:bold;cursor:pointer;line-height:1.6;';
+        _addB.onmouseover=function(){_addB.style.background='#1fd0a5';_addB.style.color='#000';};_addB.onmouseout=function(){_addB.style.background='transparent';_addB.style.color='#1fd0a5';};
+        (function(en,ds){_addB.onclick=function(e){e.stopPropagation();openAddDefectForm(en,ds);};})(elevName,dropStr);
+        _hdr.appendChild(_hdrT);_hdr.appendChild(_addB);col.appendChild(_hdr);
         for (let f=maxF;f>=minF;f--) {
             const row=document.createElement('div');row.className='floor-row';
             const grp=document.createElement('div');grp.className='window-group';
@@ -2466,6 +2507,18 @@ function generateWallDOM(elevName) {
                     grp.appendChild(node);
                 });
             } else {const v=document.createElement('div');v.className='window-node status-void';grp.appendChild(v);}
+            Object.values(manualDefects).filter(function(md){return md.drop===dropStr&&Number(md.floor)===f;}).forEach(function(md){
+                var mdn=document.createElement('div');mdn.className='window-node '+md.status;
+                mdn.style.cssText='flex:none;width:52px;font-size:0.55rem;padding:2px 3px;border-style:dashed;position:relative;';
+                mdn.title=md.label;
+                (function(id){mdn.onclick=function(){openModal(id);};})(md.id);
+                var mxBtn=document.createElement('span');mxBtn.innerText='x';mxBtn.title='Delete';
+                mxBtn.style.cssText='position:absolute;top:1px;right:2px;font-size:0.65rem;color:rgba(231,76,60,0.6);cursor:pointer;z-index:2;line-height:1;font-weight:bold;';
+                mxBtn.onmouseover=function(){mxBtn.style.color='#e74c3c';};mxBtn.onmouseout=function(){mxBtn.style.color='rgba(231,76,60,0.6)';};
+                (function(id,lbl){mxBtn.onclick=function(e){e.stopPropagation();showConfirm('Delete?','Remove "'+lbl+'"?','DELETE',function(){delete manualDefects[id];delete repairPriorities[id];delete repairTags[id];delete repairFixed[id];delete saved3DTags[id];saveCommandState();calculateBuildingGeometry();refreshCurrentView();});};})(md.id,md.label);
+                var mlb=document.createElement('div');mlb.style.cssText='text-align:center;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-weight:bold;';mlb.innerText=md.label;
+                mdn.appendChild(mxBtn);mdn.appendChild(mlb);grp.appendChild(mdn);
+            });
             row.appendChild(grp);col.appendChild(row);
         }
         frag.appendChild(col);
@@ -2631,7 +2684,9 @@ function buildPhotoArea(nodes) {
     // Manual drop slot
     const slot=document.createElement('div');slot.className='drop-slot';
     slot.innerHTML='<span>+</span><span>Drop or click to manually add an IR photo</span>';
-    setupDropSlot(slot, nodes[0]?.id);
+    var _nid=nodes[0]?nodes[0].id:'';
+    if(_nid.startsWith('MANUAL-'))setupManualPhotoSlot(slot,_nid);
+    else setupDropSlot(slot,_nid);
     area.appendChild(slot);
 }
 
@@ -2839,6 +2894,7 @@ function updatePlannerBadge() {
 
 // -- Modal navigation --------------------------------------------
 function buildModalNavSequence(nodeId) {
+    if (nodeId.startsWith('MANUAL-')) return [];
     const parts = nodeId.split('-');
     const drop  = parts[0];
     if (!inspectionData[drop]) return [];
@@ -2948,8 +3004,8 @@ function openModal(nodeId) {
     document.getElementById('btn-unpin').style.display =hasTag?'block':'none';
     document.getElementById('btn-retag').style.display =hasTag?'block':'none';
 
-    document.getElementById('m-id').innerText   =activeNodeDataArray.map(d=>d.id).join(' + ');
-    document.getElementById('m-tech').innerText ='Logged by: '+[...new Set(activeNodeDataArray.map(d=>d.tech).filter(Boolean))].join(', ');
+    document.getElementById('m-id').innerText   =manualDefects[nodeId]?(primary.label||nodeId):activeNodeDataArray.map(function(d){return d.id;}).join(' + ');
+    document.getElementById('m-tech').innerText =manualDefects[nodeId]?([primary.elevation,primary.drop?'Drop '+primary.drop:'',primary.floor?'Floor '+primary.floor:'',primary.locationDetail].filter(Boolean).join(' · ')||'Custom Defect'):'Logged by: '+[...new Set(activeNodeDataArray.map(function(d){return d.tech;}).filter(Boolean))].join(', ');
     const allFinds=[...new Set(activeNodeDataArray.flatMap(d=>d.finds.split(' | ')))].filter(f=>f!=='CLEAR'&&f!=='');
     const finds=allFinds.length?allFinds:['CLEAR'];
     document.getElementById('m-finds').innerText   =finds.join(' | ');
@@ -2963,8 +3019,9 @@ function openModal(nodeId) {
     // Remove any open picker
     const picker = document.getElementById('rp-modal-picker');
     if (picker) picker.remove();
-    // Update planner button state
     updatePlannerBtn(nodeId);
+    var _xdb=document.getElementById('btn-md-delete');if(_xdb)_xdb.remove();
+    (function(nid,prim){var _pp=nid.split('-'),_pos=_pp[_pp.length-1];if(manualDefects[nid]||['L','C','R'].indexOf(_pos)===-1){var _lbl=manualDefects[nid]?prim.label:nid;var _db=document.createElement('button');_db.id='btn-md-delete';_db.className='btn btn-dark btn-block';_db.style.cssText='margin-top:8px;border-color:#e74c3c;color:#e74c3c;font-weight:bold;';_db.innerText='Delete This Defect';(function(id,lbl){_db.onclick=function(){showConfirm('Delete?','Remove "'+lbl+'" permanently?','DELETE',function(){if(manualDefects[id])delete manualDefects[id];else{var pp=id.split('-');if(pp.length>=3&&inspectionData[pp[0]]&&inspectionData[pp[0]][pp[1]])delete inspectionData[pp[0]][pp[1]][pp[2]];}delete repairPriorities[id];delete repairTags[id];delete repairFixed[id];delete saved3DTags[id];var pi=stitchedPairs.findIndex(function(pp){return pp.includes(id);});if(pi!==-1)stitchedPairs.splice(pi,1);saveCommandState();calculateBuildingGeometry();refreshCurrentView();closeModal();});};})(nid,_lbl);document.querySelector('#info-modal .modal-box').appendChild(_db);}})(nodeId,primary);
     // Show suggest button only if this window has zero photos
     const hasPhotos = activeNodeDataArray.some(n => nodePhotoNames(n).length > 0);
     const suggestBtn = document.getElementById('btn-suggest');
@@ -4220,6 +4277,643 @@ function updateLbUI(){
 function toggleLightboxView(){const e=imageBank[lbNames[lbIndex]];if(!e||!e.dcUrl)return;lbShowDC=!lbShowDC;updateLbUI();}
 function changeLightbox(dir){lbIndex=(lbIndex+dir+lbNames.length)%lbNames.length;updateLbUI();}
 function closeLightbox(){document.getElementById('lightbox-modal').style.display='none';resetLbZoom();}
+
+
+// REPORT BUILDER
+/* ============================================================================
+   STRATA — REPORT BUILDER TAB  (v1)
+   ============================================================================
+   A new FOURTH view mode for Strata. It turns your confirmed defects +
+   Repair-Planner items into a branded, client-facing PDF inspection report.
+
+   It READS your existing in-memory state directly — no export, no handoff:
+     inspectionData, imageBank, repairPriorities, repairTags, repairFixed,
+     dropAssignments, photoRotations, projectInfo,
+     getNodeData(), nodePhotoNames(), showToast()
+   It NEVER mutates inspectionData. Report-only choices (which photos, edited
+   descriptions, severity bumps, exec summary, client/address/etc.) are saved
+   in their own localStorage key 'strataReportMeta', so the report is fully
+   restored next time you open the tab.
+
+   ── INSTALL: three small ADDITIVE edits to Strata, then paste this file ─────
+
+   (1) Add the REPORT button to .view-controls, right after the TRUE 3D TWIN
+       button:
+         <button class="view-toggle-btn" id="btn-report"
+                 onclick="switchView('report')"
+                 style="background:#0a1f18;border:1px solid #1fd0a5;color:#1fd0a5;">
+             📄 REPORT
+         </button>
+
+   (2) Add the empty container inside #dashboard-screen, right after the
+       #arena-true3d block closes:
+         <div id="arena-report" style="display:none;flex-direction:column;
+              height:100%;width:100%;overflow:auto;"></div>
+
+   (3) Inside switchView(mode), add these lines (anywhere after `currentMode=mode;`):
+         const arRep = document.getElementById('arena-report');
+         if (arRep) arRep.style.display = mode==='report' ? 'flex' : 'none';
+         const bRep = document.getElementById('btn-report');
+         if (bRep) bRep.classList.toggle('active', mode==='report');
+         if (mode==='report') renderReportBuilder();
+
+   Then paste THIS ENTIRE FILE just before Strata's closing <\/script>.
+   Add it as a new block — don't overwrite anything.
+   ============================================================================ */
+
+// ── persistent report-only state ───────────────────────────────────────────
+let REPORT_META = {
+  client: '', building: '', address: '', date: '', inspector: '', reportNo: '',
+  execSummary: '',          // '' = auto-generate
+  sortBy: 'severity',       // 'severity' | 'elevation' | 'type'
+  confirmed: false,         // must review exec summary before export is unlocked
+  desc:     {},             // nodeId -> client description text
+  sev:      {},             // nodeId -> 'CRITICAL'|'HIGH'|'MEDIUM'|'LOW'
+  excluded: [],             // nodeIds explicitly left OUT (default = included)
+  photoOff: {}              // nodeId -> ['KEY:kind', ...] photos explicitly turned OFF
+};
+
+function loadReportMeta() {
+  try {
+    const raw = localStorage.getItem('strataReportMeta');
+    if (raw) REPORT_META = Object.assign(REPORT_META, JSON.parse(raw));
+  } catch (e) { console.warn('[report] meta load failed', e); }
+}
+function saveReportMeta() {
+  try { localStorage.setItem('strataReportMeta', JSON.stringify(REPORT_META)); }
+  catch (e) { console.warn('[report] meta save failed (quota?)', e); }
+}
+loadReportMeta();
+
+const RB_SEV_RANK   = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+const RB_SEV_COLOR  = { CRITICAL: '#b3122b', HIGH: '#d9534f', MEDIUM: '#f1c40f', LOW: '#28a745' };
+const RB_POS_NAME   = { L: 'Left', C: 'Centre', R: 'Right' };
+
+function rbEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// ── data readers (all derived from real Strata state) ───────────────────────
+function rbDefaultSeverity(nodeId, node) {
+  const p = repairPriorities[nodeId];
+  if (p === 'HIGH') return 'HIGH';
+  if (p === 'MED')  return 'MEDIUM';
+  if (p === 'LOW')  return 'LOW';
+  if (node.status === 'status-confirmed') return 'HIGH';
+  if (node.status === 'status-flagged')   return 'MEDIUM';
+  return 'LOW';
+}
+function rbSeverity(nodeId, node) {
+  return REPORT_META.sev[nodeId] || rbDefaultSeverity(nodeId, node);
+}
+function rbTags(nodeId, node) {
+  let tags = (repairTags[nodeId] && repairTags[nodeId].length) ? repairTags[nodeId].slice() : [];
+  if (!tags.length) {
+    const f = (node.finds || '').toUpperCase();
+    if (f.includes('SEALANT') || f.includes('CAULK')) tags.push('Sealant / Caulking');
+    if (f.includes('SPALL')) tags.push('Spalling');
+    if (f.includes('CRACK')) tags.push('Crack');
+    if (f.includes('MOISTURE') || f.includes('WATER') || f.includes('WET')) tags.push('Moisture');
+  }
+  return tags;
+}
+function rbLocation(drop, floor, pos) {
+  const elev = dropAssignments[drop] || `Drop ${drop}`;
+  return `${elev} · Floor ${floor} · ${RB_POS_NAME[pos] || pos}`;
+}
+// Per defect: one row per IR image, exposing thermal (url) + visual (dcUrl)
+function rbPhotoItems(node) {
+  const items = [];
+  nodePhotoNames(node).forEach(key => {
+    const img = imageBank[key];
+    if (!img) return;
+    if (img.url)   items.push({ key, kind: 'thermal', url: img.url,   rot: photoRotations[key] || 0 });
+    if (img.dcUrl) items.push({ key, kind: 'visual',  url: img.dcUrl, rot: photoRotations[key] || 0 });
+  });
+  return items;
+}
+function rbIsIncluded(nodeId) { return REPORT_META.excluded.indexOf(nodeId) === -1; }
+function rbIsPhotoOn(nodeId, sel) {
+  const off = REPORT_META.photoOff[nodeId] || [];
+  return off.indexOf(sel) === -1;
+}
+
+// Candidate defects: confirmed OR in the repair planner. Sorted by severity.
+function rbCandidates() {
+  const out = [];
+  Object.keys(inspectionData).forEach(drop => {
+    Object.keys(inspectionData[drop]).map(Number).sort((a, b) => a - b).forEach(floor => {
+      const posOrder = { L: 1, C: 2, R: 3 };
+      Object.keys(inspectionData[drop][floor])
+        .sort((a, b) => (posOrder[a] || 9) - (posOrder[b] || 9))
+        .forEach(pos => {
+          const node = inspectionData[drop][floor][pos];
+          if (!node) return;
+          const nodeId = drop + '-' + floor + '-' + pos;
+          const confirmed = node.status === 'status-confirmed';
+          const inPlanner = !!repairPriorities[nodeId];
+          if (confirmed || inPlanner) out.push({ nodeId, node, drop, floor: +floor, pos, isFixed: !!repairFixed[nodeId] });
+        });
+    });
+  });
+  // Manual (non-window) defects
+  Object.values(manualDefects).forEach(node => {
+    const confirmed = node.status === 'status-confirmed';
+    const inPlanner = !!repairPriorities[node.id];
+    if (confirmed || inPlanner) out.push({ nodeId: node.id, node, drop: 'MANUAL', floor: node.floor||0, pos: '', isManual: true, isFixed: !!repairFixed[node.id] });
+  });
+  out.sort((a, b) =>
+    RB_SEV_RANK[rbSeverity(a.nodeId, a.node)] - RB_SEV_RANK[rbSeverity(b.nodeId, b.node)]);
+  return out;
+}
+
+function rbBuildExecSummary(cands) {
+  const c = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
+  cands.filter(x => rbIsIncluded(x.nodeId)).forEach(x => { c[rbSeverity(x.nodeId, x.node)]++; });
+  const total = c.CRITICAL + c.HIGH + c.MEDIUM + c.LOW;
+  const b = REPORT_META.building || projectInfo || 'the building';
+  return `A thermal and visual rope-access inspection was carried out on the façades of ${b}. `
+    + `A total of ${total} defect`
+    + `${total !== 1 ? 's were' : ' was'} identified and documented. Of these, `
+    + `${c.CRITICAL} ${c.CRITICAL === 1 ? 'is' : 'are'} classified critical, ${c.HIGH} high, `
+    + `${c.MEDIUM} medium and ${c.LOW} low priority. Each finding below includes its location, `
+    + `severity, a description of the observed condition, and supporting thermal and/or visual `
+    + `imagery. Recommended remedial actions should be prioritised in order of severity.`;
+}
+
+// ── event handlers (update state + persist + minimal DOM) ───────────────────
+function rbSetMeta(field, val) { REPORT_META[field] = val; saveReportMeta(); }
+function rbSetDesc(nodeId, val) { REPORT_META.desc[nodeId] = val; saveReportMeta(); }
+function rbSetSeverity(nodeId, val) {
+  REPORT_META.sev[nodeId] = val; saveReportMeta();
+  const badge = document.getElementById('rb-sevbadge-' + nodeId);
+  if (badge) { badge.style.background = RB_SEV_COLOR[val]; badge.style.color = val === 'MEDIUM' ? '#000' : '#fff'; badge.innerText = val; }
+}
+function rbToggleInclude(nodeId, on) {
+  const i = REPORT_META.excluded.indexOf(nodeId);
+  if (on && i !== -1) REPORT_META.excluded.splice(i, 1);
+  if (!on && i === -1) REPORT_META.excluded.push(nodeId);
+  saveReportMeta();
+  const card = document.getElementById('rb-card-' + nodeId);
+  if (card) card.style.opacity = on ? '1' : '0.4';
+}
+function rbTogglePhoto(nodeId, key, kind, el) {
+  const sel = key + ':' + kind;
+  if (!REPORT_META.photoOff[nodeId]) REPORT_META.photoOff[nodeId] = [];
+  const arr = REPORT_META.photoOff[nodeId];
+  const i = arr.indexOf(sel);
+  let nowOn;
+  if (i === -1) { arr.push(sel); nowOn = false; } else { arr.splice(i, 1); nowOn = true; }
+  saveReportMeta();
+  if (el) {
+    el.style.outline = nowOn ? '3px solid #1fd0a5' : '3px solid transparent';
+    el.style.opacity = nowOn ? '1' : '0.4';
+  }
+}
+function rbRegenSummary() {
+  REPORT_META.execSummary = rbBuildExecSummary(rbCandidates());
+  saveReportMeta();
+  const ta = document.getElementById('rb-exec');
+  if (ta) ta.value = REPORT_META.execSummary;
+}
+
+// ── render the tab ──────────────────────────────────────────────────────────
+
+// ── Sorting / grouping helpers ───────────────────────────────────────────────
+function rbGetElevation(drop, floor, pos, nodeId) {
+  if (drop === 'MANUAL') return manualDefects[nodeId]?.elevation || 'Custom Defects';
+  return dropAssignments[drop] || `Drop ${drop}`;
+}
+function rbGetDefectType(nodeId, node) {
+  const tags = rbTags(nodeId, node);
+  if (tags.length) return tags[0];
+  const f = (node.finds || '').trim();
+  return f || 'Uncategorised';
+}
+function rbGroupCandidates(cands) {
+  const sortBy = REPORT_META.sortBy || 'severity';
+  if (sortBy === 'severity') {
+    return [{ label: null, items: cands }];
+  }
+  const groups = {};
+  const order  = [];
+  cands.forEach(c => {
+    const key = sortBy === 'elevation'
+      ? rbGetElevation(c.drop, c.floor, c.pos, c.nodeId)
+      : rbGetDefectType(c.nodeId, c.node);
+    if (!groups[key]) { groups[key] = []; order.push(key); }
+    groups[key].push(c);
+  });
+  order.sort((a, b) => a.localeCompare(b));
+  return order.map(label => ({ label, items: groups[label] }));
+}
+
+function rbConfirmReport() {
+  // save whatever is currently in the textarea, then confirm
+  const ta = document.getElementById('rb-exec-ta');
+  if (ta) { REPORT_META.execSummary = ta.value.trim(); }
+  REPORT_META.confirmed = true;
+  saveReportMeta();
+  renderReportBuilder();
+  showToast('[OK] Report confirmed — Export Client Package is now unlocked.', 3500);
+}
+
+function rbDoSort(s) {
+  REPORT_META.sortBy = s;
+  saveReportMeta();
+  renderReportBuilder();
+}
+
+function renderReportBuilder() {
+  const root = document.getElementById('arena-report');
+  if (!root) { console.warn('[report] #arena-report container missing — see install step 2'); return; }
+
+  // seed building/date if empty
+  if (!REPORT_META.building) REPORT_META.building = projectInfo && projectInfo !== 'Unknown Project' ? projectInfo : '';
+  if (!REPORT_META.date) REPORT_META.date = new Date().toISOString().slice(0, 10);
+
+  const cands = rbCandidates();
+  const execVal = REPORT_META.execSummary || rbBuildExecSummary(cands);
+
+  const metaField = (id, label, val, ph) =>
+    `<div style="display:flex;flex-direction:column;gap:4px;">
+       <label style="font-size:0.68rem;color:#888;text-transform:uppercase;font-weight:bold;letter-spacing:0.5px;">${label}</label>
+       <input type="text" value="${rbEsc(val)}" placeholder="${rbEsc(ph || '')}"
+              oninput="rbSetMeta('${id}', this.value)"
+              style="background:#111;border:1px solid #2a2d38;color:#fff;border-radius:6px;padding:9px 11px;font-size:0.9rem;">
+     </div>`;
+
+  let html = `
+  <div style="max-width:980px;margin:0 auto;width:100%;padding:4px 4px 40px;">
+
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;">
+      <div>
+        <div style="font-size:1.5rem;font-weight:900;color:#1fd0a5;">📄 Report Builder</div>
+        <div style="color:#888;font-size:0.85rem;">${cands.length} candidate defect${cands.length !== 1 ? 's' : ''} (confirmed or in Repair Planner)</div>
+      <div style="display:flex;gap:6px;align-items:center;margin-top:8px;">
+        <span style="font-size:0.65rem;color:#555;text-transform:uppercase;font-weight:bold;letter-spacing:0.5px;">Sort by</span>
+        <button onclick="rbDoSort('severity')"  style="padding:4px 12px;font-size:0.72rem;font-weight:bold;border-radius:4px;cursor:pointer;background:${(REPORT_META.sortBy||'severity')==='severity'?'#1fd0a5':'transparent'};color:${(REPORT_META.sortBy||'severity')==='severity'?'#000':'#888'};border:1px solid ${(REPORT_META.sortBy||'severity')==='severity'?'#1fd0a5':'#333'};">Severity</button>
+        <button onclick="rbDoSort('elevation')" style="padding:4px 12px;font-size:0.72rem;font-weight:bold;border-radius:4px;cursor:pointer;background:${(REPORT_META.sortBy||'severity')==='elevation'?'#1fd0a5':'transparent'};color:${(REPORT_META.sortBy||'severity')==='elevation'?'#000':'#888'};border:1px solid ${(REPORT_META.sortBy||'severity')==='elevation'?'#1fd0a5':'#333'};">Elevation</button>
+        <button onclick="rbDoSort('type')"      style="padding:4px 12px;font-size:0.72rem;font-weight:bold;border-radius:4px;cursor:pointer;background:${(REPORT_META.sortBy||'severity')==='type'?'#1fd0a5':'transparent'};color:${(REPORT_META.sortBy||'severity')==='type'?'#000':'#888'};border:1px solid ${(REPORT_META.sortBy||'severity')==='type'?'#1fd0a5':'#333'};">Defect Type</button>
+      </div>
+      </div>
+      <div style="display:flex;gap:10px;flex-shrink:0;">
+        <button onclick="REPORT_META.confirmed ? exportClientPackage() : showToast('Please confirm the executive summary first — click the green Confirm button below it.', 4000, true)"
+          style="padding:14px 22px;background:#0a1f18;color:#1fd0a5;border:1px solid #1fd0a5;border-radius:8px;font-weight:900;font-size:0.95rem;letter-spacing:0.5px;cursor:pointer;text-transform:uppercase;white-space:nowrap;"
+          id="btn-export-pkg"
+          title="${REPORT_META.confirmed ? 'Export client package' : 'Review and confirm the executive summary first'}"
+          style="padding:14px 22px;background:${REPORT_META.confirmed ? '#0a1f18' : '#111'};color:${REPORT_META.confirmed ? '#1fd0a5' : '#444'};border:1px solid ${REPORT_META.confirmed ? '#1fd0a5' : '#2a2d38'};border-radius:8px;font-weight:900;font-size:0.95rem;letter-spacing:0.5px;cursor:${REPORT_META.confirmed ? 'pointer' : 'not-allowed'};text-transform:uppercase;white-space:nowrap;">
+          📦 Export Client Package
+        </button>
+        <button onclick="generateReportPDF()"
+          style="padding:14px 22px;background:#1e293b;color:#fff;border:1px solid #475569;border-radius:8px;font-weight:900;font-size:0.95rem;letter-spacing:0.5px;cursor:pointer;text-transform:uppercase;white-space:nowrap;"
+          title="Generate a static PDF for printing, signing, and archiving">
+          🖨 Generate PDF
+        </button>
+      </div>
+    </div>
+
+    <div style="background:#1a1d27;border:1px solid #2a2d38;border-radius:12px;padding:18px;margin-bottom:16px;">
+      <div style="font-size:0.8rem;color:#0cf;text-transform:uppercase;font-weight:bold;letter-spacing:1px;margin-bottom:14px;">Project Details</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        ${metaField('client',   'Client',           REPORT_META.client,   'e.g. Acme Property Group')}
+        ${metaField('building', 'Building',          REPORT_META.building, projectInfo)}
+        ${metaField('address',  'Address',           REPORT_META.address,  'Street, City')}
+        ${metaField('date',     'Inspection Date',   REPORT_META.date,     'YYYY-MM-DD')}
+        ${metaField('inspector','Lead Inspector',    REPORT_META.inspector,'Full name')}
+        ${metaField('reportNo', 'Report No.',        REPORT_META.reportNo, 'e.g. VRT-2026-014')}
+      </div>
+    </div>
+
+    <div style="background:#1a1d27;border:1px solid #2a2d38;border-radius:12px;padding:18px;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="font-size:0.8rem;color:#0cf;text-transform:uppercase;font-weight:bold;letter-spacing:1px;">Executive Summary</div>
+        <button onclick="rbRegenSummary()"
+          style="padding:6px 12px;background:#0a1a2a;color:#0cf;border:1px solid #0cf;border-radius:6px;font-size:0.72rem;font-weight:bold;cursor:pointer;">↻ Regenerate from data</button>
+      </div>
+      <textarea id="rb-exec" id="rb-exec-ta" oninput="REPORT_META.confirmed=false;rbSetMeta('execSummary', this.value)"
+        style="width:100%;min-height:120px;background:#111;border:1px solid #2a2d38;color:#fff;border-radius:6px;padding:12px;font-family:inherit;font-size:0.9rem;line-height:1.55;resize:vertical;box-sizing:border-box;">${rbEsc(execVal)}</textarea>
+    </div>
+
+    <div style="font-size:0.8rem;color:#0cf;text-transform:uppercase;font-weight:bold;letter-spacing:1px;margin:18px 4px 10px;">Findings</div>`;
+
+  if (!cands.length) {
+    html += `<div style="padding:40px;text-align:center;color:#444;border:1px dashed #2a2d38;border-radius:12px;">
+      No confirmed defects or Repair-Planner items yet.<br>
+      <span style="font-size:0.85rem;color:#333;">Mark windows as <strong style="color:#d9534f;">DEFECT</strong> or add them to the Repair Planner, then come back.</span>
+    </div>`;
+  }
+
+  let _wsGroupIdx = 0;
+  rbGroupCandidates(cands).forEach(({ label: _wsLabel, items: _wsItems }) => {
+    if (_wsLabel) {
+      html += `<div style="margin:20px 0 8px;padding:7px 12px;background:#12161f;border-left:4px solid #1fd0a5;border-radius:0 6px 6px 0;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:0.68rem;font-weight:bold;text-transform:uppercase;letter-spacing:1px;color:#1fd0a5;">${rbEsc(_wsLabel)}</span>
+        <span style="font-size:0.65rem;color:#555;">${_wsItems.length} defect${_wsItems.length!==1?'s':''}</span>
+      </div>`;
+    }
+    _wsItems.forEach((c, idx) => {
+    idx = _wsGroupIdx++;
+    const { nodeId, node, drop, floor, pos } = c;
+    const sev = rbSeverity(nodeId, node);
+    const desc = REPORT_META.desc[nodeId] != null ? REPORT_META.desc[nodeId] : (node.notes || '');
+    const tags = rbTags(nodeId, node);
+    const items = rbPhotoItems(node);
+    const included = rbIsIncluded(nodeId);
+
+    const sevOpts = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
+      .map(s => `<option value="${s}"${s === sev ? ' selected' : ''}>${s}</option>`).join('');
+
+    const tagChips = tags.length
+      ? tags.map(t => `<span style="display:inline-block;padding:2px 9px;font-size:0.68rem;font-weight:bold;border-radius:3px;background:#2a2d38;color:#aaa;border:1px solid #444;">${rbEsc(t)}</span>`).join(' ')
+      : '<span style="color:#555;font-size:0.72rem;">no defect type tagged</span>';
+
+    let thumbs = '';
+    if (items.length) {
+      items.forEach(it => {
+        const sel = it.key + ':' + it.kind;
+        const on = rbIsPhotoOn(nodeId, sel);
+        const kindLbl = it.kind === 'thermal' ? '🌡 IR' : '📷 DC';
+        const kindCol = it.kind === 'thermal' ? '#ff6b35' : '#9ad';
+        thumbs += `
+          <div onclick="rbTogglePhoto('${nodeId}','${it.key}','${it.kind}',this)"
+               style="position:relative;flex:0 0 auto;cursor:pointer;border-radius:6px;outline:3px solid ${on ? '#1fd0a5' : 'transparent'};opacity:${on ? '1' : '0.4'};transition:0.12s;">
+            <img src="${it.url}" style="width:118px;height:88px;object-fit:cover;border-radius:6px;display:block;background:#000;${it.rot ? `transform:rotate(${it.rot}deg);` : ''}">
+            <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.72);color:${kindCol};font-size:0.6rem;font-weight:bold;text-align:center;padding:2px;border-radius:0 0 5px 5px;">${kindLbl} · ${rbEsc(it.key.split('_').pop())}</div>
+          </div>`;
+      });
+    } else {
+      thumbs = '<span style="color:#555;font-size:0.78rem;padding:8px 0;">No photos linked to this window.</span>';
+    }
+
+    html += `
+    <div id="rb-card-${nodeId}" style="background:#1a1d27;border:1px solid #2a2d38;border-radius:12px;padding:16px;margin-bottom:12px;opacity:${included ? '1' : '0.4'};">
+      <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:12px;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;flex-shrink:0;margin-top:3px;">
+          <input type="checkbox" ${included ? 'checked' : ''} onchange="rbToggleInclude('${nodeId}', this.checked)" style="width:18px;height:18px;cursor:pointer;accent-color:#1fd0a5;">
+        </label>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span style="font-size:1.1rem;font-weight:900;color:#0cf;">${rbEsc(nodeId)}</span>
+            <span id="rb-sevbadge-${nodeId}" style="padding:2px 10px;border-radius:4px;font-size:0.7rem;font-weight:900;background:${RB_SEV_COLOR[sev]};color:${sev === 'MEDIUM' ? '#000' : '#fff'};">${sev}</span>
+            <span style="color:#888;font-size:0.82rem;">${rbEsc(rbLocation(drop, floor, pos))}</span>
+          </div>
+          <div style="margin-top:7px;">${tagChips}</div>
+        </div>
+        <select onchange="rbSetSeverity('${nodeId}', this.value)"
+          style="flex-shrink:0;background:#111;border:1px solid #2a2d38;color:#fff;border-radius:6px;padding:7px 9px;font-size:0.78rem;font-weight:bold;cursor:pointer;">
+          ${sevOpts}
+        </select>
+      </div>
+
+      <label style="font-size:0.68rem;color:#888;text-transform:uppercase;font-weight:bold;letter-spacing:0.5px;">Client Description</label>
+      <textarea oninput="rbSetDesc('${nodeId}', this.value)" placeholder="Describe the observed condition for the client…"
+        style="width:100%;min-height:62px;background:#111;border:1px solid #2a2d38;color:#fff;border-radius:6px;padding:10px;margin:5px 0 12px;font-family:inherit;font-size:0.88rem;line-height:1.5;resize:vertical;box-sizing:border-box;">${rbEsc(desc)}</textarea>
+
+      <label style="font-size:0.68rem;color:#888;text-transform:uppercase;font-weight:bold;letter-spacing:0.5px;">Photos for report <span style="color:#1fd0a5;">(teal outline = included)</span></label>
+      <div style="display:flex;gap:8px;overflow-x:auto;padding:8px 0 2px;">${thumbs}</div>
+    </div>`;
+  }); }); // close _wsItems + rbGroupCandidates
+
+  html += `</div>`;
+  root.innerHTML = html;
+}
+
+// ── PDF: clean print window (Save as PDF) ───────────────────────────────────
+function rbBuildReportHTML() {
+  const cands = rbCandidates().filter(c => rbIsIncluded(c.nodeId));
+  if (!cands.length) { showToast('No defects selected for the report.', 3500, true); return; }
+
+  const M = REPORT_META;
+  const building = rbEsc(M.building || projectInfo || 'Inspection');
+  const execVal = rbEsc(M.execSummary || rbBuildExecSummary(rbCandidates()));
+
+  const metaRow = (k, v) => v ? `<tr><td class="mk">${rbEsc(k)}</td><td class="mv">${rbEsc(v)}</td></tr>` : '';
+
+  let defectsHtml = '';
+  let _globalIdx = 0;
+  rbGroupCandidates(cands).forEach(({ label: _groupLabel, items: _groupItems }) => {
+    if (_groupLabel) {
+      defectsHtml += `<div style="margin:24px 0 10px;padding:8px 12px;background:#1a1d27;border-left:4px solid #1fd0a5;border-radius:0 6px 6px 0;">
+        <span style="font-size:0.7rem;text-transform:uppercase;font-weight:bold;letter-spacing:1px;color:#1fd0a5;">${rbEsc(_groupLabel)}</span>
+        <span style="font-size:0.65rem;color:#555;margin-left:8px;">${_groupItems.length} defect${_groupItems.length!==1?'s':''}</span>
+      </div>`;
+    }
+    _groupItems.forEach((c) => {
+    const idx = _globalIdx++;
+    const { nodeId, node, drop, floor, pos } = c;
+    const sev = rbSeverity(nodeId, node);
+    const desc = (M.desc[nodeId] != null ? M.desc[nodeId] : (node.notes || '')) || 'No description provided.';
+    const tags = rbTags(nodeId, node);
+    const items = rbPhotoItems(node).filter(it => rbIsPhotoOn(nodeId, it.key + ':' + it.kind));
+
+    const photoCells = items.map(it => `
+      <figure class="ph">
+        <div class="phbox"><img src="${it.url}" ${it.rot ? `style="transform:rotate(${it.rot}deg);"` : ''}></div>
+        <figcaption>${it.kind === 'thermal' ? 'Thermal (IR)' : 'Visual (DC)'} · ${rbEsc(it.key.split('_').pop())}</figcaption>
+      </figure>`).join('');
+
+    defectsHtml += `
+    <section class="defect">
+      <div class="dh">
+        <div class="dnum">${idx + 1}</div>
+        <div class="dhi">
+          <h3>${rbEsc(nodeId)} <span class="sev sev-${sev}">${sev}</span></h3>
+          <div class="loc">${rbEsc(rbLocation(drop, floor, pos))}</div>
+          ${tags.length ? `<div class="tags">${tags.map(t => `<span>${rbEsc(t)}</span>`).join('')}</div>` : ''}
+        </div>
+      </div>
+      <p class="ddesc">${rbEsc(desc)}</p>
+      ${items.length ? `<div class="photos">${photoCells}</div>` : '<p class="nophoto">No photographs selected for this finding.</p>'}
+    </section>`;
+  }); }); // close _grpItems + rbGroupCandidates
+
+  const doc = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${building} — Inspection Report</title>
+<style>
+  @page { size: letter; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1e293b; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  h1,h2,h3 { font-family: Georgia, 'Times New Roman', serif; }
+  .cover { padding: 60px 8px 8px; min-height: 88vh; display: flex; flex-direction: column; }
+  .cover h1 { font-size: 42px; line-height: 1.1; margin: 0 0 6px; color: #0f172a; }
+  .cover .sub { font-size: 16px; color: #64748b; margin-bottom: 40px; }
+  table.meta { border-collapse: collapse; margin-top: auto; width: 60%; }
+  table.meta td { padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-size: 13.5px; vertical-align: top; }
+  td.mk { color: #94a3b8; text-transform: uppercase; font-size: 10.5px; letter-spacing: 1px; font-weight: bold; width: 38%; padding-right: 14px; }
+  td.mv { color: #1e293b; font-weight: 600; }
+  .page-break { page-break-before: always; }
+  .secttitle { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: #374151; font-weight: 800; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin: 0 0 16px; }
+  .execbody { font-size: 13.5px; line-height: 1.7; color: #334155; white-space: pre-wrap; }
+  .defect { page-break-inside: avoid; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; }
+  .dh { display: flex; gap: 14px; align-items: flex-start; }
+  .dnum { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; background: #374151; color: #fff; font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+  .dhi h3 { margin: 0 0 3px; font-size: 18px; color: #0f172a; }
+  .loc { font-size: 12.5px; color: #64748b; }
+  .tags { margin-top: 6px; }
+  .tags span { display: inline-block; font-size: 10px; font-weight: bold; color: #475569; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 3px; padding: 2px 8px; margin-right: 4px; }
+  .sev { font-size: 10px; font-weight: 800; padding: 2px 9px; border-radius: 4px; vertical-align: middle; margin-left: 6px; color: #fff; }
+  .sev-CRITICAL { background: #b3122b; } .sev-HIGH { background: #d9534f; } .sev-MEDIUM { background: #f1c40f; color: #1a1205; } .sev-LOW { background: #28a745; }
+  .ddesc { font-size: 13px; line-height: 1.6; color: #334155; margin: 12px 0 14px; }
+  .photos { display: flex; flex-wrap: wrap; gap: 12px; }
+  figure.ph { margin: 0; flex: 0 0 calc(50% - 6px); }
+  .phbox { width: 100%; aspect-ratio: 4/3; overflow: hidden; border-radius: 6px; background: #1e293b; display: flex; align-items: center; justify-content: center; }
+  .phbox img { width: 100%; height: 100%; object-fit: contain; }
+  figure.ph figcaption { font-size: 10.5px; color: #64748b; margin-top: 5px; font-weight: 600; }
+  .nophoto { font-size: 12px; color: #94a3b8; font-style: italic; }
+  .footer { margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; font-size: 10px; color: #94a3b8; }
+  .printbtn { position: fixed; top: 14px; right: 14px; background: #1e293b; color: #fff; border: none; padding: 12px 18px; border-radius: 8px; font-weight: 800; cursor: pointer; font-size: 13px; }
+  @media print { .printbtn { display: none; } }
+</style></head><body>
+  <button class="printbtn" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <div class="cover">
+    <h1>Façade Inspection Report</h1>
+    <div class="sub">${building}</div>
+    <table class="meta">
+      ${metaRow('Client', M.client)}
+      ${metaRow('Building', M.building || projectInfo)}
+      ${metaRow('Address', M.address)}
+      ${metaRow('Inspection Date', M.date)}
+      ${metaRow('Lead Inspector', M.inspector)}
+      ${metaRow('Report No.', M.reportNo)}
+    </table>
+  </div>
+
+  <div class="page-break"></div>
+  <h2 class="secttitle">Executive Summary</h2>
+  <div class="execbody">${execVal}</div>
+
+  <div class="page-break"></div>
+  <h2 class="secttitle">Findings (${cands.length})</h2>
+  ${defectsHtml}
+
+  <div class="footer">Generated ${rbEsc(new Date().toLocaleDateString())}</div>
+
+<script>
+  // Wait for images to decode, then open the print dialog
+  (function(){
+    var imgs = Array.prototype.slice.call(document.images);
+    var pending = imgs.filter(function(i){ return !i.complete; }).length;
+    function go(){ setTimeout(function(){ window.focus(); window.print(); }, 350); }
+    if (!pending) { go(); return; }
+    imgs.forEach(function(i){
+      if (i.complete) return;
+      i.addEventListener('load',  function(){ if(--pending<=0) go(); });
+      i.addEventListener('error', function(){ if(--pending<=0) go(); });
+    });
+  })();
+<\/script>
+</body></html>`;
+
+  return doc;
+}
+
+function generateReportPDF() {
+  const doc = rbBuildReportHTML();
+  if (!doc) { showToast('No defects included — check the report settings first.', 4000, true); return; }
+  const w = window.open('', '_blank');
+  if (!w) { showToast('Pop-up blocked — allow pop-ups to generate the PDF.', 5000, true); return; }
+  w.document.open();
+  w.document.write(doc);
+  w.document.close();
+}
+
+// ── Export Client Package ────────────────────────────────────────────────────
+// Writes a single JSON file containing everything the interactive client portal
+// needs: defect data, 3D pin positions, selected photos (as base64), Cesium
+// twin ID, and all report metadata.
+function exportClientPackage() {
+  const allCands = rbCandidates();
+  const cands    = allCands.filter(c => rbIsIncluded(c.nodeId));
+  if (!cands.length) {
+    showToast('No defects included — check the report settings first.', 4000, true);
+    return;
+  }
+
+  const M = REPORT_META;
+
+  showToast('Building client package…', 30000);
+
+  const findings = cands.map(({ nodeId, node, drop, floor, pos }) => {
+    const sev   = rbSeverity(nodeId, node);
+    const tags  = rbTags(nodeId, node);
+    const desc  = (M.desc[nodeId] != null ? M.desc[nodeId] : (node.notes || '')) || '';
+    const tag3d = saved3DTags[nodeId] || null;
+
+    // Only include photos the user selected (teal-outlined in the workspace)
+    const photos = rbPhotoItems(node)
+      .filter(it => rbIsPhotoOn(nodeId, it.key + ':' + it.kind))
+      .map(it => ({ kind: it.kind, key: it.key, dataUrl: it.url, rot: it.rot || 0 }));
+
+    return {
+      nodeId, drop, floor, pos,
+      severity:    sev,
+      tags,
+      location:    rbLocation(drop, floor, pos),
+      description: desc,
+      finds:       node.finds  || '',
+      status:      node.status || '',
+      tag3d,       // { position, normal } — null if window was never tagged on the twin
+      photos
+    };
+  });
+
+  const reportHtml = rbBuildReportHTML();
+
+  const pkg = {
+    schema:    'strata-client-v1',
+    exported:  new Date().toISOString(),
+    project: {
+      name:      M.building    || projectInfo || '',
+      client:    M.client      || '',
+      building:  M.building    || projectInfo || '',
+      address:   M.address     || '',
+      date:      M.date        || '',
+      inspector: M.inspector   || '',
+      reportNo:  M.reportNo    || ''
+    },
+    execSummary:     M.execSummary || rbBuildExecSummary(allCands),
+    cesiumAssetId:   cesiumAssetId || 0,
+    elevations:      elevations    || [],
+    dropAssignments: dropAssignments || {},
+    findings,
+    reportHtml: reportHtml || null
+  };
+
+  try {
+    const json = JSON.stringify(pkg);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    const ts   = new Date().toISOString().slice(0, 10);
+    const name = (M.building || projectInfo || 'Inspection').replace(/\s+/g, '_');
+    a.download = `${name}_ClientPackage_${ts}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    const totalPhotos = findings.reduce((n, f) => n + f.photos.length, 0);
+    const tagged = findings.filter(f => f.tag3d).length;
+    const untagged = findings.length - tagged;
+
+    let msg = `[OK] Client package ready — ${findings.length} findings, ${totalPhotos} photos`;
+    if (untagged > 0) msg += `. Note: ${untagged} finding${untagged > 1 ? 's have' : ' has'} no 3D pin — tag them in the TRUE 3D TWIN tab first.`;
+    showToast(msg, 7000);
+  } catch(e) {
+    showToast('[WARN] Export failed: ' + e.message, 8000, true);
+  }
+}
+
+
+// MANUAL DEFECTS
+
+function restoreManualDefectPhotos(){Object.values(manualDefects).forEach(function(node){var epd=node.embeddedPhotoData||{};Object.keys(epd).forEach(function(key){if(!imageBank[key])imageBank[key]={url:epd[key],dcUrl:null,time:null,drop:'MANUAL'};});});if(typeof updatePhotoStat==='function')updatePhotoStat();}
+function setupManualPhotoSlot(slotEl,nodeId){function ingest(file){if(!file||!file.size||!file.type.startsWith('image/'))return;var reader=new FileReader();reader.onload=function(ev){var node=manualDefects[nodeId];if(!node)return;var key=nodeId+'_'+Date.now();imageBank[key]={url:ev.target.result,dcUrl:null,time:null,drop:'MANUAL'};if(!node.embeddedPhotoData)node.embeddedPhotoData={};node.embeddedPhotoData[key]=ev.target.result;if(!node.photos)node.photos=[];if(node.photos.indexOf(key)===-1)node.photos.push(key);saveCommandState();if(typeof updatePhotoStat==='function')updatePhotoStat();if(modalNodeId===nodeId)openModal(nodeId);};reader.readAsDataURL(file);}slotEl.addEventListener('dragover',function(e){e.preventDefault();slotEl.classList.add('drag-over');});slotEl.addEventListener('dragleave',function(){slotEl.classList.remove('drag-over');});slotEl.addEventListener('drop',function(e){e.preventDefault();e.stopPropagation();slotEl.classList.remove('drag-over');Array.from(e.dataTransfer.files).forEach(ingest);});slotEl.addEventListener('click',function(){var i=document.createElement('input');i.type='file';i.accept='image/*';i.multiple=true;i.onchange=function(){Array.from(i.files).forEach(ingest);};i.click();});}
+function openAddDefectForm(elevation,preselectedDrop){var existing=document.getElementById('md-overlay');if(existing){existing.remove();return;}var drops=Object.keys(inspectionData).filter(function(d){return dropAssignments[d]===elevation;}).sort();if(!drops.length){showToast('No drops assigned to this elevation yet.',3000,true);return;}var overlay=document.createElement('div');overlay.id='md-overlay';overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:5000;display:flex;align-items:center;justify-content:center;';overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};var dropOpts=drops.map(function(d){return '<option value="'+d+'"'+(d===preselectedDrop?' selected':'')+'>Drop '+d+'</option>';}).join('');var box=document.createElement('div');box.style.cssText='background:#1a1d27;border:1px solid #1fd0a5;border-radius:12px;padding:24px;width:min(540px,92vw);box-shadow:0 15px 35px rgba(0,0,0,0.9);';box.innerHTML='<div style="color:#1fd0a5;font-size:0.8rem;font-weight:bold;text-transform:uppercase;letter-spacing:1px;margin-bottom:16px;">Add Custom Defect - '+elevation+'</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;"><div style="grid-column:1/-1;"><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Defect Name *</label><input id="md-f-label" type="text" placeholder="e.g. Expansion Joint" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;"></div><div><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Drop *</label><select id="md-f-drop" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;">'+dropOpts+'</select></div><div><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Floor *</label><select id="md-f-floor" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;"></select></div><div style="grid-column:1/-1;"><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Location Detail</label><input id="md-f-loc" type="text" placeholder="e.g. NW corner" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;"></div></div><div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;"><span style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;flex-shrink:0;">Status</span><button id="md-f-flagged" style="padding:7px 16px;border-radius:5px;border:1px solid #f1c40f;background:transparent;color:#f1c40f;font-size:0.8rem;font-weight:bold;cursor:pointer;">FLAGGED</button><button id="md-f-confirmed" style="padding:7px 16px;border-radius:5px;border:1px solid #d9534f;background:#d9534f;color:#fff;font-size:0.8rem;font-weight:bold;cursor:pointer;">DEFECT</button></div><div style="display:flex;gap:10px;"><button id="md-f-add" style="flex:1;padding:11px;background:#1fd0a5;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;">ADD DEFECT</button><button id="md-f-cancel" style="padding:11px 18px;background:#222;color:#888;border:1px solid #444;border-radius:6px;cursor:pointer;">CANCEL</button></div>';overlay.appendChild(box);document.body.appendChild(overlay);var status='status-confirmed';mdPopulateFloors();document.getElementById('md-f-drop').onchange=mdPopulateFloors;document.getElementById('md-f-flagged').onclick=function(){status='status-flagged';this.style.background='#f1c40f';this.style.color='#000';document.getElementById('md-f-confirmed').style.background='transparent';document.getElementById('md-f-confirmed').style.color='#d9534f';};document.getElementById('md-f-confirmed').onclick=function(){status='status-confirmed';this.style.background='#d9534f';this.style.color='#fff';document.getElementById('md-f-flagged').style.background='transparent';document.getElementById('md-f-flagged').style.color='#f1c40f';};document.getElementById('md-f-cancel').onclick=function(){overlay.remove();};document.getElementById('md-f-add').onclick=function(){mdSaveDefect(elevation,overlay,function(){return status;});};var inp=document.getElementById('md-f-label');if(inp){inp.focus();inp.onkeypress=function(e){if(e.key==='Enter')mdSaveDefect(elevation,overlay,function(){return status;});};}}
+function mdPopulateFloors(){var dropSel=document.getElementById('md-f-drop'),floorSel=document.getElementById('md-f-floor');if(!dropSel||!floorSel)return;var floors=Object.keys(inspectionData[dropSel.value]||{}).map(Number).sort(function(a,b){return b-a;});floorSel.innerHTML=floors.map(function(f){return '<option value="'+f+'">Floor '+f+'</option>';}).join('');}
+function mdSaveDefect(elevation,overlay,getStatus){var label=(document.getElementById('md-f-label').value||'').trim();if(!label){showToast('Please enter a defect name.',2500,true);document.getElementById('md-f-label').focus();return;}var drop=document.getElementById('md-f-drop').value;var floor=parseInt(document.getElementById('md-f-floor').value);var loc=(document.getElementById('md-f-loc').value||'').trim();if(!drop||isNaN(floor)){showToast('Please select a drop and floor.',2500,true);return;}var id='MANUAL-'+Date.now()+'-'+Math.random().toString(36).slice(2,6).toUpperCase();manualDefects[id]={id:id,label:label,locationDetail:loc,elevation:elevation,drop:drop,floor:floor,finds:label,notes:'',status:getStatus(),photos:[],embeddedPhotoData:{}};overlay.remove();saveCommandState();calculateBuildingGeometry();refreshCurrentView();openModal(id);}
+
 </script>
 </body>
 </html>
