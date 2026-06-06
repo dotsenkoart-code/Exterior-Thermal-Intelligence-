@@ -2,10 +2,10 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Strata Command Center | v9.7</title>
+    <title>Strata Command Center | v9.6</title>
     <!--
     ╔══════════════════════════════════════════════════════════════════════════╗
-    ║           VERTICALITY INC — STRATA COMMAND CENTER v9.7                 ║
+    ║           VERTICALITY INC — STRATA COMMAND CENTER v9.6                 ║
     ║           Thermal Rope Access Inspection & Repair Platform              ║
     ╠══════════════════════════════════════════════════════════════════════════╣
     ║  ARCHITECTURE: Single HTML file, no build step, no dependencies        ║
@@ -26,8 +26,6 @@
     ║  repairFixed[nodeId] = true               — repair completed           ║
     ║  photoRotations[imgKey] = 90|180|270      — IR/DC orientation fix      ║
     ║  saved3DTags[nodeId] = { position, normal } — 3D hotspot coords       ║
-    ║  manualDefects[id] = { id, label, drop, floor, elevation, finds,       ║
-    ║    notes, status, photos[], embeddedPhotoData{} } — custom defects     ║
     ║  stitchedPairs = [[nodeId, nodeId], ...]  — merged window pairs        ║
     ║  dropAssignments[drop] = elevationName    — which wall each drop is on ║
     ║  elevations = ['North Face', ...]         — ordered wall names         ║
@@ -43,7 +41,7 @@
     ║    2-segment (~155KB): IR only — no DC                                 ║
     ║    1-segment (~50KB):  DC only — discard                               ║
     ╠══════════════════════════════════════════════════════════════════════════╣
-    ║  VIEW MODES: '2d' | 'repair' | 'true3d' | 'report'                   ║
+    ║  VIEW MODES: '2d' | 'repair' | 'true3d'                               ║
     ║  currentMode drives switchView() which shows/hides panels              ║
     ║  activeTab = current elevation name shown in 2D grid                   ║
     ║  activeFilter = 'ALL'|'status-clear'|'status-flagged'|'status-confirmed'║
@@ -74,7 +72,7 @@
     ║    refreshCurrentView()   — redraws active elevation tab               ║
     ║    generateWallDOM()      — builds drop columns and window nodes       ║
     ║    calculateBuildingGeometry() — updates stats bar counts              ║
-    ║    switchView(mode)       — switches between 2d/repair/true3d/report   ║
+    ║    switchView(mode)       — switches between 2d/repair/true3d          ║
     ║    setFilter(status)      — filters grid by window status              ║
     ║                                                                         ║
     ║  MODAL                                           ~L2093                ║
@@ -113,22 +111,6 @@
     ║    setupTwinTagging()     — attaches dblclick for pin placement        ║
     ║    gdriveToDirectUrl()    — converts Google Drive share link to CDN    ║
     ║                                                                         ║
-    ║  REPORT BUILDER                                  (appended)            ║
-    ║    renderReportBuilder()  — renders report workspace in #arena-report  ║
-    ║    rbBuildReportHTML()    — generates report HTML string (PDF + export)║
-    ║    generateReportPDF()    — opens print window with report HTML        ║
-    ║    exportClientPackage()  — exports JSON with findings + reportHtml    ║
-    ║    rbConfirmReport()      — confirms exec summary, unlocks export      ║
-    ║    rbDoSort(s)            — sorts/groups defect cards (sev/elev/type)  ║
-    ║    rbCandidates()         — returns all defects eligible for report    ║
-    ║                                                                         ║
-    ║  MANUAL DEFECTS                                  (appended)            ║
-    ║    openAddDefectForm()    — floating overlay: pick drop+floor+label    ║
-    ║    mdSaveDefect()         — creates manualDefects entry + opens modal  ║
-    ║    mdPopulateFloors()     — populates floor dropdown from inspData     ║
-    ║    restoreManualDefectPhotos() — re-populates imageBank from JSON      ║
-    ║    setupManualPhotoSlot() — accepts any image (not just FLIR)          ║
-    ╠══════════════════════════════════════════════════════════════════════════╣
     ║  PINCH ZOOM                                      ~L3199                ║
     ║    initPinchZoom()        — attaches touch handlers to view-2d         ║
     ║    adjustZoom(delta)      — changes gridScale, applies transform       ║
@@ -159,7 +141,6 @@
     ║      #rp-defect-filter-bar — defect type chips                         ║
     ║      #rp-tabs         — elevation tabs for repair planner              ║
     ║      #rp-grid-container — repair grid (fullscreen target)             ║
-    ║    #arena-report      — report builder panel                           ║
     ║    #arena-true3d      — 3D twin panel                                  ║
     ║      #main-3d-viewer  — model-viewer element                           ║
     ║  #info-modal          — window detail modal (moves into grid on FS)    ║
@@ -167,13 +148,12 @@
     ║  #mapping-screen      — wall/drop assignment UI                        ║
     ║  #zoom-controls       — +/1:1/- buttons (2d mode, bottom-right)       ║
     ╠══════════════════════════════════════════════════════════════════════════╣
-    ║  KNOWN LIMITATIONS                                                      ║
+    ║  KNOWN LIMITATIONS (v1 — see brutal review in session history)         ║
     ║  • No undo — destructive actions are permanent                         ║
     ║  • localStorage ~5-10MB limit — large projects may hit ceiling         ║
     ║  • No input validation — malformed CSVs can corrupt state              ║
     ║  • Single file — growing complexity, hard to maintain long-term        ║
-    ║  • Window photos session-only — must re-upload ZIP each session        ║
-    ║  • Manual defect photos persist in project JSON (not localStorage)     ║
+    ║  • Photos session-only — must re-upload ZIP each session               ║
     ║  • Fullscreen modal CSS hack — not reliable on all browsers            ║
     ╠══════════════════════════════════════════════════════════════════════════╣
     ║  QUICK ORIENTATION FOR NEW SESSION                                      ║
@@ -203,7 +183,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Strata v9.7">
+    <meta name="apple-mobile-web-app-title" content="Strata v9.6">
     <meta name="mobile-web-app-capable" content="yes">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -4389,7 +4369,8 @@ function rbPhotoItems(node) {
   nodePhotoNames(node).forEach(key => {
     const img = imageBank[key];
     if (!img) return;
-    if (img.url)   items.push({ key, kind: 'thermal', url: img.url,   rot: photoRotations[key] || 0 });
+    const isManualPhoto = img.drop === 'MANUAL';
+    if (img.url)   items.push({ key, kind: isManualPhoto ? 'site' : 'thermal', url: img.url,   rot: photoRotations[key] || 0 });
     if (img.dcUrl) items.push({ key, kind: 'visual',  url: img.dcUrl, rot: photoRotations[key] || 0 });
   });
   return items;
@@ -4621,6 +4602,7 @@ function renderReportBuilder() {
     const desc = REPORT_META.desc[nodeId] != null ? REPORT_META.desc[nodeId] : (node.notes || '');
     const tags = rbTags(nodeId, node);
     const items = rbPhotoItems(node);
+    const unselectedPhotoCount = items.filter(it => !rbIsPhotoOn(nodeId, it.key + ':' + it.kind)).length;
     const included = rbIsIncluded(nodeId);
 
     const sevOpts = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
@@ -4727,6 +4709,7 @@ function rbBuildReportHTML() {
       </div>
       <p class="ddesc">${rbEsc(desc)}</p>
       ${items.length ? `<div class="photos">${photoCells}</div>` : '<p class="nophoto">No photographs selected for this finding.</p>'}
+      ${unselectedPhotoCount > 0 ? `<p style="font-size:0.72rem;color:#f39c12;margin:6px 0 0;padding:0 16px;">⚠ ${unselectedPhotoCount} photo${unselectedPhotoCount > 1 ? 's' : ''} not selected for export — click to include</p>` : ''}
     </section>`;
   }); }); // close _grpItems + rbGroupCandidates
 
@@ -4835,22 +4818,24 @@ function exportClientPackage() {
 
   showToast('Building client package…', 30000);
 
-  const findings = cands.map(({ nodeId, node, drop, floor, pos }) => {
+  const findings = cands.map(({ nodeId, node, drop, floor, pos, isFixed }) => {
     const sev   = rbSeverity(nodeId, node);
     const tags  = rbTags(nodeId, node);
     const desc  = (M.desc[nodeId] != null ? M.desc[nodeId] : (node.notes || '')) || '';
     const tag3d = saved3DTags[nodeId] || null;
 
     // Only include photos the user selected (teal-outlined in the workspace)
-    const photos = rbPhotoItems(node)
-      .filter(it => rbIsPhotoOn(nodeId, it.key + ':' + it.kind))
-      .map(it => ({ kind: it.kind, key: it.key, dataUrl: it.url, rot: it.rot || 0 }));
+    const allPhotos = rbPhotoItems(node);
+    const selectedPhotos = allPhotos.filter(it => rbIsPhotoOn(nodeId, it.key + ':' + it.kind));
+    const unselectedCount = allPhotos.length - selectedPhotos.length;
+    const photos = selectedPhotos.map(it => ({ kind: it.kind, key: it.key, dataUrl: it.url, rot: it.rot || 0 }));
 
     return {
       nodeId, drop, floor, pos,
       severity:    sev,
       tags,
-      location:    rbLocation(drop, floor, pos),
+      isFixed:     !!isFixed,
+      location:    rbLocation(drop, floor, pos, nodeId),
       description: desc,
       finds:       node.finds  || '',
       status:      node.status || '',
@@ -4894,10 +4879,12 @@ function exportClientPackage() {
     URL.revokeObjectURL(url);
 
     const totalPhotos = findings.reduce((n, f) => n + f.photos.length, 0);
+    const findingsNoPhotos = findings.filter(f => f.photos.length === 0 && rbPhotoItems(cands.find(c=>c.nodeId===f.nodeId)?.node||{}).length > 0).length;
     const tagged = findings.filter(f => f.tag3d).length;
     const untagged = findings.length - tagged;
 
     let msg = `[OK] Client package ready — ${findings.length} findings, ${totalPhotos} photos`;
+    if (findingsNoPhotos > 0) msg += `. ⚠ ${findingsNoPhotos} finding${findingsNoPhotos>1?'s have':' has'} no photos selected — check the Report Builder.`;
     if (untagged > 0) msg += `. Note: ${untagged} finding${untagged > 1 ? 's have' : ' has'} no 3D pin — tag them in the TRUE 3D TWIN tab first.`;
     showToast(msg, 7000);
   } catch(e) {
@@ -4909,8 +4896,190 @@ function exportClientPackage() {
 // MANUAL DEFECTS
 
 function restoreManualDefectPhotos(){Object.values(manualDefects).forEach(function(node){var epd=node.embeddedPhotoData||{};Object.keys(epd).forEach(function(key){if(!imageBank[key])imageBank[key]={url:epd[key],dcUrl:null,time:null,drop:'MANUAL'};});});if(typeof updatePhotoStat==='function')updatePhotoStat();}
-function setupManualPhotoSlot(slotEl,nodeId){function ingest(file){if(!file||!file.size||!file.type.startsWith('image/'))return;var reader=new FileReader();reader.onload=function(ev){var node=manualDefects[nodeId];if(!node)return;var key=nodeId+'_'+Date.now();imageBank[key]={url:ev.target.result,dcUrl:null,time:null,drop:'MANUAL'};if(!node.embeddedPhotoData)node.embeddedPhotoData={};node.embeddedPhotoData[key]=ev.target.result;if(!node.photos)node.photos=[];if(node.photos.indexOf(key)===-1)node.photos.push(key);saveCommandState();if(typeof updatePhotoStat==='function')updatePhotoStat();if(modalNodeId===nodeId)openModal(nodeId);};reader.readAsDataURL(file);}slotEl.addEventListener('dragover',function(e){e.preventDefault();slotEl.classList.add('drag-over');});slotEl.addEventListener('dragleave',function(){slotEl.classList.remove('drag-over');});slotEl.addEventListener('drop',function(e){e.preventDefault();e.stopPropagation();slotEl.classList.remove('drag-over');Array.from(e.dataTransfer.files).forEach(ingest);});slotEl.addEventListener('click',function(){var i=document.createElement('input');i.type='file';i.accept='image/*';i.multiple=true;i.onchange=function(){Array.from(i.files).forEach(ingest);};i.click();});}
-function openAddDefectForm(elevation,preselectedDrop){var existing=document.getElementById('md-overlay');if(existing){existing.remove();return;}var drops=Object.keys(inspectionData).filter(function(d){return dropAssignments[d]===elevation;}).sort();if(!drops.length){showToast('No drops assigned to this elevation yet.',3000,true);return;}var overlay=document.createElement('div');overlay.id='md-overlay';overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:5000;display:flex;align-items:center;justify-content:center;';overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};var dropOpts=drops.map(function(d){return '<option value="'+d+'"'+(d===preselectedDrop?' selected':'')+'>Drop '+d+'</option>';}).join('');var box=document.createElement('div');box.style.cssText='background:#1a1d27;border:1px solid #1fd0a5;border-radius:12px;padding:24px;width:min(540px,92vw);box-shadow:0 15px 35px rgba(0,0,0,0.9);';box.innerHTML='<div style="color:#1fd0a5;font-size:0.8rem;font-weight:bold;text-transform:uppercase;letter-spacing:1px;margin-bottom:16px;">Add Custom Defect - '+elevation+'</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;"><div style="grid-column:1/-1;"><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Defect Name *</label><input id="md-f-label" type="text" placeholder="e.g. Expansion Joint" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;"></div><div><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Drop *</label><select id="md-f-drop" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;">'+dropOpts+'</select></div><div><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Floor *</label><select id="md-f-floor" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;"></select></div><div style="grid-column:1/-1;"><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Location Detail</label><input id="md-f-loc" type="text" placeholder="e.g. NW corner" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;"></div></div><div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;"><span style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;flex-shrink:0;">Status</span><button id="md-f-flagged" style="padding:7px 16px;border-radius:5px;border:1px solid #f1c40f;background:transparent;color:#f1c40f;font-size:0.8rem;font-weight:bold;cursor:pointer;">FLAGGED</button><button id="md-f-confirmed" style="padding:7px 16px;border-radius:5px;border:1px solid #d9534f;background:#d9534f;color:#fff;font-size:0.8rem;font-weight:bold;cursor:pointer;">DEFECT</button></div><div style="display:flex;gap:10px;"><button id="md-f-add" style="flex:1;padding:11px;background:#1fd0a5;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;">ADD DEFECT</button><button id="md-f-cancel" style="padding:11px 18px;background:#222;color:#888;border:1px solid #444;border-radius:6px;cursor:pointer;">CANCEL</button></div>';overlay.appendChild(box);document.body.appendChild(overlay);var status='status-confirmed';mdPopulateFloors();document.getElementById('md-f-drop').onchange=mdPopulateFloors;document.getElementById('md-f-flagged').onclick=function(){status='status-flagged';this.style.background='#f1c40f';this.style.color='#000';document.getElementById('md-f-confirmed').style.background='transparent';document.getElementById('md-f-confirmed').style.color='#d9534f';};document.getElementById('md-f-confirmed').onclick=function(){status='status-confirmed';this.style.background='#d9534f';this.style.color='#fff';document.getElementById('md-f-flagged').style.background='transparent';document.getElementById('md-f-flagged').style.color='#f1c40f';};document.getElementById('md-f-cancel').onclick=function(){overlay.remove();};document.getElementById('md-f-add').onclick=function(){mdSaveDefect(elevation,overlay,function(){return status;});};var inp=document.getElementById('md-f-label');if(inp){inp.focus();inp.onkeypress=function(e){if(e.key==='Enter')mdSaveDefect(elevation,overlay,function(){return status;});};}}
+function setupManualPhotoSlot(slotEl, nodeId) {
+    slotEl.addEventListener('dragover', function(e) { e.preventDefault(); slotEl.classList.add('drag-over'); });
+    slotEl.addEventListener('dragleave', function() { slotEl.classList.remove('drag-over'); });
+    slotEl.addEventListener('drop', function(e) {
+        e.preventDefault(); e.stopPropagation(); slotEl.classList.remove('drag-over');
+        openPhotoBrowser(Array.from(e.dataTransfer.files).filter(function(f){ return f.type.startsWith('image/'); }), nodeId);
+    });
+    slotEl.addEventListener('click', function() {
+        // Use directory picker for folder browsing
+        var i = document.createElement('input');
+        i.type = 'file'; i.accept = 'image/*'; i.multiple = true;
+        // Try webkitdirectory for folder selection
+        i.setAttribute('webkitdirectory', '');
+        i.onchange = function() {
+            var imgs = Array.from(i.files).filter(function(f){ return f.type.startsWith('image/'); });
+            if (imgs.length) openPhotoBrowser(imgs, nodeId);
+        };
+        i.click();
+    });
+}
+
+function openPhotoBrowser(files, nodeId) {
+    if (!files || !files.length) return;
+    var node = manualDefects[nodeId]; if (!node) return;
+
+    // Remove existing browser
+    var existing = document.getElementById('photo-browser-overlay');
+    if (existing) existing.remove();
+
+    var overlay = document.createElement('div');
+    overlay.id = 'photo-browser-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:8000;display:flex;flex-direction:column;';
+
+    // Header
+    var header = document.createElement('div');
+    header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:#111;border-bottom:1px solid #2a2d38;flex-shrink:0;';
+    header.innerHTML =
+        '<div style="display:flex;align-items:center;gap:12px;">' +
+        '  <span style="font-size:0.75rem;color:#1fd0a5;font-weight:bold;text-transform:uppercase;letter-spacing:1px;">Select Photos</span>' +
+        '  <span id="pb-count" style="font-size:0.72rem;color:#888;">0 selected</span>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;">' +
+        '  <button id="pb-add" style="padding:8px 20px;background:#1fd0a5;color:#000;border:none;border-radius:6px;font-size:0.78rem;font-weight:bold;cursor:pointer;">Add Selected</button>' +
+        '  <button id="pb-cancel" style="padding:8px 16px;background:#222;color:#888;border:1px solid #333;border-radius:6px;font-size:0.78rem;cursor:pointer;">Cancel</button>' +
+        '</div>';
+    overlay.appendChild(header);
+
+    // Grid
+    var grid = document.createElement('div');
+    grid.style.cssText = 'flex:1;overflow-y:auto;padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;align-content:start;';
+    overlay.appendChild(grid);
+
+    var selected = new Set();
+    var thumbData = []; // { file, dataUrl }
+
+    function updateCount() {
+        document.getElementById('pb-count').textContent = selected.size + ' selected';
+        document.getElementById('pb-add').style.opacity = selected.size > 0 ? '1' : '0.4';
+        document.getElementById('pb-add').style.cursor = selected.size > 0 ? 'pointer' : 'not-allowed';
+    }
+
+    function buildThumb(idx, dataUrl, file) {
+        var wrap = document.createElement('div');
+        wrap.style.cssText = 'position:relative;border-radius:8px;overflow:hidden;cursor:pointer;border:2px solid transparent;transition:0.15s;background:#1a1d27;aspect-ratio:4/3;';
+        wrap.dataset.idx = idx;
+
+        var img = document.createElement('img');
+        img.src = dataUrl;
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+        wrap.appendChild(img);
+
+        // Filename label
+        var lbl = document.createElement('div');
+        lbl.style.cssText = 'position:absolute;bottom:0;left:0;right:0;padding:4px 6px;background:rgba(0,0,0,0.65);font-size:0.58rem;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+        lbl.textContent = file.name;
+        wrap.appendChild(lbl);
+
+        // Checkmark overlay
+        var chk = document.createElement('div');
+        chk.style.cssText = 'position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;border:2px solid #fff;background:transparent;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:#fff;transition:0.15s;';
+        wrap.appendChild(chk);
+
+        // Click — toggle select
+        wrap.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (selected.has(idx)) {
+                selected.delete(idx);
+                wrap.style.borderColor = 'transparent';
+                wrap.style.boxShadow = '';
+                chk.style.background = 'transparent';
+                chk.textContent = '';
+            } else {
+                selected.add(idx);
+                wrap.style.borderColor = '#1fd0a5';
+                wrap.style.boxShadow = '0 0 0 2px #1fd0a5';
+                chk.style.background = '#1fd0a5';
+                chk.textContent = '✓';
+            }
+            updateCount();
+        });
+
+        // Long press or right-click — open lightbox
+        var pressTimer;
+        wrap.addEventListener('mousedown', function() {
+            pressTimer = setTimeout(function() { openBrowserLightbox(dataUrl, file.name); }, 600);
+        });
+        wrap.addEventListener('mouseup', function() { clearTimeout(pressTimer); });
+        wrap.addEventListener('contextmenu', function(e) { e.preventDefault(); openBrowserLightbox(dataUrl, file.name); });
+
+        // Magnify button
+        var mag = document.createElement('button');
+        mag.style.cssText = 'position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,0.6);border:none;color:#fff;font-size:0.65rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:0.15s;';
+        mag.innerHTML = '&#128269;';
+        mag.title = 'Preview full size';
+        mag.addEventListener('click', function(e) { e.stopPropagation(); openBrowserLightbox(dataUrl, file.name); });
+        wrap.appendChild(mag);
+
+        grid.appendChild(wrap);
+    }
+
+    // Lightbox inside the browser
+    function openBrowserLightbox(dataUrl, name) {
+        var lb = document.createElement('div');
+        lb.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:9000;display:flex;flex-direction:column;align-items:center;justify-content:center;';
+        lb.addEventListener('click', function() { lb.remove(); });
+
+        var img = document.createElement('img');
+        img.src = dataUrl;
+        img.style.cssText = 'max-width:90vw;max-height:85vh;object-fit:contain;border-radius:6px;box-shadow:0 20px 60px rgba(0,0,0,0.8);';
+        lb.appendChild(img);
+
+        var cap = document.createElement('div');
+        cap.style.cssText = 'margin-top:12px;font-size:0.75rem;color:rgba(255,255,255,0.5);';
+        cap.textContent = name + ' — click anywhere to close';
+        lb.appendChild(cap);
+
+        document.body.appendChild(lb);
+    }
+
+    // Load thumbnails progressively
+    var loadIdx = 0;
+    function loadNext() {
+        if (loadIdx >= files.length) return;
+        var idx = loadIdx++;
+        var file = files[idx];
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+            var dataUrl = ev.target.result;
+            thumbData[idx] = { file: file, dataUrl: dataUrl };
+            buildThumb(idx, dataUrl, file);
+            loadNext();
+        };
+        reader.readAsDataURL(file);
+    }
+    // Load 6 at a time for speed
+    for (var i = 0; i < Math.min(6, files.length); i++) loadNext();
+
+    // Wire buttons
+    document.getElementById && updateCount();
+    overlay.querySelector('#pb-cancel').addEventListener('click', function() { overlay.remove(); });
+    overlay.querySelector('#pb-add').addEventListener('click', function() {
+        if (!selected.size) return;
+        var toAdd = Array.from(selected).map(function(idx) { return thumbData[idx]; }).filter(Boolean);
+        toAdd.forEach(function(item) {
+            var node = manualDefects[nodeId]; if (!node) return;
+            var key = nodeId + '_' + Date.now() + '_' + Math.random().toString(36).slice(2,5);
+            imageBank[key] = { url: item.dataUrl, dcUrl: null, time: null, drop: 'MANUAL' };
+            if (!node.embeddedPhotoData) node.embeddedPhotoData = {};
+            node.embeddedPhotoData[key] = item.dataUrl;
+            if (!node.photos) node.photos = [];
+            if (node.photos.indexOf(key) === -1) node.photos.push(key);
+        });
+        saveCommandState();
+        if (typeof updatePhotoStat === 'function') updatePhotoStat();
+        overlay.remove();
+        if (modalNodeId === nodeId) openModal(nodeId);
+        showToast('[OK] ' + toAdd.length + ' photo' + (toAdd.length > 1 ? 's' : '') + ' added', 2500);
+    });
+
+    document.body.appendChild(overlay);
+    updateCount();
+    // Kick off loading
+    while (loadIdx < Math.min(6, files.length)) loadNext();
+}
 function mdPopulateFloors(){var dropSel=document.getElementById('md-f-drop'),floorSel=document.getElementById('md-f-floor');if(!dropSel||!floorSel)return;var floors=Object.keys(inspectionData[dropSel.value]||{}).map(Number).sort(function(a,b){return b-a;});floorSel.innerHTML=floors.map(function(f){return '<option value="'+f+'">Floor '+f+'</option>';}).join('');}
 function mdSaveDefect(elevation,overlay,getStatus){var label=(document.getElementById('md-f-label').value||'').trim();if(!label){showToast('Please enter a defect name.',2500,true);document.getElementById('md-f-label').focus();return;}var drop=document.getElementById('md-f-drop').value;var floor=parseInt(document.getElementById('md-f-floor').value);var loc=(document.getElementById('md-f-loc').value||'').trim();if(!drop||isNaN(floor)){showToast('Please select a drop and floor.',2500,true);return;}var id='MANUAL-'+Date.now()+'-'+Math.random().toString(36).slice(2,6).toUpperCase();manualDefects[id]={id:id,label:label,locationDetail:loc,elevation:elevation,drop:drop,floor:floor,finds:label,notes:'',status:getStatus(),photos:[],embeddedPhotoData:{}};overlay.remove();saveCommandState();calculateBuildingGeometry();refreshCurrentView();openModal(id);}
 
