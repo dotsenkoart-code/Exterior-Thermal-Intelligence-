@@ -1439,6 +1439,7 @@ function loadProjectFile(input) {
             repairFixed      = p.repairFixed      || {};
             manualDefects    = p.manualDefects    || {};
             if (p.photoRotations) Object.assign(photoRotations, p.photoRotations);
+            restoreManualDefectPhotos(); // repopulate imageBank from embeddedPhotoData
             cesiumAssetId    = p.cesiumAssetId    || 0;
 
             const assetInp = document.getElementById('cesium-asset-input');
