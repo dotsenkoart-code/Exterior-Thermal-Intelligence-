@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Strata Command Center | v9.6</title>
+    <title>Strata Command Center | v9.7</title>
     <!--
     ╔══════════════════════════════════════════════════════════════════════════╗
     ║           VERTICALITY INC — STRATA COMMAND CENTER v9.6                 ║
@@ -2538,7 +2538,7 @@ function buildPhotoArea(nodes) {
             const vw=document.createElement('div');vw.className='photo-viewer-wrap';
             const img=document.createElement('img');
             img.src=photoViewState[irName]==='dc'&&hasDC?entry.dcUrl:entry.url;
-            img.dataset.photoKey = irName; // needed for rotate button querySelector
+            img.dataset.photoKey = irName;
             if (photoRotations[irName]) img.style.transform = `rotate(${photoRotations[irName]}deg)`;
             img.onerror=()=>{
                 // First try re-fetching from imageBank (in case it was updated)
@@ -4327,6 +4327,77 @@ function saveReportMeta() {
 }
 loadReportMeta();
 
+// ── Defect Description Templates ─────────────────────────────────────────────
+const RB_TEMPLATES = [
+  {
+    category: 'Sealant / Caulking',
+    items: [
+      { label: 'Failed perimeter sealant',      text: 'Sealant at the window perimeter has deteriorated and is no longer providing an effective weather barrier. Cracking, shrinkage, and adhesion failure are evident, allowing water infiltration at the facade joint.' },
+      { label: 'Missing sealant',               text: 'Sealant is absent at this location, leaving an open joint in the building envelope. Without an effective seal, water can penetrate directly into the wall assembly, accelerating deterioration of surrounding materials.' },
+      { label: 'Sealant debonding',             text: 'Sealant has debonded from one or both substrate surfaces, breaking the watertight seal. The joint requires removal of the existing material and proper re-application to restore weather resistance.' },
+    ]
+  },
+  {
+    category: 'Moisture / Water Intrusion',
+    items: [
+      { label: 'Active moisture infiltration',  text: 'Radiometric thermal imaging identifies trapped moisture within the wall assembly at this location. Elevated thermal mass indicates water infiltration through the facade, which if left unaddressed will accelerate material degradation and may lead to interior damage.' },
+      { label: 'Failed window seal — moisture', text: 'The thermal scan reveals a compromised window seal allowing moisture ingress at the frame perimeter. Condensation and water infiltration at this joint indicate seal failure that requires prompt remediation to prevent interior water damage.' },
+      { label: 'Staining from water runoff',    text: 'Visible staining on the facade surface indicates prolonged water runoff from an unresolved leak point above. The staining pattern suggests a persistent moisture source that should be traced and sealed to prevent ongoing facade deterioration.' },
+    ]
+  },
+  {
+    category: 'Concrete',
+    items: [
+      { label: 'Hairline crack',                text: 'A hairline crack is present in the concrete substrate. While superficial in appearance, cracks of this nature allow water to enter the concrete matrix, accelerating carbonation and corrosion of embedded reinforcing steel if left unsealed.' },
+      { label: 'Spalling concrete',             text: 'Concrete spalling is evident at this location, with delamination of the surface layer exposing the substrate below. Spalling typically indicates moisture-driven corrosion of internal rebar, causing expansive pressure that fractures the surrounding concrete.' },
+      { label: 'Delamination',                  text: 'Surface delamination of the concrete or applied coating is present, indicating loss of bond between layers. Delaminated sections present a falling hazard and allow accelerated moisture ingress into the underlying substrate.' },
+    ]
+  },
+  {
+    category: 'Brick / Masonry / Mortar',
+    items: [
+      { label: 'Open mortar joint cracking',    text: 'Open mortar joint cracking is observed at the brick-to-concrete interface, presenting as curved arc cracks across multiple courses. The crack pattern is consistent with differential movement between dissimilar facade materials. Open joints allow water infiltration and will continue to propagate without remediation. Recommend tuckpointing of affected mortar joints and installation of an appropriate control joint to accommodate future movement.' },
+      { label: 'Failed mortar joints',          text: 'Mortar joints have deteriorated significantly, exhibiting crumbling, erosion, and loss of material. Failed mortar eliminates the weather seal between masonry units and allows water to penetrate the wall assembly. Tuckpointing is required to restore the integrity of the masonry facade.' },
+      { label: 'Efflorescence',                 text: 'White efflorescence deposits are present on the masonry surface, indicating water movement through the wall assembly carrying soluble salts to the exterior. Efflorescence is a surface symptom of moisture infiltration and should be investigated to identify and eliminate the water source.' },
+    ]
+  },
+  {
+    category: 'Window Seal Failure',
+    items: [
+      { label: 'Failed IGU seal',               text: 'The insulated glazing unit seal has failed, as evidenced by condensation or fogging between the glass panes. A failed IGU seal eliminates the thermal and acoustic performance of the double-glazed unit and requires full unit replacement.' },
+      { label: 'Frame/glazing separation',      text: 'Separation between the window frame and glazing unit is present, creating a breach in the weather seal. This gap allows wind-driven rain to bypass the perimeter sealant and infiltrate the wall assembly at the window rough opening.' },
+    ]
+  },
+  {
+    category: 'Expansion Joint',
+    items: [
+      { label: 'Expansion joint failure',       text: 'The expansion joint covering or filler at this location has deteriorated and is no longer accommodating building movement effectively. Failed expansion joints are a primary entry point for water and must be restored to maintain the integrity of the building envelope.' },
+      { label: 'Missing expansion joint filler',text: 'Expansion joint filler is absent at this location, leaving an open gap in the facade system. Without a functioning expansion joint, differential movement between building sections will concentrate stress at adjacent materials, accelerating cracking and water infiltration.' },
+    ]
+  },
+  {
+    category: 'Corrosion / Rust',
+    items: [
+      { label: 'Steel corrosion — staining',    text: 'Rust staining on the facade surface indicates corrosion of embedded steel elements or surface-mounted metalwork. Corrosion products are expansive and will cause progressive cracking and spalling of surrounding concrete or masonry if the moisture source is not eliminated.' },
+      { label: 'Corroded window hardware',      text: 'Corrosion is present on window hardware, frame components, or anchoring elements. Deteriorated metalwork compromises both the structural integrity of the window assembly and the continuity of the weather seal at the frame perimeter.' },
+    ]
+  },
+  {
+    category: 'Paint / Coating',
+    items: [
+      { label: 'Coating delamination',          text: 'The applied coating or paint system has delaminated from the substrate, exposing the underlying material to direct weathering. Delaminated coatings provide no protection and allow accelerated moisture absorption into the facade.' },
+      { label: 'Chalking / oxidation',          text: 'The coating has reached end-of-life, exhibiting chalking and surface oxidation. Without a functional protective coating, the substrate is exposed to UV degradation and moisture cycling, accelerating surface deterioration.' },
+    ]
+  },
+  {
+    category: 'Structural',
+    items: [
+      { label: 'Structural crack — monitoring', text: 'A structural crack is present that warrants close monitoring. The crack pattern and width suggest active movement in the building envelope. A licensed structural engineer should be consulted to determine the cause and appropriate remediation strategy.' },
+      { label: 'Loose or displaced element',    text: 'A facade element is loose or has shifted from its original position, indicating fastener failure or substrate deterioration. Displaced facade components present a falling hazard to occupants and pedestrians and require immediate securing and investigation.' },
+    ]
+  },
+];
+
 const RB_SEV_RANK   = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
 const RB_SEV_COLOR  = { CRITICAL: '#b3122b', HIGH: '#d9534f', MEDIUM: '#f1c40f', LOW: '#28a745' };
 const RB_POS_NAME   = { L: 'Left', C: 'Centre', R: 'Right' };
@@ -4338,6 +4409,32 @@ function rbEsc(s) {
 }
 
 // ── data readers (all derived from real Strata state) ───────────────────────
+function rbMonitoringCandidates() {
+  // Returns flagged nodes NOT in the repair planner — shown as "Areas for Monitoring"
+  const out = [];
+  Object.keys(inspectionData).forEach(drop => {
+    Object.keys(inspectionData[drop]).map(Number).sort((a,b) => a-b).forEach(floor => {
+      const posOrder = { L:1, C:2, R:3 };
+      Object.keys(inspectionData[drop][floor])
+        .sort((a,b) => (posOrder[a]||9)-(posOrder[b]||9))
+        .forEach(pos => {
+          const node = inspectionData[drop][floor][pos];
+          if (!node) return;
+          const nodeId = drop+'-'+floor+'-'+pos;
+          const isFlagged = node.status === 'status-flagged';
+          const inPlanner = !!repairPriorities[nodeId];
+          if (isFlagged && !inPlanner) out.push({ nodeId, node, drop, floor:+floor, pos });
+        });
+    });
+  });
+  // Manual defects that are flagged
+  Object.values(manualDefects).forEach(node => {
+    if (node.status === 'status-flagged' && !repairPriorities[node.id])
+      out.push({ nodeId:node.id, node, drop:'MANUAL', floor:node.floor||0, pos:'', isManual:true });
+  });
+  return out;
+}
+
 function rbDefaultSeverity(nodeId, node) {
   const p = repairPriorities[nodeId];
   if (p === 'HIGH') return 'HIGH';
@@ -4598,6 +4695,23 @@ function rbAcceptClaude() {
   showToast('[OK] AI version applied — review and confirm when ready', 3500);
 }
 
+
+function rbApplyTemplate(nodeId, selectEl) {
+  const val = selectEl.value;
+  if (!val) return;
+  // Find the textarea for this card and populate it
+  const card = selectEl.closest('.rb-card') || selectEl.parentElement;
+  const ta = card ? card.querySelector('textarea') : null;
+  if (ta) {
+    // Append to existing text or replace if empty
+    const existing = ta.value.trim();
+    ta.value = existing ? existing + ' ' + val : val;
+    ta.dispatchEvent(new Event('input')); // trigger rbSetDesc
+  }
+  // Reset dropdown
+  selectEl.value = '';
+}
+
 function rbDismissClaude() {
   const panel = document.getElementById('rb-claude-panel');
   if (panel) panel.style.display = 'none';
@@ -4756,6 +4870,15 @@ function renderReportBuilder() {
       </div>
 
       <label style="font-size:0.68rem;color:#888;text-transform:uppercase;font-weight:bold;letter-spacing:0.5px;">Client Description</label>
+      <select onchange="rbApplyTemplate('${nodeId}', this)"
+        style="width:100%;padding:7px 10px;background:#111;border:1px solid #2a2d38;color:#888;border-radius:6px;font-size:0.8rem;margin-bottom:6px;cursor:pointer;box-sizing:border-box;">
+        <option value="">— Insert description template —</option>
+        ${RB_TEMPLATES.map(cat =>
+          '<optgroup label="' + cat.category + '">' +
+          cat.items.map(t => '<option value="' + t.text.replace(/"/g,'&quot;').replace(/'/g,'&#39;') + '">' + t.label + '</option>').join('') +
+          '</optgroup>'
+        ).join('')}
+      </select>
       <textarea oninput="rbSetDesc('${nodeId}', this.value)" placeholder="Describe the observed condition for the client…"
         style="width:100%;min-height:62px;background:#111;border:1px solid #2a2d38;color:#fff;border-radius:6px;padding:10px;margin:5px 0 12px;font-family:inherit;font-size:0.88rem;line-height:1.5;resize:vertical;box-sizing:border-box;">${rbEsc(desc)}</textarea>
 
@@ -4818,6 +4941,44 @@ function rbBuildReportHTML() {
     </section>`;
   }); }); // close _grpItems + rbGroupCandidates
 
+  // ── Areas for Monitoring HTML ─────────────────────────────────────────────
+  let monitoringHtml = '';
+  const monCandidates = rbMonitoringCandidates();
+  if (monCandidates.length) {
+    const monRows = monCandidates.map(({nodeId, node, drop, floor, pos}) => {
+      const loc   = rbLocation(drop, floor, pos, nodeId);
+      const finds = rbEsc(node.finds || node.label || '');
+      const notes = rbEsc(node.notes || '');
+      const items = rbPhotoItems(node);
+      const thumb = items.length
+        ? `<img src="${items[0].url}" style="width:64px;height:48px;object-fit:cover;border-radius:4px;margin-left:12px;flex-shrink:0;">`
+        : '';
+      return `<div style="display:flex;align-items:flex-start;padding:12px 14px;border-bottom:1px solid #f0e8d8;">
+        <div style="width:8px;height:8px;border-radius:50%;background:#f39c12;flex-shrink:0;margin-top:5px;margin-right:12px;"></div>
+        <div style="flex:1;">
+          <div style="font-size:0.7rem;color:#888;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:2px;">${rbEsc(nodeId)} · ${rbEsc(loc)}</div>
+          <div style="font-size:0.88rem;color:#333;line-height:1.5;">${finds}${notes?' — '+notes:''}</div>
+        </div>${thumb}
+      </div>`;
+    }).join('');
+    monitoringHtml = `
+    <div style="margin-top:36px;page-break-before:auto;">
+      <div style="background:#fffbf0;border:1px solid #f5ddb8;border-radius:8px;overflow:hidden;">
+        <div style="padding:14px 18px;background:#fef3cd;border-bottom:1px solid #f5ddb8;display:flex;align-items:center;gap:10px;">
+          <span style="font-size:1.1rem;">👁</span>
+          <div>
+            <div style="font-size:0.8rem;font-weight:700;color:#7a4a0a;text-transform:uppercase;letter-spacing:0.08em;">Areas for Monitoring</div>
+            <div style="font-size:0.72rem;color:#9a6010;margin-top:2px;">${monCandidates.length} location${monCandidates.length!==1?'s':''} flagged for observation — not requiring immediate remediation at time of inspection</div>
+          </div>
+        </div>
+        ${monRows}
+        <div style="padding:12px 18px;font-size:0.72rem;color:#9a6010;font-style:italic;">
+          These areas exhibited minor anomalies at time of inspection that do not meet the threshold for immediate remediation. Recommend visual re-assessment at next scheduled annual inspection.
+        </div>
+      </div>
+    </div>`;
+  }
+
   const doc = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${building} — Inspection Report</title>
 <style>
   @page { size: letter; margin: 18mm 16mm; }
@@ -4875,6 +5036,7 @@ function rbBuildReportHTML() {
   <div class="page-break"></div>
   <h2 class="secttitle">Findings (${cands.length})</h2>
   ${defectsHtml}
+  \${monitoringHtml}
 
   <div class="footer">Generated ${rbEsc(new Date().toLocaleDateString())}</div>
 
@@ -4965,6 +5127,13 @@ function exportClientPackage() {
     },
     execSummary:     M.execSummary || rbBuildExecSummary(allCands),
     cesiumAssetId:   cesiumAssetId || 0,
+    monitoring: rbMonitoringCandidates().map(({nodeId, node, drop, floor, pos}) => ({
+      nodeId, drop, floor, pos,
+      location: rbLocation(drop, floor, pos, nodeId),
+      finds:    node.finds || node.label || '',
+      notes:    node.notes || '',
+      photos:   rbPhotoItems(node).slice(0,2).map(it => ({ kind:it.kind, dataUrl:it.url }))
+    })),
     elevations:      elevations    || [],
     dropAssignments: dropAssignments || {},
     findings,
