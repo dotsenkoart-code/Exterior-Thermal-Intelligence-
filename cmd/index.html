@@ -5,7 +5,7 @@
     <title>Strata Command Center | v9.7</title>
     <!--
     ╔══════════════════════════════════════════════════════════════════════════╗
-    ║           VERTICALITY INC — STRATA COMMAND CENTER v9.7                 ║
+    ║           VERTICALITY INC — STRATA COMMAND CENTER v9.6                 ║
     ║           Thermal Rope Access Inspection & Repair Platform              ║
     ╠══════════════════════════════════════════════════════════════════════════╣
     ║  ARCHITECTURE: Single HTML file, no build step, no dependencies        ║
@@ -2539,7 +2539,7 @@ function buildPhotoArea(nodes) {
             const img=document.createElement('img');
             img.src=photoViewState[irName]==='dc'&&hasDC?entry.dcUrl:entry.url;
             img.dataset.photoKey = irName;
-            if (photoRotations[irName]) img.style.transform = `rotate(${photoRotations[irName]}deg)`;
+            if (photoRotations[irName+':ir']) img.style.transform = `rotate(${photoRotations[irName+':ir']}deg)`;
             img.onerror=()=>{
                 // First try re-fetching from imageBank (in case it was updated)
                 const retry = imageBank[irName];
@@ -2569,6 +2569,9 @@ function buildPhotoArea(nodes) {
                     photoViewState[name] = photoViewState[name]==='ir' ? 'dc' : 'ir';
                     p.classList.toggle('showing-dc', photoViewState[name]==='dc');
                     el.src = photoViewState[name]==='dc' ? ent.dcUrl : ent.url;
+                    // Restore rotation for the new view
+                    const _newRotKey = name + ':' + photoViewState[name];
+                    el.style.transform = photoRotations[_newRotKey] ? `rotate(${photoRotations[_newRotKey]}deg)` : '';
                 };
             })(irName, entry, pill, img);
 
@@ -2619,19 +2622,21 @@ function buildPhotoArea(nodes) {
             const rotBtn = document.createElement('button');
             rotBtn.className = 'photo-move-btn';
             rotBtn.style.cssText = 'padding:3px 8px;font-size:0.7rem;font-weight:bold;background:#1a1a0a;color:#f1c40f;border:1px solid #f1c40f44;border-radius:4px;cursor:pointer;margin-left:4px;';
-            const curRot = photoRotations[irName] || 0;
+            const curRot = photoRotations[irName+':'+(photoViewState[irName]||'ir')] || 0;
             rotBtn.innerText = 'rotate';
             rotBtn.title = `Rotate 90 degrees (currently ${curRot} degrees)`;
             rotBtn.onclick = (function(name) {
                 return function(e) {
                     e.stopPropagation();
-                    photoRotations[name] = ((photoRotations[name] || 0) + 90) % 360;
+                    const _view = photoViewState[name] || 'ir';
+                    const _rotKey = name + ':' + _view;
+                    photoRotations[_rotKey] = ((photoRotations[_rotKey] || 0) + 90) % 360;
                     // Apply rotation to the visible img
                     const imgs = document.querySelectorAll(`img[data-photo-key="${name}"]`);
                     imgs.forEach(i => {
-                        i.style.transform = photoRotations[name] ? `rotate(${photoRotations[name]}deg)` : '';
+                        i.style.transform = photoRotations[_rotKey] ? `rotate(${photoRotations[_rotKey]}deg)` : '';
                     });
-                    rotBtn.title = `Rotate image (currently ${photoRotations[name]}?)`;
+                    rotBtn.title = `Rotate image (currently ${photoRotations[_rotKey]}deg)`;
                 };
             })(irName);
 
@@ -4469,8 +4474,8 @@ function rbPhotoItems(node) {
     const img = imageBank[key];
     if (!img) return;
     const isManualPhoto = img.drop === 'MANUAL';
-    if (img.url)   items.push({ key, kind: isManualPhoto ? 'site' : 'thermal', url: img.url,   rot: photoRotations[key] || 0 });
-    if (img.dcUrl) items.push({ key, kind: 'visual',  url: img.dcUrl, rot: photoRotations[key] || 0 });
+    if (img.url)   items.push({ key, kind: isManualPhoto ? 'site' : 'thermal', url: img.url,   rot: photoRotations[key+':ir'] || photoRotations[key] || 0 });
+    if (img.dcUrl) items.push({ key, kind: 'visual',  url: img.dcUrl, rot: photoRotations[key+':dc'] || photoRotations[key] || 0 });
   });
   return items;
 }
