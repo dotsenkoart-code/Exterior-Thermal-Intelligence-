@@ -314,8 +314,8 @@
         .toggle-pill.showing-dc .pill-ir { background:#222;color:#555; }
         .toggle-pill.showing-dc .pill-dc { background:#e0e0e0;color:#000; }
         .toggle-pill.no-dc { opacity:0.4;cursor:default;pointer-events:none; }
-        .photo-viewer-wrap { border-radius:8px;overflow:hidden;background:#000;border:2px solid #333;position:relative;aspect-ratio:4/3; }
-        .photo-viewer-wrap img { width:100%;height:100%;display:block;cursor:pointer;object-fit:contain; }
+        .photo-viewer-wrap { border-radius:8px;overflow:hidden;background:#000;border:2px solid #333;position:relative;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center; }
+        .photo-viewer-wrap img { width:100%;height:100%;display:block;object-fit:contain;cursor:pointer;object-fit:contain; }
 
         .no-photo-banner { background:#111;color:#555;padding:20px;text-align:center;border-radius:8px;border:2px dashed #333;margin-bottom:12px;font-size:0.9rem;font-weight:bold; }
         .stale-banner { background:#1a1400;color:#f1c40f;padding:8px 12px;border-radius:6px;border:1px solid #f1c40f44;font-size:0.8rem;font-weight:bold;margin-bottom:10px;display:none; }
@@ -2540,7 +2540,11 @@ function buildPhotoArea(nodes) {
             const img=document.createElement('img');
             img.src=photoViewState[irName]==='dc'&&hasDC?entry.dcUrl:entry.url;
             img.dataset.photoKey = irName;
-            if (photoRotations[irName+':ir']) img.style.transform = `rotate(${photoRotations[irName+':ir']}deg)`;
+            if (photoRotations[irName+':ir']) {
+                const _initDeg = photoRotations[irName+':ir'];
+                const _initScale = (_initDeg===90||_initDeg===270) ? ' scale(0.75)' : '';
+                img.style.transform = `rotate(${_initDeg}deg)${_initScale}`;
+            }
             img.onerror=()=>{
                 // First try re-fetching from imageBank (in case it was updated)
                 const retry = imageBank[irName];
@@ -2572,7 +2576,9 @@ function buildPhotoArea(nodes) {
                     el.src = photoViewState[name]==='dc' ? ent.dcUrl : ent.url;
                     // Restore rotation for the new view
                     const _newRotKey = name + ':' + photoViewState[name];
-                    el.style.transform = photoRotations[_newRotKey] ? `rotate(${photoRotations[_newRotKey]}deg)` : '';
+                    const _newDeg = photoRotations[_newRotKey] || 0;
+                    const _newScale = (_newDeg===90||_newDeg===270) ? ' scale(0.75)' : '';
+                    el.style.transform = _newDeg ? `rotate(${_newDeg}deg)${_newScale}` : '';
                 };
             })(irName, entry, pill, img);
 
@@ -2635,7 +2641,9 @@ function buildPhotoArea(nodes) {
                     // Apply rotation to the visible img
                     const imgs = document.querySelectorAll(`img[data-photo-key="${name}"]`);
                     imgs.forEach(i => {
-                        i.style.transform = photoRotations[_rotKey] ? `rotate(${photoRotations[_rotKey]}deg)` : '';
+                        const _deg = photoRotations[_rotKey] || 0;
+                        const _scale = (_deg===90||_deg===270) ? ' scale(0.75)' : '';
+                        i.style.transform = _deg ? `rotate(${_deg}deg)${_scale}` : '';
                     });
                     rotBtn.title = `Rotate image (currently ${photoRotations[_rotKey]}deg)`;
                 };
@@ -4927,7 +4935,7 @@ function rbBuildReportHTML() {
 
     const photoCells = items.map(it => `
       <figure class="ph">
-        <div class="phbox"><img src="${it.url}" ${it.rot ? `style="transform:rotate(${it.rot}deg);"` : ''}></div>
+        <div class="phbox"><img src="${it.url}" ${it.rot ? `style="transform:rotate(${it.rot}deg)${(it.rot===90||it.rot===270)?' scale(0.75)':''};"` : ''}></div>
         <figcaption>${it.kind === 'thermal' ? 'Thermal (IR)' : 'Visual (DC)'} · ${rbEsc(it.key.split('_').pop())}</figcaption>
       </figure>`).join('');
 
