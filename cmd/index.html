@@ -2469,6 +2469,11 @@ function generateWallDOM(elevName) {
                     if (repairPriorities[data.id]) node.classList.add('in-planner');
                     if (activeFilter!=='ALL'&&fs!==activeFilter) node.classList.add('node-filtered-out');
                     node.onclick=()=>handleNodeClick(data,node);
+                    // Drop target for manual defect drag-and-drop
+                    node.dataset.drop=dropStr;node.dataset.floor=f;node.dataset.pos=pos;
+                    node.addEventListener('dragover',function(e){if(!window._draggingMdId)return;e.preventDefault();node.style.outline='2px dashed #1fd0a5';node.style.background='rgba(31,208,165,0.18)';});
+                    node.addEventListener('dragleave',function(){node.style.outline='';node.style.background='';});
+                    node.addEventListener('drop',function(e){e.preventDefault();node.style.outline='';node.style.background='';if(window._draggingMdId){mdDropOntoWindow(window._draggingMdId,dropStr,f,pos);window._draggingMdId=null;}});
 
                     // Position label
                     const lbl=document.createElement('div');lbl.innerText=pos;node.appendChild(lbl);
