@@ -1438,7 +1438,11 @@ function loadProjectFile(input) {
             repairPriorities = p.repairPriorities || {};
             repairTags       = p.repairTags       || {};
             repairFixed      = p.repairFixed      || {};
-            manualDefects    = p.manualDefects    || {};
+            // Merge manual defects: JSON wins if it has entries, otherwise preserve existing
+            if (p.manualDefects && Object.keys(p.manualDefects).length > 0) {
+                manualDefects = p.manualDefects;
+            }
+            // Else keep whatever is already in manualDefects (from localStorage)
             if (p.photoRotations) Object.assign(photoRotations, p.photoRotations);
             restoreManualDefectPhotos();
             cesiumAssetId    = p.cesiumAssetId    || 0;
@@ -1472,7 +1476,12 @@ function loadProjectFile(input) {
                 document.getElementById('top-reload-banner').style.display = 'flex';
             }
 
-            showToast('[OK] Project loaded: ' + projectInfo, 4000);
+            const _mdCount = Object.keys(manualDefects).length;
+            if (_mdCount > 0 && (!p.manualDefects || Object.keys(p.manualDefects).length === 0)) {
+                showToast('[OK] Project loaded: ' + projectInfo + ' — ' + _mdCount + ' existing manual defect(s) preserved. Save project to include them.', 6000);
+            } else {
+                showToast('[OK] Project loaded: ' + projectInfo, 4000);
+            }
         } catch(e) {
             console.error('[loadProject] Parse error:', e);
             showToast('[WARN] Could not read project file: ' + e.message, 8000, true);
@@ -1541,9 +1550,12 @@ async function handleFiles(files, forcedType=null) {
                         repairPriorities  = p.repairPriorities  ||{};
                         repairTags        = p.repairTags        ||{};
                         repairFixed       = p.repairFixed       ||{};
+                        if (p.manualDefects && Object.keys(p.manualDefects).length > 0) manualDefects = p.manualDefects;
+                        if (p.photoRotations) Object.assign(photoRotations, p.photoRotations);
+                        restoreManualDefectPhotos();
                         const urlInp = document.getElementById('twin-url-input');
                         if (urlInp && projectModelUrl) urlInp.value = projectModelUrl;
-                        console.log('[JSON] Loaded OK. inspectionData drops:', Object.keys(inspectionData));
+                        console.log('[JSON] Loaded OK. inspectionData drops:', Object.keys(inspectionData), 'manualDefects:', Object.keys(manualDefects).length);
                     } catch(e) {
                         console.error('[JSON] Parse error:', e);
                         showToast('[WARN] Failed to read project file: ' + e.message, 8000, true);
