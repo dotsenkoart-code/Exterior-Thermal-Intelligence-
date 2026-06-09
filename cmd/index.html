@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Strata Command Center | v9.7</title>
+    <title>Strata Command Center | v9.6</title>
     <!--
     ╔══════════════════════════════════════════════════════════════════════════╗
     ║           VERTICALITY INC — STRATA COMMAND CENTER v9.6                 ║
@@ -314,8 +314,8 @@
         .toggle-pill.showing-dc .pill-ir { background:#222;color:#555; }
         .toggle-pill.showing-dc .pill-dc { background:#e0e0e0;color:#000; }
         .toggle-pill.no-dc { opacity:0.4;cursor:default;pointer-events:none; }
-        .photo-viewer-wrap { border-radius:8px;overflow:hidden;background:#000;border:2px solid #333;position:relative;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center; }
-        .photo-viewer-wrap img { width:100%;height:100%;display:block;object-fit:contain;cursor:pointer;object-fit:contain; }
+        .photo-viewer-wrap { border-radius:8px;overflow:hidden;background:#000;border:2px solid #333;position:relative;aspect-ratio:4/3; }
+        .photo-viewer-wrap img { width:100%;height:100%;display:block;cursor:pointer;object-fit:contain; }
 
         .no-photo-banner { background:#111;color:#555;padding:20px;text-align:center;border-radius:8px;border:2px dashed #333;margin-bottom:12px;font-size:0.9rem;font-weight:bold; }
         .stale-banner { background:#1a1400;color:#f1c40f;padding:8px 12px;border-radius:6px;border:1px solid #f1c40f44;font-size:0.8rem;font-weight:bold;margin-bottom:10px;display:none; }
@@ -676,7 +676,7 @@
         </div>
         <div class="manager-section">
             <span class="data-label" style="color:#fff;">Management Notes</span>
-            <textarea id="m-notes" class="modal-notes" placeholder="e.g. Schedule sealant replacement..."></textarea>
+            <textarea id="m-notes" class="modal-notes" placeholder="e.g. Schedule sealant replacement..." autocapitalize="sentences" oninput="if(this.value.length>0)this.value=this.value.charAt(0).toUpperCase()+this.value.slice(1);"></textarea>
             <div style="margin-top:15px;border-top:1px solid #333;padding-top:10px;">
                 <span class="data-label" style="color:#888;">Office Override: Status</span>
                 <div class="status-btns">
@@ -1347,7 +1347,7 @@ function saveCommandState() {
     localStorage.setItem('strataCommandState',JSON.stringify({
         projectInfo,inspectionData,elevations,dropAssignments,
         stitchedPairs,saved3DTags,manualLinks,projectModelUrl,
-        repairPriorities,repairTags,repairFixed,cesiumAssetId,manualDefects:_mdL
+        repairPriorities,repairTags,repairFixed,cesiumAssetId,manualDefects:_mdL,photoRotations
     }));
 }
 
@@ -1369,6 +1369,7 @@ function loadCommandState() {
         repairFixed       =s.repairFixed       ||{};
         cesiumAssetId     =s.cesiumAssetId     ||0;
         manualDefects     =s.manualDefects     ||{};
+        if (s.photoRotations) Object.assign(photoRotations, s.photoRotations);
         // Restore model URL input field if it exists
         const assetInp2 = document.getElementById('cesium-asset-input');
         if (assetInp2 && cesiumAssetId) assetInp2.value = cesiumAssetId;
@@ -1395,7 +1396,7 @@ function saveProject() {
     a.href='data:text/json;charset=utf-8,'+encodeURIComponent(JSON.stringify({
         projectInfo,inspectionData,elevations,dropAssignments,
         stitchedPairs,saved3DTags,manualLinks,projectModelUrl,
-        repairPriorities,repairTags,repairFixed,manualDefects
+        repairPriorities,repairTags,repairFixed,manualDefects,photoRotations
     }));
     const now = new Date();
     const ts  = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}-${String(now.getMinutes()).padStart(2,'0')}`;
@@ -1439,7 +1440,7 @@ function loadProjectFile(input) {
             repairFixed      = p.repairFixed      || {};
             manualDefects    = p.manualDefects    || {};
             if (p.photoRotations) Object.assign(photoRotations, p.photoRotations);
-            restoreManualDefectPhotos(); // repopulate imageBank from embeddedPhotoData
+            restoreManualDefectPhotos();
             cesiumAssetId    = p.cesiumAssetId    || 0;
 
             const assetInp = document.getElementById('cesium-asset-input');
@@ -2489,16 +2490,21 @@ function generateWallDOM(elevName) {
                     grp.appendChild(node);
                 });
             } else {const v=document.createElement('div');v.className='window-node status-void';grp.appendChild(v);}
-            Object.values(manualDefects).filter(function(md){return md.drop===dropStr&&Number(md.floor)===f;}).forEach(function(md){
+            Object.values(manualDefects).filter(function(md){return md.drop===dropStr&&Number(md.floor)===f;}).sort(function(a,b){var po={L:1,C:2,R:3};return (po[a.pos]||4)-(po[b.pos]||4);}).forEach(function(md){
                 var mdn=document.createElement('div');mdn.className='window-node '+md.status;
                 mdn.style.cssText='flex:none;width:52px;font-size:0.55rem;padding:2px 3px;border-style:dashed;position:relative;';
                 mdn.title=md.label;
-                (function(id){mdn.onclick=function(){openModal(id);};})(md.id);
+                (function(id){
+                mdn.onclick=function(){openModal(id);};
+                mdn.draggable=true;mdn.style.cursor='grab';
+                mdn.addEventListener('dragstart',function(e){window._draggingMdId=id;mdn.style.opacity='0.5';e.dataTransfer.effectAllowed='move';});
+                mdn.addEventListener('dragend',function(){mdn.style.opacity='';window._draggingMdId=null;});
+            })(md.id);
                 var mxBtn=document.createElement('span');mxBtn.innerText='x';mxBtn.title='Delete';
                 mxBtn.style.cssText='position:absolute;top:1px;right:2px;font-size:0.65rem;color:rgba(231,76,60,0.6);cursor:pointer;z-index:2;line-height:1;font-weight:bold;';
                 mxBtn.onmouseover=function(){mxBtn.style.color='#e74c3c';};mxBtn.onmouseout=function(){mxBtn.style.color='rgba(231,76,60,0.6)';};
                 (function(id,lbl){mxBtn.onclick=function(e){e.stopPropagation();showConfirm('Delete?','Remove "'+lbl+'"?','DELETE',function(){delete manualDefects[id];delete repairPriorities[id];delete repairTags[id];delete repairFixed[id];delete saved3DTags[id];saveCommandState();calculateBuildingGeometry();refreshCurrentView();});};})(md.id,md.label);
-                var mlb=document.createElement('div');mlb.style.cssText='text-align:center;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-weight:bold;';mlb.innerText=md.label;
+                var mlb=document.createElement('div');mlb.style.cssText='text-align:center;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-weight:bold;';mlb.innerText=(md.pos?'['+md.pos+'] ':'')+md.label;
                 mdn.appendChild(mxBtn);mdn.appendChild(mlb);grp.appendChild(mdn);
             });
             row.appendChild(grp);col.appendChild(row);
@@ -2575,11 +2581,6 @@ function buildPhotoArea(nodes) {
                     photoViewState[name] = photoViewState[name]==='ir' ? 'dc' : 'ir';
                     p.classList.toggle('showing-dc', photoViewState[name]==='dc');
                     el.src = photoViewState[name]==='dc' ? ent.dcUrl : ent.url;
-                    // Restore rotation for the new view
-                    const _newRotKey = name + ':' + photoViewState[name];
-                    const _newDeg = photoRotations[_newRotKey] || 0;
-                    const _newScale = (_newDeg===90||_newDeg===270) ? ' scale(0.75)' : '';
-                    el.style.transform = _newDeg ? `rotate(${_newDeg}deg)${_newScale}` : '';
                 };
             })(irName, entry, pill, img);
 
@@ -2630,23 +2631,19 @@ function buildPhotoArea(nodes) {
             const rotBtn = document.createElement('button');
             rotBtn.className = 'photo-move-btn';
             rotBtn.style.cssText = 'padding:3px 8px;font-size:0.7rem;font-weight:bold;background:#1a1a0a;color:#f1c40f;border:1px solid #f1c40f44;border-radius:4px;cursor:pointer;margin-left:4px;';
-            const curRot = photoRotations[irName+':'+(photoViewState[irName]||'ir')] || 0;
+            const curRot = photoRotations[irName] || 0;
             rotBtn.innerText = 'rotate';
             rotBtn.title = `Rotate 90 degrees (currently ${curRot} degrees)`;
             rotBtn.onclick = (function(name) {
                 return function(e) {
                     e.stopPropagation();
-                    const _view = photoViewState[name] || 'ir';
-                    const _rotKey = name + ':' + _view;
-                    photoRotations[_rotKey] = ((photoRotations[_rotKey] || 0) + 90) % 360;
+                    photoRotations[name] = ((photoRotations[name] || 0) + 90) % 360;
                     // Apply rotation to the visible img
                     const imgs = document.querySelectorAll(`img[data-photo-key="${name}"]`);
                     imgs.forEach(i => {
-                        const _deg = photoRotations[_rotKey] || 0;
-                        const _scale = (_deg===90||_deg===270) ? ' scale(0.75)' : '';
-                        i.style.transform = _deg ? `rotate(${_deg}deg)${_scale}` : '';
+                        i.style.transform = photoRotations[name] ? `rotate(${photoRotations[name]}deg)` : '';
                     });
-                    rotBtn.title = `Rotate image (currently ${photoRotations[_rotKey]}deg)`;
+                    rotBtn.title = `Rotate image (currently ${photoRotations[name]}?)`;
                 };
             })(irName);
 
@@ -2944,7 +2941,7 @@ function updateModalNav(nodeId) {
 
     // Check if this is the last window
     const isLast = idx >= modalNavSequence.length - 1;
-    nextBtn.innerText = isLast ? '? END' : '?';
+    nextBtn.innerText = isLast ? '► END' : '►';
     nextBtn.style.background = isLast ? '#0a1a0a' : '#1a1d27';
     nextBtn.style.borderColor = isLast ? '#28a745' : '#0cf';
     nextBtn.style.color = isLast ? '#28a745' : '#0cf';
@@ -3002,6 +2999,7 @@ function openModal(nodeId) {
     document.getElementById('btn-retag').style.display =hasTag?'block':'none';
 
     document.getElementById('m-id').innerText   =manualDefects[nodeId]?(primary.label||nodeId):activeNodeDataArray.map(function(d){return d.id;}).join(' + ');
+    updateStatusBtns(primary ? primary.status : 'status-void');
     document.getElementById('m-tech').innerText =manualDefects[nodeId]?([primary.elevation,primary.drop?'Drop '+primary.drop:'',primary.floor?'Floor '+primary.floor:'',primary.locationDetail].filter(Boolean).join(' · ')||'Custom Defect'):'Logged by: '+[...new Set(activeNodeDataArray.map(function(d){return d.tech;}).filter(Boolean))].join(', ');
     const allFinds=[...new Set(activeNodeDataArray.flatMap(d=>d.finds.split(' | ')))].filter(f=>f!=='CLEAR'&&f!=='');
     const finds=allFinds.length?allFinds:['CLEAR'];
@@ -3018,6 +3016,8 @@ function openModal(nodeId) {
     if (picker) picker.remove();
     updatePlannerBtn(nodeId);
     var _xdb=document.getElementById('btn-md-delete');if(_xdb)_xdb.remove();
+    var _xrb=document.getElementById('btn-md-reposition');if(_xrb)_xrb.remove();
+    if(manualDefects[nodeId]){var _rb=document.createElement('button');_rb.id='btn-md-reposition';_rb.className='btn btn-dark btn-block';_rb.style.cssText='margin-top:8px;border-color:#1fd0a5;color:#1fd0a5;font-weight:bold;';_rb.innerText='⇕ Reposition Defect';(function(id){_rb.onclick=function(){mdOpenRepositionForm(id);};})(nodeId);document.querySelector('#info-modal .modal-box').appendChild(_rb);}
     (function(nid,prim){var _pp=nid.split('-'),_pos=_pp[_pp.length-1];if(manualDefects[nid]||['L','C','R'].indexOf(_pos)===-1){var _lbl=manualDefects[nid]?prim.label:nid;var _db=document.createElement('button');_db.id='btn-md-delete';_db.className='btn btn-dark btn-block';_db.style.cssText='margin-top:8px;border-color:#e74c3c;color:#e74c3c;font-weight:bold;';_db.innerText='Delete This Defect';(function(id,lbl){_db.onclick=function(){showConfirm('Delete?','Remove "'+lbl+'" permanently?','DELETE',function(){if(manualDefects[id])delete manualDefects[id];else{var pp=id.split('-');if(pp.length>=3&&inspectionData[pp[0]]&&inspectionData[pp[0]][pp[1]])delete inspectionData[pp[0]][pp[1]][pp[2]];}delete repairPriorities[id];delete repairTags[id];delete repairFixed[id];delete saved3DTags[id];var pi=stitchedPairs.findIndex(function(pp){return pp.includes(id);});if(pi!==-1)stitchedPairs.splice(pi,1);saveCommandState();calculateBuildingGeometry();refreshCurrentView();closeModal();});};})(nid,_lbl);document.querySelector('#info-modal .modal-box').appendChild(_db);}})(nodeId,primary);
     // Show suggest button only if this window has zero photos
     const hasPhotos = activeNodeDataArray.some(n => nodePhotoNames(n).length > 0);
@@ -3032,6 +3032,7 @@ function openModal(nodeId) {
 
 function unmergeCurrent(){if(activeNodeDataArray[0]){const idx=stitchedPairs.findIndex(p=>p.includes(activeNodeDataArray[0].id));if(idx!==-1){showConfirm('?? Un-stitch windows?','These two windows will be separated back into individual nodes.','UN-STITCH',()=>{stitchedPairs.splice(idx,1);closeModal();calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();});}}}
 function changeStatus(s){const note=document.getElementById('m-notes').value;activeNodeDataArray.forEach(d=>{if(d){d.notes=note;d.status=s;}});calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();closeModal();}
+function updateStatusBtns(status){const btns=document.querySelectorAll('.btn-status');const map={'status-clear':'btn-green','status-flagged':'btn-status-yellow','status-confirmed':'btn-red'};btns.forEach(btn=>{btn.style.outline='';btn.style.boxShadow='';btn.style.transform='';btn.style.opacity='0.55';});const ac=map[status];if(ac){const ab=document.querySelector('.btn-status.'+ac);if(ab){ab.style.outline='3px solid #fff';ab.style.boxShadow='0 0 0 5px rgba(255,255,255,0.25)';ab.style.transform='scale(1.04)';ab.style.opacity='1';}}}
 function saveNotesOnly(){const note=document.getElementById('m-notes').value;activeNodeDataArray.forEach(d=>{if(d)d.notes=note;});calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();closeModal();}
 function unpinCurrent(){showConfirm('?? Remove 3D pin?','The window data stays safe ? only the pin position on the 3D model is removed.','REMOVE PIN',()=>{activeNodeDataArray.forEach(d=>{if(d&&saved3DTags[d.id])delete saved3DTags[d.id];});render3DHotspots();saveCommandState();closeModal();});}
 function closeModal(){document.getElementById('info-modal').style.display='none';activeNodeDataArray=[];modalNodeId=null;}
@@ -3898,7 +3899,11 @@ function renderRepairPlanner() {
                                 ? `background:#0a1a0a;border:2px solid #28a745;opacity:0.6;`
                                 : `background:${defColor}33;border:2px solid ${defColor};`;
                             node.onclick = () => openModal(nodeId);
-                            node.title = isFixed ? 'FIXED ? tap to view' : 'Tap to view';
+                            node.title = isFixed ? 'FIXED — tap to view' : 'Tap to view';
+                            node.dataset.drop=dropStr;node.dataset.floor=f;node.dataset.pos=pos;
+                            node.addEventListener('dragover',function(e){if(!window._draggingMdId)return;e.preventDefault();node.style.outline='2px dashed #1fd0a5';node.style.background='rgba(31,208,165,0.18)';});
+                            node.addEventListener('dragleave',function(){node.style.outline='';node.style.background='';});
+                            node.addEventListener('drop',function(e){e.preventDefault();node.style.outline='';node.style.background='';if(window._draggingMdId){mdDropOntoWindow(window._draggingMdId,dropStr,f,pos);window._draggingMdId=null;}});
 
                             // Position label
                             const lbl = document.createElement('div');
@@ -4484,8 +4489,8 @@ function rbPhotoItems(node) {
     const img = imageBank[key];
     if (!img) return;
     const isManualPhoto = img.drop === 'MANUAL';
-    if (img.url)   items.push({ key, kind: isManualPhoto ? 'site' : 'thermal', url: img.url,   rot: photoRotations[key+':ir'] || photoRotations[key] || 0 });
-    if (img.dcUrl) items.push({ key, kind: 'visual',  url: img.dcUrl, rot: photoRotations[key+':dc'] || photoRotations[key] || 0 });
+    if (img.url)   items.push({ key, kind: isManualPhoto ? 'site' : 'thermal', url: img.url,   rot: photoRotations[key] || 0 });
+    if (img.dcUrl) items.push({ key, kind: 'visual',  url: img.dcUrl, rot: photoRotations[key] || 0 });
   });
   return items;
 }
@@ -4936,7 +4941,7 @@ function rbBuildReportHTML() {
 
     const photoCells = items.map(it => `
       <figure class="ph">
-        <div class="phbox"><img src="${it.url}" ${it.rot ? `style="transform:rotate(${it.rot}deg)${(it.rot===90||it.rot===270)?' scale(0.75)':''};"` : ''}></div>
+        <div class="phbox"><img src="${it.url}" ${it.rot ? `style="transform:rotate(${it.rot}deg);"` : ''}></div>
         <figcaption>${it.kind === 'thermal' ? 'Thermal (IR)' : 'Visual (DC)'} · ${rbEsc(it.key.split('_').pop())}</figcaption>
       </figure>`).join('');
 
@@ -5184,11 +5189,119 @@ function exportClientPackage() {
 
 // MANUAL DEFECTS
 
+function mdDropOntoWindow(mdId,newDrop,newFloor,newPos){
+  var node=manualDefects[mdId];if(!node)return;
+  node.drop=newDrop;node.floor=Number(newFloor);node.pos=newPos;
+  var posLabel=newPos==='L'?'Left':newPos==='C'?'Center':newPos==='R'?'Right':'';
+  if(posLabel){node.locationDetail=(node.locationDetail||'').replace(/Left|Center|Right/g,'').trim();node.locationDetail=(node.locationDetail?node.locationDetail+' ':'')+posLabel;}
+  saveCommandState();calculateBuildingGeometry();refreshCurrentView();
+  showToast('[OK] Defect moved to Drop '+newDrop+' Floor '+newFloor+' '+newPos,2500);
+}
+
+function mdOpenRepositionForm(nodeId){
+  var node=manualDefects[nodeId];if(!node)return;
+  var existing=document.getElementById('md-reposition-overlay');if(existing)existing.remove();
+  var allDrops=Object.keys(inspectionData).filter(function(d){return dropAssignments[d]===node.elevation;}).sort();
+  var currentDrop=node.drop||allDrops[0];var currentFloor=node.floor||1;var currentPos=node.pos||'';
+  var overlay=document.createElement('div');overlay.id='md-reposition-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:6000;display:flex;align-items:center;justify-content:center;';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  var dropOpts=allDrops.map(function(d){return '<option value="'+d+'"'+(d===currentDrop?' selected':'')+'>Drop '+d+'</option>';}).join('');
+  var box=document.createElement('div');
+  box.style.cssText='background:#1a1d27;border:1px solid #1fd0a5;border-radius:12px;padding:24px;width:min(420px,92vw);box-shadow:0 15px 35px rgba(0,0,0,0.9);';
+  box.innerHTML='<div style="color:#1fd0a5;font-size:0.8rem;font-weight:bold;text-transform:uppercase;letter-spacing:1px;margin-bottom:16px;">⇕ Reposition — '+node.label+'</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">'+
+      '<div><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Drop</label>'+
+      '<select id="rp-drop" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;">'+dropOpts+'</select></div>'+
+      '<div><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Floor</label>'+
+      '<select id="rp-floor" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;"></select></div>'+
+    '</div>'+
+    '<div style="margin-bottom:16px;"><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;display:block;margin-bottom:8px;">Position in row</label>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;" id="rp-pos-btns">'+
+        '<button data-pos="L" style="padding:10px 6px;border-radius:6px;border:1px solid #444;background:#111;color:#aaa;font-size:0.8rem;font-weight:bold;cursor:pointer;">◄ Left</button>'+
+        '<button data-pos="C" style="padding:10px 6px;border-radius:6px;border:1px solid #444;background:#111;color:#aaa;font-size:0.8rem;font-weight:bold;cursor:pointer;">● Center</button>'+
+        '<button data-pos="R" style="padding:10px 6px;border-radius:6px;border:1px solid #444;background:#111;color:#aaa;font-size:0.8rem;font-weight:bold;cursor:pointer;">► Right</button>'+
+        '<button data-pos="" style="padding:10px 6px;border-radius:6px;border:1px solid #444;background:#111;color:#aaa;font-size:0.75rem;cursor:pointer;">⊕ Float</button>'+
+      '</div></div>'+
+    '<div style="display:flex;gap:10px;">'+
+      '<button id="rp-apply" style="flex:1;padding:11px;background:#1fd0a5;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;">Apply</button>'+
+      '<button id="rp-cancel" style="padding:11px 18px;background:#222;color:#888;border:1px solid #444;border-radius:6px;cursor:pointer;">Cancel</button>'+
+    '</div>';
+  overlay.appendChild(box);document.body.appendChild(overlay);
+  function rpPopFloors(){var d=document.getElementById('rp-drop').value;var floors=Object.keys(inspectionData[d]||{}).map(Number).sort(function(a,b){return b-a;});var sel=document.getElementById('rp-floor');sel.innerHTML=floors.map(function(f){return '<option value="'+f+'"'+(f===currentFloor?' selected':'')+'>Floor '+f+'</option>';}).join('');}
+  rpPopFloors();document.getElementById('rp-drop').onchange=rpPopFloors;
+  var selPos=currentPos;var posBtns=box.querySelectorAll('[data-pos]');
+  function rpUpdatePosBtns(){posBtns.forEach(function(b){var active=b.dataset.pos===selPos;b.style.background=active?'#1fd0a5':'#111';b.style.color=active?'#000':'#aaa';b.style.borderColor=active?'#1fd0a5':'#444';});}
+  rpUpdatePosBtns();posBtns.forEach(function(b){b.onclick=function(){selPos=b.dataset.pos;rpUpdatePosBtns();};});
+  document.getElementById('rp-cancel').onclick=function(){overlay.remove();};
+  document.getElementById('rp-apply').onclick=function(){
+    var newDrop=document.getElementById('rp-drop').value;var newFloor=parseInt(document.getElementById('rp-floor').value);
+    if(!newDrop||isNaN(newFloor)){showToast('Select a drop and floor.',2500,true);return;}
+    node.drop=newDrop;node.floor=newFloor;node.pos=selPos;
+    var posLabel=selPos==='L'?'Left':selPos==='C'?'Center':selPos==='R'?'Right':'';
+    if(posLabel)node.locationDetail=(node.locationDetail?node.locationDetail.replace(/Left|Center|Right/,'').trim()+' ':'')+posLabel;
+    saveCommandState();calculateBuildingGeometry();refreshCurrentView();overlay.remove();openModal(nodeId);showToast('[OK] Defect repositioned',2000);
+  };
+}
+
 function restoreManualDefectPhotos(){Object.values(manualDefects).forEach(function(node){var epd=node.embeddedPhotoData||{};Object.keys(epd).forEach(function(key){if(!imageBank[key])imageBank[key]={url:epd[key],dcUrl:null,time:null,drop:'MANUAL'};});});if(typeof updatePhotoStat==='function')updatePhotoStat();}
-function setupManualPhotoSlot(slotEl,nodeId){slotEl.addEventListener('dragover',function(e){e.preventDefault();slotEl.classList.add('drag-over');});slotEl.addEventListener('dragleave',function(){slotEl.classList.remove('drag-over');});slotEl.addEventListener('drop',function(e){e.preventDefault();e.stopPropagation();slotEl.classList.remove('drag-over');openPhotoBrowser(Array.from(e.dataTransfer.files).filter(function(f){return f.type.startsWith('image/');}),nodeId);});slotEl.addEventListener('click',function(){var i=document.createElement('input');i.type='file';i.accept='image/*';i.multiple=true;i.setAttribute('webkitdirectory','');i.onchange=function(){var imgs=Array.from(i.files).filter(function(f){return f.type.startsWith('image/');});if(imgs.length)openPhotoBrowser(imgs,nodeId);};i.click();});}
+
+function setupManualPhotoSlot(slotEl,nodeId){
+  slotEl.addEventListener('dragover',function(e){e.preventDefault();slotEl.classList.add('drag-over');});
+  slotEl.addEventListener('dragleave',function(){slotEl.classList.remove('drag-over');});
+  slotEl.addEventListener('drop',function(e){
+    e.preventDefault();e.stopPropagation();slotEl.classList.remove('drag-over');
+    var imgs=Array.from(e.dataTransfer.files).filter(function(f){return f.type.startsWith('image/');});
+    if(!imgs.length)return;
+    if(imgs.length===1){mdIngestPhoto(imgs[0],nodeId);}else{openPhotoBrowser(imgs,nodeId);}
+  });
+  slotEl.addEventListener('click',function(){mdShowPickerChoice(slotEl,nodeId);});
+}
+
+function mdShowPickerChoice(anchorEl,nodeId){
+  var existing=document.getElementById('md-picker-menu');if(existing){existing.remove();return;}
+  var menu=document.createElement('div');menu.id='md-picker-menu';
+  var r=anchorEl.getBoundingClientRect();
+  menu.style.cssText='position:fixed;z-index:9000;background:#1a1d27;border:1px solid #1fd0a5;border-radius:8px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,0.7);display:flex;flex-direction:column;gap:4px;';
+  menu.style.top=(r.bottom+6)+'px';menu.style.left=r.left+'px';
+  function makeBtn(label,fn){
+    var b=document.createElement('button');
+    b.style.cssText='padding:9px 18px;background:transparent;border:none;color:#fff;font-size:0.82rem;text-align:left;cursor:pointer;border-radius:6px;white-space:nowrap;';
+    b.textContent=label;b.onmouseover=function(){b.style.background='#1fd0a533';};b.onmouseout=function(){b.style.background='transparent';};b.onclick=function(){menu.remove();fn();};return b;
+  }
+  menu.appendChild(makeBtn('📷  Choose individual photo(s)',function(){
+    var i=document.createElement('input');i.type='file';i.accept='image/*';i.multiple=true;
+    i.onchange=function(){var imgs=Array.from(i.files).filter(function(f){return f.type.startsWith('image/');});if(imgs.length===1)mdIngestPhoto(imgs[0],nodeId);else if(imgs.length>1)openPhotoBrowser(imgs,nodeId);};i.click();
+  }));
+  menu.appendChild(makeBtn('📁  Choose entire folder',function(){
+    var i=document.createElement('input');i.type='file';i.accept='image/*';i.multiple=true;i.setAttribute('webkitdirectory','');
+    i.onchange=function(){var imgs=Array.from(i.files).filter(function(f){return f.type.startsWith('image/');});if(imgs.length===1)mdIngestPhoto(imgs[0],nodeId);else if(imgs.length>1)openPhotoBrowser(imgs,nodeId);};i.click();
+  }));
+  document.body.appendChild(menu);
+  setTimeout(function(){document.addEventListener('click',function _close(ev){if(!menu.contains(ev.target)){menu.remove();document.removeEventListener('click',_close);}});},0);
+}
+
+function mdIngestPhoto(file,nodeId){
+  if(!file||!file.type.startsWith('image/'))return;
+  var node=manualDefects[nodeId];if(!node)return;
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    var key=nodeId+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
+    imageBank[key]={url:ev.target.result,dcUrl:null,time:null,drop:'MANUAL'};
+    if(!node.embeddedPhotoData)node.embeddedPhotoData={};
+    node.embeddedPhotoData[key]=ev.target.result;
+    if(!node.photos)node.photos=[];if(node.photos.indexOf(key)===-1)node.photos.push(key);
+    saveCommandState();if(typeof updatePhotoStat==='function')updatePhotoStat();
+    if(modalNodeId===nodeId)openModal(nodeId);showToast('[OK] Photo added',2000);
+  };reader.readAsDataURL(file);
+}
+
 function openPhotoBrowser(files,nodeId){if(!files||!files.length)return;var node=manualDefects[nodeId];if(!node)return;var existing=document.getElementById('photo-browser-overlay');if(existing)existing.remove();var overlay=document.createElement('div');overlay.id='photo-browser-overlay';overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:8000;display:flex;flex-direction:column;';var header=document.createElement('div');header.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:#111;border-bottom:1px solid #2a2d38;flex-shrink:0;';header.innerHTML='<div style="display:flex;align-items:center;gap:12px;"><span style="font-size:0.75rem;color:#1fd0a5;font-weight:bold;text-transform:uppercase;letter-spacing:1px;">Select Photos</span><span id="pb-count" style="font-size:0.72rem;color:#888;">0 selected</span></div><div style="display:flex;gap:8px;"><button id="pb-add" style="padding:8px 20px;background:#1fd0a5;color:#000;border:none;border-radius:6px;font-size:0.78rem;font-weight:bold;cursor:pointer;">Add Selected</button><button id="pb-cancel" style="padding:8px 16px;background:#222;color:#888;border:1px solid #333;border-radius:6px;font-size:0.78rem;cursor:pointer;">Cancel</button></div>';overlay.appendChild(header);var grid=document.createElement('div');grid.style.cssText='flex:1;overflow-y:auto;padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;align-content:start;';overlay.appendChild(grid);var selected=new Set();var thumbData=[];function updateCount(){document.getElementById('pb-count').textContent=selected.size+' selected';document.getElementById('pb-add').style.opacity=selected.size>0?'1':'0.4';}function openBrowserLightbox(dataUrl,name){var lb=document.createElement('div');lb.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:9000;display:flex;flex-direction:column;align-items:center;justify-content:center;';lb.addEventListener('click',function(){lb.remove();});var img=document.createElement('img');img.src=dataUrl;img.style.cssText='max-width:90vw;max-height:85vh;object-fit:contain;border-radius:6px;';lb.appendChild(img);var cap=document.createElement('div');cap.style.cssText='margin-top:12px;font-size:0.75rem;color:rgba(255,255,255,0.5);';cap.textContent=name+' - click anywhere to close';lb.appendChild(cap);document.body.appendChild(lb);}function buildThumb(idx,dataUrl,file){var wrap=document.createElement('div');wrap.style.cssText='position:relative;border-radius:8px;overflow:hidden;cursor:pointer;border:2px solid transparent;transition:0.15s;background:#1a1d27;aspect-ratio:4/3;';var img=document.createElement('img');img.src=dataUrl;img.style.cssText='width:100%;height:100%;object-fit:cover;display:block;';wrap.appendChild(img);var lbl=document.createElement('div');lbl.style.cssText='position:absolute;bottom:0;left:0;right:0;padding:4px 6px;background:rgba(0,0,0,0.65);font-size:0.58rem;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';lbl.textContent=file.name;wrap.appendChild(lbl);var chk=document.createElement('div');chk.style.cssText='position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;border:2px solid #fff;background:transparent;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:#fff;transition:0.15s;';wrap.appendChild(chk);wrap.addEventListener('click',function(e){e.stopPropagation();if(selected.has(idx)){selected.delete(idx);wrap.style.borderColor='transparent';chk.style.background='transparent';chk.textContent='';}else{selected.add(idx);wrap.style.borderColor='#1fd0a5';chk.style.background='#1fd0a5';chk.textContent='+';}updateCount();});wrap.addEventListener('contextmenu',function(e){e.preventDefault();openBrowserLightbox(dataUrl,file.name);});var mag=document.createElement('button');mag.style.cssText='position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,0.6);border:none;color:#fff;font-size:0.65rem;cursor:pointer;';mag.textContent='Q';mag.title='Preview full size';mag.addEventListener('click',function(e){e.stopPropagation();openBrowserLightbox(dataUrl,file.name);});wrap.appendChild(mag);grid.appendChild(wrap);}var loadIdx=0;function loadNext(){if(loadIdx>=files.length)return;var idx=loadIdx++;var file=files[idx];var reader=new FileReader();reader.onload=function(ev){thumbData[idx]={file:file,dataUrl:ev.target.result};buildThumb(idx,ev.target.result,file);setTimeout(loadNext,0);};reader.readAsDataURL(file);}for(var i=0;i<Math.min(6,files.length);i++)loadNext();overlay.querySelector('#pb-cancel').addEventListener('click',function(){overlay.remove();});overlay.querySelector('#pb-add').addEventListener('click',function(){if(!selected.size)return;Array.from(selected).forEach(function(idx){var item=thumbData[idx];if(!item)return;var n=manualDefects[nodeId];if(!n)return;var key=nodeId+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);imageBank[key]={url:item.dataUrl,dcUrl:null,time:null,drop:'MANUAL'};if(!n.embeddedPhotoData)n.embeddedPhotoData={};n.embeddedPhotoData[key]=item.dataUrl;if(!n.photos)n.photos=[];if(n.photos.indexOf(key)===-1)n.photos.push(key);});saveCommandState();if(typeof updatePhotoStat==='function')updatePhotoStat();overlay.remove();if(modalNodeId===nodeId)openModal(nodeId);showToast('[OK] '+selected.size+' photo'+(selected.size>1?'s':'')+' added',2500);});document.body.appendChild(overlay);updateCount();}
-function openAddDefectForm(elevation,preselectedDrop){var existing=document.getElementById('md-overlay');if(existing){existing.remove();return;}var drops=Object.keys(inspectionData).filter(function(d){return dropAssignments[d]===elevation;}).sort();if(!drops.length){showToast('No drops assigned to this elevation yet.',3000,true);return;}var overlay=document.createElement('div');overlay.id='md-overlay';overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:5000;display:flex;align-items:center;justify-content:center;';overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};var dropOpts=drops.map(function(d){return '<option value="'+d+'"'+(d===preselectedDrop?' selected':'')+'>Drop '+d+'</option>';}).join('');var box=document.createElement('div');box.style.cssText='background:#1a1d27;border:1px solid #1fd0a5;border-radius:12px;padding:24px;width:min(540px,92vw);box-shadow:0 15px 35px rgba(0,0,0,0.9);';box.innerHTML='<div style="color:#1fd0a5;font-size:0.8rem;font-weight:bold;text-transform:uppercase;letter-spacing:1px;margin-bottom:16px;">Add Custom Defect - '+elevation+'</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;"><div style="grid-column:1/-1;"><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Defect Name *</label><input id="md-f-label" type="text" placeholder="e.g. Expansion Joint" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;"></div><div><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Drop *</label><select id="md-f-drop" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;">'+dropOpts+'</select></div><div><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Floor *</label><select id="md-f-floor" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;"></select></div><div style="grid-column:1/-1;"><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Location Detail</label><input id="md-f-loc" type="text" placeholder="e.g. NW corner" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;"></div></div><div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;"><span style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;flex-shrink:0;">Status</span><button id="md-f-flagged" style="padding:7px 16px;border-radius:5px;border:1px solid #f1c40f;background:transparent;color:#f1c40f;font-size:0.8rem;font-weight:bold;cursor:pointer;">FLAGGED</button><button id="md-f-confirmed" style="padding:7px 16px;border-radius:5px;border:1px solid #d9534f;background:#d9534f;color:#fff;font-size:0.8rem;font-weight:bold;cursor:pointer;">DEFECT</button></div><div style="display:flex;gap:10px;"><button id="md-f-add" style="flex:1;padding:11px;background:#1fd0a5;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;">ADD DEFECT</button><button id="md-f-cancel" style="padding:11px 18px;background:#222;color:#888;border:1px solid #444;border-radius:6px;cursor:pointer;">CANCEL</button></div>';overlay.appendChild(box);document.body.appendChild(overlay);var status='status-confirmed';mdPopulateFloors();document.getElementById('md-f-drop').onchange=mdPopulateFloors;document.getElementById('md-f-flagged').onclick=function(){status='status-flagged';this.style.background='#f1c40f';this.style.color='#000';document.getElementById('md-f-confirmed').style.background='transparent';document.getElementById('md-f-confirmed').style.color='#d9534f';};document.getElementById('md-f-confirmed').onclick=function(){status='status-confirmed';this.style.background='#d9534f';this.style.color='#fff';document.getElementById('md-f-flagged').style.background='transparent';document.getElementById('md-f-flagged').style.color='#f1c40f';};document.getElementById('md-f-cancel').onclick=function(){overlay.remove();};document.getElementById('md-f-add').onclick=function(){mdSaveDefect(elevation,overlay,function(){return status;});};var inp=document.getElementById('md-f-label');if(inp){inp.focus();inp.onkeypress=function(e){if(e.key==='Enter')mdSaveDefect(elevation,overlay,function(){return status;});};}}
+
+function openAddDefectForm(elevation,preselectedDrop){var existing=document.getElementById('md-overlay');if(existing){existing.remove();return;}var drops=Object.keys(inspectionData).filter(function(d){return dropAssignments[d]===elevation;}).sort();if(!drops.length){showToast('No drops assigned to this elevation yet.',3000,true);return;}var overlay=document.createElement('div');overlay.id='md-overlay';overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:5000;display:flex;align-items:center;justify-content:center;';overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};var dropOpts=drops.map(function(d){return '<option value="'+d+'"'+(d===preselectedDrop?' selected':'')+'>Drop '+d+'</option>';}).join('');var box=document.createElement('div');box.style.cssText='background:#1a1d27;border:1px solid #1fd0a5;border-radius:12px;padding:24px;width:min(540px,92vw);box-shadow:0 15px 35px rgba(0,0,0,0.9);';box.innerHTML='<div style="color:#1fd0a5;font-size:0.8rem;font-weight:bold;text-transform:uppercase;letter-spacing:1px;margin-bottom:16px;">Add Custom Defect — '+elevation+'</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;"><div style="grid-column:1/-1;"><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Defect Name *</label><input id="md-f-label" type="text" placeholder="e.g. Expansion Joint" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;"></div><div><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Drop *</label><select id="md-f-drop" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;">'+dropOpts+'</select></div><div><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Floor *</label><select id="md-f-floor" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;"></select></div><div style="grid-column:1/-1;"><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Location Detail</label><input id="md-f-loc" type="text" placeholder="e.g. NW corner" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;"></div></div><div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;"><span style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;flex-shrink:0;">Status</span><button id="md-f-flagged" style="padding:7px 16px;border-radius:5px;border:1px solid #f1c40f;background:transparent;color:#f1c40f;font-size:0.8rem;font-weight:bold;cursor:pointer;">FLAGGED</button><button id="md-f-confirmed" style="padding:7px 16px;border-radius:5px;border:1px solid #d9534f;background:#d9534f;color:#fff;font-size:0.8rem;font-weight:bold;cursor:pointer;">DEFECT</button></div><div style="display:flex;gap:10px;"><button id="md-f-add" style="flex:1;padding:11px;background:#1fd0a5;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;">ADD DEFECT</button><button id="md-f-cancel" style="padding:11px 18px;background:#222;color:#888;border:1px solid #444;border-radius:6px;cursor:pointer;">CANCEL</button></div>';overlay.appendChild(box);document.body.appendChild(overlay);var status='status-confirmed';mdPopulateFloors();document.getElementById('md-f-drop').onchange=mdPopulateFloors;document.getElementById('md-f-flagged').onclick=function(){status='status-flagged';this.style.background='#f1c40f';this.style.color='#000';document.getElementById('md-f-confirmed').style.background='transparent';document.getElementById('md-f-confirmed').style.color='#d9534f';};document.getElementById('md-f-confirmed').onclick=function(){status='status-confirmed';this.style.background='#d9534f';this.style.color='#fff';document.getElementById('md-f-flagged').style.background='transparent';document.getElementById('md-f-flagged').style.color='#f1c40f';};document.getElementById('md-f-cancel').onclick=function(){overlay.remove();};document.getElementById('md-f-add').onclick=function(){mdSaveDefect(elevation,overlay,function(){return status;});};var inp=document.getElementById('md-f-label');if(inp){inp.focus();inp.onkeypress=function(e){if(e.key==='Enter')mdSaveDefect(elevation,overlay,function(){return status;});};};}
+
 function mdPopulateFloors(){var dropSel=document.getElementById('md-f-drop'),floorSel=document.getElementById('md-f-floor');if(!dropSel||!floorSel)return;var floors=Object.keys(inspectionData[dropSel.value]||{}).map(Number).sort(function(a,b){return b-a;});floorSel.innerHTML=floors.map(function(f){return '<option value="'+f+'">Floor '+f+'</option>';}).join('');}
+
 function mdSaveDefect(elevation,overlay,getStatus){var label=(document.getElementById('md-f-label').value||'').trim();if(!label){showToast('Please enter a defect name.',2500,true);document.getElementById('md-f-label').focus();return;}var drop=document.getElementById('md-f-drop').value;var floor=parseInt(document.getElementById('md-f-floor').value);var loc=(document.getElementById('md-f-loc').value||'').trim();if(!drop||isNaN(floor)){showToast('Please select a drop and floor.',2500,true);return;}var id='MANUAL-'+Date.now()+'-'+Math.random().toString(36).slice(2,6).toUpperCase();manualDefects[id]={id:id,label:label,locationDetail:loc,elevation:elevation,drop:drop,floor:floor,finds:label,notes:'',status:getStatus(),photos:[],embeddedPhotoData:{}};overlay.remove();saveCommandState();calculateBuildingGeometry();refreshCurrentView();openModal(id);}
 
 </script>
