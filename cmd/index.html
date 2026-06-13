@@ -2829,6 +2829,7 @@ function buildPhotoArea(nodes) {
     const slot=document.createElement('div');slot.className='drop-slot';
     slot.innerHTML='<span>+</span><span>Drop or click to manually add an IR photo</span>';
     var _nid=nodes[0]?nodes[0].id:'';
+    console.log('[MD] Building photo slot. nodes[0].id:', _nid, '| isManual:', _nid.startsWith('MANUAL-'));
     if(_nid.startsWith('MANUAL-'))setupManualPhotoSlot(slot,_nid);
     else setupDropSlot(slot,_nid);
     area.appendChild(slot);
@@ -5708,6 +5709,7 @@ function setupManualPhotoSlot(slotEl,nodeId){
 }
 
 function mdShowPickerChoice(anchorEl,nodeId){
+  console.log('[MD] Picker opened for node:', nodeId, '| exists in manualDefects:', !!manualDefects[nodeId]);
   var existing=document.getElementById('md-picker-menu');if(existing){existing.remove();return;}
   var menu=document.createElement('div');menu.id='md-picker-menu';
   var r=anchorEl.getBoundingClientRect();
@@ -5719,20 +5721,45 @@ function mdShowPickerChoice(anchorEl,nodeId){
     b.textContent=label;b.onmouseover=function(){b.style.background='#1fd0a533';};b.onmouseout=function(){b.style.background='transparent';};b.onclick=function(){menu.remove();fn();};return b;
   }
   menu.appendChild(makeBtn('📷  Choose individual photo(s)',function(){
+    console.log('[MD] Individual photo button clicked, opening file dialog for:', nodeId);
     var i=document.createElement('input');i.type='file';i.accept='image/*';i.multiple=true;
-    i.onchange=function(){var imgs=Array.from(i.files).filter(function(f){return f.type.startsWith('image/');});if(imgs.length===1)mdIngestPhoto(imgs[0],nodeId);else if(imgs.length>1)openPhotoBrowser(imgs,nodeId);};i.click();
+    i.style.position='fixed';i.style.left='-9999px';
+    document.body.appendChild(i);
+    i.onchange=function(){
+        console.log('[MD] File input onchange fired. Files:', i.files ? i.files.length : 0);
+        var imgs=Array.from(i.files).filter(function(f){return f.type.startsWith('image/');});
+        console.log('[MD] Image files after filter:', imgs.length);
+        if(imgs.length===1)mdIngestPhoto(imgs[0],nodeId);
+        else if(imgs.length>1)openPhotoBrowser(imgs,nodeId);
+        else console.warn('[MD] No image files selected');
+        setTimeout(function(){if(i.parentNode)i.parentNode.removeChild(i);},1000);
+    };
+    i.click();
   }));
   menu.appendChild(makeBtn('📁  Choose entire folder',function(){
+    console.log('[MD] Folder button clicked, opening folder dialog for:', nodeId);
     var i=document.createElement('input');i.type='file';i.accept='image/*';i.multiple=true;i.setAttribute('webkitdirectory','');
-    i.onchange=function(){var imgs=Array.from(i.files).filter(function(f){return f.type.startsWith('image/');});if(imgs.length===1)mdIngestPhoto(imgs[0],nodeId);else if(imgs.length>1)openPhotoBrowser(imgs,nodeId);};i.click();
+    i.style.position='fixed';i.style.left='-9999px';
+    document.body.appendChild(i);
+    i.onchange=function(){
+        console.log('[MD] Folder input onchange fired. Files:', i.files ? i.files.length : 0);
+        var imgs=Array.from(i.files).filter(function(f){return f.type.startsWith('image/');});
+        console.log('[MD] Image files after filter:', imgs.length);
+        if(imgs.length===1)mdIngestPhoto(imgs[0],nodeId);
+        else if(imgs.length>1)openPhotoBrowser(imgs,nodeId);
+        else console.warn('[MD] No image files selected');
+        setTimeout(function(){if(i.parentNode)i.parentNode.removeChild(i);},1000);
+    };
+    i.click();
   }));
   document.body.appendChild(menu);
   setTimeout(function(){document.addEventListener('click',function _close(ev){if(!menu.contains(ev.target)){menu.remove();document.removeEventListener('click',_close);}});},0);
 }
 
 function mdIngestPhoto(file,nodeId){
-  if(!file||!file.type.startsWith('image/'))return;
-  var node=manualDefects[nodeId];if(!node)return;
+  console.log('[MD] Ingesting photo for node:', nodeId, '| file:', file ? file.name : 'NONE', '| type:', file ? file.type : 'N/A');
+  if(!file||!file.type.startsWith('image/')){console.warn('[MD] Rejected: not an image or no file');return;}
+  var node=manualDefects[nodeId];if(!node){console.warn('[MD] Rejected: node not found in manualDefects:', nodeId);return;}
   var reader=new FileReader();
   reader.onload=function(ev){
     var key=nodeId+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
