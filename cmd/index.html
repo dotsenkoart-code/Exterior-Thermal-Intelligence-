@@ -2481,6 +2481,7 @@ function generateWallDOM(elevName) {
                     if (repairPriorities[data.id]) node.classList.add('in-planner');
                     if (activeFilter!=='ALL'&&fs!==activeFilter) node.classList.add('node-filtered-out');
                     node.onclick=()=>handleNodeClick(data,node);
+                    node.dataset.windowPos=pos; // position marker for MD interleaving
                     // Drop target for manual defect drag-and-drop
                     node.dataset.drop=dropStr;node.dataset.floor=f;node.dataset.pos=pos;
                     node.addEventListener('dragover',function(e){if(!window._draggingMdId)return;e.preventDefault();node.style.outline='2px dashed #1fd0a5';node.style.background='rgba(31,208,165,0.18)';});
@@ -2507,23 +2508,52 @@ function generateWallDOM(elevName) {
                     grp.appendChild(node);
                 });
             } else {const v=document.createElement('div');v.className='window-node status-void';grp.appendChild(v);}
-            Object.values(manualDefects).filter(function(md){return md.drop===dropStr&&Number(md.floor)===f;}).sort(function(a,b){var po={L:1,C:2,R:3};return (po[a.pos]||4)-(po[b.pos]||4);}).forEach(function(md){
-                var mdn=document.createElement('div');mdn.className='window-node '+md.status;
-                mdn.style.cssText='flex:none;width:52px;font-size:0.55rem;padding:2px 3px;border-style:dashed;position:relative;';
-                mdn.title=md.label;
-                (function(id){
-                mdn.onclick=function(){openModal(id);};
-                mdn.draggable=true;mdn.style.cursor='grab';
-                mdn.addEventListener('dragstart',function(e){window._draggingMdId=id;mdn.style.opacity='0.5';e.dataTransfer.effectAllowed='move';});
-                mdn.addEventListener('dragend',function(){mdn.style.opacity='';window._draggingMdId=null;});
-            })(md.id);
-                var mxBtn=document.createElement('span');mxBtn.innerText='x';mxBtn.title='Delete';
-                mxBtn.style.cssText='position:absolute;top:1px;right:2px;font-size:0.65rem;color:rgba(231,76,60,0.6);cursor:pointer;z-index:2;line-height:1;font-weight:bold;';
-                mxBtn.onmouseover=function(){mxBtn.style.color='#e74c3c';};mxBtn.onmouseout=function(){mxBtn.style.color='rgba(231,76,60,0.6)';};
-                (function(id,lbl){mxBtn.onclick=function(e){e.stopPropagation();showConfirm('Delete?','Remove "'+lbl+'"?','DELETE',function(){delete manualDefects[id];delete repairPriorities[id];delete repairTags[id];delete repairFixed[id];delete saved3DTags[id];saveCommandState();calculateBuildingGeometry();refreshCurrentView();});};})(md.id,md.label);
-                var mlb=document.createElement('div');mlb.style.cssText='text-align:center;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-weight:bold;';mlb.innerText=(md.pos?'['+md.pos+'] ':'')+md.label;
-                mdn.appendChild(mxBtn);mdn.appendChild(mlb);grp.appendChild(mdn);
-            });
+            // Group manual defects for this row by position
+            (function(){
+                function _buildMdNode(md){
+                    var mdn=document.createElement('div');mdn.className='window-node '+md.status;
+                    mdn.style.cssText='flex:none;width:52px;font-size:0.55rem;padding:2px 3px;border-style:dashed;position:relative;';
+                    mdn.title=md.label;
+                    (function(id){
+                        mdn.onclick=function(){openModal(id);};
+                        mdn.draggable=true;mdn.style.cursor='grab';
+                        mdn.addEventListener('dragstart',function(e){window._draggingMdId=id;mdn.style.opacity='0.5';e.dataTransfer.effectAllowed='move';});
+                        mdn.addEventListener('dragend',function(){mdn.style.opacity='';window._draggingMdId=null;});
+                    })(md.id);
+                    var mxBtn=document.createElement('span');mxBtn.innerText='x';mxBtn.title='Delete';
+                    mxBtn.style.cssText='position:absolute;top:1px;right:2px;font-size:0.65rem;color:rgba(231,76,60,0.6);cursor:pointer;z-index:2;line-height:1;font-weight:bold;';
+                    mxBtn.onmouseover=function(){mxBtn.style.color='#e74c3c';};mxBtn.onmouseout=function(){mxBtn.style.color='rgba(231,76,60,0.6)';};
+                    (function(id,lbl){mxBtn.onclick=function(e){e.stopPropagation();showConfirm('Delete?','Remove "'+lbl+'"?','DELETE',function(){delete manualDefects[id];delete repairPriorities[id];delete repairTags[id];delete repairFixed[id];delete saved3DTags[id];saveCommandState();calculateBuildingGeometry();refreshCurrentView();});};})(md.id,md.label);
+                    var mlb=document.createElement('div');mlb.style.cssText='text-align:center;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-weight:bold;';
+                    mlb.innerText=(md.pos?'['+md.pos+'] ':'')+md.label;
+                    mdn.appendChild(mxBtn);mdn.appendChild(mlb);
+                    return mdn;
+                }
+                var _mdRow=Object.values(manualDefects).filter(function(md){return md.drop===dropStr&&Number(md.floor)===f;});
+                var _mdL=[],_mdC=[],_mdR=[],_mdF=[];
+                _mdRow.forEach(function(md){
+                    if(md.pos==='L')_mdL.push(md);
+                    else if(md.pos==='C')_mdC.push(md);
+                    else if(md.pos==='R')_mdR.push(md);
+                    else _mdF.push(md);
+                });
+                // L defects: LEFT of L window node (prepend before L node)
+                _mdL.forEach(function(md){
+                    var _lWin=Array.from(grp.children).find(function(el){return el.dataset&&el.dataset.windowPos==='L';});
+                    if(_lWin)grp.insertBefore(_buildMdNode(md),_lWin);
+                    else grp.insertBefore(_buildMdNode(md),grp.firstChild||null);
+                });
+                // C defects: BETWEEN L and R (insert before R window node)
+                _mdC.forEach(function(md){
+                    var _rWin=Array.from(grp.children).find(function(el){return el.dataset&&el.dataset.windowPos==='R';});
+                    if(_rWin)grp.insertBefore(_buildMdNode(md),_rWin);
+                    else grp.appendChild(_buildMdNode(md));
+                });
+                // R defects: RIGHT of R window (append after all standard windows)
+                _mdR.forEach(function(md){grp.appendChild(_buildMdNode(md));});
+                // Float defects: at the very end
+                _mdF.forEach(function(md){grp.appendChild(_buildMdNode(md));});
+            })();
             row.appendChild(grp);col.appendChild(row);
         }
         frag.appendChild(col);
@@ -2598,6 +2628,11 @@ function buildPhotoArea(nodes) {
                     photoViewState[name] = photoViewState[name]==='ir' ? 'dc' : 'ir';
                     p.classList.toggle('showing-dc', photoViewState[name]==='dc');
                     el.src = photoViewState[name]==='dc' ? ent.dcUrl : ent.url;
+                    // Restore rotation for the new channel
+                    const _rk = name + ':' + photoViewState[name];
+                    const _rd = photoRotations[_rk] || 0;
+                    const _rs = (_rd===90||_rd===270) ? ' scale(0.75)' : '';
+                    el.style.transform = _rd ? `rotate(${_rd}deg)${_rs}` : '';
                 };
             })(irName, entry, pill, img);
 
@@ -2654,13 +2689,15 @@ function buildPhotoArea(nodes) {
             rotBtn.onclick = (function(name) {
                 return function(e) {
                     e.stopPropagation();
-                    photoRotations[name] = ((photoRotations[name] || 0) + 90) % 360;
-                    // Apply rotation to the visible img
+                    const _view = photoViewState[name] || 'ir';
+                    const _rotKey = name + ':' + _view;
+                    photoRotations[_rotKey] = ((photoRotations[_rotKey] || 0) + 90) % 360;
+                    const _deg = photoRotations[_rotKey];
+                    const _scale = (_deg===90||_deg===270) ? ' scale(0.75)' : '';
                     const imgs = document.querySelectorAll(`img[data-photo-key="${name}"]`);
-                    imgs.forEach(i => {
-                        i.style.transform = photoRotations[name] ? `rotate(${photoRotations[name]}deg)` : '';
-                    });
-                    rotBtn.title = `Rotate image (currently ${photoRotations[name]}?)`;
+                    imgs.forEach(i => { i.style.transform = _deg ? `rotate(${_deg}deg)${_scale}` : ''; });
+                    rotBtn.title = `Rotate image (currently ${_deg}deg)`;
+                    saveCommandState();
                 };
             })(irName);
 
@@ -2685,7 +2722,16 @@ function buildPhotoArea(nodes) {
         });
     });
 
-    if (anyStale) document.getElementById('m-stale-banner').style.display='block';
+    if (anyStale) {
+        const _staleBanner = document.getElementById('m-stale-banner');
+        const _isManual = nodes[0] && nodes[0].id && nodes[0].id.startsWith('MANUAL-');
+        if (_isManual) {
+            _staleBanner.innerHTML = '📷 Photo references exist but could not be restored. Load your saved project JSON to restore manual defect photos.';
+        } else {
+            _staleBanner.innerHTML = '📷 Photo references exist but images not loaded. Re-upload your ZIP to restore photos.';
+        }
+        _staleBanner.style.display='block';
+    }
     if (!anyPhoto) {
         const nb=document.createElement('div');nb.className='no-photo-banner';
         nb.innerText='No photos linked to this window.';
@@ -3036,6 +3082,8 @@ function openModal(nodeId) {
     var _xrb=document.getElementById('btn-md-reposition');if(_xrb)_xrb.remove();
     if(manualDefects[nodeId]){var _rb=document.createElement('button');_rb.id='btn-md-reposition';_rb.className='btn btn-dark btn-block';_rb.style.cssText='margin-top:8px;border-color:#1fd0a5;color:#1fd0a5;font-weight:bold;';_rb.innerText='⇕ Reposition Defect';(function(id){_rb.onclick=function(){mdOpenRepositionForm(id);};})(nodeId);document.querySelector('#info-modal .modal-box').appendChild(_rb);}
     (function(nid,prim){var _pp=nid.split('-'),_pos=_pp[_pp.length-1];if(manualDefects[nid]||['L','C','R'].indexOf(_pos)===-1){var _lbl=manualDefects[nid]?prim.label:nid;var _db=document.createElement('button');_db.id='btn-md-delete';_db.className='btn btn-dark btn-block';_db.style.cssText='margin-top:8px;border-color:#e74c3c;color:#e74c3c;font-weight:bold;';_db.innerText='Delete This Defect';(function(id,lbl){_db.onclick=function(){showConfirm('Delete?','Remove "'+lbl+'" permanently?','DELETE',function(){if(manualDefects[id])delete manualDefects[id];else{var pp=id.split('-');if(pp.length>=3&&inspectionData[pp[0]]&&inspectionData[pp[0]][pp[1]])delete inspectionData[pp[0]][pp[1]][pp[2]];}delete repairPriorities[id];delete repairTags[id];delete repairFixed[id];delete saved3DTags[id];var pi=stitchedPairs.findIndex(function(pp){return pp.includes(id);});if(pi!==-1)stitchedPairs.splice(pi,1);saveCommandState();calculateBuildingGeometry();refreshCurrentView();closeModal();});};})(nid,_lbl);document.querySelector('#info-modal .modal-box').appendChild(_db);}})(nodeId,primary);
+    // For manual defects: ensure photos are in imageBank
+    if (nodeId.startsWith('MANUAL-')) restoreManualDefectPhotos();
     // Show suggest button only if this window has zero photos
     const hasPhotos = activeNodeDataArray.some(n => nodePhotoNames(n).length > 0);
     const suggestBtn = document.getElementById('btn-suggest');
