@@ -4754,6 +4754,13 @@ async function rbEnhanceWithClaude() {
   const draft = ta.value.trim();
   if (!draft) { showToast('Write a draft executive summary first, then enhance it.', 3500, true); return; }
 
+  // Optional custom instruction (only present after first enhancement)
+  let _instruction = '';
+  if (useInstruction) {
+    const _instEl = document.getElementById('rb-claude-instruction');
+    _instruction = _instEl ? _instEl.value.trim() : '';
+  }
+
   const btn    = document.getElementById('btn-claude-enhance');
   const panel  = document.getElementById('rb-claude-panel');
   const status = document.getElementById('rb-claude-status');
@@ -4800,6 +4807,7 @@ async function rbEnhanceWithClaude() {
     'DRAFT SUMMARY TO IMPROVE:',
     draft,
     '',
+    (_instruction ? 'ADDITIONAL INSTRUCTION (follow this carefully): ' + _instruction + '\n' : ''),
     'Return only the improved executive summary text. No preamble, no explanation, no quotation marks around the output.'
   ].join('\n');
 
@@ -4889,7 +4897,7 @@ function rbRotatePhoto(nodeId, key, kind) {
     }
 }
 
-async function rbEnhanceDefect(nodeId) {
+async function rbEnhanceDefect(nodeId, useInstruction) {
     const node = getNodeData(nodeId);
     if (!node) return;
     const ta = document.getElementById('rb-desc-ta-' + nodeId);
@@ -4899,6 +4907,12 @@ async function rbEnhanceDefect(nodeId) {
     if (!ta || !panel) return;
     const draft = ta.value.trim();
     if (!draft) { showToast('Write a description first, then enhance it.', 3000, true); return; }
+
+    let _defInstruction = '';
+    if (useInstruction) {
+        const _di = document.getElementById('rb-defect-instruction-' + nodeId);
+        _defInstruction = _di ? _di.value.trim() : '';
+    }
 
     panel.style.display = 'block';
     origEl.textContent = draft;
@@ -4920,7 +4934,7 @@ Field observations: ${finds}
 
 DESCRIPTION TO IMPROVE:
 ${draft}
-
+${_defInstruction ? '\nADDITIONAL INSTRUCTION (follow this carefully): ' + _defInstruction + '\n' : ''}
 Return only the improved description text. No preamble or quotation marks.`;
 
     try {
@@ -5043,6 +5057,16 @@ function renderReportBuilder() {
             <div id="rb-claude-text" style="font-size:0.82rem;color:#fff;line-height:1.55;background:#0a0a14;padding:10px;border-radius:6px;min-height:60px;white-space:pre-wrap;">…</div>
           </div>
         </div>
+        <div style="margin-bottom:10px;">
+          <label style="font-size:0.62rem;color:#a78bfa;text-transform:uppercase;font-weight:bold;letter-spacing:0.5px;display:block;margin-bottom:4px;">Refine with an instruction (optional)</label>
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="rb-claude-instruction" placeholder="e.g. make it more urgent, mention the chimney may collapse..."
+              onkeypress="if(event.key==='Enter')rbEnhanceWithClaude(true)"
+              style="flex:1;padding:8px 10px;background:#0a0a14;border:1px solid #a78bfa;color:#fff;border-radius:6px;font-size:0.8rem;box-sizing:border-box;">
+            <button onclick="rbEnhanceWithClaude(true)"
+              style="flex-shrink:0;padding:8px 14px;background:#1a0a2a;color:#a78bfa;border:1px solid #a78bfa;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.8rem;white-space:nowrap;">↻ Re-enhance</button>
+          </div>
+        </div>
         <div style="display:flex;gap:8px;">
           <button onclick="rbAcceptClaude()" style="flex:1;padding:9px;background:#a78bfa;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">✓ Use AI version</button>
           <button onclick="rbDismissClaude()" style="padding:9px 16px;background:#222;color:#888;border:1px solid #444;border-radius:6px;cursor:pointer;font-size:0.85rem;">Keep mine</button>
@@ -5154,6 +5178,16 @@ function renderReportBuilder() {
           <div>
             <div style="font-size:0.62rem;color:#a78bfa;text-transform:uppercase;font-weight:bold;margin-bottom:4px;">AI version</div>
             <div id="rb-dc-ai-${nodeId}" style="font-size:0.8rem;color:#fff;line-height:1.5;background:#0a0a14;padding:8px;border-radius:4px;min-height:40px;white-space:pre-wrap;">…</div>
+          </div>
+        </div>
+        <div style="margin-bottom:10px;">
+          <label style="font-size:0.6rem;color:#a78bfa;text-transform:uppercase;font-weight:bold;letter-spacing:0.5px;display:block;margin-bottom:4px;">Refine with an instruction (optional)</label>
+          <div style="display:flex;gap:6px;">
+            <input type="text" id="rb-defect-instruction-${nodeId}" placeholder="e.g. mention falling hazard, make it more urgent..."
+              onkeypress="if(event.key==='Enter')rbEnhanceDefect('${nodeId}',true)"
+              style="flex:1;padding:7px 9px;background:#0a0a14;border:1px solid #a78bfa;color:#fff;border-radius:4px;font-size:0.76rem;box-sizing:border-box;">
+            <button onclick="rbEnhanceDefect('${nodeId}',true)"
+              style="flex-shrink:0;padding:7px 12px;background:#1a0a2a;color:#a78bfa;border:1px solid #a78bfa;border-radius:4px;font-weight:bold;cursor:pointer;font-size:0.76rem;white-space:nowrap;">↻ Re-enhance</button>
           </div>
         </div>
         <div style="display:flex;gap:8px;">
