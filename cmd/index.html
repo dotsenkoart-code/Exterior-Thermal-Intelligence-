@@ -336,7 +336,7 @@
             will-change: transform;
         }
         #zoom-controls {
-            position:fixed;bottom:20px;right:20px;z-index:500;
+            position:fixed;bottom:20px;right:20px;z-index:4200;
             display:none;flex-direction:column;gap:6px;
         }
         #zoom-controls button {
@@ -1481,7 +1481,7 @@ function loadProjectFile(input) {
                 )
             );
             if (hasPhotoRefs) {
-                document.getElementById('top-reload-banner').style.display = 'flex';
+                document.getElementById('top-reload-banner').style.display='none';
             }
 
             const _mdCount = Object.keys(manualDefects).length;
@@ -1715,7 +1715,7 @@ async function handleFiles(files, forcedType=null) {
             )
         );
         if (hasPhotoRefs && Object.keys(imageBank).length === 0) {
-            document.getElementById('top-reload-banner').style.display = 'flex';
+            document.getElementById('top-reload-banner').style.display='none';
         }
     }
 
@@ -2396,6 +2396,11 @@ function handleNodeClick(data,el) {
 }
 
 function switchView(mode) {
+    // If leaving 2D while in fullscreen, exit fullscreen cleanly first
+    const _v2d = document.getElementById('view-2d');
+    if (_v2d && _v2d.classList.contains('fs-2d') && mode !== '2d') {
+        toggle2DFullscreen();
+    }
     currentMode=mode;
     document.getElementById('btn-2d').classList.toggle('active',mode==='2d');
     document.getElementById('btn-true3d').classList.toggle('active',mode==='true3d');
@@ -3791,11 +3796,28 @@ function resetZoom() {
 function toggle2DFullscreen() {
     const view = document.getElementById('view-2d');
     const btn  = document.getElementById('btn-2d-fs');
+    const tabs = document.getElementById('tabs-container');
+    const grid = document.getElementById('building-container-2d');
+
     if (view.classList.contains('fs-2d')) {
+        // EXIT fullscreen
         view.classList.remove('fs-2d');
+        // Move tabs back to their original spot (before view-2d)
+        if (tabs && tabs.dataset.fsMoved === '1') {
+            view.parentNode.insertBefore(tabs, view);
+            tabs.dataset.fsMoved = '';
+            tabs.style.cssText = '';
+        }
         if (btn) { btn.innerHTML = '&#x26F6;'; btn.style.color='#0cf'; btn.style.borderColor='#2a2d38'; }
     } else {
+        // ENTER fullscreen
         view.classList.add('fs-2d');
+        // Move the elevation tabs INTO the fullscreen view so they stay visible & clickable
+        if (tabs) {
+            view.insertBefore(tabs, grid);
+            tabs.dataset.fsMoved = '1';
+            tabs.style.cssText = 'display:flex;gap:5px;overflow-x:auto;padding:10px 60px 10px 10px;flex-shrink:0;background:#0f111a;position:sticky;top:0;z-index:4100;border-bottom:2px solid #333;';
+        }
         if (btn) { btn.innerHTML = '&#x2715;'; btn.style.color='#e74c3c'; btn.style.borderColor='#e74c3c'; }
     }
 }
@@ -4973,6 +4995,74 @@ function rbAcceptDefectClaude(nodeId) {
     showToast('[OK] AI description applied', 2500);
 }
 
+function rbEnlargePhoto(key, kind) {
+    const img0 = imageBank[key];
+    if (!img0) { showToast('Photo not available.', 2500, true); return; }
+    const url = (kind === 'visual') ? (img0.dcUrl || img0.url) : img0.url;
+    const label = key.split('_').pop() + ' · ' + (kind === 'thermal' ? 'IR' : kind === 'visual' ? 'DC' : kind);
+    const rotKeyName = key + ':' + (kind === 'thermal' ? 'ir' : kind === 'visual' ? 'dc' : 'ir');
+    let rotDeg = photoRotations[rotKeyName] || 0;
+    const existing = document.getElementById('rb-enlarge-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'rb-enlarge-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:zoom-out;';
+
+    // Rotation state — starts at the photo's saved rotation, user can spin further
+    let _curRot = rotDeg;
+
+    const imgWrap = document.createElement('div');
+    imgWrap.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;width:100%;overflow:hidden;padding:20px;box-sizing:border-box;';
+
+    const img = document.createElement('img');
+    img.src = url;
+    function applyRot() {
+        const sc = (_curRot===90||_curRot===270) ? ' scale(0.72)' : '';
+        img.style.transform = `rotate(${_curRot}deg)${sc}`;
+    }
+    img.style.cssText = 'max-width:92vw;max-height:82vh;object-fit:contain;border-radius:8px;transition:transform 0.2s;';
+    applyRot();
+    imgWrap.appendChild(img);
+
+    // Clicking the image itself doesn't close (only the backdrop does)
+    img.onclick = function(e){ e.stopPropagation(); };
+
+    // Toolbar
+    const bar = document.createElement('div');
+    bar.style.cssText = 'display:flex;gap:12px;align-items:center;padding:14px;background:rgba(0,0,0,0.6);border-radius:10px;margin-bottom:20px;cursor:default;';
+    bar.onclick = function(e){ e.stopPropagation(); };
+
+    const lbl = document.createElement('span');
+    lbl.style.cssText = 'color:#aaa;font-size:0.8rem;font-weight:bold;margin-right:8px;';
+    lbl.innerText = label || '';
+    bar.appendChild(lbl);
+
+    const rotBtn = document.createElement('button');
+    rotBtn.innerText = '↻ Rotate view';
+    rotBtn.style.cssText = 'padding:8px 16px;background:#1a1a0a;color:#f1c40f;border:1px solid #f1c40f;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;';
+    rotBtn.onclick = function(){ _curRot = (_curRot + 90) % 360; applyRot(); };
+    bar.appendChild(rotBtn);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.innerText = '✕ Close';
+    closeBtn.style.cssText = 'padding:8px 16px;background:#222;color:#fff;border:1px solid #555;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;';
+    closeBtn.onclick = function(){ overlay.remove(); };
+    bar.appendChild(closeBtn);
+
+    overlay.appendChild(imgWrap);
+    overlay.appendChild(bar);
+
+    // Click backdrop to close
+    overlay.onclick = function(){ overlay.remove(); };
+
+    // Escape closes
+    function _esc(e){ if(e.key==='Escape'){ overlay.remove(); document.removeEventListener('keydown', _esc); } }
+    document.addEventListener('keydown', _esc);
+
+    document.body.appendChild(overlay);
+}
+
 function renderReportBuilder() {
   const root = document.getElementById('arena-report');
   if (!root) { console.warn('[report] #arena-report container missing — see install step 2'); return; }
@@ -5124,6 +5214,8 @@ function renderReportBuilder() {
               <img src="${it.url}" style="width:118px;height:88px;object-fit:cover;border-radius:6px;display:block;background:#000;${rotDeg ? `transform:rotate(${rotDeg}deg)${rotScale};` : ''}">
               <div style="position:absolute;bottom:18px;left:0;right:0;background:rgba(0,0,0,0.72);color:${kindCol};font-size:0.6rem;font-weight:bold;text-align:center;padding:2px;">${kindLbl} · ${rbEsc(it.key.split('_').pop())}</div>
             </div>
+            <button onclick="rbEnlargePhoto('${it.key}','${it.kind}')" title="Enlarge photo"
+              style="position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,0.7);border:1px solid rgba(255,255,255,0.5);color:#fff;font-size:0.75rem;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:3;">🔍</button>
             <button onclick="rbRotatePhoto('${nodeId}','${it.key}','${it.kind}')" title="Rotate photo"
               style="position:absolute;bottom:0;left:0;right:0;padding:2px;background:rgba(241,196,15,0.85);border:none;color:#000;font-size:0.55rem;font-weight:bold;cursor:pointer;border-radius:0 0 5px 5px;">↻ ROTATE</button>
           </div>`;
