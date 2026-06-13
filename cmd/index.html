@@ -1352,11 +1352,27 @@ document.addEventListener('visibilitychange',()=>{
 // =======================================================
 function saveCommandState() {
     const _mdL={}; Object.entries(manualDefects).forEach(function(e){var k=e[0],v=e[1];var r=Object.assign({},v);delete r.embeddedPhotoData;_mdL[k]=r;});
-    localStorage.setItem('strataCommandState',JSON.stringify({
-        projectInfo,inspectionData,elevations,dropAssignments,
-        stitchedPairs,saved3DTags,manualLinks,projectModelUrl,
-        repairPriorities,repairTags,repairFixed,cesiumAssetId,manualDefects:_mdL,photoRotations
-    }));
+    try {
+        localStorage.setItem('strataCommandState',JSON.stringify({
+            projectInfo,inspectionData,elevations,dropAssignments,
+            stitchedPairs,saved3DTags,manualLinks,projectModelUrl,
+            repairPriorities,repairTags,repairFixed,cesiumAssetId,manualDefects:_mdL,photoRotations
+        }));
+    } catch(e) { console.warn('[save] main state quota?', e); }
+    // Save manual defect photos to a SEPARATE key so they survive page reload
+    // without needing to reload the project JSON every session.
+    try {
+        const _photos={};
+        Object.entries(manualDefects).forEach(function(e){
+            var k=e[0],v=e[1];
+            if(v.embeddedPhotoData && Object.keys(v.embeddedPhotoData).length){
+                _photos[k]=v.embeddedPhotoData;
+            }
+        });
+        localStorage.setItem('strataManualPhotos', JSON.stringify(_photos));
+    } catch(e) {
+        console.warn('[save] manual photos too large for localStorage — they remain in the project JSON', e);
+    }
 }
 
 function loadCommandState() {
@@ -1377,6 +1393,18 @@ function loadCommandState() {
         repairFixed       =s.repairFixed       ||{};
         cesiumAssetId     =s.cesiumAssetId     ||0;
         manualDefects     =s.manualDefects     ||{};
+        // Restore manual defect photos from their separate localStorage key
+        try {
+            const _mp = localStorage.getItem('strataManualPhotos');
+            if (_mp) {
+                const _photos = JSON.parse(_mp);
+                Object.keys(_photos).forEach(function(nodeId){
+                    if (manualDefects[nodeId]) {
+                        manualDefects[nodeId].embeddedPhotoData = _photos[nodeId];
+                    }
+                });
+            }
+        } catch(e) { console.warn('[load] manual photos restore failed', e); }
         if (s.photoRotations) Object.assign(photoRotations, s.photoRotations);
         // Restore model URL input field if it exists
         const assetInp2 = document.getElementById('cesium-asset-input');
