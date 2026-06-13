@@ -1474,9 +1474,36 @@ function loadProjectFile(input) {
             repairPriorities = p.repairPriorities || {};
             repairTags       = p.repairTags       || {};
             repairFixed      = p.repairFixed      || {};
-            // Merge manual defects: JSON wins if it has entries, otherwise preserve existing
+            // Merge manual defects: JSON wins for structure, but PRESERVE photos.
+            // Photos may live in: (a) the JSON's embeddedPhotoData, (b) the separate
+            // localStorage photo key, or (c) current in-memory defects. Never lose them.
             if (p.manualDefects && Object.keys(p.manualDefects).length > 0) {
+                // Snapshot existing photo data before overwriting
+                const _existingPhotos = {};
+                Object.entries(manualDefects).forEach(function(e){
+                    if (e[1].embeddedPhotoData && Object.keys(e[1].embeddedPhotoData).length) {
+                        _existingPhotos[e[0]] = e[1].embeddedPhotoData;
+                    }
+                });
+                // Also pull from the separate localStorage photo key
+                try {
+                    const _mp = localStorage.getItem('strataManualPhotos');
+                    if (_mp) {
+                        const _saved = JSON.parse(_mp);
+                        Object.keys(_saved).forEach(function(nid){
+                            if (!_existingPhotos[nid]) _existingPhotos[nid] = _saved[nid];
+                        });
+                    }
+                } catch(e) {}
+                // Take the JSON's defects, but restore photos where JSON has none
                 manualDefects = p.manualDefects;
+                Object.keys(manualDefects).forEach(function(nid){
+                    const jsonHasPhotos = manualDefects[nid].embeddedPhotoData &&
+                        Object.keys(manualDefects[nid].embeddedPhotoData).length > 0;
+                    if (!jsonHasPhotos && _existingPhotos[nid]) {
+                        manualDefects[nid].embeddedPhotoData = _existingPhotos[nid];
+                    }
+                });
             }
             // Else keep whatever is already in manualDefects (from localStorage)
             if (p.photoRotations) Object.assign(photoRotations, p.photoRotations);
@@ -1588,7 +1615,13 @@ async function handleFiles(files, forcedType=null) {
                         repairPriorities  = p.repairPriorities  ||{};
                         repairTags        = p.repairTags        ||{};
                         repairFixed       = p.repairFixed       ||{};
-                        if (p.manualDefects && Object.keys(p.manualDefects).length > 0) manualDefects = p.manualDefects;
+                        if (p.manualDefects && Object.keys(p.manualDefects).length > 0) {
+                            const _exP = {};
+                            Object.entries(manualDefects).forEach(function(e){if(e[1].embeddedPhotoData&&Object.keys(e[1].embeddedPhotoData).length)_exP[e[0]]=e[1].embeddedPhotoData;});
+                            try{const _mp=localStorage.getItem('strataManualPhotos');if(_mp){const _sv=JSON.parse(_mp);Object.keys(_sv).forEach(function(nid){if(!_exP[nid])_exP[nid]=_sv[nid];});}}catch(e){}
+                            manualDefects = p.manualDefects;
+                            Object.keys(manualDefects).forEach(function(nid){const jh=manualDefects[nid].embeddedPhotoData&&Object.keys(manualDefects[nid].embeddedPhotoData).length>0;if(!jh&&_exP[nid])manualDefects[nid].embeddedPhotoData=_exP[nid];});
+                        }
                         if (p.photoRotations) Object.assign(photoRotations, p.photoRotations);
                         restoreManualDefectPhotos();
                         if (modalNodeId) { const _mid = modalNodeId; setTimeout(() => openModal(_mid), 150); }
