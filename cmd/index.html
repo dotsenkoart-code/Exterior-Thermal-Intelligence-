@@ -738,6 +738,14 @@
 // =======================================================
 // STATE
 // =======================================================
+// AI PROXY CONFIG ---------------------------------------------------------
+// Where the AI enhancement features send their requests.
+//   • Inside claude.ai: leave as 'https://api.anthropic.com/v1/messages'
+//     (auth is handled automatically by the claude.ai environment).
+//   • Hosted on GitHub Pages / Cloudflare / anywhere else: set this to your
+//     Cloudflare Worker URL, e.g. 'https://strata-ai.YOURNAME.workers.dev'
+const AI_ENDPOINT = 'https://strata-ai.dotsenkoart.workers.dev';
+// -------------------------------------------------------------------------
 let inspectionData      = {};
 let projectInfo         = 'Unknown Project';
 let activeNodeDataArray = [];
@@ -1482,6 +1490,8 @@ function loadProjectFile(input) {
             } else {
                 showToast('[OK] Project loaded: ' + projectInfo, 4000);
             }
+            // If modal is open (e.g. user clicked Load JSON from stale banner), refresh it
+            if (modalNodeId) { const _mid = modalNodeId; setTimeout(() => openModal(_mid), 150); }
         } catch(e) {
             console.error('[loadProject] Parse error:', e);
             showToast('[WARN] Could not read project file: ' + e.message, 8000, true);
@@ -1553,6 +1563,7 @@ async function handleFiles(files, forcedType=null) {
                         if (p.manualDefects && Object.keys(p.manualDefects).length > 0) manualDefects = p.manualDefects;
                         if (p.photoRotations) Object.assign(photoRotations, p.photoRotations);
                         restoreManualDefectPhotos();
+                        if (modalNodeId) { const _mid = modalNodeId; setTimeout(() => openModal(_mid), 150); }
                         const urlInp = document.getElementById('twin-url-input');
                         if (urlInp && projectModelUrl) urlInp.value = projectModelUrl;
                         console.log('[JSON] Loaded OK. inspectionData drops:', Object.keys(inspectionData), 'manualDefects:', Object.keys(manualDefects).length);
@@ -2571,6 +2582,16 @@ function buildPhotoArea(nodes) {
 
     let anyPhoto=false, anyStale=false;
 
+    // For manual defect nodes: populate imageBank directly from embeddedPhotoData
+    // This is more reliable than depending on restoreManualDefectPhotos() timing
+    nodes.forEach(node=>{
+        if (!node || !node.id || !node.id.startsWith('MANUAL-')) return;
+        const epd = node.embeddedPhotoData || {};
+        Object.entries(epd).forEach(function([key, dataUrl]){
+            if (!imageBank[key]) imageBank[key] = {url:dataUrl, dcUrl:null, time:null, drop:'MANUAL'};
+        });
+    });
+
     nodes.forEach(node=>{
         if (!node) return;
         const names=nodePhotoNames(node);
@@ -2726,9 +2747,9 @@ function buildPhotoArea(nodes) {
         const _staleBanner = document.getElementById('m-stale-banner');
         const _isManual = nodes[0] && nodes[0].id && nodes[0].id.startsWith('MANUAL-');
         if (_isManual) {
-            _staleBanner.innerHTML = '📷 Photo references exist but could not be restored. Load your saved project JSON to restore manual defect photos.';
+            _staleBanner.innerHTML = '📷 Photos are stored in your project file — <button onclick="document.getElementById(\'projectInput\').click()" style="background:#f39c12;color:#000;border:none;border-radius:4px;padding:3px 10px;font-weight:bold;cursor:pointer;font-size:0.8rem;margin:0 4px;">📦 Load Project JSON</button> to restore them.';
         } else {
-            _staleBanner.innerHTML = '📷 Photo references exist but images not loaded. Re-upload your ZIP to restore photos.';
+            _staleBanner.innerHTML = '📷 Photo references exist but images not loaded. <button onclick="document.getElementById(\'folderInput\').click()" style="background:#f39c12;color:#000;border:none;border-radius:4px;padding:3px 10px;font-weight:bold;cursor:pointer;font-size:0.8rem;margin:0 4px;">📁 Re-upload ZIP</button> to restore photos.';
         }
         _staleBanner.style.display='block';
     }
@@ -3070,7 +3091,33 @@ function openModal(nodeId) {
     document.getElementById('m-finds').style.color =finds.includes('CLEAR')?'#28a745':'#f1c40f';
     document.getElementById('m-row-proved').style.display=finds.includes('MOISTURE')?'flex':'none';
     document.getElementById('m-proved').innerText  =activeNodeDataArray.some(d=>d.proved==='YES')?'YES':'NO';
-    document.getElementById('m-notes').value       =activeNodeDataArray.map(d=>d.notes||'').filter(n=>n.trim()).join('\n');
+    document.getElementById('m-notes').value       =activeNodeDataArray.map(d=>d.notes||'').join('\n');  // include empty, don't filter
+
+    // For manual defects: show a prominent notes field near the TOP of the modal
+    {
+        let _qn = document.getElementById('md-top-notes');
+        if (manualDefects[nodeId]) {
+            if (!_qn) {
+                _qn = document.createElement('div');
+                _qn.id = 'md-top-notes';
+                _qn.style.cssText = 'margin:8px 0 12px;';
+                // Insert after m-tech subtitle
+                const _mt = document.getElementById('m-tech');
+                _mt.parentNode.insertBefore(_qn, _mt.nextSibling);
+            }
+            _qn.style.display = 'block';
+            _qn.innerHTML = '<label style="font-size:0.65rem;color:#1fd0a5;text-transform:uppercase;font-weight:bold;letter-spacing:0.5px;display:block;margin-bottom:4px;">Notes</label>'
+                + '<textarea id="md-top-notes-ta" autocapitalize="sentences" placeholder="Add inspection notes..." '
+                + 'style="width:100%;min-height:70px;background:#111;border:1px solid #1fd0a5;color:#fff;border-radius:6px;padding:10px;font-family:inherit;font-size:0.88rem;resize:vertical;box-sizing:border-box;">'
+                + (activeNodeDataArray[0]?.notes || '')
+                + '</textarea>';
+            document.getElementById('md-top-notes-ta').oninput = function() {
+                document.getElementById('m-notes').value = this.value;
+            };
+        } else {
+            if (_qn) _qn.style.display = 'none';
+        }
+    }
 
     buildPhotoArea(activeNodeDataArray);
     document.getElementById('info-modal').style.display='flex';
@@ -3096,9 +3143,23 @@ function openModal(nodeId) {
 }
 
 function unmergeCurrent(){if(activeNodeDataArray[0]){const idx=stitchedPairs.findIndex(p=>p.includes(activeNodeDataArray[0].id));if(idx!==-1){showConfirm('?? Un-stitch windows?','These two windows will be separated back into individual nodes.','UN-STITCH',()=>{stitchedPairs.splice(idx,1);closeModal();calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();});}}}
-function changeStatus(s){const note=document.getElementById('m-notes').value;activeNodeDataArray.forEach(d=>{if(d){d.notes=note;d.status=s;}});calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();closeModal();}
+function changeStatus(s){
+    const _qnta2 = document.getElementById('md-top-notes-ta');
+    const note = _qnta2 ? _qnta2.value : document.getElementById('m-notes').value;
+    document.getElementById('m-notes').value = note;
+    activeNodeDataArray.forEach(d=>{if(d){d.notes=note;d.status=s;}});
+    calculateBuildingGeometry();saveCommandState();
+    if(currentMode==='2d')refreshCurrentView();closeModal();
+}
 function updateStatusBtns(status){const btns=document.querySelectorAll('.btn-status');const map={'status-clear':'btn-green','status-flagged':'btn-status-yellow','status-confirmed':'btn-red'};btns.forEach(btn=>{btn.style.outline='';btn.style.boxShadow='';btn.style.transform='';btn.style.opacity='0.55';});const ac=map[status];if(ac){const ab=document.querySelector('.btn-status.'+ac);if(ab){ab.style.outline='3px solid #fff';ab.style.boxShadow='0 0 0 5px rgba(255,255,255,0.25)';ab.style.transform='scale(1.04)';ab.style.opacity='1';}}}
-function saveNotesOnly(){const note=document.getElementById('m-notes').value;activeNodeDataArray.forEach(d=>{if(d)d.notes=note;});calculateBuildingGeometry();saveCommandState();if(currentMode==='2d')refreshCurrentView();closeModal();}
+function saveNotesOnly(){
+    const _qnta = document.getElementById('md-top-notes-ta');
+    const note = _qnta ? _qnta.value : document.getElementById('m-notes').value;
+    document.getElementById('m-notes').value = note;
+    activeNodeDataArray.forEach(d=>{if(d)d.notes=note;});
+    calculateBuildingGeometry();saveCommandState();
+    if(currentMode==='2d')refreshCurrentView();closeModal();
+}
 function unpinCurrent(){showConfirm('?? Remove 3D pin?','The window data stays safe ? only the pin position on the 3D model is removed.','REMOVE PIN',()=>{activeNodeDataArray.forEach(d=>{if(d&&saved3DTags[d.id])delete saved3DTags[d.id];});render3DHotspots();saveCommandState();closeModal();});}
 function closeModal(){document.getElementById('info-modal').style.display='none';activeNodeDataArray=[];modalNodeId=null;}
 
@@ -4554,8 +4615,8 @@ function rbPhotoItems(node) {
     const img = imageBank[key];
     if (!img) return;
     const isManualPhoto = img.drop === 'MANUAL';
-    if (img.url)   items.push({ key, kind: isManualPhoto ? 'site' : 'thermal', url: img.url,   rot: photoRotations[key] || 0 });
-    if (img.dcUrl) items.push({ key, kind: 'visual',  url: img.dcUrl, rot: photoRotations[key] || 0 });
+    if (img.url)   items.push({ key, kind: isManualPhoto ? 'site' : 'thermal', url: img.url,   rot: photoRotations[key+':ir'] || photoRotations[key] || 0 });
+    if (img.dcUrl) items.push({ key, kind: 'visual',  url: img.dcUrl, rot: photoRotations[key+':dc'] || photoRotations[key] || 0 });
   });
   return items;
 }
@@ -4702,10 +4763,10 @@ async function rbEnhanceWithClaude() {
   btn.textContent = '✦ Enhancing…';
   btn.style.opacity = '0.6';
   btn.disabled = true;
+  if (panel) panel.style.display = 'block';
+  if (origEl) origEl.textContent = draft;
+  if (clEl) clEl.textContent = '…';
   if (status) status.textContent = 'Calling AI…';
-  panel.style.display = 'block';
-  origEl.textContent = draft;
-  clEl.textContent = '…';
 
   // Build full context for Claude
   const cands   = rbCandidates();
@@ -4724,26 +4785,30 @@ async function rbEnhanceWithClaude() {
 
   const systemPrompt = `You are a senior building envelope consultant with expertise in facade inspection, thermal diagnostics, and rope access maintenance. You write executive summaries for property managers and building owners who are intelligent but not technical engineers. Your writing is clear, professional, and authoritative — precise without being jargon-heavy. You never use filler phrases like "it is worth noting" or "it should be mentioned."`;
 
-  const userPrompt = `Improve the following executive summary for a building facade inspection report. Fix grammatical errors, improve sentence structure, and enhance clarity and professionalism. You may expand or condense as needed to improve the overall quality. Keep all the technical findings and observations intact — only improve the language and presentation.
-
-BUILDING: \${building}\${address ? ', ' + address : ''}
-INSPECTION DATE: \${date || 'Recent'}
-INSPECTOR: \${inspector || 'Verticality Inc.'}
-TOTAL FINDINGS: \${total} (\${critical} critical, \${high} high, \${medium} medium, \${low} low\${repaired ? ', ' + repaired + ' repaired' : ''})
-KEY FINDINGS:
-\${topFinds}
-
-DRAFT SUMMARY TO IMPROVE:
-\${draft}
-
-Return only the improved executive summary text. No preamble, no explanation, no quotation marks around the output.`;
+  const userPrompt = [
+    'Improve the following executive summary for a building facade inspection report.',
+    'Fix grammatical errors, improve sentence structure, and enhance clarity and professionalism.',
+    'You may expand or condense as needed. Keep all technical findings intact — only improve the language.',
+    '',
+    'BUILDING: ' + building + (address ? ', ' + address : ''),
+    'INSPECTION DATE: ' + (date || 'Recent'),
+    'INSPECTOR: ' + (inspector || 'Verticality Inc.'),
+    'TOTAL FINDINGS: ' + total + ' (' + critical + ' critical, ' + high + ' high, ' + medium + ' medium, ' + low + ' low' + (repaired ? ', ' + repaired + ' repaired' : '') + ')',
+    'KEY FINDINGS:',
+    topFinds,
+    '',
+    'DRAFT SUMMARY TO IMPROVE:',
+    draft,
+    '',
+    'Return only the improved executive summary text. No preamble, no explanation, no quotation marks around the output.'
+  ].join('\n');
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch(AI_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 1000,
         messages: [
           { role: 'user', content: userPrompt }
@@ -4806,6 +4871,92 @@ function rbDoSort(s) {
   REPORT_META.sortBy = s;
   saveReportMeta();
   renderReportBuilder();
+}
+
+function rbRotatePhoto(nodeId, key, kind) {
+    const rotKey = key + ':' + (kind === 'thermal' ? 'ir' : kind === 'visual' ? 'dc' : 'ir');
+    photoRotations[rotKey] = ((photoRotations[rotKey] || 0) + 90) % 360;
+    saveCommandState();
+    // Update the thumbnail in place
+    const thumbEl = document.getElementById('rb-thumb-' + nodeId + '-' + key + '-' + kind);
+    if (thumbEl) {
+        const img = thumbEl.querySelector('img');
+        if (img) {
+            const deg = photoRotations[rotKey] || 0;
+            const scale = (deg===90||deg===270) ? ' scale(0.75)' : '';
+            img.style.transform = deg ? `rotate(${deg}deg)${scale}` : '';
+        }
+    }
+}
+
+async function rbEnhanceDefect(nodeId) {
+    const node = getNodeData(nodeId);
+    if (!node) return;
+    const ta = document.getElementById('rb-desc-ta-' + nodeId);
+    const panel = document.getElementById('rb-defect-claude-' + nodeId);
+    const origEl = document.getElementById('rb-dc-orig-' + nodeId);
+    const aiEl   = document.getElementById('rb-dc-ai-' + nodeId);
+    if (!ta || !panel) return;
+    const draft = ta.value.trim();
+    if (!draft) { showToast('Write a description first, then enhance it.', 3000, true); return; }
+
+    panel.style.display = 'block';
+    origEl.textContent = draft;
+    aiEl.textContent = '…';
+
+    const sev   = rbSeverity(nodeId, node);
+    const tags  = rbTags(nodeId, node);
+    const finds = node.finds || node.label || '';
+    const loc   = rbLocation(nodeId.split('-')[0], nodeId.split('-')[1], nodeId.split('-')[2]) || '';
+
+    const systemPrompt = `You are a senior building envelope consultant writing client-facing defect descriptions for inspection reports. Write for property managers and building owners — intelligent but not technical engineers. Be precise, professional, and action-oriented. Never use filler phrases. Keep descriptions concise (2-4 sentences).`;
+
+    const userPrompt = `Improve this defect description for a facade inspection report.
+
+Location: ${loc}
+Severity: ${sev}
+Defect type: ${tags.join(', ') || 'General'}
+Field observations: ${finds}
+
+DESCRIPTION TO IMPROVE:
+${draft}
+
+Return only the improved description text. No preamble or quotation marks.`;
+
+    try {
+        const response = await fetch(AI_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: 'claude-sonnet-4-6',
+                max_tokens: 400,
+                system: systemPrompt,
+                messages: [{ role: 'user', content: userPrompt }]
+            })
+        });
+        const data = await response.json();
+        const enhanced = data.content && data.content[0] && data.content[0].text
+            ? data.content[0].text.trim() : null;
+        if (!enhanced) throw new Error('No response');
+        aiEl.textContent = enhanced;
+    } catch(err) {
+        aiEl.textContent = 'Enhancement failed — check your connection.';
+        console.error('[Claude defect enhance]', err);
+    }
+}
+
+function rbAcceptDefectClaude(nodeId) {
+    const aiEl = document.getElementById('rb-dc-ai-' + nodeId);
+    const ta   = document.getElementById('rb-desc-ta-' + nodeId);
+    const panel = document.getElementById('rb-defect-claude-' + nodeId);
+    if (!aiEl || !ta) return;
+    const enhanced = aiEl.textContent.trim();
+    if (!enhanced || enhanced === '…') return;
+    ta.value = enhanced;
+    REPORT_META.desc[nodeId] = enhanced;
+    saveReportMeta();
+    if (panel) panel.style.display = 'none';
+    showToast('[OK] AI description applied', 2500);
 }
 
 function renderReportBuilder() {
@@ -4878,8 +5029,25 @@ function renderReportBuilder() {
           id="btn-claude-enhance"
           style="padding:6px 12px;background:#1a0a2a;color:#a78bfa;border:1px solid #a78bfa;border-radius:6px;font-size:0.72rem;font-weight:bold;cursor:pointer;">✦ Enhance with AI</button>
       </div>
-      <textarea id="rb-exec" id="rb-exec-ta" oninput="REPORT_META.confirmed=false;rbSetMeta('execSummary', this.value)"
+      <textarea id="rb-exec-ta" oninput="REPORT_META.confirmed=false;rbSetMeta('execSummary', this.value)"
         style="width:100%;min-height:120px;background:#111;border:1px solid #2a2d38;color:#fff;border-radius:6px;padding:12px;font-family:inherit;font-size:0.9rem;line-height:1.55;resize:vertical;box-sizing:border-box;">${rbEsc(execVal)}</textarea>
+      <div id="rb-claude-panel" style="display:none;margin-top:12px;">
+        <div style="color:#a78bfa;font-size:0.72rem;font-weight:bold;margin-bottom:6px;">✦ AI Enhancement — <span id="rb-claude-status" style="color:#888;font-weight:normal;">Ready</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+          <div>
+            <div style="font-size:0.62rem;color:#555;text-transform:uppercase;font-weight:bold;margin-bottom:4px;">Your version</div>
+            <div id="rb-original-text" style="font-size:0.82rem;color:#aaa;line-height:1.55;background:#0a0a0a;padding:10px;border-radius:6px;min-height:60px;white-space:pre-wrap;"></div>
+          </div>
+          <div>
+            <div style="font-size:0.62rem;color:#a78bfa;text-transform:uppercase;font-weight:bold;margin-bottom:4px;">AI version</div>
+            <div id="rb-claude-text" style="font-size:0.82rem;color:#fff;line-height:1.55;background:#0a0a14;padding:10px;border-radius:6px;min-height:60px;white-space:pre-wrap;">…</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="rbAcceptClaude()" style="flex:1;padding:9px;background:#a78bfa;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.85rem;">✓ Use AI version</button>
+          <button onclick="rbDismissClaude()" style="padding:9px 16px;background:#222;color:#888;border:1px solid #444;border-radius:6px;cursor:pointer;font-size:0.85rem;">Keep mine</button>
+        </div>
+      </div>
     </div>
 
     <div style="font-size:0.8rem;color:#0cf;text-transform:uppercase;font-weight:bold;letter-spacing:1px;margin:18px 4px 10px;">Findings</div>`;
@@ -4921,13 +5089,19 @@ function renderReportBuilder() {
       items.forEach(it => {
         const sel = it.key + ':' + it.kind;
         const on = rbIsPhotoOn(nodeId, sel);
-        const kindLbl = it.kind === 'thermal' ? '🌡 IR' : '📷 DC';
+        const kindLbl = it.kind === 'thermal' ? '🌡 IR' : (it.kind === 'visual' ? '📷 DC' : '📸');
         const kindCol = it.kind === 'thermal' ? '#ff6b35' : '#9ad';
+        const rotKey = it.key + ':' + (it.kind === 'thermal' ? 'ir' : it.kind === 'visual' ? 'dc' : 'ir');
+        const rotDeg = photoRotations[rotKey] || 0;
+        const rotScale = (rotDeg===90||rotDeg===270) ? ' scale(0.75)' : '';
         thumbs += `
-          <div onclick="rbTogglePhoto('${nodeId}','${it.key}','${it.kind}',this)"
-               style="position:relative;flex:0 0 auto;cursor:pointer;border-radius:6px;outline:3px solid ${on ? '#1fd0a5' : 'transparent'};opacity:${on ? '1' : '0.4'};transition:0.12s;">
-            <img src="${it.url}" style="width:118px;height:88px;object-fit:cover;border-radius:6px;display:block;background:#000;${it.rot ? `transform:rotate(${it.rot}deg);` : ''}">
-            <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.72);color:${kindCol};font-size:0.6rem;font-weight:bold;text-align:center;padding:2px;border-radius:0 0 5px 5px;">${kindLbl} · ${rbEsc(it.key.split('_').pop())}</div>
+          <div id="rb-thumb-${nodeId}-${it.key}-${it.kind}" style="position:relative;flex:0 0 auto;border-radius:6px;outline:3px solid ${on ? '#1fd0a5' : 'transparent'};opacity:${on ? '1' : '0.4'};transition:0.12s;">
+            <div onclick="rbTogglePhoto('${nodeId}','${it.key}','${it.kind}',this.parentElement)" style="cursor:pointer;">
+              <img src="${it.url}" style="width:118px;height:88px;object-fit:cover;border-radius:6px;display:block;background:#000;${rotDeg ? `transform:rotate(${rotDeg}deg)${rotScale};` : ''}">
+              <div style="position:absolute;bottom:18px;left:0;right:0;background:rgba(0,0,0,0.72);color:${kindCol};font-size:0.6rem;font-weight:bold;text-align:center;padding:2px;">${kindLbl} · ${rbEsc(it.key.split('_').pop())}</div>
+            </div>
+            <button onclick="rbRotatePhoto('${nodeId}','${it.key}','${it.kind}')" title="Rotate photo"
+              style="position:absolute;bottom:0;left:0;right:0;padding:2px;background:rgba(241,196,15,0.85);border:none;color:#000;font-size:0.55rem;font-weight:bold;cursor:pointer;border-radius:0 0 5px 5px;">↻ ROTATE</button>
           </div>`;
       });
     } else {
@@ -4964,8 +5138,31 @@ function renderReportBuilder() {
           '</optgroup>'
         ).join('')}
       </select>
-      <textarea oninput="rbSetDesc('${nodeId}', this.value)" placeholder="Describe the observed condition for the client…"
-        style="width:100%;min-height:62px;background:#111;border:1px solid #2a2d38;color:#fff;border-radius:6px;padding:10px;margin:5px 0 12px;font-family:inherit;font-size:0.88rem;line-height:1.5;resize:vertical;box-sizing:border-box;">${rbEsc(desc)}</textarea>
+      <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:12px;">
+        <textarea id="rb-desc-ta-${nodeId}" oninput="rbSetDesc('${nodeId}', this.value)" placeholder="Describe the observed condition for the client…"
+          style="flex:1;min-height:62px;background:#111;border:1px solid #2a2d38;color:#fff;border-radius:6px;padding:10px;margin:5px 0 0;font-family:inherit;font-size:0.88rem;line-height:1.5;resize:vertical;box-sizing:border-box;">${rbEsc(desc)}</textarea>
+        <button onclick="rbEnhanceDefect('${nodeId}')"
+          style="flex-shrink:0;margin-top:5px;padding:7px 10px;background:#1a0a2a;color:#a78bfa;border:1px solid #a78bfa;border-radius:6px;font-size:0.7rem;font-weight:bold;cursor:pointer;white-space:nowrap;">✦ AI</button>
+      </div>
+      <div id="rb-defect-claude-${nodeId}" style="display:none;background:#111;border:1px solid #a78bfa;border-radius:8px;padding:12px;margin-bottom:12px;">
+        <div style="color:#a78bfa;font-size:0.72rem;font-weight:bold;margin-bottom:8px;">✦ AI Enhancement — choose a version:</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+          <div>
+            <div style="font-size:0.62rem;color:#555;text-transform:uppercase;font-weight:bold;margin-bottom:4px;">Your version</div>
+            <div id="rb-dc-orig-${nodeId}" style="font-size:0.8rem;color:#aaa;line-height:1.5;background:#0a0a0a;padding:8px;border-radius:4px;min-height:40px;white-space:pre-wrap;"></div>
+          </div>
+          <div>
+            <div style="font-size:0.62rem;color:#a78bfa;text-transform:uppercase;font-weight:bold;margin-bottom:4px;">AI version</div>
+            <div id="rb-dc-ai-${nodeId}" style="font-size:0.8rem;color:#fff;line-height:1.5;background:#0a0a14;padding:8px;border-radius:4px;min-height:40px;white-space:pre-wrap;">…</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="rbAcceptDefectClaude('${nodeId}')"
+            style="flex:1;padding:8px;background:#a78bfa;color:#000;border:none;border-radius:4px;font-weight:bold;cursor:pointer;font-size:0.8rem;">✓ Use AI version</button>
+          <button onclick="document.getElementById('rb-defect-claude-${nodeId}').style.display='none'"
+            style="padding:8px 14px;background:#222;color:#888;border:1px solid #444;border-radius:4px;cursor:pointer;font-size:0.8rem;">Keep mine</button>
+        </div>
+      </div>
 
       <label style="font-size:0.68rem;color:#888;text-transform:uppercase;font-weight:bold;letter-spacing:0.5px;">Photos for report <span style="color:#1fd0a5;">(teal outline = included)</span></label>
       <div style="display:flex;gap:8px;overflow-x:auto;padding:8px 0 2px;">${thumbs}</div>
