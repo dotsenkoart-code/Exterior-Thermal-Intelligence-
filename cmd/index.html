@@ -2028,7 +2028,7 @@ function runBracketZipline() {
         // This prevents double-linking when photos are re-uploaded.
         // Manual links AND manually-added phone photos (keyed _PHONE_) are preserved.
         allNodes.forEach(({node}) => {
-            node.photos = (node.photos || []).filter(function(p){ return p.indexOf('_PHONE_') !== -1; });
+            node.photos = (node.photos || []).filter(function(p){ return p.indexOf('_PHONE_') !== -1 || p.indexOf('_ANNOT_') !== -1; });
         });
 
         // -- 6. Bracket-match every IR image ---------------------
@@ -2939,7 +2939,21 @@ function buildPhotoArea(nodes) {
                 };
             })(irName);
 
-            bar.appendChild(nl);bar.appendChild(pill);bar.appendChild(moveBtn);bar.appendChild(removeBtn);bar.appendChild(rotBtn);wrap.appendChild(bar);
+            // Annotate button — opens the drawing editor for this photo
+            const annotBtn = document.createElement('button');
+            annotBtn.className = 'photo-move-btn';
+            annotBtn.style.cssText = 'padding:3px 10px;font-size:0.7rem;font-weight:bold;background:#0a1a14;color:#1fd0a5;border:1px solid #1fd0a5;border-radius:4px;cursor:pointer;margin-left:4px;text-transform:uppercase;letter-spacing:0.5px;';
+            annotBtn.innerText = '✎ Mark';
+            annotBtn.title = 'Draw circles/arrows on this photo (saves an annotated copy)';
+            annotBtn.onclick = (function(name, viewKind, nid){
+                return function(e){
+                    e.stopPropagation();
+                    var k = (photoViewState[name] === 'dc') ? 'dc' : 'ir';
+                    openAnnotationEditor(name, k, nid);
+                };
+            })(irName, photoViewState[irName], nodes[0]?.id);
+
+            bar.appendChild(nl);bar.appendChild(pill);bar.appendChild(moveBtn);bar.appendChild(annotBtn);bar.appendChild(removeBtn);bar.appendChild(rotBtn);wrap.appendChild(bar);
 
             // Click image -> lightbox, opening at the current IR/DC state
             img.onclick=(function(name, ent){
@@ -6331,6 +6345,292 @@ function mdOpenRepositionForm(nodeId){
     if(posLabel)node.locationDetail=(node.locationDetail?node.locationDetail.replace(/Left|Center|Right/,'').trim()+' ':'')+posLabel;
     saveCommandState();calculateBuildingGeometry();refreshCurrentView();overlay.remove();openModal(nodeId);showToast('[OK] Defect repositioned',2000);
   };
+}
+
+
+// ============================================================================
+//  PHOTO ANNOTATION EDITOR
+//  Draw circles, arrows, boxes, and freehand on a photo. The markup is baked
+//  into a NEW image (original is preserved). The annotated copy is stored in
+//  imageBank under a new key and linked to the same node.
+// ============================================================================
+function openAnnotationEditor(sourceKey, kind, nodeId) {
+  var entry = imageBank[sourceKey];
+  if (!entry) { showToast('Photo not available.', 2500, true); return; }
+  var srcUrl = (kind === 'dc' && entry.dcUrl) ? entry.dcUrl : entry.url;
+
+  var existing = document.getElementById('annot-overlay');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'annot-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(10,12,18,0.96);z-index:11000;display:flex;flex-direction:column;';
+
+  // --- Toolbar ---
+  var toolbar = document.createElement('div');
+  toolbar.style.cssText = 'display:flex;align-items:center;gap:8px;padding:12px 16px;background:#11151f;border-bottom:1px solid #2a2d38;flex-wrap:wrap;flex-shrink:0;';
+
+  function toolBtn(label, tool, title) {
+    var b = document.createElement('button');
+    b.innerHTML = label;
+    b.title = title || '';
+    b.dataset.tool = tool;
+    b.style.cssText = 'padding:8px 12px;background:#1a1d27;color:#cbd5e1;border:1px solid #2a2d38;border-radius:6px;cursor:pointer;font-size:0.82rem;font-weight:bold;min-width:42px;';
+    return b;
+  }
+
+  var tools = [
+    toolBtn('◯', 'circle', 'Circle / ellipse'),
+    toolBtn('↗', 'arrow', 'Arrow'),
+    toolBtn('▢', 'box', 'Rectangle'),
+    toolBtn('✎', 'free', 'Freehand'),
+  ];
+  var toolWrap = document.createElement('div');
+  toolWrap.style.cssText = 'display:flex;gap:4px;';
+  tools.forEach(function(t){ toolWrap.appendChild(t); });
+
+  // Color picker
+  var colors = ['#ff2d2d', '#ffd400', '#00e0ff', '#19e36a', '#ffffff', '#000000'];
+  var colorWrap = document.createElement('div');
+  colorWrap.style.cssText = 'display:flex;gap:4px;align-items:center;margin-left:8px;padding-left:8px;border-left:1px solid #2a2d38;';
+  var colorBtns = [];
+  colors.forEach(function(c){
+    var cb = document.createElement('button');
+    cb.style.cssText = 'width:26px;height:26px;border-radius:50%;background:'+c+';border:2px solid #2a2d38;cursor:pointer;padding:0;';
+    cb.dataset.color = c;
+    colorBtns.push(cb);
+    colorWrap.appendChild(cb);
+  });
+
+  // Line width
+  var widthWrap = document.createElement('div');
+  widthWrap.style.cssText = 'display:flex;gap:6px;align-items:center;margin-left:8px;padding-left:8px;border-left:1px solid #2a2d38;';
+  var widthLabel = document.createElement('span');
+  widthLabel.style.cssText = 'color:#888;font-size:0.72rem;';
+  widthLabel.innerText = 'Width';
+  var widthInput = document.createElement('input');
+  widthInput.type = 'range'; widthInput.min = '2'; widthInput.max = '20'; widthInput.value = '5';
+  widthInput.style.cssText = 'width:80px;';
+  widthWrap.appendChild(widthLabel); widthWrap.appendChild(widthInput);
+
+  // Spacer + action buttons
+  var spacer = document.createElement('div');
+  spacer.style.cssText = 'flex:1;';
+
+  var undoBtn = document.createElement('button');
+  undoBtn.innerHTML = '↶ Undo';
+  undoBtn.style.cssText = 'padding:8px 14px;background:#1a1d27;color:#cbd5e1;border:1px solid #2a2d38;border-radius:6px;cursor:pointer;font-size:0.82rem;font-weight:bold;';
+
+  var clearBtn = document.createElement('button');
+  clearBtn.innerHTML = '✕ Clear';
+  clearBtn.style.cssText = 'padding:8px 14px;background:#1a1d27;color:#cbd5e1;border:1px solid #2a2d38;border-radius:6px;cursor:pointer;font-size:0.82rem;font-weight:bold;';
+
+  var saveBtn = document.createElement('button');
+  saveBtn.innerHTML = '✓ Save Annotated Copy';
+  saveBtn.style.cssText = 'padding:8px 16px;background:#1fd0a5;color:#000;border:none;border-radius:6px;cursor:pointer;font-size:0.82rem;font-weight:bold;';
+
+  var cancelBtn = document.createElement('button');
+  cancelBtn.innerHTML = 'Cancel';
+  cancelBtn.style.cssText = 'padding:8px 14px;background:#222;color:#888;border:1px solid #444;border-radius:6px;cursor:pointer;font-size:0.82rem;';
+
+  toolbar.appendChild(toolWrap);
+  toolbar.appendChild(colorWrap);
+  toolbar.appendChild(widthWrap);
+  toolbar.appendChild(spacer);
+  toolbar.appendChild(undoBtn);
+  toolbar.appendChild(clearBtn);
+  toolbar.appendChild(cancelBtn);
+  toolbar.appendChild(saveBtn);
+
+  // --- Canvas stage ---
+  var stage = document.createElement('div');
+  stage.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;overflow:auto;padding:20px;';
+  var canvasWrap = document.createElement('div');
+  canvasWrap.style.cssText = 'position:relative;line-height:0;box-shadow:0 8px 40px rgba(0,0,0,0.6);';
+  var canvas = document.createElement('canvas');
+  canvas.style.cssText = 'cursor:crosshair;max-width:100%;display:block;touch-action:none;';
+  canvasWrap.appendChild(canvas);
+  stage.appendChild(canvasWrap);
+
+  overlay.appendChild(toolbar);
+  overlay.appendChild(stage);
+  document.body.appendChild(overlay);
+
+  // --- State ---
+  var ctx = canvas.getContext('2d');
+  var baseImg = new Image();
+  var shapes = [];          // committed shapes
+  var current = null;       // shape in progress
+  var curTool = 'circle';
+  var curColor = '#ff2d2d';
+  var curWidth = 5;
+  var imgScale = 1;         // displayed-size / natural-size
+
+  function setActiveTool(tool){
+    curTool = tool;
+    tools.forEach(function(t){
+      var on = t.dataset.tool === tool;
+      t.style.background = on ? '#1fd0a5' : '#1a1d27';
+      t.style.color = on ? '#000' : '#cbd5e1';
+      t.style.borderColor = on ? '#1fd0a5' : '#2a2d38';
+    });
+  }
+  function setActiveColor(c){
+    curColor = c;
+    colorBtns.forEach(function(cb){
+      cb.style.borderColor = cb.dataset.color === c ? '#fff' : '#2a2d38';
+      cb.style.transform = cb.dataset.color === c ? 'scale(1.15)' : 'scale(1)';
+    });
+  }
+  tools.forEach(function(t){ t.onclick = function(){ setActiveTool(t.dataset.tool); }; });
+  colorBtns.forEach(function(cb){ cb.onclick = function(){ setActiveColor(cb.dataset.color); }; });
+  widthInput.oninput = function(){ curWidth = parseInt(widthInput.value); };
+
+  baseImg.onload = function(){
+    canvas.width = baseImg.naturalWidth;
+    canvas.height = baseImg.naturalHeight;
+    // Fit displayed size to viewport
+    var maxW = window.innerWidth - 80;
+    var maxH = window.innerHeight - 160;
+    var scale = Math.min(maxW / baseImg.naturalWidth, maxH / baseImg.naturalHeight, 1);
+    canvas.style.width = (baseImg.naturalWidth * scale) + 'px';
+    canvas.style.height = (baseImg.naturalHeight * scale) + 'px';
+    imgScale = scale;
+    redraw();
+  };
+  baseImg.onerror = function(){ showToast('Could not load photo for annotation.', 3000, true); overlay.remove(); };
+  baseImg.src = srcUrl;
+
+  function redraw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(baseImg, 0, 0, canvas.width, canvas.height);
+    shapes.forEach(drawShape);
+    if (current) drawShape(current);
+  }
+
+  function drawShape(s){
+    ctx.strokeStyle = s.color;
+    ctx.lineWidth = s.width;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    if (s.tool === 'circle') {
+      ctx.beginPath();
+      var cx = (s.x1 + s.x2)/2, cy = (s.y1 + s.y2)/2;
+      var rx = Math.abs(s.x2 - s.x1)/2, ry = Math.abs(s.y2 - s.y1)/2;
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2);
+      ctx.stroke();
+    } else if (s.tool === 'box') {
+      ctx.strokeRect(Math.min(s.x1,s.x2), Math.min(s.y1,s.y2), Math.abs(s.x2-s.x1), Math.abs(s.y2-s.y1));
+    } else if (s.tool === 'arrow') {
+      drawArrow(s.x1, s.y1, s.x2, s.y2, s.width, s.color);
+    } else if (s.tool === 'free') {
+      ctx.beginPath();
+      if (s.points && s.points.length) {
+        ctx.moveTo(s.points[0].x, s.points[0].y);
+        for (var i=1;i<s.points.length;i++) ctx.lineTo(s.points[i].x, s.points[i].y);
+      }
+      ctx.stroke();
+    }
+  }
+
+  function drawArrow(x1,y1,x2,y2,w,color){
+    var headLen = Math.max(14, w * 3.5);
+    var ang = Math.atan2(y2-y1, x2-x1);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = w; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2,y2);
+    ctx.lineTo(x2 - headLen*Math.cos(ang - Math.PI/6), y2 - headLen*Math.sin(ang - Math.PI/6));
+    ctx.lineTo(x2 - headLen*Math.cos(ang + Math.PI/6), y2 - headLen*Math.sin(ang + Math.PI/6));
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function getPos(e){
+    var rect = canvas.getBoundingClientRect();
+    var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    var clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+      x: (clientX - rect.left) / rect.width * canvas.width,
+      y: (clientY - rect.top) / rect.height * canvas.height
+    };
+  }
+
+  var drawing = false;
+  function start(e){
+    e.preventDefault();
+    drawing = true;
+    var p = getPos(e);
+    current = { tool: curTool, color: curColor, width: curWidth, x1: p.x, y1: p.y, x2: p.x, y2: p.y };
+    if (curTool === 'free') current.points = [{x:p.x, y:p.y}];
+  }
+  function move(e){
+    if (!drawing || !current) return;
+    e.preventDefault();
+    var p = getPos(e);
+    current.x2 = p.x; current.y2 = p.y;
+    if (curTool === 'free') current.points.push({x:p.x, y:p.y});
+    redraw();
+  }
+  function end(e){
+    if (!drawing) return;
+    drawing = false;
+    if (current) {
+      // Ignore tiny accidental clicks (except freehand)
+      var moved = Math.abs(current.x2 - current.x1) + Math.abs(current.y2 - current.y1);
+      if (current.tool === 'free' || moved > 4) shapes.push(current);
+    }
+    current = null;
+    redraw();
+  }
+
+  canvas.addEventListener('mousedown', start);
+  canvas.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', end);
+  canvas.addEventListener('touchstart', start, {passive:false});
+  canvas.addEventListener('touchmove', move, {passive:false});
+  canvas.addEventListener('touchend', end);
+
+  undoBtn.onclick = function(){ shapes.pop(); redraw(); };
+  clearBtn.onclick = function(){ shapes = []; redraw(); };
+  cancelBtn.onclick = function(){ cleanup(); overlay.remove(); };
+  overlay.addEventListener('keydown', function(e){ if(e.key==='Escape'){ cleanup(); overlay.remove(); } });
+
+  function cleanup(){
+    window.removeEventListener('mouseup', end);
+  }
+
+  saveBtn.onclick = function(){
+    if (!shapes.length) { showToast('Draw something first, or press Cancel.', 2500, true); return; }
+    // Bake annotations into a new image
+    redraw();
+    var dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+    // Create a new key for the annotated copy
+    var annotKey = sourceKey + '_ANNOT_' + Date.now() + '_' + Math.random().toString(36).slice(2,4);
+    imageBank[annotKey] = { url: dataUrl, dcUrl: null, time: entry.time || null, drop: entry.drop || 'ANNOT', _annotated: true, _sourceKey: sourceKey };
+
+    // Link to the node (both photos + manualLinks + embeddedPhotoData so it persists)
+    var node = getNodeData(nodeId);
+    if (node) {
+      if (!node.photos) node.photos = [];
+      if (node.photos.indexOf(annotKey) === -1) node.photos.push(annotKey);
+      if (!node.embeddedPhotoData) node.embeddedPhotoData = {};
+      node.embeddedPhotoData[annotKey] = dataUrl;
+    }
+    if (!manualLinks[nodeId]) manualLinks[nodeId] = [];
+    if (manualLinks[nodeId].indexOf(annotKey) === -1) manualLinks[nodeId].push(annotKey);
+
+    saveCommandState();
+    if (typeof updatePhotoStat === 'function') updatePhotoStat();
+    cleanup();
+    overlay.remove();
+    if (modalNodeId === nodeId) openModal(nodeId);
+    showToast('[OK] Annotated copy saved — original preserved', 3000);
+  };
+
+  // Defaults
+  setActiveTool('circle');
+  setActiveColor('#ff2d2d');
 }
 
 function restoreManualDefectPhotos(){
