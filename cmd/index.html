@@ -4721,7 +4721,9 @@ let REPORT_META = {
   scopeMethod: '',          // inspection method
   scopeWeather: '',         // weather/conditions
   scopeNotAccessed: '',     // areas not accessed
-  recommendations: ''       // '' = auto-generate from findings
+  recommendations: '',      // '' = auto-generate from findings
+  coverPhoto: '',           // base64 data URL for the cover hero image
+  estimates: {}             // nodeId -> estimate string (only set where provided)
 };
 
 function loadReportMeta() {
@@ -4934,6 +4936,41 @@ function rbBuildExecSummary(cands) {
 
 // ── event handlers (update state + persist + minimal DOM) ───────────────────
 function rbSetMeta(field, val) { REPORT_META[field] = val; saveReportMeta(); }
+function rbSetEstimate(nodeId, val) {
+  val = (val || '').trim();
+  if (val) { REPORT_META.estimates[nodeId] = val; }
+  else { delete REPORT_META.estimates[nodeId]; }
+  saveReportMeta();
+}
+function rbPickCoverPhoto() {
+  var i = document.createElement('input');
+  i.type = 'file'; i.accept = 'image/*,.heic,.heif';
+  i.style.position = 'fixed'; i.style.left = '-9999px';
+  document.body.appendChild(i);
+  i.onchange = function() {
+    if (!i.files.length) { if(i.parentNode)i.parentNode.removeChild(i); return; }
+    var file = i.files[0];
+    if (!isImageFile(file)) { showToast('Please choose an image file.', 2500, true); return; }
+    convertHeicIfNeeded(file).then(function(useFile) {
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        REPORT_META.coverPhoto = ev.target.result;
+        saveReportMeta();
+        renderReportBuilder();
+        showToast('[OK] Cover photo added', 2000);
+      };
+      reader.readAsDataURL(useFile);
+    });
+    setTimeout(function(){ if(i.parentNode)i.parentNode.removeChild(i); }, 1000);
+  };
+  i.click();
+}
+function rbClearCoverPhoto() {
+  REPORT_META.coverPhoto = '';
+  saveReportMeta();
+  renderReportBuilder();
+  showToast('Cover photo removed', 1800);
+}
 function rbSetDesc(nodeId, val) { REPORT_META.desc[nodeId] = val; saveReportMeta(); }
 function rbSetSeverity(nodeId, val) {
   REPORT_META.sev[nodeId] = val; saveReportMeta();
@@ -5364,6 +5401,15 @@ function renderReportBuilder() {
         ${metaField('reportNo', 'Report No.',        REPORT_META.reportNo, 'e.g. VRT-2026-014')}
         ${metaField('inspectorCreds','Inspector Credentials', REPORT_META.inspectorCreds, 'e.g. Level I Thermographer, SPRAT Rope Access')}
       </div>
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid #2a2d38;">
+        <label style="font-size:0.68rem;color:#888;text-transform:uppercase;font-weight:bold;letter-spacing:0.5px;display:block;margin-bottom:8px;">Cover Photo (optional)</label>
+        ${REPORT_META.coverPhoto
+          ? `<div style="display:flex;align-items:center;gap:12px;">
+               <img src="${REPORT_META.coverPhoto}" style="width:120px;height:80px;object-fit:cover;border-radius:6px;border:1px solid #2a2d38;">
+               <button onclick="rbClearCoverPhoto()" style="padding:8px 14px;background:#1a0a0a;color:#e74c3c;border:1px solid #e74c3c;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:bold;">Remove</button>
+             </div>`
+          : `<button onclick="rbPickCoverPhoto()" style="padding:10px 16px;background:#0a1a14;color:#1fd0a5;border:1px solid #1fd0a5;border-radius:6px;cursor:pointer;font-size:0.82rem;font-weight:bold;">📷 Add a hero shot of the building</button>`}
+      </div>
     </div>
 
     <details style="background:#1a1d27;border:1px solid #2a2d38;border-radius:12px;padding:18px;margin-bottom:16px;">
@@ -5553,6 +5599,12 @@ function renderReportBuilder() {
         </div>
       </div>
 
+      <div style="margin-bottom:12px;">
+        <label style="font-size:0.68rem;color:#888;text-transform:uppercase;font-weight:bold;letter-spacing:0.5px;display:block;margin-bottom:4px;">Repair Estimate <span style="color:#555;font-weight:normal;text-transform:none;letter-spacing:0;">(optional — shows on report only if filled)</span></label>
+        <input type="text" id="rb-est-${nodeId}" oninput="rbSetEstimate('${nodeId}', this.value)" value="${rbEsc(REPORT_META.estimates[nodeId] || '')}" placeholder="e.g. \$1,200–1,800 or 'Quote upon request'"
+          style="width:100%;background:#111;border:1px solid #2a2d38;color:#1fd0a5;border-radius:6px;padding:9px 11px;font-size:0.86rem;font-weight:bold;box-sizing:border-box;">
+      </div>
+
       <label style="font-size:0.68rem;color:#888;text-transform:uppercase;font-weight:bold;letter-spacing:0.5px;">Photos for report <span style="color:#1fd0a5;">(teal outline = included)</span></label>
       <div style="display:flex;gap:8px;overflow-x:auto;padding:8px 0 2px;">${thumbs}</div>
     </div>`;
@@ -5686,6 +5738,14 @@ function rbBuildRecommendationsSection(cands, sevCount) {
       </div>`;
   });
   html += '</div>';
+
+  // If estimates were provided, summarize how many findings have them
+  var estCount = 0;
+  cands.forEach(function(c){ if (M.estimates[c.nodeId]) estCount++; });
+  if (estCount > 0) {
+    html += `<div class="rec-est-summary">Preliminary repair estimates have been provided for ${estCount} of the findings in this report, shown with each applicable finding. These are budgetary figures intended for planning purposes; a formal proposal can be prepared upon request.</div>`;
+  }
+
   html += `<div class="rec-note">Verticality is equipped to perform same-drop remediation of many of the conditions identified above, reducing mobilization costs and shortening repair timelines. We are pleased to provide a detailed repair proposal upon request.</div>`;
   return html;
 }
@@ -5744,6 +5804,7 @@ function rbBuildReportHTML() {
     }).join('');
 
         const _defectTitle = rbEsc(rbCleanTitle(node.label || node.finds, tags, sev));
+    const _estimate = REPORT_META.estimates[nodeId] || '';
     const _sevLabel = sev.charAt(0) + sev.slice(1).toLowerCase();
     defectsHtml += `
     <section class="defect">
@@ -5759,6 +5820,7 @@ function rbBuildReportHTML() {
       <div class="defect-body">
         ${tags.length ? `<div class="defect-tags">${tags.map(t => `<span>${rbEsc(t)}</span>`).join('')}</div>` : ''}
         <div class="defect-desc">${rbEsc(desc)}</div>
+        ${_estimate ? `<div class="defect-estimate"><span class="est-label">Estimated Repair</span><span class="est-value">${rbEsc(_estimate)}</span></div>` : ''}
         ${items.length ? `<div class="photos">${photoCells}</div>` : '<p class="nophoto">No photographs included for this finding.</p>'}
       </div>
     </section>`;
@@ -5835,7 +5897,9 @@ function rbBuildReportHTML() {
   .wordmark { font-family: Georgia, serif; font-size: 22pt; font-weight: 600; letter-spacing: 0.5px; color: #fff; }
   .wordmark .v { color: #8fb4d6; }
   .wordmark-sub { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 7.5pt; letter-spacing: 3.5px; text-transform: uppercase; color: #9fb3cc; margin-top: 4px; font-weight: 600; }
-  .cover-body { padding: 24mm 20mm; flex: 1; display: flex; flex-direction: column; }
+  .cover-photo { width: 100%; height: 95mm; overflow: hidden; background: #0f1c30; }
+  .cover-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cover-body { padding: 22mm 20mm; flex: 1; display: flex; flex-direction: column; }
   .doctype-label { font-size: 8.5pt; letter-spacing: 4px; text-transform: uppercase; color: var(--grey); font-weight: 700; margin-bottom: 14px; }
   .cover-body h1 { font-size: 34pt; line-height: 1.08; color: var(--navy); margin-bottom: 10px; }
   .cover-subject { font-size: 15pt; color: var(--slate); font-family: Georgia, serif; font-style: italic; margin-bottom: auto; }
@@ -5894,6 +5958,9 @@ function rbBuildReportHTML() {
   .defect-tags { margin-bottom: 10px; }
   .defect-tags span { display: inline-block; font-size: 8pt; font-weight: 700; color: var(--slate); background: #eef2f6; border-radius: 3px; padding: 3px 9px; margin-right: 5px; letter-spacing: 0.3px; }
   .defect-desc { font-size: 10.5pt; line-height: 1.65; color: var(--slate); margin-bottom: 14px; }
+  .defect-estimate { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: #f3f7f4; border-left: 3px solid var(--low); border-radius: 0 5px 5px 0; margin-bottom: 14px; }
+  .defect-estimate .est-label { font-size: 7.5pt; letter-spacing: 1px; text-transform: uppercase; color: var(--grey); font-weight: 700; }
+  .defect-estimate .est-value { font-size: 11pt; font-weight: 700; color: var(--navy); font-family: Georgia, serif; }
   .photos { display: flex; flex-wrap: wrap; gap: 12px; }
   figure.ph { margin: 0; flex: 0 0 calc(50% - 6px); }
   .phbox { width: 100%; aspect-ratio: 4/3; overflow: hidden; border-radius: 5px; background: #111c2b; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line); }
@@ -5951,6 +6018,7 @@ function rbBuildReportHTML() {
   .rec-text { font-size: 10pt; color: var(--slate); line-height: 1.6; padding-top: 4px; }
   .rec-text strong { color: var(--navy); }
   .rec-note { font-size: 10pt; color: var(--slate); line-height: 1.65; padding: 14px 16px; background: #f6f8fa; border-left: 3px solid var(--navy); border-radius: 0 6px 6px 0; margin-top: 6px; }
+  .rec-est-summary { font-size: 9.5pt; color: var(--slate); line-height: 1.6; padding: 12px 16px; background: #f3f7f4; border-left: 3px solid var(--low); border-radius: 0 6px 6px 0; margin: 14px 0 6px; }
 
   /* ---------- LIMITATIONS ---------- */
   .limitations p { font-size: 9pt; color: var(--grey); line-height: 1.65; margin-bottom: 10px; text-align: justify; }
@@ -5967,6 +6035,7 @@ function rbBuildReportHTML() {
       <div class="wordmark"><span class="v">V</span>erticality</div>
       <div class="wordmark-sub">Exterior Thermal Intelligence</div>
     </div>
+    ${M.coverPhoto ? `<div class="cover-photo"><img src="${M.coverPhoto}"></div>` : ''}
     <div class="cover-body">
       <div class="doctype-label">Building Envelope Assessment</div>
       <h1>Façade Inspection<br>Report</h1>
