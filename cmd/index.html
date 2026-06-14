@@ -1356,26 +1356,47 @@ document.addEventListener('visibilitychange',()=>{
 // =======================================================
 function saveCommandState() {
     const _mdL={}; Object.entries(manualDefects).forEach(function(e){var k=e[0],v=e[1];var r=Object.assign({},v);delete r.embeddedPhotoData;_mdL[k]=r;});
+    // Build a copy of inspectionData WITHOUT embeddedPhotoData (base64 would blow localStorage quota)
+    const _idLite={};
+    Object.keys(inspectionData).forEach(function(drop){
+        _idLite[drop]={};
+        Object.keys(inspectionData[drop]).forEach(function(floor){
+            _idLite[drop][floor]={};
+            Object.keys(inspectionData[drop][floor]).forEach(function(pos){
+                var n=inspectionData[drop][floor][pos];
+                var c=Object.assign({},n);
+                delete c.embeddedPhotoData;
+                _idLite[drop][floor][pos]=c;
+            });
+        });
+    });
     try {
         localStorage.setItem('strataCommandState',JSON.stringify({
-            projectInfo,inspectionData,elevations,dropAssignments,
+            projectInfo,inspectionData:_idLite,elevations,dropAssignments,
             stitchedPairs,saved3DTags,manualLinks,projectModelUrl,
             repairPriorities,repairTags,repairFixed,cesiumAssetId,manualDefects:_mdL,photoRotations
         }));
     } catch(e) { console.warn('[save] main state quota?', e); }
-    // Save manual defect photos to a SEPARATE key so they survive page reload
-    // without needing to reload the project JSON every session.
+    // Save ALL embedded photos (manual defects + phone photos on regular windows)
+    // to a SEPARATE key so they survive page reload.
     try {
         const _photos={};
         Object.entries(manualDefects).forEach(function(e){
             var k=e[0],v=e[1];
-            if(v.embeddedPhotoData && Object.keys(v.embeddedPhotoData).length){
-                _photos[k]=v.embeddedPhotoData;
-            }
+            if(v.embeddedPhotoData && Object.keys(v.embeddedPhotoData).length){_photos[k]=v.embeddedPhotoData;}
+        });
+        // Phone photos on regular windows — keyed by nodeId
+        Object.keys(inspectionData).forEach(function(drop){
+            Object.keys(inspectionData[drop]).forEach(function(floor){
+                Object.keys(inspectionData[drop][floor]).forEach(function(pos){
+                    var n=inspectionData[drop][floor][pos];
+                    if(n.embeddedPhotoData && Object.keys(n.embeddedPhotoData).length){_photos[n.id]=n.embeddedPhotoData;}
+                });
+            });
         });
         localStorage.setItem('strataManualPhotos', JSON.stringify(_photos));
     } catch(e) {
-        console.warn('[save] manual photos too large for localStorage — they remain in the project JSON', e);
+        console.warn('[save] photos too large for localStorage — they remain in the project JSON', e);
     }
 }
 
@@ -1397,7 +1418,7 @@ function loadCommandState() {
         repairFixed       =s.repairFixed       ||{};
         cesiumAssetId     =s.cesiumAssetId     ||0;
         manualDefects     =s.manualDefects     ||{};
-        // Restore manual defect photos from their separate localStorage key
+        // Restore embedded photos (manual defects + phone photos on regular windows)
         try {
             const _mp = localStorage.getItem('strataManualPhotos');
             if (_mp) {
@@ -1405,10 +1426,16 @@ function loadCommandState() {
                 Object.keys(_photos).forEach(function(nodeId){
                     if (manualDefects[nodeId]) {
                         manualDefects[nodeId].embeddedPhotoData = _photos[nodeId];
+                    } else if (nodeId.indexOf('-') !== -1) {
+                        // Regular window node: drop-floor-pos
+                        var p = nodeId.split('-');
+                        if (p.length === 3 && inspectionData[p[0]] && inspectionData[p[0]][p[1]] && inspectionData[p[0]][p[1]][p[2]]) {
+                            inspectionData[p[0]][p[1]][p[2]].embeddedPhotoData = _photos[nodeId];
+                        }
                     }
                 });
             }
-        } catch(e) { console.warn('[load] manual photos restore failed', e); }
+        } catch(e) { console.warn('[load] photos restore failed', e); }
         if (s.photoRotations) Object.assign(photoRotations, s.photoRotations);
         // Restore model URL input field if it exists
         const assetInp2 = document.getElementById('cesium-asset-input');
@@ -1999,8 +2026,10 @@ function runBracketZipline() {
 
         // -- 5. Clear existing Zipline assignments for this drop --
         // This prevents double-linking when photos are re-uploaded.
-        // Manual links are preserved.
-        allNodes.forEach(({node}) => { node.photos = []; });
+        // Manual links AND manually-added phone photos (keyed _PHONE_) are preserved.
+        allNodes.forEach(({node}) => {
+            node.photos = (node.photos || []).filter(function(p){ return p.indexOf('_PHONE_') !== -1; });
+        });
 
         // -- 6. Bracket-match every IR image ---------------------
         images.forEach(img => {
@@ -2143,24 +2172,133 @@ function initGlobalDragDrop() {
 }
 
 function setupDropSlot(slotEl, nodeId) {
+    // Regular drop windows can take EITHER FLIR thermal files (via handleFiles)
+    // OR plain phone photos (via the manual-photo path). We detect which and route
+    // accordingly so a phone snap attaches to a real window just like on a manual defect.
     slotEl.addEventListener('dragover',e=>{e.preventDefault();slotEl.classList.add('drag-over');});
     slotEl.addEventListener('dragleave',()=>slotEl.classList.remove('drag-over'));
     slotEl.addEventListener('drop',async e=>{
         e.preventDefault();e.stopPropagation();
         slotEl.classList.remove('drag-over');
         if (!e.dataTransfer.files.length) return;
-        await handleFiles(e.dataTransfer.files,'media');
-        manualAssignLatest(nodeId);
+        var imgs=Array.from(e.dataTransfer.files).filter(isImageFile);
+        if(imgs.length===1){ingestPhoneePhotoToWindow(imgs[0],nodeId);}
+        else if(imgs.length>1){openWindowPhotoBrowser(imgs,nodeId);}
     });
     slotEl.addEventListener('click',()=>{
-        const inp=document.createElement('input');
-        inp.type='file';inp.accept='image/*';
-        inp.onchange=async()=>{
-            if (!inp.files.length) return;
-            await handleFiles(inp.files,'media');
+        windowShowPickerChoice(slotEl,nodeId);
+    });
+}
+
+// Picker menu for regular windows: choose FLIR files or phone photos
+function windowShowPickerChoice(anchorEl,nodeId){
+    var existing=document.getElementById('win-picker-menu');if(existing){existing.remove();return;}
+    var menu=document.createElement('div');menu.id='win-picker-menu';
+    var r=anchorEl.getBoundingClientRect();
+    menu.style.cssText='position:fixed;z-index:9000;background:#1a1d27;border:1px solid #0cf;border-radius:8px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,0.7);display:flex;flex-direction:column;gap:4px;';
+    menu.style.top=(r.bottom+6)+'px';menu.style.left=r.left+'px';
+    function makeBtn(label,fn){
+        var b=document.createElement('button');
+        b.style.cssText='padding:9px 18px;background:transparent;border:none;color:#fff;font-size:0.82rem;text-align:left;cursor:pointer;border-radius:6px;white-space:nowrap;';
+        b.textContent=label;b.onmouseover=function(){b.style.background='#0cf33';};b.onmouseout=function(){b.style.background='transparent';};b.onclick=function(){menu.remove();fn();};return b;
+    }
+    menu.appendChild(makeBtn('📷  Add phone photo(s)',function(){
+        var i=document.createElement('input');i.type='file';i.accept='image/*,.heic,.heif,.tiff,.tif';i.multiple=true;
+        i.style.position='fixed';i.style.left='-9999px';document.body.appendChild(i);
+        i.onchange=function(){
+            var imgs=Array.from(i.files).filter(isImageFile);
+            if(imgs.length===1)ingestPhoneePhotoToWindow(imgs[0],nodeId);
+            else if(imgs.length>1)openWindowPhotoBrowser(imgs,nodeId);
+            setTimeout(function(){if(i.parentNode)i.parentNode.removeChild(i);},1000);
+        };i.click();
+    }));
+    menu.appendChild(makeBtn('🌡  Add FLIR thermal file(s)',function(){
+        var i=document.createElement('input');i.type='file';i.accept='.jpg,.jpeg,.png';i.multiple=true;
+        i.style.position='fixed';i.style.left='-9999px';document.body.appendChild(i);
+        i.onchange=async function(){
+            if(!i.files.length)return;
+            await handleFiles(i.files,'media');
             manualAssignLatest(nodeId);
+            setTimeout(function(){if(i.parentNode)i.parentNode.removeChild(i);},1000);
+        };i.click();
+    }));
+    document.body.appendChild(menu);
+    setTimeout(function(){document.addEventListener('click',function _close(ev){if(!menu.contains(ev.target)){menu.remove();document.removeEventListener('click',_close);}});},0);
+}
+
+// Ingest a plain phone photo and attach it to a REGULAR window node.
+// Stores in imageBank + node.embeddedPhotoData (so it persists like manual photos)
+// and adds the key to manualLinks so it survives CSV/ZIP reloads.
+function ingestPhoneePhotoToWindow(file,nodeId){
+    if(!file||!isImageFile(file))return;
+    var node=getNodeData(nodeId);if(!node)return;
+    convertHeicIfNeeded(file).then(function(useFile){
+        var reader=new FileReader();
+        reader.onload=function(ev){
+            var key=nodeId+'_PHONE_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
+            imageBank[key]={url:ev.target.result,dcUrl:null,time:null,drop:nodeId.split('-')[0]};
+            // Persist the bytes on the node itself (same mechanism as manual defects)
+            if(!node.embeddedPhotoData)node.embeddedPhotoData={};
+            node.embeddedPhotoData[key]=ev.target.result;
+            if(!node.photos)node.photos=[];if(node.photos.indexOf(key)===-1)node.photos.push(key);
+            // Track in manualLinks so a ZIP/CSV reload won't wipe it
+            if(!manualLinks[nodeId])manualLinks[nodeId]=[];
+            if(manualLinks[nodeId].indexOf(key)===-1)manualLinks[nodeId].push(key);
+            saveCommandState();if(typeof updatePhotoStat==='function')updatePhotoStat();
+            if(modalNodeId===nodeId)openModal(nodeId);showToast('[OK] Photo added',2000);
+        };reader.readAsDataURL(useFile);
+    });
+}
+
+// Multi-photo browser for regular windows (reuses the manual browser visuals)
+function openWindowPhotoBrowser(filesRaw,nodeId){
+    if(!filesRaw||!filesRaw.length)return;
+    var node=getNodeData(nodeId);if(!node)return;
+    showToast('Processing '+filesRaw.length+' photos...',4000);
+    Promise.all(Array.from(filesRaw).map(function(f){return convertHeicIfNeeded(f);})).then(function(files){
+        // Build a lightweight selection overlay (same as manual openPhotoBrowser)
+        var existing=document.getElementById('win-photo-browser');if(existing)existing.remove();
+        var overlay=document.createElement('div');overlay.id='win-photo-browser';
+        overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:8000;display:flex;flex-direction:column;';
+        var header=document.createElement('div');
+        header.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:#111;border-bottom:1px solid #2a2d38;flex-shrink:0;';
+        header.innerHTML='<div style="display:flex;align-items:center;gap:12px;"><span style="font-size:0.75rem;color:#0cf;font-weight:bold;text-transform:uppercase;letter-spacing:1px;">Select Photos for '+nodeId+'</span><span id="wpb-count" style="font-size:0.72rem;color:#888;">0 selected</span></div><div style="display:flex;gap:8px;"><button id="wpb-add" style="padding:8px 20px;background:#0cf;color:#000;border:none;border-radius:6px;font-size:0.78rem;font-weight:bold;cursor:pointer;">Add Selected</button><button id="wpb-cancel" style="padding:8px 16px;background:#222;color:#888;border:1px solid #333;border-radius:6px;font-size:0.78rem;cursor:pointer;">Cancel</button></div>';
+        overlay.appendChild(header);
+        var grid=document.createElement('div');
+        grid.style.cssText='flex:1;overflow-y:auto;padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;align-content:start;';
+        overlay.appendChild(grid);
+        var selected=new Set();var thumbData=[];
+        function updateCount(){document.getElementById('wpb-count').textContent=selected.size+' selected';document.getElementById('wpb-add').style.opacity=selected.size>0?'1':'0.4';}
+        files.forEach(function(file,idx){
+            var reader=new FileReader();
+            reader.onload=function(ev){
+                thumbData[idx]={file:file,dataUrl:ev.target.result};
+                var wrap=document.createElement('div');
+                wrap.style.cssText='position:relative;border-radius:8px;overflow:hidden;cursor:pointer;border:2px solid transparent;background:#1a1d27;aspect-ratio:4/3;';
+                var img=document.createElement('img');img.src=ev.target.result;img.style.cssText='width:100%;height:100%;object-fit:cover;display:block;';wrap.appendChild(img);
+                var chk=document.createElement('div');chk.style.cssText='position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;border:2px solid #fff;background:transparent;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:#fff;';wrap.appendChild(chk);
+                wrap.onclick=function(){if(selected.has(idx)){selected.delete(idx);wrap.style.borderColor='transparent';chk.style.background='transparent';chk.textContent='';}else{selected.add(idx);wrap.style.borderColor='#0cf';chk.style.background='#0cf';chk.textContent='✓';}updateCount();};
+                grid.appendChild(wrap);
+            };reader.readAsDataURL(file);
+        });
+        overlay.querySelector('#wpb-cancel').onclick=function(){overlay.remove();};
+        overlay.querySelector('#wpb-add').onclick=function(){
+            if(!selected.size)return;
+            Array.from(selected).forEach(function(idx){
+                var item=thumbData[idx];if(!item)return;
+                var key=nodeId+'_PHONE_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
+                imageBank[key]={url:item.dataUrl,dcUrl:null,time:null,drop:nodeId.split('-')[0]};
+                if(!node.embeddedPhotoData)node.embeddedPhotoData={};
+                node.embeddedPhotoData[key]=item.dataUrl;
+                if(!node.photos)node.photos=[];if(node.photos.indexOf(key)===-1)node.photos.push(key);
+                if(!manualLinks[nodeId])manualLinks[nodeId]=[];
+                if(manualLinks[nodeId].indexOf(key)===-1)manualLinks[nodeId].push(key);
+            });
+            saveCommandState();if(typeof updatePhotoStat==='function')updatePhotoStat();
+            overlay.remove();if(modalNodeId===nodeId)openModal(nodeId);
+            showToast('[OK] '+selected.size+' photo'+(selected.size>1?'s':'')+' added',2500);
         };
-        inp.click();
+        document.body.appendChild(overlay);updateCount();
     });
 }
 
@@ -4558,7 +4696,18 @@ let REPORT_META = {
   desc:     {},             // nodeId -> client description text
   sev:      {},             // nodeId -> 'CRITICAL'|'HIGH'|'MEDIUM'|'LOW'
   excluded: [],             // nodeIds explicitly left OUT (default = included)
-  photoOff: {}              // nodeId -> ['KEY:kind', ...] photos explicitly turned OFF
+  photoOff: {},             // nodeId -> ['KEY:kind', ...] photos explicitly turned OFF
+  // --- Professional report sections (write-once, reusable) ---
+  inspectorCreds: '',       // e.g. 'Level I Thermographer · SPRAT/IRATA Rope Access'
+  bldgStories: '',          // number of stories
+  bldgConstruction: '',     // facade construction type
+  bldgYear: '',             // year built
+  bldgArea: '',             // approx facade area inspected
+  scopeElevations: '',      // which elevations inspected
+  scopeMethod: '',          // inspection method
+  scopeWeather: '',         // weather/conditions
+  scopeNotAccessed: '',     // areas not accessed
+  recommendations: ''       // '' = auto-generate from findings
 };
 
 function loadReportMeta() {
@@ -5199,8 +5348,30 @@ function renderReportBuilder() {
         ${metaField('date',     'Inspection Date',   REPORT_META.date,     'YYYY-MM-DD')}
         ${metaField('inspector','Lead Inspector',    REPORT_META.inspector,'Full name')}
         ${metaField('reportNo', 'Report No.',        REPORT_META.reportNo, 'e.g. VRT-2026-014')}
+        ${metaField('inspectorCreds','Inspector Credentials', REPORT_META.inspectorCreds, 'e.g. Level I Thermographer, SPRAT Rope Access')}
       </div>
     </div>
+
+    <details style="background:#1a1d27;border:1px solid #2a2d38;border-radius:12px;padding:18px;margin-bottom:16px;">
+      <summary style="font-size:0.78rem;color:#1fd0a5;text-transform:uppercase;font-weight:bold;letter-spacing:1px;cursor:pointer;">Property Description &amp; Scope (optional — improves professionalism)</summary>
+      <div style="margin-top:14px;">
+        <div style="font-size:0.7rem;color:#666;text-transform:uppercase;font-weight:bold;letter-spacing:0.5px;margin-bottom:10px;">Property Facts</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px;">
+          ${metaField('bldgStories','Number of Stories', REPORT_META.bldgStories, 'e.g. 12')}
+          ${metaField('bldgConstruction','Façade Construction', REPORT_META.bldgConstruction, 'e.g. Terracotta & brick masonry')}
+          ${metaField('bldgYear','Year Built', REPORT_META.bldgYear, 'e.g. 1926')}
+          ${metaField('bldgArea','Façade Area Inspected', REPORT_META.bldgArea, 'e.g. 18,000 sq ft')}
+        </div>
+        <div style="font-size:0.7rem;color:#666;text-transform:uppercase;font-weight:bold;letter-spacing:0.5px;margin-bottom:10px;">Scope &amp; Methodology</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          ${metaField('scopeElevations','Elevations Inspected', REPORT_META.scopeElevations, 'e.g. North, East, South facades')}
+          ${metaField('scopeMethod','Inspection Method', REPORT_META.scopeMethod, 'Leave blank for standard')}
+          ${metaField('scopeWeather','Conditions', REPORT_META.scopeWeather, 'e.g. Clear, 68°F, dry')}
+          ${metaField('scopeNotAccessed','Areas Not Accessed', REPORT_META.scopeNotAccessed, 'e.g. West face (adjacent building)')}
+        </div>
+        <div style="font-size:0.66rem;color:#666;margin-top:12px;line-height:1.5;">Leave any field blank to use a sensible professional default. These persist across reports.</div>
+      </div>
+    </details>
 
     <div style="background:#1a1d27;border:1px solid #2a2d38;border-radius:12px;padding:18px;margin-bottom:16px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
@@ -5378,6 +5549,142 @@ function renderReportBuilder() {
 }
 
 // ── PDF: clean print window (Save as PDF) ───────────────────────────────────
+// Maps internal field-status labels to professional defect titles, or strips them.
+// These come from the CSV FieldGuess column (REVIEW SUSPECT, ALL CLEAR, FORGOT GUESS, etc.)
+// and must never appear verbatim in a client report.
+function rbCleanTitle(rawLabel, tags, sev) {
+  var label = (rawLabel || '').toString();
+  // Split on pipe first, then clean each piece
+  var parts = label.split('|').map(function(s){
+    // Strip anything that isn't a basic letter, number, space, or hyphen
+    // (removes corrupted icon bytes like ƒ?¦, emoji, mojibake)
+    return s.replace(/[^A-Za-z0-9 \-]/g, '').replace(/\s+/g, ' ').trim();
+  }).filter(Boolean);
+
+  // Known status noise (case-insensitive) that should NOT be a title
+  var noise = /^(review suspect|forgot guess|all clear|suspect|clear|review|guess|forgot|na|pending|tbd)$/i;
+
+  // Keep only meaningful parts
+  var meaningful = parts.filter(function(p){ return p.length > 1 && !noise.test(p); });
+
+  if (meaningful.length) {
+    return rbTitleCase(meaningful[0]);
+  }
+
+  // Nothing meaningful in the label — derive a title from tags, then severity
+  if (tags && tags.length) {
+    return rbTitleCase(tags[0]);
+  }
+  var sevWord = (sev || 'MEDIUM');
+  sevWord = sevWord.charAt(0) + sevWord.slice(1).toLowerCase();
+  return sevWord + '-Priority Finding';
+}
+
+function rbTitleCase(s) {
+  s = (s || '').toString().toLowerCase().trim();
+  // Keep common all-caps acronyms uppercase
+  return s.replace(/\b\w+/g, function(w){
+    if (['ir','dc','hvac','epdm','tpo','gfrc','efis','eifs'].indexOf(w) !== -1) return w.toUpperCase();
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  });
+}
+
+// ============ PROFESSIONAL REPORT SECTION BUILDERS ============
+// Severity classification legend with action timeframes
+function rbBuildSeverityLegend() {
+  return `
+    <table class="legend-table">
+      <tr>
+        <td class="lg-band"><span class="lg-dot sev-CRITICAL"></span></td>
+        <td class="lg-tier">Critical</td>
+        <td class="lg-def">Condition appears to present an active hazard. We suggest arranging remediation as soon as practical.</td>
+      </tr>
+      <tr>
+        <td class="lg-band"><span class="lg-dot sev-HIGH"></span></td>
+        <td class="lg-tier">High</td>
+        <td class="lg-def">Significant deficiency likely to worsen if left unaddressed. As a general guideline, we suggest addressing within roughly 3–6 months.</td>
+      </tr>
+      <tr>
+        <td class="lg-band"><span class="lg-dot sev-MEDIUM"></span></td>
+        <td class="lg-tier">Medium</td>
+        <td class="lg-def">Active deterioration that does not appear to pose immediate risk. A suggested guideline is to plan repair within roughly 6–12 months.</td>
+      </tr>
+      <tr>
+        <td class="lg-band"><span class="lg-dot sev-LOW"></span></td>
+        <td class="lg-tier">Low</td>
+        <td class="lg-def">Minor condition worth monitoring. We suggest re-evaluating at the next scheduled inspection.</td>
+      </tr>
+    </table>`;
+}
+
+// Scope & Methodology section
+function rbBuildScopeSection() {
+  const M = REPORT_META;
+  const row = (k, v, fallback) => `<tr><td class="sk">${rbEsc(k)}</td><td class="sv">${rbEsc(v || fallback)}</td></tr>`;
+  return `
+    <table class="scope-table">
+      ${row('Elevations Inspected', M.scopeElevations, 'All accessible building elevations')}
+      ${row('Inspection Method', M.scopeMethod, 'Rope-access (drop) survey with high-resolution photography and handheld FLIR infrared thermography; aerial drone photogrammetry where applicable')}
+      ${row('Date of Inspection', M.date, 'See cover page')}
+      ${row('Conditions', M.scopeWeather, 'Conditions suitable for thermographic survey')}
+      ${row('Areas Not Accessed', M.scopeNotAccessed, 'None — full accessible coverage achieved')}
+    </table>`;
+}
+
+// Property description section
+function rbBuildPropertySection() {
+  const M = REPORT_META;
+  const hasAny = M.bldgStories || M.bldgConstruction || M.bldgYear || M.bldgArea;
+  if (!hasAny && !M.address) return '';
+  const row = (k, v) => v ? `<tr><td class="sk">${rbEsc(k)}</td><td class="sv">${rbEsc(v)}</td></tr>` : '';
+  return `
+    <table class="scope-table">
+      ${row('Property', M.building || projectInfo)}
+      ${row('Address', M.address)}
+      ${row('Number of Stories', M.bldgStories)}
+      ${row('Façade Construction', M.bldgConstruction)}
+      ${row('Year Built', M.bldgYear)}
+      ${row('Façade Area Inspected', M.bldgArea)}
+    </table>`;
+}
+
+// Recommendations section — auto-generated from findings by severity, or manual override
+function rbBuildRecommendationsSection(cands, sevCount) {
+  const M = REPORT_META;
+  if (M.recommendations && M.recommendations.trim()) {
+    return `<div class="exec-body">${rbEsc(M.recommendations)}</div>`;
+  }
+  // Auto-generate a prioritized recommendation list
+  let html = '<div class="rec-list">';
+  const tiers = [
+    { key:'CRITICAL', label:'Critical', cls:'sev-CRITICAL', action:'We suggest engaging a qualified contractor to remediate as soon as practical, as these conditions appear to present an active hazard.' },
+    { key:'HIGH', label:'High Priority', cls:'sev-HIGH', action:'As a general guideline, we suggest addressing these within roughly 3–6 months to help prevent further deterioration.' },
+    { key:'MEDIUM', label:'Medium Priority', cls:'sev-MEDIUM', action:'We suggest planning corrective work within roughly 6–12 months as part of routine building maintenance.' },
+    { key:'LOW', label:'Low Priority / Monitoring', cls:'sev-LOW', action:'We suggest monitoring these areas and re-evaluating at the next scheduled inspection.' },
+  ];
+  tiers.forEach(function(t){
+    const n = sevCount[t.key] || 0;
+    if (!n) return;
+    html += `
+      <div class="rec-item">
+        <div class="rec-badge ${t.cls}">${n}</div>
+        <div class="rec-text"><strong>${t.label} — ${n} finding${n!==1?'s':''}.</strong> ${t.action}</div>
+      </div>`;
+  });
+  html += '</div>';
+  html += `<div class="rec-note">Verticality is equipped to perform same-drop remediation of many of the conditions identified above, reducing mobilization costs and shortening repair timelines. We are pleased to provide a detailed repair proposal upon request.</div>`;
+  return html;
+}
+
+// Limitations / disclaimer
+function rbBuildLimitations() {
+  return `
+    <div class="limitations">
+      <p>This report reflects the condition of the building façade as observed at the time of inspection and is based on visual and infrared thermographic assessment from rope-access drops and, where applicable, aerial imagery. Conditions concealed behind finishes, within wall assemblies, or otherwise not visually accessible at the time of inspection are excluded from this assessment.</p>
+      <p>Infrared thermography indicates apparent thermal anomalies that are commonly associated with subsurface moisture, air leakage, or material discontinuity; thermographic findings are indicative and may warrant confirmatory testing. Severity classifications and suggested timeframes provided in this report are observational recommendations intended to assist with maintenance planning; they do not constitute engineering determinations or code-compliance findings. This report does not constitute a structural engineering certification and should not be relied upon as such. It is prepared exclusively for the named client and for the building identified herein.</p>
+    </div>`;
+}
+
 function rbBuildReportHTML() {
   const cands = rbCandidates().filter(c => rbIsIncluded(c.nodeId));
   if (!cands.length) { showToast('No defects selected for the report.', 3500, true); return; }
@@ -5387,6 +5694,12 @@ function rbBuildReportHTML() {
   const execVal = rbEsc(M.execSummary || rbBuildExecSummary(rbCandidates()));
 
   const metaRow = (k, v) => v ? `<tr><td class="mk">${rbEsc(k)}</td><td class="mv">${rbEsc(v)}</td></tr>` : '';
+
+  // Severity counts for the executive dashboard
+  const _sevCount = { CRITICAL:0, HIGH:0, MEDIUM:0, LOW:0 };
+  cands.forEach(function(c){ var s = rbSeverity(c.nodeId, c.node); if(_sevCount[s]!==undefined) _sevCount[s]++; });
+  const _totalFindings = cands.length;
+  const _yr = new Date().getFullYear();
 
   let defectsHtml = '';
   let _globalIdx = 0;
@@ -5403,27 +5716,37 @@ function rbBuildReportHTML() {
     const sev = rbSeverity(nodeId, node);
     const desc = (M.desc[nodeId] != null ? M.desc[nodeId] : (node.notes || '')) || 'No description provided.';
     const tags = rbTags(nodeId, node);
-    const items = rbPhotoItems(node).filter(it => rbIsPhotoOn(nodeId, it.key + ':' + it.kind));
+    const _allItems = rbPhotoItems(node);
+    const items = _allItems.filter(it => rbIsPhotoOn(nodeId, it.key + ':' + it.kind));
+    const unselectedPhotoCount = _allItems.length - items.length;
 
-    const photoCells = items.map(it => `
+    const photoCells = items.map(it => {
+      var _kindLabel = it.kind === 'thermal' ? 'Thermal (IR)' : it.kind === 'visual' ? 'Visual Spectrum' : it.kind === 'site' ? 'Site Photo' : 'Photo';
+      return `
       <figure class="ph">
         <div class="phbox"><img src="${it.url}" ${it.rot ? `style="transform:rotate(${it.rot}deg);"` : ''}></div>
-        <figcaption>${it.kind === 'thermal' ? 'Thermal (IR)' : 'Visual (DC)'} · ${rbEsc(it.key.split('_').pop())}</figcaption>
-      </figure>`).join('');
+        <figcaption>${_kindLabel}</figcaption>
+      </figure>`;
+    }).join('');
 
+        const _defectTitle = rbEsc(rbCleanTitle(node.label || node.finds, tags, sev));
+    const _sevLabel = sev.charAt(0) + sev.slice(1).toLowerCase();
     defectsHtml += `
     <section class="defect">
-      <div class="dh">
-        <div class="dnum">${idx + 1}</div>
-        <div class="dhi">
-          <h3>${rbEsc(nodeId)} <span class="sev sev-${sev}">${sev}</span></h3>
+      <div class="defect-head">
+        <div class="defect-sevbar sev-${sev}"></div>
+        <div class="defect-num">${idx + 1}</div>
+        <div class="defect-titles">
+          <h3>${_defectTitle}</h3>
           <div class="loc">${rbEsc(rbLocation(drop, floor, pos))}</div>
-          ${tags.length ? `<div class="tags">${tags.map(t => `<span>${rbEsc(t)}</span>`).join('')}</div>` : ''}
         </div>
+        <div class="defect-sevtag"><span class="sev-pill sev-${sev}">${_sevLabel}</span></div>
       </div>
-      <p class="ddesc">${rbEsc(desc)}</p>
-      ${items.length ? `<div class="photos">${photoCells}</div>` : '<p class="nophoto">No photographs selected for this finding.</p>'}
-      ${unselectedPhotoCount > 0 ? `<p style="font-size:0.72rem;color:#f39c12;margin:6px 0 0;padding:0 16px;">⚠ ${unselectedPhotoCount} photo${unselectedPhotoCount > 1 ? 's' : ''} not selected for export — click to include</p>` : ''}
+      <div class="defect-body">
+        ${tags.length ? `<div class="defect-tags">${tags.map(t => `<span>${rbEsc(t)}</span>`).join('')}</div>` : ''}
+        <div class="defect-desc">${rbEsc(desc)}</div>
+        ${items.length ? `<div class="photos">${photoCells}</div>` : '<p class="nophoto">No photographs included for this finding.</p>'}
+      </div>
     </section>`;
   }); }); // close _grpItems + rbGroupCandidates
 
@@ -5437,7 +5760,7 @@ function rbBuildReportHTML() {
       const notes = rbEsc(node.notes || '');
       const items = rbPhotoItems(node);
       const thumb = items.length
-        ? `<img src="${items[0].url}" style="width:64px;height:48px;object-fit:cover;border-radius:4px;margin-left:12px;flex-shrink:0;">`
+        ? `<img src="${items[0].url}" style="width:60px;height:45px;object-fit:cover;border-radius:4px;margin-left:12px;flex-shrink:0;border:1px solid #d8dee6;">`
         : '';
       return `<div style="display:flex;align-items:flex-start;padding:12px 14px;border-bottom:1px solid #f0e8d8;">
         <div style="width:8px;height:8px;border-radius:50%;background:#f39c12;flex-shrink:0;margin-top:5px;margin-right:12px;"></div>
@@ -5448,90 +5771,268 @@ function rbBuildReportHTML() {
       </div>`;
     }).join('');
     monitoringHtml = `
-    <div style="margin-top:36px;page-break-before:auto;">
-      <div style="background:#fffbf0;border:1px solid #f5ddb8;border-radius:8px;overflow:hidden;">
-        <div style="padding:14px 18px;background:#fef3cd;border-bottom:1px solid #f5ddb8;display:flex;align-items:center;gap:10px;">
-          <span style="font-size:1.1rem;">👁</span>
-          <div>
-            <div style="font-size:0.8rem;font-weight:700;color:#7a4a0a;text-transform:uppercase;letter-spacing:0.08em;">Areas for Monitoring</div>
-            <div style="font-size:0.72rem;color:#9a6010;margin-top:2px;">${monCandidates.length} location${monCandidates.length!==1?'s':''} flagged for observation — not requiring immediate remediation at time of inspection</div>
-          </div>
+    <div class="mon-wrap">
+      <div class="mon-card">
+        <div class="mon-head">
+          <div class="t">Areas for Monitoring</div>
+          <div class="s">${monCandidates.length} location${monCandidates.length!==1?'s':''} flagged for observation — not requiring immediate remediation at time of inspection</div>
         </div>
         ${monRows}
-        <div style="padding:12px 18px;font-size:0.72rem;color:#9a6010;font-style:italic;">
-          These areas exhibited minor anomalies at time of inspection that do not meet the threshold for immediate remediation. Recommend visual re-assessment at next scheduled annual inspection.
+        <div style="padding:12px 16px;font-size:8.5pt;color:#6b7a8f;font-style:italic;border-top:1px solid #e9edf2;">
+          These areas exhibited minor anomalies at the time of inspection that do not meet the threshold for immediate remediation. A visual re-assessment is recommended at the next scheduled inspection.
         </div>
       </div>
     </div>`;
   }
 
-  const doc = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${building} — Inspection Report</title>
+    // Build the professional sections
+  const _legendHtml = rbBuildSeverityLegend();
+  const _scopeHtml = rbBuildScopeSection();
+  const _propertyHtml = rbBuildPropertySection();
+  const _recsHtml = rbBuildRecommendationsSection(cands, _sevCount);
+  const _limitationsHtml = rbBuildLimitations();
+  const _credLine = M.inspectorCreds ? `<div style="font-size:8.5pt;color:#6b7a8f;margin-top:3px;">${rbEsc(M.inspectorCreds)}</div>` : '';
+
+  const doc = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${building} — Facade Inspection Report</title>
 <style>
-  @page { size: letter; margin: 18mm 16mm; }
-  * { box-sizing: border-box; }
-  body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1e293b; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  h1,h2,h3 { font-family: Georgia, 'Times New Roman', serif; }
-  .cover { padding: 60px 8px 8px; min-height: 88vh; display: flex; flex-direction: column; }
-  .cover h1 { font-size: 42px; line-height: 1.1; margin: 0 0 6px; color: #0f172a; }
-  .cover .sub { font-size: 16px; color: #64748b; margin-bottom: 40px; }
-  table.meta { border-collapse: collapse; margin-top: auto; width: 60%; }
-  table.meta td { padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-size: 13.5px; vertical-align: top; }
-  td.mk { color: #94a3b8; text-transform: uppercase; font-size: 10.5px; letter-spacing: 1px; font-weight: bold; width: 38%; padding-right: 14px; }
-  td.mv { color: #1e293b; font-weight: 600; }
+  @page { size: letter; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy: #1a2942;
+    --navy-deep: #0f1c30;
+    --slate: #3d4f66;
+    --grey: #6b7a8f;
+    --line: #d8dee6;
+    --line-soft: #e9edf2;
+    --paper: #ffffff;
+    --ink: #1c2733;
+    --crit: #a01b2e;
+    --high: #c45a26;
+    --med: #c7992b;
+    --low: #2e7d4f;
+  }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; color: var(--ink); background: var(--paper); -webkit-print-color-adjust: exact; print-color-adjust: exact; font-size: 11pt; line-height: 1.6; }
+  .page { padding: 22mm 20mm; position: relative; }
+  h1,h2,h3,h4 { font-family: Georgia, 'Times New Roman', serif; font-weight: 600; color: var(--navy); }
+
+  /* ---------- COVER ---------- */
+  .cover { min-height: 100vh; display: flex; flex-direction: column; padding: 0; }
+  .cover-band { background: var(--navy); color: #fff; padding: 26mm 20mm 18mm; }
+  .wordmark { font-family: Georgia, serif; font-size: 22pt; font-weight: 600; letter-spacing: 0.5px; color: #fff; }
+  .wordmark .v { color: #8fb4d6; }
+  .wordmark-sub { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 7.5pt; letter-spacing: 3.5px; text-transform: uppercase; color: #9fb3cc; margin-top: 4px; font-weight: 600; }
+  .cover-body { padding: 24mm 20mm; flex: 1; display: flex; flex-direction: column; }
+  .doctype-label { font-size: 8.5pt; letter-spacing: 4px; text-transform: uppercase; color: var(--grey); font-weight: 700; margin-bottom: 14px; }
+  .cover-body h1 { font-size: 34pt; line-height: 1.08; color: var(--navy); margin-bottom: 10px; }
+  .cover-subject { font-size: 15pt; color: var(--slate); font-family: Georgia, serif; font-style: italic; margin-bottom: auto; }
+  .cover-meta { border-top: 2px solid var(--navy); padding-top: 18px; margin-top: 40px; }
+  table.meta { border-collapse: collapse; width: 100%; }
+  table.meta td { padding: 9px 0; border-bottom: 1px solid var(--line-soft); font-size: 10.5pt; vertical-align: top; }
+  td.mk { color: var(--grey); text-transform: uppercase; font-size: 8pt; letter-spacing: 1.2px; font-weight: 700; width: 32%; padding-right: 16px; padding-top: 11px; }
+  td.mv { color: var(--ink); font-weight: 600; }
+  .cover-foot { margin-top: 30px; font-size: 8pt; color: var(--grey); line-height: 1.6; border-top: 1px solid var(--line-soft); padding-top: 14px; }
+
+  /* ---------- SECTION HEADERS ---------- */
   .page-break { page-break-before: always; }
-  .secttitle { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: #374151; font-weight: 800; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin: 0 0 16px; }
-  .execbody { font-size: 13.5px; line-height: 1.7; color: #334155; white-space: pre-wrap; }
-  .defect { page-break-inside: avoid; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; }
-  .dh { display: flex; gap: 14px; align-items: flex-start; }
-  .dnum { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; background: #374151; color: #fff; font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: center; }
-  .dhi h3 { margin: 0 0 3px; font-size: 18px; color: #0f172a; }
-  .loc { font-size: 12.5px; color: #64748b; }
-  .tags { margin-top: 6px; }
-  .tags span { display: inline-block; font-size: 10px; font-weight: bold; color: #475569; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 3px; padding: 2px 8px; margin-right: 4px; }
-  .sev { font-size: 10px; font-weight: 800; padding: 2px 9px; border-radius: 4px; vertical-align: middle; margin-left: 6px; color: #fff; }
-  .sev-CRITICAL { background: #b3122b; } .sev-HIGH { background: #d9534f; } .sev-MEDIUM { background: #f1c40f; color: #1a1205; } .sev-LOW { background: #28a745; }
-  .ddesc { font-size: 13px; line-height: 1.6; color: #334155; margin: 12px 0 14px; }
+  .sect-head { display: flex; align-items: baseline; gap: 12px; border-bottom: 2px solid var(--navy); padding-bottom: 9px; margin-bottom: 20px; }
+  .sect-num { font-family: Georgia, serif; font-size: 11pt; color: var(--grey); font-weight: 600; }
+  .sect-title { font-size: 15pt; color: var(--navy); flex: 1; }
+  .running-head { position: running(rh); }
+
+  /* ---------- EXEC SUMMARY ---------- */
+  .exec-body { font-size: 11pt; line-height: 1.75; color: var(--slate); white-space: pre-wrap; text-align: justify; }
+
+  /* ---------- DASHBOARD ---------- */
+  .dash { display: flex; gap: 10px; margin: 4px 0 26px; }
+  .dash-card { flex: 1; border: 1px solid var(--line); border-radius: 6px; padding: 14px 10px; text-align: center; background: #fbfcfd; }
+  .dash-card.is-crit { border-top: 3px solid var(--crit); }
+  .dash-card.is-high { border-top: 3px solid var(--high); }
+  .dash-card.is-med  { border-top: 3px solid var(--med); }
+  .dash-card.is-low  { border-top: 3px solid var(--low); }
+  .dash-num { font-family: Georgia, serif; font-size: 26pt; font-weight: 600; color: var(--navy); line-height: 1; }
+  .dash-lbl { font-size: 7.5pt; letter-spacing: 1.5px; text-transform: uppercase; color: var(--grey); font-weight: 700; margin-top: 7px; }
+  .dash-total { flex: 1.2; background: var(--navy); border: 1px solid var(--navy); }
+  .dash-total .dash-num { color: #fff; }
+  .dash-total .dash-lbl { color: #9fb3cc; }
+
+  /* ---------- DEFECTS ---------- */
+  .grp-head { margin: 26px 0 14px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+  .grp-head .gl { font-size: 9.5pt; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; color: var(--navy); }
+  .grp-head .gc { font-size: 8.5pt; color: var(--grey); margin-left: 8px; }
+  .defect { page-break-inside: avoid; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 18px; overflow: hidden; }
+  .defect-head { display: flex; align-items: stretch; border-bottom: 1px solid var(--line-soft); }
+  .defect-sevbar { width: 5px; flex-shrink: 0; }
+  .defect-sevbar.sev-CRITICAL { background: var(--crit); }
+  .defect-sevbar.sev-HIGH { background: var(--high); }
+  .defect-sevbar.sev-MEDIUM { background: var(--med); }
+  .defect-sevbar.sev-LOW { background: var(--low); }
+  .defect-num { flex-shrink: 0; width: 46px; display: flex; align-items: center; justify-content: center; font-family: Georgia, serif; font-size: 16pt; font-weight: 600; color: var(--navy); background: #f6f8fa; border-right: 1px solid var(--line-soft); }
+  .defect-titles { flex: 1; padding: 12px 16px; }
+  .defect-titles h3 { font-size: 13pt; color: var(--navy); margin-bottom: 3px; line-height: 1.2; }
+  .defect-titles .loc { font-size: 9.5pt; color: var(--grey); }
+  .defect-sevtag { flex-shrink: 0; display: flex; align-items: center; padding: 0 16px; }
+  .sev-pill { font-size: 8pt; font-weight: 800; letter-spacing: 0.8px; padding: 4px 11px; border-radius: 3px; color: #fff; text-transform: uppercase; }
+  .sev-pill.sev-CRITICAL { background: var(--crit); }
+  .sev-pill.sev-HIGH { background: var(--high); }
+  .sev-pill.sev-MEDIUM { background: var(--med); color: #2a2008; }
+  .sev-pill.sev-LOW { background: var(--low); }
+  .defect-body { padding: 14px 16px 16px; }
+  .defect-tags { margin-bottom: 10px; }
+  .defect-tags span { display: inline-block; font-size: 8pt; font-weight: 700; color: var(--slate); background: #eef2f6; border-radius: 3px; padding: 3px 9px; margin-right: 5px; letter-spacing: 0.3px; }
+  .defect-desc { font-size: 10.5pt; line-height: 1.65; color: var(--slate); margin-bottom: 14px; }
   .photos { display: flex; flex-wrap: wrap; gap: 12px; }
   figure.ph { margin: 0; flex: 0 0 calc(50% - 6px); }
-  .phbox { width: 100%; aspect-ratio: 4/3; overflow: hidden; border-radius: 6px; background: #1e293b; display: flex; align-items: center; justify-content: center; }
+  .phbox { width: 100%; aspect-ratio: 4/3; overflow: hidden; border-radius: 5px; background: #111c2b; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line); }
   .phbox img { width: 100%; height: 100%; object-fit: contain; }
-  figure.ph figcaption { font-size: 10.5px; color: #64748b; margin-top: 5px; font-weight: 600; }
-  .nophoto { font-size: 12px; color: #94a3b8; font-style: italic; }
-  .footer { margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; font-size: 10px; color: #94a3b8; }
-  .printbtn { position: fixed; top: 14px; right: 14px; background: #1e293b; color: #fff; border: none; padding: 12px 18px; border-radius: 8px; font-weight: 800; cursor: pointer; font-size: 13px; }
+  figure.ph figcaption { font-size: 8.5pt; color: var(--grey); margin-top: 6px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  figure.ph figcaption::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--navy); flex-shrink: 0; }
+  .nophoto { font-size: 9.5pt; color: var(--grey); font-style: italic; }
+
+  /* ---------- MONITORING ---------- */
+  .mon-wrap { margin-top: 30px; page-break-inside: avoid; }
+  .mon-card { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .mon-head { padding: 12px 16px; background: var(--navy); color: #fff; }
+  .mon-head .t { font-family: Georgia, serif; font-size: 11pt; font-weight: 600; }
+  .mon-head .s { font-size: 8.5pt; color: #9fb3cc; margin-top: 2px; }
+  .mon-row { display: flex; align-items: flex-start; padding: 12px 16px; border-bottom: 1px solid var(--line-soft); }
+  .mon-row:last-child { border-bottom: none; }
+  .mon-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--med); flex-shrink: 0; margin-top: 5px; margin-right: 12px; }
+  .mon-content { flex: 1; }
+  .mon-loc { font-size: 8pt; color: var(--grey); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 2px; font-weight: 700; }
+  .mon-txt { font-size: 10pt; color: var(--slate); line-height: 1.5; }
+
+  /* ---------- FOOTER ---------- */
+  .report-footer { margin-top: 40px; border-top: 2px solid var(--navy); padding-top: 12px; display: flex; justify-content: space-between; align-items: baseline; }
+  .report-footer .fl { font-family: Georgia, serif; font-size: 9pt; color: var(--navy); font-weight: 600; }
+  .report-footer .fr { font-size: 8pt; color: var(--grey); }
+  .sig-block { margin-top: 36px; page-break-inside: avoid; }
+  .sig-line { border-top: 1px solid var(--ink); width: 260px; margin-top: 44px; padding-top: 6px; font-size: 9pt; color: var(--slate); }
+
+  /* ---------- SUBHEADS & TABLES ---------- */
+  .subhead { font-size: 11pt; color: var(--navy); margin: 22px 0 10px; font-weight: 600; }
+  .subhead:first-child { margin-top: 0; }
+  .scope-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+  .scope-table td { padding: 9px 0; border-bottom: 1px solid var(--line-soft); font-size: 10pt; vertical-align: top; }
+  .scope-table td.sk { color: var(--grey); font-weight: 700; width: 34%; padding-right: 16px; text-transform: uppercase; font-size: 8pt; letter-spacing: 0.8px; padding-top: 11px; }
+  .scope-table td.sv { color: var(--ink); line-height: 1.55; }
+
+  /* ---------- SEVERITY LEGEND ---------- */
+  .legend-intro { font-size: 10pt; color: var(--slate); line-height: 1.6; margin-bottom: 12px; }
+  .legend-table { width: 100%; border-collapse: collapse; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .legend-table tr { border-bottom: 1px solid var(--line-soft); }
+  .legend-table tr:last-child { border-bottom: none; }
+  .legend-table td { padding: 11px 12px; vertical-align: top; font-size: 9.5pt; }
+  .lg-band { width: 30px; text-align: center; }
+  .lg-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; }
+  .lg-dot.sev-CRITICAL { background: var(--crit); } .lg-dot.sev-HIGH { background: var(--high); } .lg-dot.sev-MEDIUM { background: var(--med); } .lg-dot.sev-LOW { background: var(--low); }
+  .lg-tier { width: 90px; font-weight: 700; color: var(--navy); }
+  .lg-def { color: var(--slate); line-height: 1.5; }
+
+  /* ---------- RECOMMENDATIONS ---------- */
+  .rec-list { margin-bottom: 18px; }
+  .rec-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line-soft); }
+  .rec-item:last-child { border-bottom: none; }
+  .rec-badge { flex-shrink: 0; width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: 12pt; font-family: Georgia, serif; }
+  .rec-badge.sev-CRITICAL { background: var(--crit); } .rec-badge.sev-HIGH { background: var(--high); } .rec-badge.sev-MEDIUM { background: var(--med); color: #2a2008; } .rec-badge.sev-LOW { background: var(--low); }
+  .rec-text { font-size: 10pt; color: var(--slate); line-height: 1.6; padding-top: 4px; }
+  .rec-text strong { color: var(--navy); }
+  .rec-note { font-size: 10pt; color: var(--slate); line-height: 1.65; padding: 14px 16px; background: #f6f8fa; border-left: 3px solid var(--navy); border-radius: 0 6px 6px 0; margin-top: 6px; }
+
+  /* ---------- LIMITATIONS ---------- */
+  .limitations p { font-size: 9pt; color: var(--grey); line-height: 1.65; margin-bottom: 10px; text-align: justify; }
+
+  /* ---------- PRINT BUTTON ---------- */
+  .printbtn { position: fixed; top: 14px; right: 14px; background: var(--navy); color: #fff; border: none; padding: 12px 18px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 10pt; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 999; }
   @media print { .printbtn { display: none; } }
 </style></head><body>
-  <button class="printbtn" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <button class="printbtn" onclick="window.print()">Print / Save as PDF</button>
+
+  <!-- COVER -->
   <div class="cover">
-    <h1>Façade Inspection Report</h1>
-    <div class="sub">${building}</div>
-    <table class="meta">
-      ${metaRow('Client', M.client)}
-      ${metaRow('Building', M.building || projectInfo)}
-      ${metaRow('Address', M.address)}
-      ${metaRow('Inspection Date', M.date)}
-      ${metaRow('Lead Inspector', M.inspector)}
-      ${metaRow('Report No.', M.reportNo)}
-    </table>
+    <div class="cover-band">
+      <div class="wordmark"><span class="v">V</span>erticality</div>
+      <div class="wordmark-sub">Exterior Thermal Intelligence</div>
+    </div>
+    <div class="cover-body">
+      <div class="doctype-label">Building Envelope Assessment</div>
+      <h1>Façade Inspection<br>Report</h1>
+      <div class="cover-subject">${building}</div>
+      <div class="cover-meta">
+        <table class="meta">
+          ${metaRow('Prepared For', M.client)}
+          ${metaRow('Property', M.building || projectInfo)}
+          ${metaRow('Address', M.address)}
+          ${metaRow('Date of Inspection', M.date)}
+          ${metaRow('Lead Inspector', M.inspector)}
+          ${metaRow('Report Number', M.reportNo)}
+        </table>
+      </div>
+      <div class="cover-foot">
+        Inspection conducted via rope access and infrared thermography in accordance with industry standards for building envelope assessment. This report is confidential and prepared solely for the named client.
+      </div>
+    </div>
   </div>
 
+  <!-- PROPERTY & SCOPE -->
   <div class="page-break"></div>
-  <h2 class="secttitle">Executive Summary</h2>
-  <div class="execbody">${execVal}</div>
+  <div class="page">
+    <div class="sect-head"><span class="sect-num">01</span><span class="sect-title">Property &amp; Scope</span></div>
+    ${_propertyHtml ? `<h4 class="subhead">Property Description</h4>${_propertyHtml}` : ''}
+    <h4 class="subhead">Scope &amp; Methodology</h4>
+    ${_scopeHtml}
+    <h4 class="subhead">Condition Classification</h4>
+    <p class="legend-intro">Each finding is assigned one of the following severity classifications. The suggested timeframes below are general guidelines to assist with maintenance planning and prioritization — they are observational recommendations, not engineering or code-compliance determinations:</p>
+    ${_legendHtml}
+  </div>
 
+  <!-- EXECUTIVE SUMMARY -->
   <div class="page-break"></div>
-  <h2 class="secttitle">Findings (${cands.length})</h2>
-  ${defectsHtml}
-  \${monitoringHtml}
+  <div class="page">
+    <div class="sect-head"><span class="sect-num">02</span><span class="sect-title">Executive Summary</span></div>
 
-  <div class="footer">Generated ${rbEsc(new Date().toLocaleDateString())}</div>
+    <div class="dash">
+      <div class="dash-card dash-total"><div class="dash-num">${_totalFindings}</div><div class="dash-lbl">Total Findings</div></div>
+      <div class="dash-card is-crit"><div class="dash-num">${_sevCount.CRITICAL}</div><div class="dash-lbl">Critical</div></div>
+      <div class="dash-card is-high"><div class="dash-num">${_sevCount.HIGH}</div><div class="dash-lbl">High</div></div>
+      <div class="dash-card is-med"><div class="dash-num">${_sevCount.MEDIUM}</div><div class="dash-lbl">Medium</div></div>
+      <div class="dash-card is-low"><div class="dash-num">${_sevCount.LOW}</div><div class="dash-lbl">Low</div></div>
+    </div>
+
+    <div class="exec-body">${execVal}</div>
+  </div>
+
+  <!-- FINDINGS -->
+  <div class="page-break"></div>
+  <div class="page">
+    <div class="sect-head"><span class="sect-num">03</span><span class="sect-title">Detailed Findings</span></div>
+    ${defectsHtml}
+    ${monitoringHtml}
+  </div>
+
+  <!-- RECOMMENDATIONS -->
+  <div class="page-break"></div>
+  <div class="page">
+    <div class="sect-head"><span class="sect-num">04</span><span class="sect-title">Recommendations</span></div>
+    ${_recsHtml}
+
+    <h4 class="subhead" style="margin-top:30px;">Limitations of Assessment</h4>
+    ${_limitationsHtml}
+
+    <div class="sig-block">
+      <div class="sig-line">${rbEsc(M.inspector || 'Lead Inspector')}<br><span style="font-size:8pt;color:#6b7a8f;">Verticality · Lead Inspector</span>${_credLine}</div>
+    </div>
+
+    <div class="report-footer">
+      <div class="fl"><span style="color:#8fb4d6;">V</span>erticality</div>
+      <div class="fr">${building} · Report ${rbEsc(M.reportNo || '—')} · Generated ${rbEsc(new Date().toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'}))}</div>
+    </div>
+  </div>
 
 <script>
-  // Wait for images to decode, then open the print dialog
   (function(){
     var imgs = Array.prototype.slice.call(document.images);
     var pending = imgs.filter(function(i){ return !i.complete; }).length;
-    function go(){ setTimeout(function(){ window.focus(); window.print(); }, 350); }
+    function go(){ setTimeout(function(){ window.focus(); window.print(); }, 400); }
     if (!pending) { go(); return; }
     imgs.forEach(function(i){
       if (i.complete) return;
@@ -5546,13 +6047,47 @@ function rbBuildReportHTML() {
 }
 
 function generateReportPDF() {
-  const doc = rbBuildReportHTML();
-  if (!doc) { showToast('No defects included — check the report settings first.', 4000, true); return; }
-  const w = window.open('', '_blank');
-  if (!w) { showToast('Pop-up blocked — allow pop-ups to generate the PDF.', 5000, true); return; }
-  w.document.open();
-  w.document.write(doc);
-  w.document.close();
+  let doc;
+  try {
+    doc = rbBuildReportHTML();
+  } catch (err) {
+    console.error('[PDF] rbBuildReportHTML threw:', err);
+    showToast('[!] Report build error: ' + (err && err.message ? err.message : err), 9000, true);
+    return;
+  }
+  if (!doc) { return; } // rbBuildReportHTML already showed a toast for the no-defects case
+
+  // Primary path: open a new tab and write the report (user prints to PDF from there).
+  let w = null;
+  try { w = window.open('', '_blank'); } catch(e) { w = null; }
+
+  if (w && w.document) {
+    try {
+      w.document.open();
+      w.document.write(doc);
+      w.document.close();
+      return;
+    } catch (e) {
+      console.warn('[PDF] popup write failed, falling back to blob', e);
+    }
+  }
+
+  // Fallback: popup blocked — create a Blob and open via a real anchor click.
+  try {
+    const blob = new Blob([doc], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 4000);
+    showToast('Report opened in a new tab. Use your browser Print → Save as PDF.', 6000);
+  } catch (e) {
+    console.error('[PDF] blob fallback failed:', e);
+    showToast('[!] Could not open the report. Allow pop-ups for this site, then try again.', 8000, true);
+  }
 }
 
 // ── Export Client Package ────────────────────────────────────────────────────
@@ -5798,7 +6333,23 @@ function mdOpenRepositionForm(nodeId){
   };
 }
 
-function restoreManualDefectPhotos(){Object.values(manualDefects).forEach(function(node){var epd=node.embeddedPhotoData||{};Object.keys(epd).forEach(function(key){if(!imageBank[key])imageBank[key]={url:epd[key],dcUrl:null,time:null,drop:'MANUAL'};});});if(typeof updatePhotoStat==='function')updatePhotoStat();}
+function restoreManualDefectPhotos(){
+    Object.values(manualDefects).forEach(function(node){
+        var epd=node.embeddedPhotoData||{};
+        Object.keys(epd).forEach(function(key){if(!imageBank[key])imageBank[key]={url:epd[key],dcUrl:null,time:null,drop:'MANUAL'};});
+    });
+    // Also restore phone photos attached to REGULAR windows
+    Object.keys(inspectionData).forEach(function(drop){
+        Object.keys(inspectionData[drop]).forEach(function(floor){
+            Object.keys(inspectionData[drop][floor]).forEach(function(pos){
+                var node=inspectionData[drop][floor][pos];
+                var epd=node.embeddedPhotoData||{};
+                Object.keys(epd).forEach(function(key){if(!imageBank[key])imageBank[key]={url:epd[key],dcUrl:null,time:null,drop:drop};});
+            });
+        });
+    });
+    if(typeof updatePhotoStat==='function')updatePhotoStat();
+}
 
 function setupManualPhotoSlot(slotEl,nodeId){
   slotEl.addEventListener('dragover',function(e){e.preventDefault();slotEl.classList.add('drag-over');});
