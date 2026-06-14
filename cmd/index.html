@@ -3206,7 +3206,11 @@ function openModal(nodeId) {
     updatePlannerBtn(nodeId);
     var _xdb=document.getElementById('btn-md-delete');if(_xdb)_xdb.remove();
     var _xrb=document.getElementById('btn-md-reposition');if(_xrb)_xrb.remove();
-    if(manualDefects[nodeId]){var _rb=document.createElement('button');_rb.id='btn-md-reposition';_rb.className='btn btn-dark btn-block';_rb.style.cssText='margin-top:8px;border-color:#1fd0a5;color:#1fd0a5;font-weight:bold;';_rb.innerText='⇕ Reposition Defect';(function(id){_rb.onclick=function(){mdOpenRepositionForm(id);};})(nodeId);document.querySelector('#info-modal .modal-box').appendChild(_rb);}
+    var _xeb=document.getElementById('btn-md-edit');if(_xeb)_xeb.remove();
+    if(manualDefects[nodeId]){
+        var _eb=document.createElement('button');_eb.id='btn-md-edit';_eb.className='btn btn-dark btn-block';_eb.style.cssText='margin-top:8px;border-color:#1fd0a5;color:#1fd0a5;font-weight:bold;';_eb.innerText='✎ Edit Details';(function(id){_eb.onclick=function(){mdOpenEditForm(id);};})(nodeId);document.querySelector('#info-modal .modal-box').appendChild(_eb);
+        var _rb=document.createElement('button');_rb.id='btn-md-reposition';_rb.className='btn btn-dark btn-block';_rb.style.cssText='margin-top:8px;border-color:#1fd0a5;color:#1fd0a5;font-weight:bold;';_rb.innerText='⇕ Quick Reposition';(function(id){_rb.onclick=function(){mdOpenRepositionForm(id);};})(nodeId);document.querySelector('#info-modal .modal-box').appendChild(_rb);
+    }
     (function(nid,prim){var _pp=nid.split('-'),_pos=_pp[_pp.length-1];if(manualDefects[nid]||['L','C','R'].indexOf(_pos)===-1){var _lbl=manualDefects[nid]?prim.label:nid;var _db=document.createElement('button');_db.id='btn-md-delete';_db.className='btn btn-dark btn-block';_db.style.cssText='margin-top:8px;border-color:#e74c3c;color:#e74c3c;font-weight:bold;';_db.innerText='Delete This Defect';(function(id,lbl){_db.onclick=function(){showConfirm('Delete?','Remove "'+lbl+'" permanently?','DELETE',function(){if(manualDefects[id])delete manualDefects[id];else{var pp=id.split('-');if(pp.length>=3&&inspectionData[pp[0]]&&inspectionData[pp[0]][pp[1]])delete inspectionData[pp[0]][pp[1]][pp[2]];}delete repairPriorities[id];delete repairTags[id];delete repairFixed[id];delete saved3DTags[id];var pi=stitchedPairs.findIndex(function(pp){return pp.includes(id);});if(pi!==-1)stitchedPairs.splice(pi,1);saveCommandState();calculateBuildingGeometry();refreshCurrentView();closeModal();});};})(nid,_lbl);document.querySelector('#info-modal .modal-box').appendChild(_db);}})(nodeId,primary);
     // For manual defects: ensure photos are in imageBank
     if (nodeId.startsWith('MANUAL-')) restoreManualDefectPhotos();
@@ -5658,6 +5662,94 @@ function mdDropOntoWindow(mdId,newDrop,newFloor,newPos){
   if(posLabel){node.locationDetail=(node.locationDetail||'').replace(/Left|Center|Right/g,'').trim();node.locationDetail=(node.locationDetail?node.locationDetail+' ':'')+posLabel;}
   saveCommandState();calculateBuildingGeometry();refreshCurrentView();
   showToast('[OK] Defect moved to Drop '+newDrop+' Floor '+newFloor+' '+newPos,2500);
+}
+
+function mdOpenEditForm(nodeId){
+  var node=manualDefects[nodeId];if(!node)return;
+  var existing=document.getElementById('md-edit-overlay');if(existing)existing.remove();
+
+  // All elevations that have drops assigned
+  var allElevations=elevations.slice();
+  var currentElev=node.elevation||allElevations[0]||'';
+
+  var overlay=document.createElement('div');overlay.id='md-edit-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:6000;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+
+  var elevOpts=allElevations.map(function(el){return '<option value="'+el.replace(/"/g,'&quot;')+'"'+(el===currentElev?' selected':'')+'>'+el+'</option>';}).join('');
+
+  var box=document.createElement('div');
+  box.style.cssText='background:#1a1d27;border:1px solid #1fd0a5;border-radius:12px;padding:24px;width:min(480px,94vw);max-height:90vh;overflow-y:auto;box-shadow:0 15px 35px rgba(0,0,0,0.9);';
+  box.innerHTML=''+
+    '<div style="color:#1fd0a5;font-size:0.8rem;font-weight:bold;text-transform:uppercase;letter-spacing:1px;margin-bottom:16px;">✎ Edit Defect Details</div>'+
+    '<div style="margin-bottom:14px;"><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Defect Name *</label>'+
+      '<input id="ed-label" type="text" value="'+(node.label||'').replace(/"/g,'&quot;')+'" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;"></div>'+
+    '<div style="margin-bottom:14px;"><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Location Detail</label>'+
+      '<input id="ed-loc" type="text" value="'+(node.locationDetail||'').replace(/"/g,'&quot;')+'" placeholder="e.g. NW corner, chipped piece..." style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;"></div>'+
+    '<div style="margin-bottom:14px;"><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Elevation</label>'+
+      '<select id="ed-elev" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;">'+elevOpts+'</select></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">'+
+      '<div><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Drop</label>'+
+      '<select id="ed-drop" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;"></select></div>'+
+      '<div><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Floor</label>'+
+      '<select id="ed-floor" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;"></select></div>'+
+    '</div>'+
+    '<div style="margin-bottom:16px;"><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;display:block;margin-bottom:8px;">Position in row</label>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;" id="ed-pos-btns">'+
+        '<button data-pos="L" style="padding:10px 6px;border-radius:6px;border:1px solid #444;background:#111;color:#aaa;font-size:0.8rem;font-weight:bold;cursor:pointer;">◄ Left</button>'+
+        '<button data-pos="C" style="padding:10px 6px;border-radius:6px;border:1px solid #444;background:#111;color:#aaa;font-size:0.8rem;font-weight:bold;cursor:pointer;">● Center</button>'+
+        '<button data-pos="R" style="padding:10px 6px;border-radius:6px;border:1px solid #444;background:#111;color:#aaa;font-size:0.8rem;font-weight:bold;cursor:pointer;">► Right</button>'+
+        '<button data-pos="" style="padding:10px 6px;border-radius:6px;border:1px solid #444;background:#111;color:#aaa;font-size:0.75rem;cursor:pointer;">⊕ Float</button>'+
+      '</div></div>'+
+    '<div style="display:flex;gap:10px;">'+
+      '<button id="ed-apply" style="flex:1;padding:11px;background:#1fd0a5;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;">Save Changes</button>'+
+      '<button id="ed-cancel" style="padding:11px 18px;background:#222;color:#888;border:1px solid #444;border-radius:6px;cursor:pointer;">Cancel</button>'+
+    '</div>';
+  overlay.appendChild(box);document.body.appendChild(overlay);
+
+  var selPos=node.pos||'';
+  // Populate drops for the selected elevation
+  function edPopDrops(){
+    var el=document.getElementById('ed-elev').value;
+    var drops=Object.keys(inspectionData).filter(function(d){return dropAssignments[d]===el;}).sort();
+    var dsel=document.getElementById('ed-drop');
+    dsel.innerHTML=drops.map(function(d){return '<option value="'+d+'"'+(d===node.drop?' selected':'')+'>Drop '+d+'</option>';}).join('');
+    edPopFloors();
+  }
+  function edPopFloors(){
+    var d=document.getElementById('ed-drop').value;
+    var floors=Object.keys(inspectionData[d]||{}).map(Number).sort(function(a,b){return b-a;});
+    var fsel=document.getElementById('ed-floor');
+    fsel.innerHTML=floors.map(function(f){return '<option value="'+f+'"'+(f===node.floor?' selected':'')+'>Floor '+f+'</option>';}).join('');
+  }
+  edPopDrops();
+  document.getElementById('ed-elev').onchange=edPopDrops;
+  document.getElementById('ed-drop').onchange=edPopFloors;
+
+  var posBtns=box.querySelectorAll('#ed-pos-btns [data-pos]');
+  function edUpdatePos(){posBtns.forEach(function(b){var active=b.dataset.pos===selPos;b.style.background=active?'#1fd0a5':'#111';b.style.color=active?'#000':'#aaa';b.style.borderColor=active?'#1fd0a5':'#444';});}
+  edUpdatePos();
+  posBtns.forEach(function(b){b.onclick=function(){selPos=b.dataset.pos;edUpdatePos();};});
+
+  document.getElementById('ed-cancel').onclick=function(){overlay.remove();};
+  document.getElementById('ed-apply').onclick=function(){
+    var newLabel=(document.getElementById('ed-label').value||'').trim();
+    if(!newLabel){showToast('Defect name cannot be empty.',2500,true);return;}
+    var newLoc=(document.getElementById('ed-loc').value||'').trim();
+    var newElev=document.getElementById('ed-elev').value;
+    var newDrop=document.getElementById('ed-drop').value;
+    var newFloor=parseInt(document.getElementById('ed-floor').value);
+    if(!newDrop||isNaN(newFloor)){showToast('Select a drop and floor.',2500,true);return;}
+    node.label=newLabel;
+    node.finds=newLabel;
+    node.locationDetail=newLoc;
+    node.elevation=newElev;
+    node.drop=newDrop;
+    node.floor=newFloor;
+    node.pos=selPos;
+    saveCommandState();calculateBuildingGeometry();refreshCurrentView();overlay.remove();openModal(nodeId);
+    showToast('[OK] Defect updated',2000);
+  };
 }
 
 function mdOpenRepositionForm(nodeId){
