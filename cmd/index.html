@@ -4723,7 +4723,8 @@ let REPORT_META = {
   scopeNotAccessed: '',     // areas not accessed
   recommendations: '',      // '' = auto-generate from findings
   coverPhoto: '',           // base64 data URL for the cover hero image
-  estimates: {}             // nodeId -> estimate string (only set where provided)
+  estimates: {},            // nodeId -> estimate string (only set where provided)
+  photoOrder: {}            // nodeId -> ['key:kind', ...] explicit display order
 };
 
 function loadReportMeta() {
@@ -4874,6 +4875,42 @@ function rbLocation(drop, floor, pos) {
   return `${elev} · Floor ${floor} · ${RB_POS_NAME[pos] || pos}`;
 }
 // Per defect: one row per IR image, exposing thermal (url) + visual (dcUrl)
+// Applies the user's saved photo display order (REPORT_META.photoOrder) to an items list.
+// Items not in the saved order keep their natural position at the end.
+function rbApplyPhotoOrder(nodeId, items) {
+  var order = REPORT_META.photoOrder && REPORT_META.photoOrder[nodeId];
+  if (!order || !order.length) return items;
+  var indexOf = {};
+  order.forEach(function(sel, i){ indexOf[sel] = i; });
+  return items.slice().sort(function(a, b){
+    var sa = a.key + ':' + a.kind, sb = b.key + ':' + b.kind;
+    var ia = (sa in indexOf) ? indexOf[sa] : 9999;
+    var ib = (sb in indexOf) ? indexOf[sb] : 9999;
+    return ia - ib;
+  });
+}
+
+// Move a photo left or right within a node's display order.
+function rbMovePhoto(nodeId, key, kind, dir) {
+  var items = rbApplyPhotoOrder(nodeId, rbPhotoItems(node_forOrder(nodeId)));
+  // Build the current ordered list of sel strings
+  var sels = items.map(function(it){ return it.key + ':' + it.kind; });
+  var sel = key + ':' + kind;
+  var i = sels.indexOf(sel);
+  if (i === -1) return;
+  var j = i + dir;
+  if (j < 0 || j >= sels.length) return;
+  // Swap
+  var tmp = sels[i]; sels[i] = sels[j]; sels[j] = tmp;
+  if (!REPORT_META.photoOrder) REPORT_META.photoOrder = {};
+  REPORT_META.photoOrder[nodeId] = sels;
+  saveReportMeta();
+  renderReportBuilder();
+}
+
+// Helper to fetch a node for ordering (handles manual + regular)
+function node_forOrder(nodeId) { return getNodeData(nodeId); }
+
 function rbPhotoItems(node) {
   const items = [];
   nodePhotoNames(node).forEach(key => {
@@ -5496,7 +5533,7 @@ function renderReportBuilder() {
     const sev = rbSeverity(nodeId, node);
     const desc = REPORT_META.desc[nodeId] != null ? REPORT_META.desc[nodeId] : (node.notes || '');
     const tags = rbTags(nodeId, node);
-    const items = rbPhotoItems(node);
+    const items = rbApplyPhotoOrder(nodeId, rbPhotoItems(node));
     const unselectedPhotoCount = items.filter(it => !rbIsPhotoOn(nodeId, it.key + ':' + it.kind)).length;
     const included = rbIsIncluded(nodeId);
 
@@ -5509,9 +5546,11 @@ function renderReportBuilder() {
 
     let thumbs = '';
     if (items.length) {
-      items.forEach(it => {
+      items.forEach((it, _pIdx) => {
         const sel = it.key + ':' + it.kind;
         const on = rbIsPhotoOn(nodeId, sel);
+        const _isFirst = _pIdx === 0;
+        const _isLast = _pIdx === items.length - 1;
         const kindLbl = it.kind === 'thermal' ? '🌡 IR' : (it.kind === 'visual' ? '📷 DC' : '📸');
         const kindCol = it.kind === 'thermal' ? '#ff6b35' : '#9ad';
         const rotKey = it.key + ':' + (it.kind === 'thermal' ? 'ir' : it.kind === 'visual' ? 'dc' : 'ir');
@@ -5524,9 +5563,15 @@ function renderReportBuilder() {
               <div style="position:absolute;bottom:18px;left:0;right:0;background:rgba(0,0,0,0.72);color:${kindCol};font-size:0.6rem;font-weight:bold;text-align:center;padding:2px;">${kindLbl} · ${rbEsc(it.key.split('_').pop())}</div>
             </div>
             <button onclick="rbEnlargePhoto('${it.key}','${it.kind}')" title="Enlarge photo"
-              style="position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,0.7);border:1px solid rgba(255,255,255,0.5);color:#fff;font-size:0.75rem;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:3;">🔍</button>
+              style="position:absolute;top:4px;right:32px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,0.7);border:1px solid rgba(255,255,255,0.5);color:#fff;font-size:0.75rem;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:3;">🔍</button>
+            <button onclick="event.stopPropagation();openAnnotationEditor('${it.key}', '${it.kind === 'visual' ? 'dc' : 'ir'}', '${nodeId}')" title="Crop, circle, label this photo"
+              style="position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:rgba(31,208,165,0.85);border:1px solid #1fd0a5;color:#000;font-size:0.72rem;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:3;">✎</button>
             <button onclick="rbRotatePhoto('${nodeId}','${it.key}','${it.kind}')" title="Rotate photo"
               style="position:absolute;bottom:0;left:0;right:0;padding:2px;background:rgba(241,196,15,0.85);border:none;color:#000;font-size:0.55rem;font-weight:bold;cursor:pointer;border-radius:0 0 5px 5px;">↻ ROTATE</button>
+            <div style="position:absolute;top:4px;left:4px;display:flex;gap:3px;">
+              ${!_isFirst ? `<button onclick="event.stopPropagation();rbMovePhoto('${nodeId}','${it.key}','${it.kind}',-1)" title="Move left (earlier in report)" style="width:22px;height:22px;border-radius:4px;background:rgba(0,0,0,0.72);border:1px solid rgba(255,255,255,0.4);color:#fff;font-size:0.72rem;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;">◄</button>` : ''}
+              ${!_isLast ? `<button onclick="event.stopPropagation();rbMovePhoto('${nodeId}','${it.key}','${it.kind}',1)" title="Move right (later in report)" style="width:22px;height:22px;border-radius:4px;background:rgba(0,0,0,0.72);border:1px solid rgba(255,255,255,0.4);color:#fff;font-size:0.72rem;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;">►</button>` : ''}
+            </div>
           </div>`;
       });
     } else {
@@ -6453,6 +6498,8 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
     toolBtn('↗', 'arrow', 'Arrow'),
     toolBtn('▢', 'box', 'Rectangle'),
     toolBtn('✎', 'free', 'Freehand'),
+    toolBtn('⌖', 'text', 'Add text label'),
+    toolBtn('⛶', 'crop', 'Crop / zoom to region'),
   ];
   var toolWrap = document.createElement('div');
   toolWrap.style.cssText = 'display:flex;gap:4px;';
@@ -6534,6 +6581,7 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
   var curColor = '#ff2d2d';
   var curWidth = 5;
   var imgScale = 1;         // displayed-size / natural-size
+  var _edited = false;      // true once any crop or annotation has been applied
 
   function setActiveTool(tool){
     curTool = tool;
@@ -6599,6 +6647,19 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
         for (var i=1;i<s.points.length;i++) ctx.lineTo(s.points[i].x, s.points[i].y);
       }
       ctx.stroke();
+    } else if (s.tool === 'text') {
+      var fs = s.fontSize || 28;
+      ctx.font = 'bold ' + fs + 'px Arial, sans-serif';
+      ctx.textBaseline = 'top';
+      var padding = fs * 0.35;
+      var metrics = ctx.measureText(s.text || '');
+      var boxW = metrics.width + padding*2;
+      var boxH = fs + padding*2;
+      // Semi-opaque background for legibility on any photo
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(s.x1, s.y1, boxW, boxH);
+      ctx.fillStyle = s.color;
+      ctx.fillText(s.text || '', s.x1 + padding, s.y1 + padding);
     }
   }
 
@@ -6626,17 +6687,34 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
   }
 
   var drawing = false;
+  var cropRect = null; // live crop selection rectangle
   function start(e){
     e.preventDefault();
-    drawing = true;
     var p = getPos(e);
+    if (curTool === 'text') {
+      // Inline text input on the canvas (window.prompt is blocked in some iframes)
+      showTextInput(p.x, p.y);
+      return;
+    }
+    drawing = true;
+    if (curTool === 'crop') {
+      cropRect = { x1: p.x, y1: p.y, x2: p.x, y2: p.y };
+      return;
+    }
     current = { tool: curTool, color: curColor, width: curWidth, x1: p.x, y1: p.y, x2: p.x, y2: p.y };
     if (curTool === 'free') current.points = [{x:p.x, y:p.y}];
   }
   function move(e){
-    if (!drawing || !current) return;
+    if (!drawing) return;
     e.preventDefault();
     var p = getPos(e);
+    if (curTool === 'crop' && cropRect) {
+      cropRect.x2 = p.x; cropRect.y2 = p.y;
+      redraw();
+      drawCropOverlay();
+      return;
+    }
+    if (!current) return;
     current.x2 = p.x; current.y2 = p.y;
     if (curTool === 'free') current.points.push({x:p.x, y:p.y});
     redraw();
@@ -6644,13 +6722,66 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
   function end(e){
     if (!drawing) return;
     drawing = false;
+    if (curTool === 'crop' && cropRect) {
+      applyCrop(cropRect);
+      cropRect = null;
+      return;
+    }
     if (current) {
-      // Ignore tiny accidental clicks (except freehand)
       var moved = Math.abs(current.x2 - current.x1) + Math.abs(current.y2 - current.y1);
-      if (current.tool === 'free' || moved > 4) shapes.push(current);
+      if (current.tool === 'free' || moved > 4) { shapes.push(current); _edited = true; }
     }
     current = null;
     redraw();
+  }
+
+  // Visual overlay while dragging a crop region
+  function drawCropOverlay(){
+    if (!cropRect) return;
+    var x = Math.min(cropRect.x1, cropRect.x2), y = Math.min(cropRect.y1, cropRect.y2);
+    var w = Math.abs(cropRect.x2 - cropRect.x1), h = Math.abs(cropRect.y2 - cropRect.y1);
+    ctx.save();
+    // Dim everything outside the selection
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(0,0,canvas.width,y);
+    ctx.fillRect(0,y+h,canvas.width,canvas.height-(y+h));
+    ctx.fillRect(0,y,x,h);
+    ctx.fillRect(x+w,y,canvas.width-(x+w),h);
+    // Selection border
+    ctx.strokeStyle = '#1fd0a5'; ctx.lineWidth = 2; ctx.setLineDash([8,5]);
+    ctx.strokeRect(x,y,w,h);
+    ctx.restore();
+  }
+
+  // Crop: bake current state, then replace the base image with the cropped region.
+  // Annotations already drawn are baked in; the cropped result becomes the new canvas.
+  function applyCrop(rect){
+    var x = Math.min(rect.x1, rect.x2), y = Math.min(rect.y1, rect.y2);
+    var w = Math.abs(rect.x2 - rect.x1), h = Math.abs(rect.y2 - rect.y1);
+    if (w < 20 || h < 20) { redraw(); showToast('Crop region too small — drag a larger area.', 2500, true); return; }
+    // Render everything (image + shapes) then grab the cropped pixels
+    redraw();
+    var cropped = ctx.getImageData(x, y, w, h);
+    // Make the cropped region the new base image
+    var tmp = document.createElement('canvas');
+    tmp.width = w; tmp.height = h;
+    tmp.getContext('2d').putImageData(cropped, 0, 0);
+    var newImg = new Image();
+    newImg.onload = function(){
+      baseImg = newImg;
+      shapes = []; // shapes are now baked into the cropped image
+      canvas.width = w; canvas.height = h;
+      // Refit display size
+      var maxW = window.innerWidth - 80, maxH = window.innerHeight - 160;
+      var scale = Math.min(maxW / w, maxH / h, 1);
+      canvas.style.width = (w * scale) + 'px';
+      canvas.style.height = (h * scale) + 'px';
+      imgScale = scale;
+      _edited = true;
+      redraw();
+      showToast('Cropped. Draw or add text, then Save.', 2500);
+    };
+    newImg.src = tmp.toDataURL('image/jpeg', 0.95);
   }
 
   canvas.addEventListener('mousedown', start);
@@ -6659,6 +6790,52 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
   canvas.addEventListener('touchstart', start, {passive:false});
   canvas.addEventListener('touchmove', move, {passive:false});
   canvas.addEventListener('touchend', end);
+
+  // Inline canvas text input — overlays a real <input> at the click point,
+  // positioned to match the displayed canvas scale, so it works in any iframe.
+  function showTextInput(imgX, imgY){
+    // Remove any existing input first
+    var old = document.getElementById('annot-text-input');
+    if (old) old.remove();
+
+    var rect = canvas.getBoundingClientRect();
+    // Convert image coords -> screen coords for input placement
+    var screenX = rect.left + (imgX / canvas.width) * rect.width;
+    var screenY = rect.top + (imgY / canvas.height) * rect.height;
+    var displayFontPx = Math.max(14, (curWidth * 5) * imgScale);
+
+    var input = document.createElement('input');
+    input.id = 'annot-text-input';
+    input.type = 'text';
+    input.placeholder = 'Type label, press Enter';
+    input.style.cssText = 'position:fixed;left:' + screenX + 'px;top:' + screenY + 'px;' +
+      'font:bold ' + displayFontPx + 'px Arial,sans-serif;color:' + curColor + ';' +
+      'background:rgba(0,0,0,0.75);border:1px solid ' + curColor + ';border-radius:3px;' +
+      'padding:2px 6px;z-index:12000;min-width:160px;outline:none;';
+    document.body.appendChild(input);
+    input.focus();
+
+    var _done = false;
+    function commit(){
+      if (_done) return; _done = true;
+      var txt = input.value.trim();
+      if (txt) {
+        shapes.push({ tool:'text', color: curColor, width: curWidth, x1: imgX, y1: imgY, x2: imgX, y2: imgY, text: txt, fontSize: Math.max(18, curWidth * 5) });
+        _edited = true;
+        redraw();
+      }
+      if (input.parentNode) input.parentNode.removeChild(input);
+    }
+    function cancel(){ if (_done) return; _done = true; if (input.parentNode) input.parentNode.removeChild(input); }
+
+    input.addEventListener('keydown', function(e){
+      e.stopPropagation();
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+      else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+    });
+    // Commit when clicking away
+    input.addEventListener('blur', function(){ setTimeout(commit, 50); });
+  }
 
   undoBtn.onclick = function(){ shapes.pop(); redraw(); };
   clearBtn.onclick = function(){ shapes = []; redraw(); };
@@ -6670,7 +6847,7 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
   }
 
   saveBtn.onclick = function(){
-    if (!shapes.length) { showToast('Draw something first, or press Cancel.', 2500, true); return; }
+    if (!_edited && !shapes.length) { showToast('Make an edit (draw, add text, or crop) first, or press Cancel.', 2800, true); return; }
     // Bake annotations into a new image
     redraw();
     var dataUrl = canvas.toDataURL('image/jpeg', 0.9);
@@ -6693,7 +6870,13 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
     if (typeof updatePhotoStat === 'function') updatePhotoStat();
     cleanup();
     overlay.remove();
-    if (modalNodeId === nodeId) openModal(nodeId);
+    // Refresh whichever view is active so the new annotated copy appears immediately
+    var _inReport = (typeof currentMode !== 'undefined' && currentMode === 'report');
+    if (_inReport) {
+      if (typeof renderReportBuilder === 'function') renderReportBuilder();
+    } else if (modalNodeId === nodeId) {
+      openModal(nodeId);
+    }
     showToast('[OK] Annotated copy saved — original preserved', 3000);
   };
 
