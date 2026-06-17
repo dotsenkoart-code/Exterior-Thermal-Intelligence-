@@ -4137,7 +4137,7 @@ function renderRepairPlanner() {
             btn.id = 'rp-fs-btn';
             btn.className = 'btn-fullscreen';
             btn.onclick = toggleRPFullscreen;
-            btn.innerText = '?';
+            btn.innerText = '\u26F6 Fullscreen';
             btn.style.cssText = 'position:static;flex-shrink:0;padding:8px 12px;font-size:0.75rem;align-self:stretch;border-radius:6px;';
             sb.appendChild(btn);
         }
@@ -4292,10 +4292,10 @@ function renderRepairPlanner() {
                             node.appendChild(lbl);
 
                             if (isFixed) {
-                                // Show checkmark instead of priority dot
+                                // Show checkmark + "DONE" instead of priority dot
                                 const chk = document.createElement('div');
-                                chk.innerText = '?';
-                                chk.style.cssText = 'font-size:0.8rem;color:#28a745;font-weight:900;';
+                                chk.innerText = '\u2713 DONE';
+                                chk.style.cssText = 'font-size:0.6rem;color:#28a745;font-weight:900;letter-spacing:0.5px;';
                                 node.appendChild(chk);
                             } else {
                                 // Priority dot
@@ -4707,7 +4707,7 @@ function toggleRPFullscreen() {
         if (exitBtn) exitBtn.style.display = 'none';
         if (document.fullscreenElement) document.exitFullscreen();
         if (document.webkitFullscreenElement) document.webkitExitFullscreen();
-        if (fsBtn) fsBtn.innerText = '?';
+        if (fsBtn) fsBtn.innerText = '\u26F6 Fullscreen';
     }
 }
 
@@ -4719,7 +4719,7 @@ function exitRPFullscreenCleanup() {
     const fsBtn   = document.getElementById('rp-fs-btn');
     grid.classList.remove('rp-fullscreen');
     if (exitBtn) exitBtn.style.display = 'none';
-    if (fsBtn) fsBtn.innerText = '?';
+    if (fsBtn) fsBtn.innerText = '\u26F6 Fullscreen';
     // Return modal to body if it was moved in
     if (modal && modal.parentElement !== document.body) {
         document.body.appendChild(modal);
