@@ -4217,7 +4217,9 @@ function renderRepairPlanner() {
     const drops = Object.keys(inspectionData)
         .filter(d => dropAssignments[d] === rpActiveElev).sort();
     if (!drops.length) {
-        gridCont.innerHTML = '<div style="padding:40px;color:#444;">No drops assigned to this elevation.</div>';
+        // No FLIR drops on this elevation — but there may still be manual defects to show
+        gridCont.innerHTML = '<div style="padding:24px 12px;color:#666;font-size:0.85rem;">No window drops assigned to this elevation.</div>';
+        rpRenderManualDefects(gridCont);
         return;
     }
 
@@ -4344,6 +4346,79 @@ function renderRepairPlanner() {
         }
         gridCont.appendChild(col);
     });
+
+    // ---- Manual (non-window) defects section ----------------------------
+    // Manual defects don't fit the drop/floor grid, so show them in their own
+    // column at the end. Includes any manual defect that is in the planner OR
+    // confirmed, so they can be prioritized and flow into repair planning.
+    rpRenderManualDefects(gridCont);
+}
+
+// Renders manual defects as a dedicated column in the repair planner grid.
+function rpRenderManualDefects(gridCont) {
+    var manualList = Object.values(manualDefects).filter(function(node){
+        if (!node) return false;
+        // Show manual defects assigned to the active elevation (or unassigned),
+        // and only those in the planner or confirmed.
+        var elevMatch = !rpActiveElev || !node.elevation || node.elevation === rpActiveElev ||
+                        (dropAssignments[node.drop] === rpActiveElev);
+        var inPlanner = !!repairPriorities[node.id];
+        var confirmed = node.status === 'status-confirmed';
+        return elevMatch && (inPlanner || confirmed);
+    });
+    if (!manualList.length) return;
+
+    var priColors = {HIGH:'#d9534f', MED:'#f1c40f', LOW:'#28a745', NONE:'#555'};
+
+    var col = document.createElement('div');
+    col.className = 'drop-column';
+    col.style.cssText = 'min-width:150px;border-left:2px solid #f39c1244;margin-left:6px;';
+    col.innerHTML = '<div class="drop-header" style="background:#2a1d00;color:#f39c12;">✋ MANUAL</div>';
+
+    manualList.forEach(function(node){
+        var nodeId = node.id;
+        var inPlanner = !!repairPriorities[nodeId];
+        var cats = repairTags[nodeId] || [];
+        var pri = repairPriorities[nodeId] || 'NONE';
+        var isFixed = !!repairFixed[nodeId];
+        var passesDefect = rpDefectFilter === 'ALL' || cats.includes(rpDefectFilter);
+
+        var cell = document.createElement('div');
+        cell.style.cssText = 'padding:4px;';
+
+        if (inPlanner && passesDefect) {
+            var mainCat = cats[0] || 'Other';
+            var defColor = (typeof DEFECT_COLORS !== 'undefined' && DEFECT_COLORS[mainCat]) || '#7f8c8d';
+            var box = document.createElement('div');
+            box.className = 'window-node' + (isFixed ? ' rp-fixed-node' : '');
+            box.style.cssText = isFixed
+                ? 'background:#0a1a0a;border:2px solid #28a745;opacity:0.6;border-radius:6px;padding:8px;min-height:54px;cursor:pointer;'
+                : 'background:' + defColor + '33;border:2px solid ' + defColor + ';border-radius:6px;padding:8px;min-height:54px;cursor:pointer;';
+            var priColor = priColors[pri] || '#555';
+            var cleanLabel = rbCleanTitle ? rbCleanTitle(node.label || node.finds, cats, rbSeverity ? rbSeverity(nodeId, node) : 'MEDIUM') : (node.label || 'Defect');
+            box.innerHTML =
+                '<div style="font-size:0.72rem;font-weight:bold;color:#fff;line-height:1.2;margin-bottom:4px;">' + (isFixed ? '✓ ' : '') + rbEsc(cleanLabel) + '</div>' +
+                '<div style="display:flex;align-items:center;gap:5px;">' +
+                  '<span style="width:8px;height:8px;border-radius:50%;background:' + priColor + ';"></span>' +
+                  '<span style="font-size:0.6rem;color:#aaa;text-transform:uppercase;">' + pri + '</span>' +
+                '</div>' +
+                (node.locationDetail ? '<div style="font-size:0.58rem;color:#888;margin-top:3px;">' + rbEsc(node.locationDetail) + '</div>' : '');
+            box.onclick = function(){ openModal(nodeId); };
+            box.title = isFixed ? 'FIXED — tap to view' : 'Tap to view / edit';
+            cell.appendChild(box);
+        } else if (!inPlanner) {
+            // Confirmed but not yet in planner — show a faint "add" prompt
+            var add = document.createElement('div');
+            add.style.cssText = 'background:#1a1d27;border:1px dashed #f39c1255;border-radius:6px;padding:8px;min-height:54px;cursor:pointer;display:flex;align-items:center;justify-content:center;text-align:center;';
+            add.innerHTML = '<span style="font-size:0.62rem;color:#f39c12;">' + rbEsc((node.label||'Manual defect')) + '<br>+ add to planner</span>';
+            add.onclick = function(){ openModal(nodeId); };
+            add.title = 'Tap to open and add to planner';
+            cell.appendChild(add);
+        }
+        if (cell.firstChild) col.appendChild(cell);
+    });
+
+    if (col.children.length > 1) gridCont.appendChild(col);
 }
 
 
