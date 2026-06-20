@@ -5112,6 +5112,23 @@ function rbBuildExecSummary(cands) {
 // ── event handlers (update state + persist + minimal DOM) ───────────────────
 function rbSetMeta(field, val) { REPORT_META[field] = val; saveReportMeta(); }
 function rbSetFindingsView(view) { rbFindingsView = view; renderReportBuilder(); }
+// Console diagnostic: see the breakdown of what's being counted
+function rbDiagnoseCounts() {
+  var cands = rbCandidates().filter(function(c){ return rbIsIncluded(c.nodeId); });
+  var windows = cands.filter(function(c){ return !c.isManual; });
+  var manual = cands.filter(function(c){ return c.isManual; });
+  var fixed = cands.filter(function(c){ return repairFixed[c.nodeId]; });
+  console.log('=== FINDINGS COUNT DIAGNOSTIC ===');
+  console.log('Total findings (found):', cands.length);
+  console.log('  Window defects:', windows.length);
+  console.log('  Manual defects:', manual.length);
+  console.log('Marked fixed/repaired:', fixed.length);
+  console.log('  Fixed window:', fixed.filter(function(c){return !c.isManual;}).length);
+  console.log('  Fixed manual:', fixed.filter(function(c){return c.isManual;}).length);
+  console.log('Remaining to monitor:', cands.length - fixed.length);
+  console.log('Manual defect IDs:', manual.map(function(c){return c.nodeId;}));
+  return { found: cands.length, windows: windows.length, manual: manual.length, fixed: fixed.length };
+}
 function rbSetEstimate(nodeId, val) {
   val = (val || '').trim();
   if (val) { REPORT_META.estimates[nodeId] = val; }
