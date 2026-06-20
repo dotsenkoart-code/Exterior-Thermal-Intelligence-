@@ -4842,7 +4842,9 @@ let REPORT_META = {
   recommendations: '',      // '' = auto-generate from findings
   coverPhoto: '',           // base64 data URL for the cover hero image
   estimates: {},            // nodeId -> estimate string (only set where provided)
-  photoOrder: {}            // nodeId -> ['key:kind', ...] explicit display order
+  photoOrder: {},           // nodeId -> ['key:kind', ...] explicit display order
+  repairDesc: {},           // nodeId -> short description of completed repair work
+  findingsSummary: ''       // '' = auto-generate the found/fixed/monitor summary line
 };
 
 function loadReportMeta() {
@@ -5096,6 +5098,42 @@ function rbSetEstimate(nodeId, val) {
   if (val) { REPORT_META.estimates[nodeId] = val; }
   else { delete REPORT_META.estimates[nodeId]; }
   saveReportMeta();
+}
+function rbSetRepairDesc(nodeId, val) {
+  val = (val || '').trim();
+  if (val) { REPORT_META.repairDesc[nodeId] = val; }
+  else { delete REPORT_META.repairDesc[nodeId]; }
+  saveReportMeta();
+}
+// Collects all completed (fixed) repairs across windows + manual defects.
+// Returns [{nodeId, node, label, cats, location, desc}]
+function rbCollectCompletedRepairs() {
+  var out = [];
+  if (typeof repairFixed === 'undefined') return out;
+  Object.keys(repairFixed).forEach(function(nodeId){
+    if (!repairFixed[nodeId]) return;
+    var node = (typeof getNodeData === 'function') ? getNodeData(nodeId) : null;
+    var cats = (typeof repairTags !== 'undefined' && repairTags[nodeId]) ? repairTags[nodeId] : [];
+    var label = node ? (node.label || node.finds || '') : '';
+    var cleanLabel = (typeof rbCleanTitle === 'function')
+      ? rbCleanTitle(label, cats, 'MEDIUM')
+      : (label || (cats[0] || 'Repair'));
+    // Location: try node's stored location, else derive
+    var loc = '';
+    if (node) {
+      if (node.locationDetail) loc = node.locationDetail;
+      else if (typeof rbLocation === 'function' && node.drop) loc = rbLocation(node.drop, node.floor, node.pos || '');
+    }
+    out.push({
+      nodeId: nodeId,
+      node: node,
+      label: cleanLabel,
+      cats: cats,
+      location: loc,
+      desc: REPORT_META.repairDesc[nodeId] || ''
+    });
+  });
+  return out;
 }
 function rbPickCoverPhoto() {
   var i = document.createElement('input');
@@ -5588,6 +5626,65 @@ function renderReportBuilder() {
       </div>
     </details>
 
+    ${(function(){
+      var done = rbCollectCompletedRepairs();
+      if (!done.length) return '<div style="background:#1a1d27;border:1px solid #2a2d38;border-radius:12px;padding:14px 18px;margin-bottom:16px;color:#666;font-size:0.8rem;">No completed repairs marked yet. Mark repairs as <strong>fixed</strong> in the Repair Planner and they will appear here, ready for you to describe what was done.</div>';
+      var rows = done.map(function(r){
+        return '<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #23262f;">' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' +
+            '<span style="color:#28a745;font-weight:900;">\u2713</span>' +
+            '<span style="font-size:0.86rem;font-weight:bold;color:#fff;">' + rbEsc(r.label) + '</span>' +
+            (r.location ? '<span style="font-size:0.72rem;color:#888;">— ' + rbEsc(r.location) + '</span>' : '') +
+          '</div>' +
+          '<textarea oninput="rbSetRepairDesc(\'' + r.nodeId + '\', this.value)" placeholder="Describe what was done (e.g. Removed failed sealant, cleaned joint, applied new backer rod and polyurethane sealant)" ' +
+            'style="width:100%;min-height:48px;background:#111;border:1px solid #2a2d38;color:#1fd0a5;border-radius:6px;padding:9px 11px;font-size:0.84rem;line-height:1.5;resize:vertical;box-sizing:border-box;font-family:inherit;">' + rbEsc(r.desc) + '</textarea>' +
+        '</div>';
+      }).join('');
+      return '<details open style="background:#1a1d27;border:1px solid #2a2d38;border-radius:12px;padding:18px;margin-bottom:16px;">' +
+        '<summary style="font-size:0.78rem;color:#28a745;text-transform:uppercase;font-weight:bold;letter-spacing:1px;cursor:pointer;">\u2713 Completed Repairs (' + done.length + ') — describe what was done</summary>' +
+        '<div style="margin-top:14px;">' + rows +
+        '<div style="font-size:0.66rem;color:#666;margin-top:4px;line-height:1.5;">These appear in the report\'s Work Completed section and are summarized in the Executive Summary. Photos attached to each item are included automatically if available.</div>' +
+        '</div></details>';
+    })()}
+
+
+    <div style="background:#1a1d27;border:1px solid #2a2d38;border-radius:12px;padding:18px;margin-bottom:16px;">
+      ${(function(){
+        var cands = rbCandidates().filter(function(c){ return rbIsIncluded(c.nodeId); });
+        var found = cands.length;
+        var fixed = 0;
+        if (typeof repairFixed !== 'undefined') { cands.forEach(function(c){ if(repairFixed[c.nodeId]) fixed++; }); }
+        var remaining = Math.max(0, found - fixed);
+        var auto = '';
+        if (found) {
+          auto = 'This assessment identified ' + found + ' finding' + (found!==1?'s':'') + ' across the building envelope. ';
+          if (fixed>0 && remaining===0) {
+            auto += (fixed===1) ? 'This condition was repaired during this engagement through same-drop remediation.' : 'All ' + fixed + ' were repaired during this engagement through same-drop remediation.';
+          } else if (fixed>0) {
+            auto += 'Of these, ' + fixed + ' ' + (fixed!==1?'were':'was') + ' repaired during this engagement through same-drop remediation, with ' + remaining + ' remaining condition' + (remaining!==1?'s':'') + ' recommended for monitoring and scheduled maintenance.';
+          } else if (remaining===1) {
+            auto += 'This condition is recommended for monitoring and scheduled maintenance, with severity and a suggested timeframe detailed below.';
+          } else {
+            auto += 'These ' + remaining + ' conditions are recommended for monitoring and scheduled maintenance, with severity and suggested timeframes detailed below.';
+          }
+        }
+        return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">' +
+            '<div style="font-size:0.8rem;color:#1fd0a5;text-transform:uppercase;font-weight:bold;letter-spacing:1px;">Findings Summary</div>' +
+            '<div style="display:flex;gap:6px;font-size:0.66rem;">' +
+              '<span style="background:#0d1117;border:1px solid #2a2d38;border-radius:10px;padding:3px 9px;color:#fff;">Found: <strong>' + found + '</strong></span>' +
+              '<span style="background:#0a1a0a;border:1px solid #28a745;border-radius:10px;padding:3px 9px;color:#28a745;">Fixed: <strong>' + fixed + '</strong></span>' +
+              '<span style="background:#1a1500;border:1px solid #f39c12;border-radius:10px;padding:3px 9px;color:#f39c12;">Monitor: <strong>' + remaining + '</strong></span>' +
+            '</div>' +
+          '</div>' +
+          '<textarea id="rb-findings-summary-ta" oninput="rbSetMeta(\'findingsSummary\', this.value)" placeholder="' + auto.replace(/"/g,'&quot;') + '" ' +
+            'style="width:100%;min-height:70px;background:#111;border:1px solid #2a2d38;color:#fff;border-radius:6px;padding:11px;font-family:inherit;font-size:0.86rem;line-height:1.5;resize:vertical;box-sizing:border-box;">' + rbEsc(REPORT_META.findingsSummary || '') + '</textarea>' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-top:6px;">' +
+            '<button onclick="rbSetMeta(\'findingsSummary\',\'\');renderReportBuilder();" style="padding:5px 10px;background:#0a1a14;color:#1fd0a5;border:1px solid #1fd0a5;border-radius:5px;font-size:0.68rem;font-weight:bold;cursor:pointer;">↻ Use auto-generated</button>' +
+            '<span style="font-size:0.64rem;color:#666;">Leave blank to auto-generate from the counts above. This appears at the top of the Executive Summary.</span>' +
+          '</div>';
+      })()}
+    </div>
+
     <div style="background:#1a1d27;border:1px solid #2a2d38;border-radius:12px;padding:18px;margin-bottom:16px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
         <div style="font-size:0.8rem;color:#0cf;text-transform:uppercase;font-weight:bold;letter-spacing:1px;">Executive Summary</div>
@@ -5913,6 +6010,40 @@ function rbBuildRecommendationsSection(cands, sevCount) {
   return html;
 }
 
+// Work Completed section — lists repairs that were marked fixed in the planner.
+function rbBuildWorkCompletedSection() {
+  var done = rbCollectCompletedRepairs();
+  if (!done.length) return '';
+  var rows = done.map(function(r, i){
+    var catLine = (r.cats && r.cats.length) ? r.cats.join(' · ') : '';
+    var photosHtml = '';
+    // Include up to 2 photos if available for this node
+    if (r.node) {
+      var items = (typeof rbPhotoItems === 'function') ? rbPhotoItems(r.node) : [];
+      if (items.length) {
+        var shown = items.slice(0, 2).map(function(it){
+          return '<div class="wc-photo"><img src="' + it.url + '"' + (it.rot ? ' style="transform:rotate(' + it.rot + 'deg);"' : '') + '></div>';
+        }).join('');
+        photosHtml = '<div class="wc-photos">' + shown + '</div>';
+      }
+    }
+    return '<div class="wc-item">' +
+      '<div class="wc-head">' +
+        '<div class="wc-check">\u2713</div>' +
+        '<div class="wc-titles">' +
+          '<div class="wc-title">' + rbEsc(r.label) + '</div>' +
+          (r.location ? '<div class="wc-loc">' + rbEsc(r.location) + '</div>' : '') +
+        '</div>' +
+        (catLine ? '<div class="wc-cat">' + rbEsc(catLine) + '</div>' : '') +
+      '</div>' +
+      (r.desc ? '<div class="wc-desc">' + rbEsc(r.desc) + '</div>' : '') +
+      photosHtml +
+    '</div>';
+  }).join('');
+  return '<div class="wc-intro">The following repairs were completed during this engagement. Verticality performs same-drop remediation, addressing many conditions at the time of inspection to reduce mobilizations and shorten repair timelines.</div>' +
+    '<div class="wc-list">' + rows + '</div>';
+}
+
 // Limitations / disclaimer
 function rbBuildLimitations() {
   return `
@@ -6030,6 +6161,33 @@ function rbBuildReportHTML() {
   const _propertyHtml = rbBuildPropertySection();
   const _recsHtml = rbBuildRecommendationsSection(cands, _sevCount);
   const _limitationsHtml = rbBuildLimitations();
+  const _workCompletedHtml = rbBuildWorkCompletedSection();
+  const _completedCount = rbCollectCompletedRepairs().length;
+  // Count how many of the INCLUDED findings have been marked fixed in the repair planner
+  let _fixedInReport = 0;
+  if (typeof repairFixed !== 'undefined') {
+    cands.forEach(function(c){ if (repairFixed[c.nodeId]) _fixedInReport++; });
+  }
+  const _remaining = Math.max(0, _totalFindings - _fixedInReport);
+  // Auto-generated findings + repairs summary line (editable via REPORT_META.findingsSummary)
+  const _autoFindingsSummary = (function(){
+    if (!_totalFindings) return '';
+    let s = `This assessment identified ${_totalFindings} finding${_totalFindings !== 1 ? 's' : ''} across the building envelope. `;
+    if (_fixedInReport > 0 && _remaining === 0) {
+      s += _fixedInReport === 1 ? `This condition was repaired during this engagement through same-drop remediation.` : `All ${_fixedInReport} were repaired during this engagement through same-drop remediation.`;
+    } else if (_fixedInReport > 0) {
+      s += `Of these, ${_fixedInReport} ${_fixedInReport !== 1 ? 'were' : 'was'} repaired during this engagement through same-drop remediation, with ${_remaining} remaining condition${_remaining !== 1 ? 's' : ''} recommended for monitoring and scheduled maintenance.`;
+    } else if (_remaining === 1) {
+      s += `This condition is recommended for monitoring and scheduled maintenance, with severity and a suggested timeframe detailed below.`;
+    } else {
+      s += `These ${_remaining} conditions are recommended for monitoring and scheduled maintenance, with severity and suggested timeframes detailed below.`;
+    }
+    return s;
+  })();
+  // Use the manual override if the user typed one, otherwise the auto-generated line
+  const _workSummaryLine = (M.findingsSummary && M.findingsSummary.trim())
+    ? rbEsc(M.findingsSummary)
+    : _autoFindingsSummary;
   const _credLine = M.inspectorCreds ? `<div style="font-size:8.5pt;color:#6b7a8f;margin-top:3px;">${rbEsc(M.inspectorCreds)}</div>` : '';
 
   const doc = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${building} — Facade Inspection Report</title>
@@ -6183,6 +6341,21 @@ function rbBuildReportHTML() {
   .rec-note { font-size: 10pt; color: var(--slate); line-height: 1.65; padding: 14px 16px; background: #f6f8fa; border-left: 3px solid var(--navy); border-radius: 0 6px 6px 0; margin-top: 6px; }
   .rec-est-summary { font-size: 9.5pt; color: var(--slate); line-height: 1.6; padding: 12px 16px; background: #f3f7f4; border-left: 3px solid var(--low); border-radius: 0 6px 6px 0; margin: 14px 0 6px; }
 
+  /* ---------- WORK COMPLETED ---------- */
+  .wc-intro { font-size: 10.5pt; color: var(--slate); line-height: 1.7; margin-bottom: 18px; padding: 12px 16px; background: #f3f7f4; border-left: 3px solid var(--low); border-radius: 0 6px 6px 0; }
+  .wc-list { display: flex; flex-direction: column; gap: 14px; }
+  .wc-item { border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; page-break-inside: avoid; }
+  .wc-head { display: flex; align-items: center; gap: 12px; }
+  .wc-check { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; background: var(--low); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 14pt; }
+  .wc-titles { flex: 1; }
+  .wc-title { font-size: 12pt; font-weight: 600; color: var(--navy); font-family: Georgia, serif; line-height: 1.2; }
+  .wc-loc { font-size: 9pt; color: var(--grey); margin-top: 2px; }
+  .wc-cat { flex-shrink: 0; font-size: 8pt; font-weight: 700; color: var(--low); text-transform: uppercase; letter-spacing: 0.5px; }
+  .wc-desc { font-size: 10pt; color: var(--slate); line-height: 1.6; margin-top: 10px; padding-left: 40px; }
+  .wc-photos { display: flex; gap: 10px; margin-top: 12px; padding-left: 40px; }
+  .wc-photo { flex: 0 0 calc(50% - 25px); aspect-ratio: 4/3; overflow: hidden; border-radius: 5px; border: 1px solid var(--line); background: #111c2b; }
+  .wc-photo img { width: 100%; height: 100%; object-fit: contain; }
+
   /* ---------- LIMITATIONS ---------- */
   .limitations p { font-size: 9pt; color: var(--grey); line-height: 1.65; margin-bottom: 10px; text-align: justify; }
 
@@ -6244,7 +6417,7 @@ function rbBuildReportHTML() {
       <div class="dash-card is-low"><div class="dash-num">${_sevCount.LOW}</div><div class="dash-lbl">Low</div></div>
     </div>
 
-    <div class="exec-body">${execVal}</div>
+    <div class="exec-body">${_workSummaryLine ? _workSummaryLine + '\n\n' : ''}${execVal}</div>
   </div>
 
   <!-- FINDINGS -->
@@ -6255,10 +6428,18 @@ function rbBuildReportHTML() {
     ${monitoringHtml}
   </div>
 
+  ${_workCompletedHtml ? `
+  <!-- WORK COMPLETED -->
+  <div class="page-break"></div>
+  <div class="page">
+    <div class="sect-head"><span class="sect-num">04</span><span class="sect-title">Work Completed</span></div>
+    ${_workCompletedHtml}
+  </div>` : ''}
+
   <!-- RECOMMENDATIONS -->
   <div class="page-break"></div>
   <div class="page">
-    <div class="sect-head"><span class="sect-num">04</span><span class="sect-title">Recommendations</span></div>
+    <div class="sect-head"><span class="sect-num">${_workCompletedHtml ? '05' : '04'}</span><span class="sect-title">Recommendations</span></div>
     ${_recsHtml}
 
     <h4 class="subhead" style="margin-top:30px;">Limitations of Assessment</h4>
