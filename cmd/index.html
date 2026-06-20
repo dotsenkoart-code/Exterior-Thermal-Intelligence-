@@ -3418,6 +3418,7 @@ const DEFECT_COLORS = {
 };
 
 let rpActiveFilter  = 'ALL';
+let rbFindingsView = 'all'; // on-screen report findings filter: 'all' | 'fixed' | 'monitor'
 let rpGroupBy       = 'defect';
 let rpActiveElev    = '';
 let rpDefectFilter  = 'ALL'; // 'defect' | 'elevation' | 'drop'
@@ -5066,11 +5067,12 @@ function rbCandidates() {
         });
     });
   });
-  // Manual (non-window) defects
+  // Manual (non-window) defects — these are deliberately hand-added findings, so they
+  // always count as candidates (the user added them on purpose). They can still be
+  // removed from a specific report via the exclude toggle (rbIsIncluded).
   Object.values(manualDefects).forEach(node => {
-    const confirmed = node.status === 'status-confirmed';
-    const inPlanner = !!repairPriorities[node.id];
-    if (confirmed || inPlanner) out.push({ nodeId: node.id, node, drop: 'MANUAL', floor: node.floor||0, pos: '', isManual: true, isFixed: !!repairFixed[node.id] });
+    if (!node || !node.id) return;
+    out.push({ nodeId: node.id, node, drop: 'MANUAL', floor: node.floor||0, pos: '', isManual: true, isFixed: !!repairFixed[node.id] });
   });
   out.sort((a, b) =>
     RB_SEV_RANK[rbSeverity(a.nodeId, a.node)] - RB_SEV_RANK[rbSeverity(b.nodeId, b.node)]);
@@ -5109,6 +5111,7 @@ function rbBuildExecSummary(cands) {
 
 // ── event handlers (update state + persist + minimal DOM) ───────────────────
 function rbSetMeta(field, val) { REPORT_META[field] = val; saveReportMeta(); }
+function rbSetFindingsView(view) { rbFindingsView = view; renderReportBuilder(); }
 function rbSetEstimate(nodeId, val) {
   val = (val || '').trim();
   if (val) { REPORT_META.estimates[nodeId] = val; }
@@ -5573,6 +5576,16 @@ function renderReportBuilder() {
               style="background:#111;border:1px solid #2a2d38;color:#fff;border-radius:6px;padding:9px 11px;font-size:0.9rem;">
      </div>`;
 
+  // Findings view filter (on-screen only): compute fixed/monitor counts and the filtered list.
+  // A finding is "fixed" if marked fixed in the repair planner; otherwise "monitor".
+  const _inclCands = cands.filter(c => rbIsIncluded(c.nodeId));
+  const _isFixed = c => (typeof repairFixed !== 'undefined') && !!repairFixed[c.nodeId];
+  const _fvCounts = {
+    all: _inclCands.length,
+    fixed: _inclCands.filter(_isFixed).length,
+    monitor: _inclCands.filter(c => !_isFixed(c)).length
+  };
+
   let html = `
   <div style="max-width:980px;margin:0 auto;width:100%;padding:4px 4px 40px;">
 
@@ -5646,26 +5659,7 @@ function renderReportBuilder() {
       </div>
     </details>
 
-    ${(function(){
-      var done = rbCollectCompletedRepairs();
-      if (!done.length) return '<div style="background:#1a1d27;border:1px solid #2a2d38;border-radius:12px;padding:14px 18px;margin-bottom:16px;color:#666;font-size:0.8rem;">No completed repairs marked yet. Mark repairs as <strong>fixed</strong> in the Repair Planner and they will appear here, ready for you to describe what was done.</div>';
-      var rows = done.map(function(r){
-        return '<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #23262f;">' +
-          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' +
-            '<span style="color:#28a745;font-weight:900;">\u2713</span>' +
-            '<span style="font-size:0.86rem;font-weight:bold;color:#fff;">' + rbEsc(r.label) + '</span>' +
-            (r.location ? '<span style="font-size:0.72rem;color:#888;">— ' + rbEsc(r.location) + '</span>' : '') +
-          '</div>' +
-          '<textarea oninput="rbSetRepairDesc(\'' + r.nodeId + '\', this.value)" placeholder="Describe what was done (e.g. Removed failed sealant, cleaned joint, applied new backer rod and polyurethane sealant)" ' +
-            'style="width:100%;min-height:48px;background:#111;border:1px solid #2a2d38;color:#1fd0a5;border-radius:6px;padding:9px 11px;font-size:0.84rem;line-height:1.5;resize:vertical;box-sizing:border-box;font-family:inherit;">' + rbEsc(r.desc) + '</textarea>' +
-        '</div>';
-      }).join('');
-      return '<details open style="background:#1a1d27;border:1px solid #2a2d38;border-radius:12px;padding:18px;margin-bottom:16px;">' +
-        '<summary style="font-size:0.78rem;color:#28a745;text-transform:uppercase;font-weight:bold;letter-spacing:1px;cursor:pointer;">\u2713 Completed Repairs (' + done.length + ') — describe what was done</summary>' +
-        '<div style="margin-top:14px;">' + rows +
-        '<div style="font-size:0.66rem;color:#666;margin-top:4px;line-height:1.5;">These appear in the report\'s Work Completed section and are summarized in the Executive Summary. Photos attached to each item are included automatically if available.</div>' +
-        '</div></details>';
-    })()}
+
 
 
     <div style="background:#1a1d27;border:1px solid #2a2d38;border-radius:12px;padding:18px;margin-bottom:16px;">
@@ -5745,7 +5739,15 @@ function renderReportBuilder() {
       </div>
     </div>
 
-    <div style="font-size:0.8rem;color:#0cf;text-transform:uppercase;font-weight:bold;letter-spacing:1px;margin:18px 4px 10px;">Findings</div>`;
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:18px 4px 10px;flex-wrap:wrap;gap:8px;">
+      <div style="font-size:0.8rem;color:#0cf;text-transform:uppercase;font-weight:bold;letter-spacing:1px;">Findings</div>
+      <div style="display:flex;gap:4px;background:#0d1117;border:1px solid #2a2d38;border-radius:8px;padding:3px;">
+        <button onclick="rbSetFindingsView('all')" style="padding:5px 12px;border-radius:5px;border:none;cursor:pointer;font-size:0.7rem;font-weight:bold;background:${rbFindingsView==='all'?'#0cf':'transparent'};color:${rbFindingsView==='all'?'#000':'#888'};">All (${_fvCounts.all})</button>
+        <button onclick="rbSetFindingsView('fixed')" style="padding:5px 12px;border-radius:5px;border:none;cursor:pointer;font-size:0.7rem;font-weight:bold;background:${rbFindingsView==='fixed'?'#28a745':'transparent'};color:${rbFindingsView==='fixed'?'#fff':'#888'};">Repaired (${_fvCounts.fixed})</button>
+        <button onclick="rbSetFindingsView('monitor')" style="padding:5px 12px;border-radius:5px;border:none;cursor:pointer;font-size:0.7rem;font-weight:bold;background:${rbFindingsView==='monitor'?'#f39c12':'transparent'};color:${rbFindingsView==='monitor'?'#000':'#888'};">Monitor (${_fvCounts.monitor})</button>
+      </div>
+    </div>
+    <div style="font-size:0.66rem;color:#555;margin:0 4px 10px;">${rbFindingsView!=='all'?'Filtered view — the exported PDF always includes all findings.':'Showing all findings.'}</div>`;
 
   if (!cands.length) {
     html += `<div style="padding:40px;text-align:center;color:#444;border:1px dashed #2a2d38;border-radius:12px;">
@@ -5755,7 +5757,13 @@ function renderReportBuilder() {
   }
 
   let _wsGroupIdx = 0;
-  rbGroupCandidates(cands).forEach(({ label: _wsLabel, items: _wsItems }) => {
+  // Apply the on-screen findings view filter (all / fixed / monitor)
+  const _viewCands = cands.filter(c => {
+    if (rbFindingsView === 'all') return true;
+    var fixed = (typeof repairFixed !== 'undefined') && !!repairFixed[c.nodeId];
+    return rbFindingsView === 'fixed' ? fixed : !fixed;
+  });
+  rbGroupCandidates(_viewCands).forEach(({ label: _wsLabel, items: _wsItems }) => {
     if (_wsLabel) {
       html += `<div style="margin:20px 0 8px;padding:7px 12px;background:#12161f;border-left:4px solid #1fd0a5;border-radius:0 6px 6px 0;display:flex;align-items:center;gap:10px;">
         <span style="font-size:0.68rem;font-weight:bold;text-transform:uppercase;letter-spacing:1px;color:#1fd0a5;">${rbEsc(_wsLabel)}</span>
@@ -6181,7 +6189,6 @@ function rbBuildReportHTML() {
   const _propertyHtml = rbBuildPropertySection();
   const _recsHtml = rbBuildRecommendationsSection(cands, _sevCount);
   const _limitationsHtml = rbBuildLimitations();
-  const _workCompletedHtml = rbBuildWorkCompletedSection();
   const _completedCount = rbCollectCompletedRepairs().length;
   // Count how many of the INCLUDED findings have been marked fixed in the repair planner
   let _fixedInReport = 0;
@@ -6448,18 +6455,10 @@ function rbBuildReportHTML() {
     ${monitoringHtml}
   </div>
 
-  ${_workCompletedHtml ? `
-  <!-- WORK COMPLETED -->
-  <div class="page-break"></div>
-  <div class="page">
-    <div class="sect-head"><span class="sect-num">04</span><span class="sect-title">Work Completed</span></div>
-    ${_workCompletedHtml}
-  </div>` : ''}
-
   <!-- RECOMMENDATIONS -->
   <div class="page-break"></div>
   <div class="page">
-    <div class="sect-head"><span class="sect-num">${_workCompletedHtml ? '05' : '04'}</span><span class="sect-title">Recommendations</span></div>
+    <div class="sect-head"><span class="sect-num">04</span><span class="sect-title">Recommendations</span></div>
     ${_recsHtml}
 
     <h4 class="subhead" style="margin-top:30px;">Limitations of Assessment</h4>
