@@ -5078,17 +5078,33 @@ function rbCandidates() {
 }
 
 function rbBuildExecSummary(cands) {
+  const incl = cands.filter(x => rbIsIncluded(x.nodeId));
   const c = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
-  cands.filter(x => rbIsIncluded(x.nodeId)).forEach(x => { c[rbSeverity(x.nodeId, x.node)]++; });
+  incl.forEach(x => { c[rbSeverity(x.nodeId, x.node)]++; });
   const total = c.CRITICAL + c.HIGH + c.MEDIUM + c.LOW;
   const b = REPORT_META.building || projectInfo || 'the building';
-  return `A thermal and visual rope-access inspection was carried out on the façades of ${b}. `
+
+  // How many of the included findings were repaired (marked fixed in the planner)
+  let fixed = 0;
+  if (typeof repairFixed !== 'undefined') { incl.forEach(x => { if (repairFixed[x.nodeId]) fixed++; }); }
+  const remaining = Math.max(0, total - fixed);
+
+  let s = `A thermal and visual rope-access inspection was carried out on the façades of ${b}. `
     + `A total of ${total} defect`
     + `${total !== 1 ? 's were' : ' was'} identified and documented. Of these, `
     + `${c.CRITICAL} ${c.CRITICAL === 1 ? 'is' : 'are'} classified critical, ${c.HIGH} high, `
-    + `${c.MEDIUM} medium and ${c.LOW} low priority. Each finding below includes its location, `
-    + `severity, a description of the observed condition, and supporting thermal and/or visual `
-    + `imagery. Recommended remedial actions should be prioritised in order of severity.`;
+    + `${c.MEDIUM} medium and ${c.LOW} low priority. `;
+
+  // Repair / monitoring sentence
+  if (fixed > 0 && remaining === 0) {
+    s += `All ${total === 1 ? 'of which was' : 'were'} repaired during this engagement through same-drop remediation. `;
+  } else if (fixed > 0) {
+    s += `${fixed} ${fixed === 1 ? 'was' : 'were'} repaired during this engagement through same-drop remediation, leaving ${remaining} condition${remaining !== 1 ? 's' : ''} recommended for monitoring and scheduled maintenance. `;
+  }
+
+  s += `Each finding below includes its location, severity, a description of the observed condition, `
+    + `and supporting thermal and/or visual imagery. Recommended remedial actions should be prioritised in order of severity.`;
+  return s;
 }
 
 // ── event handlers (update state + persist + minimal DOM) ───────────────────
@@ -5193,9 +5209,13 @@ function rbTogglePhoto(nodeId, key, kind, el) {
 }
 function rbRegenSummary() {
   REPORT_META.execSummary = rbBuildExecSummary(rbCandidates());
+  REPORT_META.confirmed = false;
   saveReportMeta();
-  const ta = document.getElementById('rb-exec');
+  // The textarea id is 'rb-exec-ta'; update it directly and re-render so it sticks
+  const ta = document.getElementById('rb-exec-ta');
   if (ta) ta.value = REPORT_META.execSummary;
+  renderReportBuilder();
+  showToast('[OK] Executive summary regenerated from current data', 2500);
 }
 
 // ── render the tab ──────────────────────────────────────────────────────────
