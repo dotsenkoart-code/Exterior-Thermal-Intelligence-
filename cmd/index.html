@@ -3419,6 +3419,9 @@ const DEFECT_COLORS = {
 
 let rpActiveFilter  = 'ALL';
 let rbFindingsView = 'all'; // on-screen report findings filter: 'all' | 'fixed' | 'monitor'
+let rbFocusMode = false;    // productivity mode: show one finding at a time
+let rbFocusIndex = 0;       // which finding is currently shown in focus mode
+let rbReviewed = {};        // nodeId -> true when user has stepped past/marked it reviewed
 let rpGroupBy       = 'defect';
 let rpActiveElev    = '';
 let rpDefectFilter  = 'ALL'; // 'defect' | 'elevation' | 'drop'
@@ -4845,7 +4848,8 @@ let REPORT_META = {
   estimates: {},            // nodeId -> estimate string (only set where provided)
   photoOrder: {},           // nodeId -> ['key:kind', ...] explicit display order
   repairDesc: {},           // nodeId -> short description of completed repair work
-  findingsSummary: ''       // '' = auto-generate the found/fixed/monitor summary line
+  findingsSummary: '',      // '' = auto-generate the found/fixed/monitor summary line
+  verified: {}              // nodeId -> true when user has double-checked the finding
 };
 
 function loadReportMeta() {
@@ -5115,7 +5119,33 @@ function rbBuildExecSummary(cands) {
 
 // ── event handlers (update state + persist + minimal DOM) ───────────────────
 function rbSetMeta(field, val) { REPORT_META[field] = val; saveReportMeta(); }
-function rbSetFindingsView(view) { rbFindingsView = view; renderReportBuilder(); }
+function rbSetFindingsView(view) { rbFindingsView = view; if (rbFocusMode) rbFocusIndex = 0; renderReportBuilder(); }
+function rbSetVerified(nodeId, on) {
+  if (!REPORT_META.verified) REPORT_META.verified = {};
+  if (on) REPORT_META.verified[nodeId] = true;
+  else delete REPORT_META.verified[nodeId];
+  saveReportMeta();
+  renderReportBuilder();
+}
+function rbToggleFocusMode() {
+  rbFocusMode = !rbFocusMode;
+  if (rbFocusMode) rbFocusIndex = 0;
+  renderReportBuilder();
+  if (rbFocusMode) showToast('Focus Mode on — reviewing one finding at a time. Use Back/Next to move.', 3000);
+}
+function rbFocusNav(dir) {
+  rbFocusIndex += dir;
+  renderReportBuilder();
+  // Scroll to top of the findings area so the focused card is in view
+  var el = document.getElementById('report-builder-content') || document.querySelector('#arena-report');
+  if (el) el.scrollTop = 0;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function rbResetReviewed() {
+  rbReviewed = {};
+  renderReportBuilder();
+  showToast('Progress reset.', 2000);
+}
 // Console diagnostic: see the breakdown of what's being counted
 function rbDiagnoseCounts() {
   var rawManual = (typeof manualDefects !== 'undefined') ? Object.keys(manualDefects).length : 0;
@@ -5750,7 +5780,8 @@ function renderReportBuilder() {
           </div>
           <div>
             <div style="font-size:0.62rem;color:#a78bfa;text-transform:uppercase;font-weight:bold;margin-bottom:4px;">AI version</div>
-            <div id="rb-claude-text" style="font-size:0.82rem;color:#fff;line-height:1.55;background:#0a0a14;padding:10px;border-radius:6px;min-height:60px;white-space:pre-wrap;">…</div>
+            <div id="rb-claude-text" contenteditable="true" spellcheck="true" style="font-size:0.82rem;color:#fff;line-height:1.55;background:#0a0a14;padding:10px;border-radius:6px;min-height:60px;white-space:pre-wrap;outline:none;border:1px solid #2a2d38;cursor:text;">…</div>
+            <div style="font-size:0.6rem;color:#777;margin-top:4px;">✎ You can edit the AI text directly here before using it.</div>
           </div>
         </div>
         <div style="margin-bottom:10px;">
@@ -5777,7 +5808,37 @@ function renderReportBuilder() {
         <button onclick="rbSetFindingsView('fixed')" style="padding:5px 12px;border-radius:5px;border:none;cursor:pointer;font-size:0.7rem;font-weight:bold;background:${rbFindingsView==='fixed'?'#28a745':'transparent'};color:${rbFindingsView==='fixed'?'#fff':'#888'};">Repaired (${_fvCounts.fixed})</button>
         <button onclick="rbSetFindingsView('monitor')" style="padding:5px 12px;border-radius:5px;border:none;cursor:pointer;font-size:0.7rem;font-weight:bold;background:${rbFindingsView==='monitor'?'#f39c12':'transparent'};color:${rbFindingsView==='monitor'?'#000':'#888'};">Monitor (${_fvCounts.monitor})</button>
       </div>
+      <button onclick="rbToggleFocusMode()" style="padding:6px 14px;border-radius:8px;cursor:pointer;font-size:0.72rem;font-weight:bold;border:1px solid ${rbFocusMode?'#a78bfa':'#2a2d38'};background:${rbFocusMode?'#a78bfa':'#0d1117'};color:${rbFocusMode?'#000':'#a78bfa'};">${rbFocusMode?'✓ Focus Mode On':'◉ Focus Mode'}</button>
     </div>
+    ${(function(){
+      // Dual progress tracking: WRITTEN (has description) + VERIFIED (manually checked)
+      var totalCount = _viewCands.length;
+      var writtenCount = _viewCands.filter(function(c){
+        var d = REPORT_META.desc[c.nodeId];
+        return d != null && String(d).trim().length > 0;
+      }).length;
+      var verifiedCount = _viewCands.filter(function(c){ return REPORT_META.verified && REPORT_META.verified[c.nodeId]; }).length;
+      var wPct = totalCount ? Math.round(writtenCount/totalCount*100) : 0;
+      var vPct = totalCount ? Math.round(verifiedCount/totalCount*100) : 0;
+      function bar(label, count, pct, color, leftColor){
+        return '<div style="margin-bottom:8px;">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">' +
+            '<span style="font-size:0.7rem;color:#888;">' + label + ': <strong style="color:' + color + ';">' + count + '</strong> of <strong>' + totalCount + '</strong>' +
+              (totalCount-count>0 ? ' · <span style="color:' + leftColor + ';">' + (totalCount-count) + ' left</span>' : ' · <span style="color:#28a745;">complete \u2713</span>') + '</span>' +
+            '<span style="font-size:0.66rem;color:' + color + ';font-weight:bold;">' + pct + '%</span>' +
+          '</div>' +
+          '<div style="height:6px;background:#0d1117;border-radius:3px;overflow:hidden;border:1px solid #2a2d38;">' +
+            '<div style="height:100%;width:' + pct + '%;background:' + color + ';transition:width 0.3s;"></div>' +
+          '</div>' +
+        '</div>';
+      }
+      return '<div style="margin:0 4px 14px;padding:12px 14px;background:#12161f;border:1px solid #2a2d38;border-radius:10px;">' +
+        '<div style="font-size:0.64rem;color:#666;text-transform:uppercase;letter-spacing:1px;font-weight:bold;margin-bottom:8px;">Review Progress</div>' +
+        bar('\u270E Written', writtenCount, wPct, '#1fd0a5', '#f39c12') +
+        bar('\u2713 Verified', verifiedCount, vPct, '#28a745', '#888') +
+        '<div style="font-size:0.6rem;color:#666;margin-top:2px;">Written = has a description. Verified = you\'ve double-checked it (tick the box on each finding).</div>' +
+      '</div>';
+    })()}
     <div style="font-size:0.66rem;color:#555;margin:0 4px 10px;">${rbFindingsView!=='all'?'Filtered view — the exported PDF always includes all findings.':'Showing all findings.'}</div>`;
 
   if (!cands.length) {
@@ -5794,8 +5855,31 @@ function renderReportBuilder() {
     var fixed = (typeof repairFixed !== 'undefined') && !!repairFixed[c.nodeId];
     return rbFindingsView === 'fixed' ? fixed : !fixed;
   });
-  rbGroupCandidates(_viewCands).forEach(({ label: _wsLabel, items: _wsItems }) => {
-    if (_wsLabel) {
+
+  // FOCUS MODE: show one finding at a time with next/back navigation
+  let _renderCands = _viewCands;
+  if (rbFocusMode && _viewCands.length) {
+    // Clamp the index to valid range
+    if (rbFocusIndex < 0) rbFocusIndex = 0;
+    if (rbFocusIndex >= _viewCands.length) rbFocusIndex = _viewCands.length - 1;
+    const _cur = _viewCands[rbFocusIndex];
+    _renderCands = [_cur];
+    // Navigation bar
+    const _atFirst = rbFocusIndex === 0;
+    const _atLast = rbFocusIndex === _viewCands.length - 1;
+    html += `
+    <div style="position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px;background:#12101f;border:1px solid #a78bfa;border-radius:10px;padding:10px 14px;margin-bottom:14px;">
+      <button onclick="rbFocusNav(-1)" ${_atFirst?'disabled':''} style="padding:8px 16px;border-radius:7px;border:none;cursor:${_atFirst?'not-allowed':'pointer'};font-weight:bold;font-size:0.8rem;background:${_atFirst?'#1a1a22':'#a78bfa'};color:${_atFirst?'#555':'#000'};">◄ Back</button>
+      <div style="text-align:center;flex:1;">
+        <div style="font-size:0.78rem;color:#a78bfa;font-weight:bold;">Finding ${rbFocusIndex+1} of ${_viewCands.length}</div>
+        <div style="font-size:0.62rem;color:#888;margin-top:1px;">Focus Mode — review one at a time</div>
+      </div>
+      <button onclick="rbFocusNav(1)" ${_atLast?'disabled':''} style="padding:8px 16px;border-radius:7px;border:none;cursor:${_atLast?'not-allowed':'pointer'};font-weight:bold;font-size:0.8rem;background:${_atLast?'#1a1a22':'#a78bfa'};color:${_atLast?'#555':'#000'};">${_atLast?'Done':'Next ►'}</button>
+    </div>`;
+  }
+
+  rbGroupCandidates(_renderCands).forEach(({ label: _wsLabel, items: _wsItems }) => {
+    if (_wsLabel && !rbFocusMode) {
       html += `<div style="margin:20px 0 8px;padding:7px 12px;background:#12161f;border-left:4px solid #1fd0a5;border-radius:0 6px 6px 0;display:flex;align-items:center;gap:10px;">
         <span style="font-size:0.68rem;font-weight:bold;text-transform:uppercase;letter-spacing:1px;color:#1fd0a5;">${rbEsc(_wsLabel)}</span>
         <span style="font-size:0.65rem;color:#555;">${_wsItems.length} defect${_wsItems.length!==1?'s':''}</span>
@@ -5862,6 +5946,10 @@ function renderReportBuilder() {
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
             <span style="font-size:1.1rem;font-weight:900;color:#0cf;">${rbEsc(nodeId)}</span>
             <span id="rb-sevbadge-${nodeId}" style="padding:2px 10px;border-radius:4px;font-size:0.7rem;font-weight:900;background:${RB_SEV_COLOR[sev]};color:${sev === 'MEDIUM' ? '#000' : '#fff'};">${sev}</span>
+            ${c.isFixed
+              ? '<span style="padding:2px 10px;border-radius:4px;font-size:0.7rem;font-weight:900;background:#0a2a16;color:#28a745;border:1px solid #28a745;">\u2713 REPAIRED</span>'
+              : '<span style="padding:2px 10px;border-radius:4px;font-size:0.7rem;font-weight:900;background:#2a2200;color:#f39c12;border:1px solid #f39c12;">\u25C9 MONITOR</span>'}
+            ${(REPORT_META.desc[nodeId] && String(REPORT_META.desc[nodeId]).trim()) ? '<span style="padding:2px 8px;border-radius:4px;font-size:0.64rem;font-weight:bold;background:#0a1a18;color:#1fd0a5;border:1px solid #1fd0a5;">\u270E written</span>' : '<span style="padding:2px 8px;border-radius:4px;font-size:0.64rem;font-weight:bold;background:#1a1a1a;color:#666;border:1px solid #333;">\u270E not written</span>'}
             <span style="color:#888;font-size:0.82rem;">${rbEsc(rbLocation(drop, floor, pos))}</span>
           </div>
           <div style="margin-top:7px;">${tagChips}</div>
@@ -5926,6 +6014,11 @@ function renderReportBuilder() {
 
       <label style="font-size:0.68rem;color:#888;text-transform:uppercase;font-weight:bold;letter-spacing:0.5px;">Photos for report <span style="color:#1fd0a5;">(teal outline = included)</span></label>
       <div style="display:flex;gap:8px;overflow-x:auto;padding:8px 0 2px;">${thumbs}</div>
+      <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:12px;padding-top:10px;border-top:1px solid #2a2d38;">
+        ${(REPORT_META.verified && REPORT_META.verified[nodeId])
+          ? '<span style="font-size:0.7rem;color:#28a745;font-weight:bold;">\u2713 Verified — double-checked</span><button onclick="rbSetVerified(\'' + nodeId + '\', false)" style="padding:6px 14px;border-radius:7px;border:1px solid #444;background:#1a1a1a;color:#888;font-size:0.72rem;font-weight:bold;cursor:pointer;">Unverify</button>'
+          : '<span style="font-size:0.68rem;color:#666;">Double-checked this finding?</span><button onclick="rbSetVerified(\'' + nodeId + '\', true)" style="padding:6px 16px;border-radius:7px;border:1px solid #28a745;background:#0a2a16;color:#28a745;font-size:0.72rem;font-weight:bold;cursor:pointer;">\u2713 Mark Verified</button>'}
+      </div>
     </div>`;
   }); }); // close _wsItems + rbGroupCandidates
 
@@ -6843,6 +6936,7 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
   }
 
   var tools = [
+    toolBtn('✥', 'select', 'Select / move / rotate a shape'),
     toolBtn('◯', 'circle', 'Circle / ellipse'),
     toolBtn('↗', 'arrow', 'Arrow'),
     toolBtn('▢', 'box', 'Rectangle'),
@@ -6907,6 +7001,22 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
   toolbar.appendChild(cancelBtn);
   toolbar.appendChild(saveBtn);
 
+  // Select-mode hint (shown only when the Select tool is active)
+  var selectHint = document.createElement('div');
+  selectHint.id = 'annot-select-hint';
+  selectHint.style.cssText = 'display:none;width:100%;text-align:center;font-size:0.75rem;color:#1fd0a5;background:#0a1a14;border:1px solid #1fd0a5;border-radius:6px;padding:6px 10px;margin-top:6px;';
+  selectHint.innerHTML = '✥ Tap a shape to select it · drag to move · drag the green dot to rotate · press Delete to remove';
+  toolbar.appendChild(selectHint);
+
+  // Keyboard: Delete removes the selected shape
+  document.addEventListener('keydown', function _annotKey(ev){
+    if (!document.body.contains(overlay)) { document.removeEventListener('keydown', _annotKey); return; }
+    if ((ev.key === 'Delete' || ev.key === 'Backspace') && selectedShape && curTool === 'select') {
+      var i = shapes.indexOf(selectedShape);
+      if (i !== -1) { shapes.splice(i, 1); selectedShape = null; _edited = true; redraw(); }
+    }
+  });
+
   // --- Canvas stage ---
   var stage = document.createElement('div');
   stage.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;overflow:auto;padding:20px;';
@@ -6926,6 +7036,9 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
   var baseImg = new Image();
   var shapes = [];          // committed shapes
   var current = null;       // shape in progress
+  var selectedShape = null; // shape selected for move/rotate
+  var dragMode = null;      // 'move' | 'rotate' | null
+  var dragStart = null;     // {x,y} where drag began
   var curTool = 'circle';
   var curColor = '#ff2d2d';
   var curWidth = 5;
@@ -6934,12 +7047,17 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
 
   function setActiveTool(tool){
     curTool = tool;
+    if (tool !== 'select') { selectedShape = null; }
     tools.forEach(function(t){
       var on = t.dataset.tool === tool;
       t.style.background = on ? '#1fd0a5' : '#1a1d27';
       t.style.color = on ? '#000' : '#cbd5e1';
       t.style.borderColor = on ? '#1fd0a5' : '#2a2d38';
     });
+    // Show/hide the select-mode hint
+    var hint = document.getElementById('annot-select-hint');
+    if (hint) hint.style.display = (tool === 'select') ? 'block' : 'none';
+    if (typeof redraw === 'function') redraw();
   }
   function setActiveColor(c){
     curColor = c;
@@ -6974,7 +7092,23 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
     if (current) drawShape(current);
   }
 
+  function shapeCenter(s){
+    if (s.tool === 'free' && s.points && s.points.length) {
+      var xs = s.points.map(function(p){return p.x;}), ys = s.points.map(function(p){return p.y;});
+      return { x: (Math.min.apply(null,xs)+Math.max.apply(null,xs))/2, y: (Math.min.apply(null,ys)+Math.max.apply(null,ys))/2 };
+    }
+    return { x: (s.x1 + s.x2)/2, y: (s.y1 + s.y2)/2 };
+  }
+
   function drawShape(s){
+    ctx.save();
+    // Apply per-shape rotation around its center
+    if (s.rot) {
+      var c = shapeCenter(s);
+      ctx.translate(c.x, c.y);
+      ctx.rotate(s.rot * Math.PI / 180);
+      ctx.translate(-c.x, -c.y);
+    }
     ctx.strokeStyle = s.color;
     ctx.lineWidth = s.width;
     ctx.lineCap = 'round';
@@ -7010,6 +7144,58 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
       ctx.fillStyle = s.color;
       ctx.fillText(s.text || '', s.x1 + padding, s.y1 + padding);
     }
+    ctx.restore();
+    // Selection highlight + rotation handle
+    if (s === selectedShape) {
+      var c = shapeCenter(s);
+      var bb = shapeBBox(s);
+      ctx.save();
+      ctx.strokeStyle = '#1fd0a5';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6,4]);
+      ctx.strokeRect(bb.x - 6, bb.y - 6, bb.w + 12, bb.h + 12);
+      ctx.setLineDash([]);
+      // Rotation handle above the shape
+      var handleY = bb.y - 28;
+      ctx.beginPath();
+      ctx.moveTo(c.x, bb.y - 6);
+      ctx.lineTo(c.x, handleY);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(c.x, handleY, 7, 0, Math.PI*2);
+      ctx.fillStyle = '#1fd0a5';
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // Bounding box of a shape (ignoring rotation, for selection UI)
+  function shapeBBox(s){
+    if (s.tool === 'free' && s.points && s.points.length) {
+      var xs = s.points.map(function(p){return p.x;}), ys = s.points.map(function(p){return p.y;});
+      var minx=Math.min.apply(null,xs), miny=Math.min.apply(null,ys);
+      return { x:minx, y:miny, w:Math.max.apply(null,xs)-minx, h:Math.max.apply(null,ys)-miny };
+    }
+    if (s.tool === 'text') {
+      var fs = s.fontSize || 28;
+      return { x:s.x1, y:s.y1, w:(s.text||'').length*fs*0.55+fs, h:fs*1.7 };
+    }
+    var x=Math.min(s.x1,s.x2), y=Math.min(s.y1,s.y2);
+    return { x:x, y:y, w:Math.abs(s.x2-s.x1), h:Math.abs(s.y2-s.y1) };
+  }
+
+  // Hit test: is point (px,py) on/near shape s?
+  function hitShape(s, px, py){
+    var bb = shapeBBox(s);
+    var pad = Math.max(10, (s.width||5) + 6);
+    return px >= bb.x - pad && px <= bb.x + bb.w + pad && py >= bb.y - pad && py <= bb.y + bb.h + pad;
+  }
+
+  // Is point on the rotation handle of the selected shape?
+  function hitRotateHandle(s, px, py){
+    var c = shapeCenter(s), bb = shapeBBox(s);
+    var hx = c.x, hy = bb.y - 28;
+    return Math.hypot(px - hx, py - hy) <= 12;
   }
 
   function drawArrow(x1,y1,x2,y2,w,color){
@@ -7040,6 +7226,28 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
   function start(e){
     e.preventDefault();
     var p = getPos(e);
+    if (curTool === 'select') {
+      // Selecting / moving / rotating existing shapes
+      if (selectedShape && hitRotateHandle(selectedShape, p.x, p.y)) {
+        dragMode = 'rotate';
+        dragStart = p;
+        drawing = true;
+        return;
+      }
+      // Find topmost shape under the cursor
+      var hit = null;
+      for (var i = shapes.length - 1; i >= 0; i--) {
+        if (hitShape(shapes[i], p.x, p.y)) { hit = shapes[i]; break; }
+      }
+      selectedShape = hit;
+      if (hit) {
+        dragMode = 'move';
+        dragStart = p;
+        drawing = true;
+      }
+      redraw();
+      return;
+    }
     if (curTool === 'text') {
       // Inline text input on the canvas (window.prompt is blocked in some iframes)
       showTextInput(p.x, p.y);
@@ -7057,6 +7265,21 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
     if (!drawing) return;
     e.preventDefault();
     var p = getPos(e);
+    if (curTool === 'select' && selectedShape && dragMode) {
+      if (dragMode === 'move') {
+        var dx = p.x - dragStart.x, dy = p.y - dragStart.y;
+        moveShape(selectedShape, dx, dy);
+        dragStart = p;
+      } else if (dragMode === 'rotate') {
+        var c = shapeCenter(selectedShape);
+        var ang = Math.atan2(p.y - c.y, p.x - c.x) * 180 / Math.PI;
+        // Handle starts pointing "up" (-90deg), so offset
+        selectedShape.rot = ang + 90;
+      }
+      _edited = true;
+      redraw();
+      return;
+    }
     if (curTool === 'crop' && cropRect) {
       cropRect.x2 = p.x; cropRect.y2 = p.y;
       redraw();
@@ -7068,9 +7291,22 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
     if (curTool === 'free') current.points.push({x:p.x, y:p.y});
     redraw();
   }
+
+  // Move a shape by (dx,dy)
+  function moveShape(s, dx, dy){
+    if (s.tool === 'free' && s.points) {
+      s.points.forEach(function(pt){ pt.x += dx; pt.y += dy; });
+    }
+    s.x1 += dx; s.y1 += dy; s.x2 += dx; s.y2 += dy;
+  }
   function end(e){
     if (!drawing) return;
     drawing = false;
+    if (curTool === 'select') {
+      dragMode = null;
+      dragStart = null;
+      return;
+    }
     if (curTool === 'crop' && cropRect) {
       applyCrop(cropRect);
       cropRect = null;
