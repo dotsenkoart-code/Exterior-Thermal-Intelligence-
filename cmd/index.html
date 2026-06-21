@@ -5812,12 +5812,18 @@ function renderReportBuilder() {
     </div>
     ${(function(){
       // Dual progress tracking: WRITTEN (has description) + VERIFIED (manually checked)
-      var totalCount = _viewCands.length;
-      var writtenCount = _viewCands.filter(function(c){
+      // Compute the filtered list locally (this runs before _viewCands is defined below)
+      var _progCands = cands.filter(function(c){ return rbIsIncluded(c.nodeId); }).filter(function(c){
+        if (rbFindingsView === 'all') return true;
+        var fx = (typeof repairFixed !== 'undefined') && !!repairFixed[c.nodeId];
+        return rbFindingsView === 'fixed' ? fx : !fx;
+      });
+      var totalCount = _progCands.length;
+      var writtenCount = _progCands.filter(function(c){
         var d = REPORT_META.desc[c.nodeId];
         return d != null && String(d).trim().length > 0;
       }).length;
-      var verifiedCount = _viewCands.filter(function(c){ return REPORT_META.verified && REPORT_META.verified[c.nodeId]; }).length;
+      var verifiedCount = _progCands.filter(function(c){ return REPORT_META.verified && REPORT_META.verified[c.nodeId]; }).length;
       var wPct = totalCount ? Math.round(writtenCount/totalCount*100) : 0;
       var vPct = totalCount ? Math.round(verifiedCount/totalCount*100) : 0;
       function bar(label, count, pct, color, leftColor){
