@@ -1560,7 +1560,7 @@ function loadProjectFile(input) {
                     REPORT_META[k] = p.REPORT_META[k];
                 });
                 // Make sure sub-objects exist (older saves may lack newer fields)
-                ['desc','sev','excluded','estimates','photoOrder','repairDesc','verified'].forEach(function(k){
+                ['desc','sev','excluded','estimates','photoOrder','repairDesc','verified','title','tags'].forEach(function(k){
                     if (REPORT_META[k] == null) REPORT_META[k] = (k === 'excluded') ? [] : {};
                 });
                 try { saveReportMeta(); } catch(e) {}
@@ -4875,7 +4875,9 @@ let REPORT_META = {
   photoOrder: {},           // nodeId -> ['key:kind', ...] explicit display order
   repairDesc: {},           // nodeId -> short description of completed repair work
   findingsSummary: '',      // '' = auto-generate the found/fixed/monitor summary line
-  verified: {}              // nodeId -> true when user has double-checked the finding
+  verified: {},             // nodeId -> true when user has double-checked the finding
+  title: {},                // nodeId -> custom title override ('' or absent = auto-generate)
+  tags: {}                  // nodeId -> [tag,...] override for the displayed defect tags
 };
 
 function loadReportMeta() {
@@ -4884,6 +4886,7 @@ function loadReportMeta() {
     if (raw) REPORT_META = Object.assign(REPORT_META, JSON.parse(raw));
   } catch (e) { console.warn('[report] meta load failed', e); }
 }
+var _lastStorageWarn = 0;
 function saveReportMeta() {
   var data = JSON.stringify(REPORT_META);
   try {
@@ -4895,9 +4898,18 @@ function saveReportMeta() {
     try { localStorage.removeItem('strataManualPhotos'); } catch(e2) {}
     try {
       localStorage.setItem('strataReportMeta', data);
+      // Succeeded after clearing photos — report data IS saved. No alarm needed;
+      // just a quiet console note. (Photos remain safe in the project JSON.)
+      console.log('[report] saved after clearing photo cache — report data is safe');
     } catch (e3) {
+      // Still failing — this is the genuine "save a JSON" case. Throttle the warning
+      // so it shows at most once every 90s instead of on every keystroke.
       console.warn('[report] meta save still failing after clearing photo cache', e3);
-      if (typeof showToast === 'function') showToast('⚠ Storage full — please Save Project to a JSON file now to avoid losing report work.', 6000, true);
+      var now = Date.now();
+      if (typeof showToast === 'function' && (now - _lastStorageWarn) > 90000) {
+        _lastStorageWarn = now;
+        showToast('\u26A0 Browser storage is full. Your work is safe in this session, but please use Save Project to download a JSON file as a backup.', 6000, true);
+      }
     }
   }
 }
@@ -4976,6 +4988,12 @@ const RB_TEMPLATES = [
 
 const RB_SEV_RANK   = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
 const RB_SEV_COLOR  = { CRITICAL: '#b3122b', HIGH: '#d9534f', MEDIUM: '#f1c40f', LOW: '#28a745' };
+// Standard defect-type tags the user can pick from on each report card
+const RB_TAG_OPTIONS = [
+  'Sealant / Caulking', 'Moisture', 'Crack', 'Spalling', 'Mortar / Masonry',
+  'Corrosion / Rust', 'Window Seal', 'Expansion Joint', 'Coating / Paint',
+  'Efflorescence', 'Delamination', 'Structural'
+];
 const RB_POS_NAME   = { L: 'Left', C: 'Centre', R: 'Right' };
 
 function rbEsc(s) {
@@ -5024,6 +5042,10 @@ function rbSeverity(nodeId, node) {
   return REPORT_META.sev[nodeId] || rbDefaultSeverity(nodeId, node);
 }
 function rbTags(nodeId, node) {
+  // User override from the report builder wins
+  if (REPORT_META.tags && REPORT_META.tags[nodeId] && REPORT_META.tags[nodeId].length) {
+    return REPORT_META.tags[nodeId].slice();
+  }
   let tags = (repairTags[nodeId] && repairTags[nodeId].length) ? repairTags[nodeId].slice() : [];
   if (!tags.length) {
     const f = (node.finds || '').toUpperCase();
@@ -5198,8 +5220,78 @@ function rbBuildExecSummary(cands) {
 // ── event handlers (update state + persist + minimal DOM) ───────────────────
 function rbSetMeta(field, val) { REPORT_META[field] = val; saveReportMeta(); }
 function rbSetFindingsView(view) { rbFindingsView = view; if (rbFocusMode) rbFocusIndex = 0; renderReportBuilder(); }
+// Resolves the displayed title: custom override if set, else the auto-generated clean title.
+function rbResolveTitle(nodeId, node, tags, sev) {
+  if (REPORT_META.title && REPORT_META.title[nodeId] && String(REPORT_META.title[nodeId]).trim()) {
+    return String(REPORT_META.title[nodeId]).trim();
+  }
+  return rbCleanTitle(node.label || node.finds, tags, sev);
+}
+function rbSetTitle(nodeId, val) {
+  if (!REPORT_META.title) REPORT_META.title = {};
+  val = (val || '').trim();
+  if (val) REPORT_META.title[nodeId] = val;
+  else delete REPORT_META.title[nodeId];
+  saveReportMeta();
+}
+function rbToggleTag(nodeId, tag) {
+  if (!REPORT_META.tags) REPORT_META.tags = {};
+  // Seed from current displayed tags if no override exists yet
+  if (!REPORT_META.tags[nodeId]) {
+    var node = getNodeData(nodeId);
+    REPORT_META.tags[nodeId] = rbTags(nodeId, node).slice();
+  }
+  var arr = REPORT_META.tags[nodeId];
+  var i = arr.indexOf(tag);
+  if (i === -1) arr.push(tag);
+  else arr.splice(i, 1);
+  // If the override now exactly matches what auto would produce, we still keep it explicit (fine)
+  saveReportMeta();
+  renderReportBuilder();
+}
 let rbFocusPreview = false;  // in focus mode, show the report-style preview of the current finding
 function rbToggleFocusPreview() { rbFocusPreview = !rbFocusPreview; renderReportBuilder(); }
+// Estimate how full localStorage is and let the user free up space (photos are safe in JSON).
+function rbStorageStatus() {
+  var total = 0;
+  try {
+    for (var k in localStorage) {
+      if (localStorage.hasOwnProperty(k)) total += (localStorage[k].length + k.length);
+    }
+  } catch(e){}
+  // Most browsers cap localStorage around 5MB (~5,000,000 chars)
+  var mb = (total / 1000000).toFixed(1);
+  var pct = Math.min(100, Math.round(total / 5000000 * 100));
+  return { bytes: total, mb: mb, pct: pct };
+}
+function rbClearPhotoCache() {
+  var before = rbStorageStatus();
+  try { localStorage.removeItem('strataManualPhotos'); } catch(e){}
+  var after = rbStorageStatus();
+  var freed = (before.bytes - after.bytes) / 1000000;
+  showToast('Freed ' + freed.toFixed(1) + ' MB of browser storage. Your photos are still safe in the project JSON.', 4000);
+  renderReportBuilder();
+}
+// Inline per-card PDF preview (works in free-scroll, no Focus Mode needed)
+function rbPreviewCard(nodeId) {
+  var box = document.getElementById('rb-cardpreview-' + nodeId);
+  if (!box) return;
+  if (box.style.display === 'none' || !box.style.display) {
+    // Build the preview for this finding
+    var cands = rbCandidates();
+    var c = null, num = 0;
+    for (var i = 0; i < cands.length; i++) {
+      if (cands[i].nodeId === nodeId) { c = cands[i]; num = i + 1; break; }
+    }
+    if (!c) return;
+    box.innerHTML = '<div style="font-size:0.62rem;color:#666;text-align:center;margin-bottom:6px;">\u2193 How this finding will appear in the PDF report \u2193</div>' + rbBuildFindingPreview(c, num);
+    box.style.display = 'block';
+    box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } else {
+    box.style.display = 'none';
+    box.innerHTML = '';
+  }
+}
 
 // Builds a single finding rendered the way it will appear in the PDF report,
 // wrapped with the report's own styles so the preview matches the real output.
@@ -5214,7 +5306,7 @@ function rbBuildFindingPreview(c, displayNum) {
     var _kindLabel = it.kind === 'thermal' ? 'Thermal (IR)' : it.kind === 'visual' ? 'Visual Spectrum' : it.kind === 'site' ? 'Site Photo' : 'Photo';
     return '<figure class="ph"><div class="phbox"><img src="' + it.url + '" ' + (it.rot ? 'style="transform:rotate(' + it.rot + 'deg);"' : '') + '></div><figcaption>' + _kindLabel + '</figcaption></figure>';
   }).join('');
-  const _defectTitle = rbEsc(rbCleanTitle(node.label || node.finds, tags, sev));
+  const _defectTitle = rbEsc(rbResolveTitle(nodeId, node, tags, sev));
   const _estimate = REPORT_META.estimates[nodeId] || '';
   const _sevLabel = sev.charAt(0) + sev.slice(1).toLowerCase();
   const card = '<section class="defect">' +
@@ -5794,6 +5886,19 @@ function renderReportBuilder() {
   let html = `
   <div style="max-width:980px;margin:0 auto;width:100%;padding:4px 4px 40px;">
 
+    ${(function(){
+      var st = rbStorageStatus();
+      if (st.pct < 70) return '';
+      var col = st.pct >= 90 ? '#e74c3c' : '#f39c12';
+      return '<div style="background:#1a1206;border:1px solid ' + col + ';border-radius:10px;padding:12px 14px;margin-bottom:16px;">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">' +
+          '<div style="font-size:0.8rem;color:' + col + ';font-weight:bold;">\u26A0 Browser storage ' + st.pct + '% full (' + st.mb + ' MB)</div>' +
+          '<button onclick="rbClearPhotoCache()" style="padding:6px 14px;border-radius:7px;border:1px solid ' + col + ';background:transparent;color:' + col + ';font-size:0.72rem;font-weight:bold;cursor:pointer;">Free up space</button>' +
+        '</div>' +
+        '<div style="font-size:0.66rem;color:#999;margin-top:6px;">Your work is being saved, but storage is filling up. Click \'Free up space\' to clear cached photos (they stay safe in your project JSON), and remember to Save Project to a file regularly.</div>' +
+      '</div>';
+    })()}
+
     <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;">
       <div>
         <div style="font-size:1.5rem;font-weight:900;color:#1fd0a5;">📄 Report Builder</div>
@@ -6121,7 +6226,19 @@ function renderReportBuilder() {
             ${(REPORT_META.desc[nodeId] && String(REPORT_META.desc[nodeId]).trim()) ? '<span style="padding:2px 8px;border-radius:4px;font-size:0.64rem;font-weight:bold;background:#0a1a18;color:#1fd0a5;border:1px solid #1fd0a5;">\u270E written</span>' : '<span style="padding:2px 8px;border-radius:4px;font-size:0.64rem;font-weight:bold;background:#1a1a1a;color:#666;border:1px solid #333;">\u270E not written</span>'}
             <span style="color:#888;font-size:0.82rem;">${rbEsc(rbLocation(drop, floor, pos))}</span>
           </div>
-          <div style="margin-top:7px;">${tagChips}</div>
+          <input type="text" value="${rbEsc(rbResolveTitle(nodeId, node, tags, sev))}"
+            onchange="rbSetTitle('${nodeId}', this.value); renderReportBuilder();"
+            placeholder="Defect title"
+            style="margin-top:8px;width:100%;background:#0d1117;border:1px solid #2a2d38;color:#fff;border-radius:6px;padding:7px 10px;font-size:0.92rem;font-weight:bold;box-sizing:border-box;">
+          <div style="margin-top:8px;">
+            <div style="font-size:0.6rem;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;">Defect type tags <span style="color:#555;text-transform:none;">(tap to toggle)</span></div>
+            <div style="display:flex;flex-wrap:wrap;gap:5px;">
+              ${RB_TAG_OPTIONS.map(function(opt){
+                var active = tags.indexOf(opt) !== -1;
+                return '<button onclick="rbToggleTag(\'' + nodeId + '\', \'' + opt.replace(/'/g, "\\'") + '\')" style="padding:3px 10px;font-size:0.66rem;font-weight:bold;border-radius:12px;cursor:pointer;border:1px solid ' + (active ? '#1fd0a5' : '#333') + ';background:' + (active ? '#0a2a20' : '#1a1d27') + ';color:' + (active ? '#1fd0a5' : '#888') + ';">' + (active ? '\u2713 ' : '') + rbEsc(opt) + '</button>';
+              }).join('')}
+            </div>
+          </div>
         </div>
         <select onchange="rbSetSeverity('${nodeId}', this.value)"
           style="flex-shrink:0;background:#111;border:1px solid #2a2d38;color:#fff;border-radius:6px;padding:7px 9px;font-size:0.78rem;font-weight:bold;cursor:pointer;">
@@ -6183,11 +6300,15 @@ function renderReportBuilder() {
 
       <label style="font-size:0.68rem;color:#888;text-transform:uppercase;font-weight:bold;letter-spacing:0.5px;">Photos for report <span style="color:#1fd0a5;">(teal outline = included)</span></label>
       <div style="display:flex;gap:8px;overflow-x:auto;padding:8px 0 2px;">${thumbs}</div>
-      <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:12px;padding-top:10px;border-top:1px solid #2a2d38;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding-top:10px;border-top:1px solid #2a2d38;flex-wrap:wrap;">
+        <button onclick="rbPreviewCard('${nodeId}')" style="padding:6px 14px;border-radius:7px;border:1px solid #0cf;background:#0d1117;color:#0cf;font-size:0.72rem;font-weight:bold;cursor:pointer;">\uD83D\uDC41 Preview as PDF</button>
+        <div style="display:flex;align-items:center;gap:10px;">
         ${(REPORT_META.verified && REPORT_META.verified[nodeId])
           ? '<span style="font-size:0.7rem;color:#28a745;font-weight:bold;">\u2713 Verified — double-checked</span><button onclick="rbSetVerified(\'' + nodeId + '\', false)" style="padding:6px 14px;border-radius:7px;border:1px solid #444;background:#1a1a1a;color:#888;font-size:0.72rem;font-weight:bold;cursor:pointer;">Unverify</button>'
           : '<span style="font-size:0.68rem;color:#666;">Double-checked this finding?</span><button onclick="rbSetVerified(\'' + nodeId + '\', true)" style="padding:6px 16px;border-radius:7px;border:1px solid #28a745;background:#0a2a16;color:#28a745;font-size:0.72rem;font-weight:bold;cursor:pointer;">\u2713 Mark Verified</button>'}
+        </div>
       </div>
+      <div id="rb-cardpreview-${nodeId}" style="display:none;margin-top:12px;"></div>
     </div>`;
   }); }); // close _wsItems + rbGroupCandidates
 
@@ -6418,7 +6539,7 @@ function rbBuildReportHTML() {
       </figure>`;
     }).join('');
 
-        const _defectTitle = rbEsc(rbCleanTitle(node.label || node.finds, tags, sev));
+        const _defectTitle = rbEsc(rbResolveTitle(nodeId, node, tags, sev));
     const _estimate = REPORT_META.estimates[nodeId] || '';
     const _sevLabel = sev.charAt(0) + sev.slice(1).toLowerCase();
     defectsHtml += `
