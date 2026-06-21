@@ -1377,15 +1377,17 @@ function saveCommandState() {
             repairPriorities,repairTags,repairFixed,cesiumAssetId,manualDefects:_mdL,photoRotations
         }));
     } catch(e) { console.warn('[save] main state quota?', e); }
-    // Save ALL embedded photos (manual defects + phone photos on regular windows)
-    // to a SEPARATE key so they survive page reload.
+    // Save embedded photos to a SEPARATE key so they survive page reload —
+    // BUT only if they fit comfortably. Photos are ALSO in the project JSON, so if
+    // they're too big for localStorage we skip this WITHOUT breaking other saves
+    // (critically: report descriptions/severities live in a different key and must
+    // not be starved of space by photos).
     try {
         const _photos={};
         Object.entries(manualDefects).forEach(function(e){
             var k=e[0],v=e[1];
             if(v.embeddedPhotoData && Object.keys(v.embeddedPhotoData).length){_photos[k]=v.embeddedPhotoData;}
         });
-        // Phone photos on regular windows — keyed by nodeId
         Object.keys(inspectionData).forEach(function(drop){
             Object.keys(inspectionData[drop]).forEach(function(floor){
                 Object.keys(inspectionData[drop][floor]).forEach(function(pos){
@@ -1394,9 +1396,19 @@ function saveCommandState() {
                 });
             });
         });
-        localStorage.setItem('strataManualPhotos', JSON.stringify(_photos));
+        var _photoStr = JSON.stringify(_photos);
+        // ~3MB cap — only cache photos in localStorage if they're small enough to leave
+        // room for everything else. Otherwise rely on the JSON file (the real backup).
+        if (_photoStr.length < 3000000) {
+            localStorage.setItem('strataManualPhotos', _photoStr);
+        } else {
+            // Too big — remove any stale photo cache so it doesn't hog quota and
+            // block report-data saves. Photos are safe in the JSON file.
+            try { localStorage.removeItem('strataManualPhotos'); } catch(e2) {}
+        }
     } catch(e) {
-        console.warn('[save] photos too large for localStorage — they remain in the project JSON', e);
+        // Quota hit — clear the photo cache so it can't block other saves, then move on.
+        try { localStorage.removeItem('strataManualPhotos'); } catch(e2) {}
     }
 }
 
@@ -1463,7 +1475,8 @@ function saveProject() {
     a.href='data:text/json;charset=utf-8,'+encodeURIComponent(JSON.stringify({
         projectInfo,inspectionData,elevations,dropAssignments,
         stitchedPairs,saved3DTags,manualLinks,projectModelUrl,
-        repairPriorities,repairTags,repairFixed,manualDefects,photoRotations
+        repairPriorities,repairTags,repairFixed,manualDefects,photoRotations,
+        REPORT_META
     }));
     const now = new Date();
     const ts  = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}-${String(now.getMinutes()).padStart(2,'0')}`;
@@ -1539,6 +1552,19 @@ function loadProjectFile(input) {
             // Else keep whatever is already in manualDefects (from localStorage)
             if (p.photoRotations) Object.assign(photoRotations, p.photoRotations);
             restoreManualDefectPhotos();
+            // Restore the report builder data (descriptions, severity, cover photo, scope,
+            // estimates, photo order, findings summary, verified flags, etc.)
+            if (p.REPORT_META && typeof p.REPORT_META === 'object') {
+                // Merge into the existing REPORT_META so any new fields keep their defaults
+                Object.keys(p.REPORT_META).forEach(function(k){
+                    REPORT_META[k] = p.REPORT_META[k];
+                });
+                // Make sure sub-objects exist (older saves may lack newer fields)
+                ['desc','sev','excluded','estimates','photoOrder','repairDesc','verified'].forEach(function(k){
+                    if (REPORT_META[k] == null) REPORT_META[k] = (k === 'excluded') ? [] : {};
+                });
+                try { saveReportMeta(); } catch(e) {}
+            }
             cesiumAssetId    = p.cesiumAssetId    || 0;
 
             const assetInp = document.getElementById('cesium-asset-input');
@@ -4859,8 +4885,21 @@ function loadReportMeta() {
   } catch (e) { console.warn('[report] meta load failed', e); }
 }
 function saveReportMeta() {
-  try { localStorage.setItem('strataReportMeta', JSON.stringify(REPORT_META)); }
-  catch (e) { console.warn('[report] meta save failed (quota?)', e); }
+  var data = JSON.stringify(REPORT_META);
+  try {
+    localStorage.setItem('strataReportMeta', data);
+  } catch (e) {
+    // Quota hit. Report data is PRECIOUS — free up space by dropping the photo
+    // cache (photos are safe in the project JSON) and retry so descriptions/severities
+    // are never lost to a full localStorage again.
+    try { localStorage.removeItem('strataManualPhotos'); } catch(e2) {}
+    try {
+      localStorage.setItem('strataReportMeta', data);
+    } catch (e3) {
+      console.warn('[report] meta save still failing after clearing photo cache', e3);
+      if (typeof showToast === 'function') showToast('⚠ Storage full — please Save Project to a JSON file now to avoid losing report work.', 6000, true);
+    }
+  }
 }
 loadReportMeta();
 
@@ -5016,6 +5055,45 @@ function rbApplyPhotoOrder(nodeId, items) {
 }
 
 // Move a photo left or right within a node's display order.
+// --- Drag-and-drop photo reordering (uses the same REPORT_META.photoOrder as the arrows) ---
+var _rbDragPhoto = null;
+function rbPhotoDragStart(ev, nodeId, key, kind) {
+  _rbDragPhoto = { nodeId: nodeId, sel: key + ':' + kind };
+  ev.dataTransfer.effectAllowed = 'move';
+  try { ev.dataTransfer.setData('text/plain', _rbDragPhoto.sel); } catch(e){}
+  if (ev.currentTarget && ev.currentTarget.style) ev.currentTarget.style.opacity = '0.4';
+}
+function rbPhotoDragOver(ev) {
+  ev.preventDefault();
+  ev.dataTransfer.dropEffect = 'move';
+  if (ev.currentTarget && ev.currentTarget.style) ev.currentTarget.style.outline = '3px solid #0cf';
+}
+function rbPhotoDrop(ev, nodeId, key, kind) {
+  ev.preventDefault();
+  if (ev.currentTarget && ev.currentTarget.style) ev.currentTarget.style.outline = '';
+  if (!_rbDragPhoto || _rbDragPhoto.nodeId !== nodeId) { _rbDragPhoto = null; return; }
+  var targetSel = key + ':' + kind;
+  var draggedSel = _rbDragPhoto.sel;
+  if (targetSel === draggedSel) { _rbDragPhoto = null; return; }
+  // Build the current ordered sel list and move dragged item to target's position
+  var items = rbApplyPhotoOrder(nodeId, rbPhotoItems(getNodeData(nodeId)));
+  var sels = items.map(function(it){ return it.key + ':' + it.kind; });
+  var from = sels.indexOf(draggedSel);
+  var to = sels.indexOf(targetSel);
+  if (from === -1 || to === -1) { _rbDragPhoto = null; return; }
+  sels.splice(from, 1);          // remove dragged
+  sels.splice(to, 0, draggedSel); // insert at target position
+  if (!REPORT_META.photoOrder) REPORT_META.photoOrder = {};
+  REPORT_META.photoOrder[nodeId] = sels;
+  saveReportMeta();
+  _rbDragPhoto = null;
+  renderReportBuilder();
+}
+function rbPhotoDragEnd(ev) {
+  if (ev.currentTarget && ev.currentTarget.style) { ev.currentTarget.style.opacity = ''; ev.currentTarget.style.outline = ''; }
+  _rbDragPhoto = null;
+}
+
 function rbMovePhoto(nodeId, key, kind, dir) {
   var items = rbApplyPhotoOrder(nodeId, rbPhotoItems(node_forOrder(nodeId)));
   // Build the current ordered list of sel strings
@@ -5120,6 +5198,72 @@ function rbBuildExecSummary(cands) {
 // ── event handlers (update state + persist + minimal DOM) ───────────────────
 function rbSetMeta(field, val) { REPORT_META[field] = val; saveReportMeta(); }
 function rbSetFindingsView(view) { rbFindingsView = view; if (rbFocusMode) rbFocusIndex = 0; renderReportBuilder(); }
+let rbFocusPreview = false;  // in focus mode, show the report-style preview of the current finding
+function rbToggleFocusPreview() { rbFocusPreview = !rbFocusPreview; renderReportBuilder(); }
+
+// Builds a single finding rendered the way it will appear in the PDF report,
+// wrapped with the report's own styles so the preview matches the real output.
+function rbBuildFindingPreview(c, displayNum) {
+  const { nodeId, node, drop, floor, pos } = c;
+  const sev = rbSeverity(nodeId, node);
+  const tags = rbTags(nodeId, node);
+  const desc = REPORT_META.desc[nodeId] != null ? REPORT_META.desc[nodeId] : (node.notes || '');
+  const _allItems = rbApplyPhotoOrder(nodeId, rbPhotoItems(node));
+  const items = _allItems.filter(it => rbIsPhotoOn(nodeId, it.key + ':' + it.kind));
+  const photoCells = items.map(it => {
+    var _kindLabel = it.kind === 'thermal' ? 'Thermal (IR)' : it.kind === 'visual' ? 'Visual Spectrum' : it.kind === 'site' ? 'Site Photo' : 'Photo';
+    return '<figure class="ph"><div class="phbox"><img src="' + it.url + '" ' + (it.rot ? 'style="transform:rotate(' + it.rot + 'deg);"' : '') + '></div><figcaption>' + _kindLabel + '</figcaption></figure>';
+  }).join('');
+  const _defectTitle = rbEsc(rbCleanTitle(node.label || node.finds, tags, sev));
+  const _estimate = REPORT_META.estimates[nodeId] || '';
+  const _sevLabel = sev.charAt(0) + sev.slice(1).toLowerCase();
+  const card = '<section class="defect">' +
+      '<div class="defect-head">' +
+        '<div class="defect-sevbar sev-' + sev + '"></div>' +
+        '<div class="defect-num">' + displayNum + '</div>' +
+        '<div class="defect-titles"><h3>' + _defectTitle + '</h3><div class="loc">' + rbEsc(rbLocation(drop, floor, pos)) + '</div></div>' +
+        '<div class="defect-sevtag"><span class="sev-pill sev-' + sev + '">' + _sevLabel + '</span></div>' +
+      '</div>' +
+      '<div class="defect-body">' +
+        (tags.length ? '<div class="defect-tags">' + tags.map(function(t){return '<span>' + rbEsc(t) + '</span>';}).join('') + '</div>' : '') +
+        '<div class="defect-desc">' + (desc ? rbEsc(desc) : '<em style="color:#999;">No description written yet.</em>') + '</div>' +
+        (_estimate ? '<div class="defect-estimate"><span class="est-label">Estimated Repair</span><span class="est-value">' + rbEsc(_estimate) + '</span></div>' : '') +
+        (items.length ? '<div class="photos">' + photoCells + '</div>' : '<p class="nophoto">No photographs included for this finding.</p>') +
+      '</div>' +
+    '</section>';
+  // Wrap in a white "paper" container with the report styles scoped inside
+  return '<div style="background:#fff;border-radius:8px;padding:24px;margin-bottom:14px;box-shadow:0 4px 20px rgba(0,0,0,0.4);">' +
+    '<style>' + rbReportPreviewCSS() + '</style>' +
+    '<div class="rb-pdf-preview">' + card + '</div>' +
+  '</div>';
+}
+
+// Minimal slice of the report CSS needed to render a single defect card faithfully.
+function rbReportPreviewCSS() {
+  return '.rb-pdf-preview{font-family:Georgia,"Times New Roman",serif;color:#1a2942;}' +
+  '.rb-pdf-preview .defect{border:1px solid #d9dee5;border-radius:6px;overflow:hidden;position:relative;}' +
+  '.rb-pdf-preview .defect-head{display:flex;align-items:center;gap:12px;padding:12px 14px 12px 18px;background:#f6f8fa;border-bottom:1px solid #e3e8ee;position:relative;}' +
+  '.rb-pdf-preview .defect-sevbar{position:absolute;left:0;top:0;bottom:0;width:6px;}' +
+  '.rb-pdf-preview .defect-num{flex-shrink:0;width:30px;height:30px;border-radius:50%;background:#1a2942;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:13px;font-family:Arial,sans-serif;}' +
+  '.rb-pdf-preview .defect-titles{flex:1;}' +
+  '.rb-pdf-preview .defect-titles h3{margin:0;font-size:15pt;color:#1a2942;line-height:1.2;}' +
+  '.rb-pdf-preview .loc{font-size:9pt;color:#6b7a8f;margin-top:2px;font-family:Arial,sans-serif;}' +
+  '.rb-pdf-preview .sev-pill{padding:3px 11px;border-radius:4px;font-size:8.5pt;font-weight:bold;color:#fff;font-family:Arial,sans-serif;text-transform:uppercase;}' +
+  '.rb-pdf-preview .defect-body{padding:14px 18px;}' +
+  '.rb-pdf-preview .defect-tags{margin-bottom:10px;}' +
+  '.rb-pdf-preview .defect-tags span{display:inline-block;padding:2px 9px;font-size:8pt;font-weight:bold;background:#eef2f6;color:#5a6b7f;border-radius:3px;margin-right:5px;font-family:Arial,sans-serif;}' +
+  '.rb-pdf-preview .defect-desc{font-size:10.5pt;line-height:1.6;color:#2a3744;text-align:justify;}' +
+  '.rb-pdf-preview .defect-estimate{margin-top:10px;padding:8px 12px;background:#f0f7f3;border-left:3px solid #28a745;border-radius:0 4px 4px 0;display:flex;justify-content:space-between;}' +
+  '.rb-pdf-preview .est-label{font-size:8.5pt;color:#28a745;font-weight:bold;text-transform:uppercase;font-family:Arial,sans-serif;}' +
+  '.rb-pdf-preview .est-value{font-size:10pt;color:#1a2942;font-weight:bold;}' +
+  '.rb-pdf-preview .photos{display:flex;gap:12px;margin-top:14px;flex-wrap:wrap;}' +
+  '.rb-pdf-preview .ph{flex:1;min-width:200px;margin:0;}' +
+  '.rb-pdf-preview .phbox{width:100%;aspect-ratio:4/3;overflow:hidden;border-radius:5px;border:1px solid #d9dee5;background:#f0f0f0;display:flex;align-items:center;justify-content:center;}' +
+  '.rb-pdf-preview .phbox img{width:100%;height:100%;object-fit:contain;}' +
+  '.rb-pdf-preview figcaption{font-size:8.5pt;color:#6b7a8f;margin-top:5px;text-align:center;font-family:Arial,sans-serif;}' +
+  '.rb-pdf-preview .nophoto{font-size:9.5pt;color:#999;font-style:italic;}' +
+  '.rb-pdf-preview .sev-CRITICAL{background:#b3122b;}.rb-pdf-preview .sev-HIGH{background:#d9534f;}.rb-pdf-preview .sev-MEDIUM{background:#f1c40f;color:#000;}.rb-pdf-preview .sev-LOW{background:#28a745;}';
+}
 function rbSetVerified(nodeId, on) {
   if (!REPORT_META.verified) REPORT_META.verified = {};
   if (on) REPORT_META.verified[nodeId] = true;
@@ -5874,14 +6018,28 @@ function renderReportBuilder() {
     const _atFirst = rbFocusIndex === 0;
     const _atLast = rbFocusIndex === _viewCands.length - 1;
     html += `
-    <div style="position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px;background:#12101f;border:1px solid #a78bfa;border-radius:10px;padding:10px 14px;margin-bottom:14px;">
-      <button onclick="rbFocusNav(-1)" ${_atFirst?'disabled':''} style="padding:8px 16px;border-radius:7px;border:none;cursor:${_atFirst?'not-allowed':'pointer'};font-weight:bold;font-size:0.8rem;background:${_atFirst?'#1a1a22':'#a78bfa'};color:${_atFirst?'#555':'#000'};">◄ Back</button>
-      <div style="text-align:center;flex:1;">
-        <div style="font-size:0.78rem;color:#a78bfa;font-weight:bold;">Finding ${rbFocusIndex+1} of ${_viewCands.length}</div>
-        <div style="font-size:0.62rem;color:#888;margin-top:1px;">Focus Mode — review one at a time</div>
+    <div style="position:sticky;top:0;z-index:20;background:#12101f;border:1px solid #a78bfa;border-radius:10px;padding:10px 14px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <button onclick="rbFocusNav(-1)" ${_atFirst?'disabled':''} style="padding:8px 16px;border-radius:7px;border:none;cursor:${_atFirst?'not-allowed':'pointer'};font-weight:bold;font-size:0.8rem;background:${_atFirst?'#1a1a22':'#a78bfa'};color:${_atFirst?'#555':'#000'};">◄ Back</button>
+        <div style="text-align:center;flex:1;">
+          <div style="font-size:0.78rem;color:#a78bfa;font-weight:bold;">Finding ${rbFocusIndex+1} of ${_viewCands.length}</div>
+          <div style="font-size:0.62rem;color:#888;margin-top:1px;">Focus Mode — review one at a time</div>
+        </div>
+        <button onclick="rbFocusNav(1)" ${_atLast?'disabled':''} style="padding:8px 16px;border-radius:7px;border:none;cursor:${_atLast?'not-allowed':'pointer'};font-weight:bold;font-size:0.8rem;background:${_atLast?'#1a1a22':'#a78bfa'};color:${_atLast?'#555':'#000'};">${_atLast?'Done':'Next ►'}</button>
       </div>
-      <button onclick="rbFocusNav(1)" ${_atLast?'disabled':''} style="padding:8px 16px;border-radius:7px;border:none;cursor:${_atLast?'not-allowed':'pointer'};font-weight:bold;font-size:0.8rem;background:${_atLast?'#1a1a22':'#a78bfa'};color:${_atLast?'#555':'#000'};">${_atLast?'Done':'Next ►'}</button>
+      <div style="display:flex;justify-content:center;margin-top:8px;">
+        <button onclick="rbToggleFocusPreview()" style="padding:6px 16px;border-radius:7px;cursor:pointer;font-size:0.72rem;font-weight:bold;border:1px solid ${rbFocusPreview?'#0cf':'#2a2d38'};background:${rbFocusPreview?'#0cf':'#0d1117'};color:${rbFocusPreview?'#000':'#0cf'};">${rbFocusPreview?'✎ Back to Editing':'\uD83D\uDC41 Preview as PDF'}</button>
+      </div>
     </div>`;
+    // If preview is on, render the report-style card and SKIP the editing card
+    if (rbFocusPreview) {
+      html += '<div style="font-size:0.64rem;color:#666;text-align:center;margin-bottom:8px;">This is how the finding will appear in the PDF report.</div>';
+      html += rbBuildFindingPreview(_cur, rbFocusIndex + 1);
+      html += `</div>`;
+      // Close out and write — skip the normal editing loop for this finding
+      root.innerHTML = html;
+      return;
+    }
   }
 
   rbGroupCandidates(_renderCands).forEach(({ label: _wsLabel, items: _wsItems }) => {
@@ -5921,7 +6079,12 @@ function renderReportBuilder() {
         const rotDeg = photoRotations[rotKey] || 0;
         const rotScale = (rotDeg===90||rotDeg===270) ? ' scale(0.75)' : '';
         thumbs += `
-          <div id="rb-thumb-${nodeId}-${it.key}-${it.kind}" style="position:relative;flex:0 0 auto;border-radius:6px;outline:3px solid ${on ? '#1fd0a5' : 'transparent'};opacity:${on ? '1' : '0.4'};transition:0.12s;">
+          <div id="rb-thumb-${nodeId}-${it.key}-${it.kind}" draggable="true"
+            ondragstart="rbPhotoDragStart(event,'${nodeId}','${it.key}','${it.kind}')"
+            ondragover="rbPhotoDragOver(event)"
+            ondrop="rbPhotoDrop(event,'${nodeId}','${it.key}','${it.kind}')"
+            ondragend="rbPhotoDragEnd(event)"
+            style="position:relative;flex:0 0 auto;border-radius:6px;outline:3px solid ${on ? '#1fd0a5' : 'transparent'};opacity:${on ? '1' : '0.4'};transition:0.12s;cursor:grab;">
             <div onclick="rbTogglePhoto('${nodeId}','${it.key}','${it.kind}',this.parentElement)" style="cursor:pointer;">
               <img src="${it.url}" style="width:118px;height:88px;object-fit:cover;border-radius:6px;display:block;background:#000;${rotDeg ? `transform:rotate(${rotDeg}deg)${rotScale};` : ''}">
               <div style="position:absolute;bottom:18px;left:0;right:0;background:rgba(0,0,0,0.72);color:${kindCol};font-size:0.6rem;font-weight:bold;text-align:center;padding:2px;">${kindLbl} · ${rbEsc(it.key.split('_').pop())}</div>
@@ -7011,7 +7174,7 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
   var selectHint = document.createElement('div');
   selectHint.id = 'annot-select-hint';
   selectHint.style.cssText = 'display:none;width:100%;text-align:center;font-size:0.75rem;color:#1fd0a5;background:#0a1a14;border:1px solid #1fd0a5;border-radius:6px;padding:6px 10px;margin-top:6px;';
-  selectHint.innerHTML = '✥ Tap a shape to select it · drag to move · drag the green dot to rotate · press Delete to remove';
+  selectHint.innerHTML = '✥ Tap a shape to select · drag body to move · green dot = rotate · blue square = resize · pick a color or width to restyle it · Delete to remove';
   toolbar.appendChild(selectHint);
 
   // Keyboard: Delete removes the selected shape
@@ -7071,10 +7234,24 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
       cb.style.borderColor = cb.dataset.color === c ? '#fff' : '#2a2d38';
       cb.style.transform = cb.dataset.color === c ? 'scale(1.15)' : 'scale(1)';
     });
+    // If a shape is selected in the Select tool, recolor it immediately
+    if (curTool === 'select' && selectedShape) {
+      selectedShape.color = c;
+      _edited = true;
+      redraw();
+    }
   }
   tools.forEach(function(t){ t.onclick = function(){ setActiveTool(t.dataset.tool); }; });
   colorBtns.forEach(function(cb){ cb.onclick = function(){ setActiveColor(cb.dataset.color); }; });
-  widthInput.oninput = function(){ curWidth = parseInt(widthInput.value); };
+  widthInput.oninput = function(){
+    curWidth = parseInt(widthInput.value);
+    // If a shape is selected, change its width immediately
+    if (curTool === 'select' && selectedShape) {
+      selectedShape.width = curWidth;
+      _edited = true;
+      redraw();
+    }
+  };
 
   baseImg.onload = function(){
     canvas.width = baseImg.naturalWidth;
@@ -7171,6 +7348,13 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
       ctx.arc(c.x, handleY, 7, 0, Math.PI*2);
       ctx.fillStyle = '#1fd0a5';
       ctx.fill();
+      // Resize handle at the bottom-right corner (square, to distinguish from rotate)
+      var rh = resizeHandlePos(s);
+      ctx.fillStyle = '#0cf';
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(rh.x - 6, rh.y - 6, 12, 12);
+      ctx.strokeRect(rh.x - 6, rh.y - 6, 12, 12);
       ctx.restore();
     }
   }
@@ -7204,6 +7388,16 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
     return Math.hypot(px - hx, py - hy) <= 12;
   }
 
+  // Position of the resize handle (bottom-right corner of the bounding box)
+  function resizeHandlePos(s){
+    var bb = shapeBBox(s);
+    return { x: bb.x + bb.w + 6, y: bb.y + bb.h + 6 };
+  }
+  function hitResizeHandle(s, px, py){
+    var rh = resizeHandlePos(s);
+    return Math.abs(px - rh.x) <= 9 && Math.abs(py - rh.y) <= 9;
+  }
+
   function drawArrow(x1,y1,x2,y2,w,color){
     var headLen = Math.max(14, w * 3.5);
     var ang = Math.atan2(y2-y1, x2-x1);
@@ -7233,7 +7427,13 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
     e.preventDefault();
     var p = getPos(e);
     if (curTool === 'select') {
-      // Selecting / moving / rotating existing shapes
+      // Selecting / moving / rotating / resizing existing shapes
+      if (selectedShape && hitResizeHandle(selectedShape, p.x, p.y)) {
+        dragMode = 'resize';
+        dragStart = p;
+        drawing = true;
+        return;
+      }
       if (selectedShape && hitRotateHandle(selectedShape, p.x, p.y)) {
         dragMode = 'rotate';
         dragStart = p;
@@ -7281,6 +7481,9 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
         var ang = Math.atan2(p.y - c.y, p.x - c.x) * 180 / Math.PI;
         // Handle starts pointing "up" (-90deg), so offset
         selectedShape.rot = ang + 90;
+      } else if (dragMode === 'resize') {
+        resizeShape(selectedShape, p);
+        dragStart = p;
       }
       _edited = true;
       redraw();
@@ -7304,6 +7507,36 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
       s.points.forEach(function(pt){ pt.x += dx; pt.y += dy; });
     }
     s.x1 += dx; s.y1 += dy; s.x2 += dx; s.y2 += dy;
+  }
+
+  // Resize a shape by dragging its bottom-right handle toward point p.
+  // Keeps the top-left anchor fixed and scales the shape to the new corner.
+  function resizeShape(s, p){
+    if (s.tool === 'text') {
+      // For text, resize changes font size based on drag distance from anchor
+      var newH = Math.max(12, p.y - Math.min(s.y1, s.y2));
+      s.fontSize = Math.max(10, Math.round(newH * 0.7));
+      return;
+    }
+    if (s.tool === 'free' && s.points && s.points.length) {
+      // Scale freehand points relative to their bounding box top-left
+      var bb = shapeBBox(s);
+      var newW = Math.max(8, p.x - bb.x), newH = Math.max(8, p.y - bb.y);
+      var sx = bb.w ? newW / bb.w : 1, sy = bb.h ? newH / bb.h : 1;
+      s.points.forEach(function(pt){
+        pt.x = bb.x + (pt.x - bb.x) * sx;
+        pt.y = bb.y + (pt.y - bb.y) * sy;
+      });
+      // Keep x1..y2 roughly in sync with the new bounds
+      var bb2 = shapeBBox(s);
+      s.x1 = bb2.x; s.y1 = bb2.y; s.x2 = bb2.x + bb2.w; s.y2 = bb2.y + bb2.h;
+      return;
+    }
+    // Circle / box / arrow: top-left stays, bottom-right follows the cursor
+    var ax = Math.min(s.x1, s.x2), ay = Math.min(s.y1, s.y2);
+    s.x1 = ax; s.y1 = ay;
+    s.x2 = Math.max(ax + 5, p.x);
+    s.y2 = Math.max(ay + 5, p.y);
   }
   function end(e){
     if (!drawing) return;
