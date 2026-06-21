@@ -5061,9 +5061,13 @@ function rbCandidates() {
           const node = inspectionData[drop][floor][pos];
           if (!node) return;
           const nodeId = drop + '-' + floor + '-' + pos;
+          // Count every non-clear window: DEFECTS (confirmed) AND PENDING (flagged),
+          // plus anything in the repair planner. This matches the dashboard's
+          // (PENDING + DEFECTS) total. Only CLEAR windows are excluded.
           const confirmed = node.status === 'status-confirmed';
+          const flagged   = node.status === 'status-flagged';
           const inPlanner = !!repairPriorities[nodeId];
-          if (confirmed || inPlanner) out.push({ nodeId, node, drop, floor: +floor, pos, isFixed: !!repairFixed[nodeId] });
+          if (confirmed || flagged || inPlanner) out.push({ nodeId, node, drop, floor: +floor, pos, isFixed: !!repairFixed[nodeId] });
         });
     });
   });
@@ -5114,20 +5118,30 @@ function rbSetMeta(field, val) { REPORT_META[field] = val; saveReportMeta(); }
 function rbSetFindingsView(view) { rbFindingsView = view; renderReportBuilder(); }
 // Console diagnostic: see the breakdown of what's being counted
 function rbDiagnoseCounts() {
-  var cands = rbCandidates().filter(function(c){ return rbIsIncluded(c.nodeId); });
+  var rawManual = (typeof manualDefects !== 'undefined') ? Object.keys(manualDefects).length : 0;
+  var allCands = rbCandidates();
+  var cands = allCands.filter(function(c){ return rbIsIncluded(c.nodeId); });
   var windows = cands.filter(function(c){ return !c.isManual; });
   var manual = cands.filter(function(c){ return c.isManual; });
   var fixed = cands.filter(function(c){ return repairFixed[c.nodeId]; });
+  var excluded = allCands.length - cands.length;
   console.log('=== FINDINGS COUNT DIAGNOSTIC ===');
-  console.log('Total findings (found):', cands.length);
+  console.log('RAW manualDefects in data:', rawManual, '<-- if this is 0, your manual defects are NOT loaded');
+  console.log('rbCandidates total (before exclude):', allCands.length);
+  console.log('Excluded from report:', excluded);
+  console.log('---');
+  console.log('Total findings shown (found):', cands.length);
   console.log('  Window defects:', windows.length);
   console.log('  Manual defects:', manual.length);
   console.log('Marked fixed/repaired:', fixed.length);
-  console.log('  Fixed window:', fixed.filter(function(c){return !c.isManual;}).length);
-  console.log('  Fixed manual:', fixed.filter(function(c){return c.isManual;}).length);
   console.log('Remaining to monitor:', cands.length - fixed.length);
-  console.log('Manual defect IDs:', manual.map(function(c){return c.nodeId;}));
-  return { found: cands.length, windows: windows.length, manual: manual.length, fixed: fixed.length };
+  console.log('---');
+  console.log('Manual defect IDs in data:', (typeof manualDefects !== 'undefined') ? Object.keys(manualDefects) : 'none');
+  console.log('Manual defects passing into count:', manual.map(function(c){return c.nodeId;}));
+  if (rawManual > manual.length) {
+    console.log('WARNING:', (rawManual - manual.length), 'manual defect(s) exist in data but are EXCLUDED from the report. Check the exclude toggles.');
+  }
+  return { rawManual: rawManual, found: cands.length, windows: windows.length, manual: manual.length, fixed: fixed.length, excluded: excluded };
 }
 function rbSetEstimate(nodeId, val) {
   val = (val || '').trim();
