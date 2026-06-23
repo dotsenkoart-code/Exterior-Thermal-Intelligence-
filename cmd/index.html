@@ -4889,22 +4889,30 @@ function loadReportMeta() {
 }
 var _lastStorageWarn = 0;
 function saveReportMeta() {
-  var data = JSON.stringify(REPORT_META);
+  // Build a localStorage-safe copy that EXCLUDES large image data (cover photo).
+  // Big images live in the project JSON file and in memory — never in localStorage,
+  // where they would overflow the quota and block everything else from saving.
+  // The cover photo is preserved in the in-memory REPORT_META and written to the JSON
+  // on Save Project; it simply isn't mirrored to localStorage.
+  var liteMeta = {};
+  for (var k in REPORT_META) {
+    if (!REPORT_META.hasOwnProperty(k)) continue;
+    if (k === 'coverPhoto') continue;            // skip the big base64 cover image
+    liteMeta[k] = REPORT_META[k];
+  }
+  var data;
+  try { data = JSON.stringify(liteMeta); }
+  catch (eStr) { data = '{}'; }
+
   try {
     localStorage.setItem('strataReportMeta', data);
   } catch (e) {
-    // Quota hit. Report data is PRECIOUS — free up space by dropping the photo
-    // cache (photos are safe in the project JSON) and retry so descriptions/severities
-    // are never lost to a full localStorage again.
+    // Even the lite copy didn't fit — clear the photo cache and retry.
     try { localStorage.removeItem('strataManualPhotos'); } catch(e2) {}
     try {
       localStorage.setItem('strataReportMeta', data);
-      // Succeeded after clearing photos — report data IS saved. No alarm needed;
-      // just a quiet console note. (Photos remain safe in the project JSON.)
       console.log('[report] saved after clearing photo cache — report data is safe');
     } catch (e3) {
-      // Still failing — this is the genuine "save a JSON" case. Throttle the warning
-      // so it shows at most once every 90s instead of on every keystroke.
       console.warn('[report] meta save still failing after clearing photo cache', e3);
       var now = Date.now();
       if (typeof showToast === 'function' && (now - _lastStorageWarn) > 90000) {
