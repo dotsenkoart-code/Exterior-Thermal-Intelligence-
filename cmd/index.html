@@ -4889,34 +4889,54 @@ function loadReportMeta() {
 }
 var _lastStorageWarn = 0;
 function saveReportMeta() {
-  // Build a localStorage-safe copy that EXCLUDES large image data (cover photo).
-  // Big images live in the project JSON file and in memory — never in localStorage,
-  // where they would overflow the quota and block everything else from saving.
-  // The cover photo is preserved in the in-memory REPORT_META and written to the JSON
-  // on Save Project; it simply isn't mirrored to localStorage.
-  var liteMeta = {};
-  for (var k in REPORT_META) {
-    if (!REPORT_META.hasOwnProperty(k)) continue;
-    if (k === 'coverPhoto') continue;            // skip the big base64 cover image
-    liteMeta[k] = REPORT_META[k];
+  // Lite copy WITHOUT the big cover image — used only as a fallback if the full
+  // version won't fit in localStorage. The cover photo is always safe in the project JSON.
+  function buildLite() {
+    var liteMeta = {};
+    for (var k in REPORT_META) {
+      if (!REPORT_META.hasOwnProperty(k)) continue;
+      if (k === 'coverPhoto') continue;
+      liteMeta[k] = REPORT_META[k];
+    }
+    try { return JSON.stringify(liteMeta); } catch (e) { return '{}'; }
   }
-  var data;
-  try { data = JSON.stringify(liteMeta); }
-  catch (eStr) { data = '{}'; }
 
+  // 1. FIRST try to save EVERYTHING, including the cover photo, so it survives a refresh.
+  var full;
+  try { full = JSON.stringify(REPORT_META); } catch (eFull) { full = null; }
+
+  if (full != null) {
+    try {
+      localStorage.setItem('strataReportMeta', full);
+      return; // Success — cover photo and all data persisted.
+    } catch (e) {
+      // Full version too big. Free the photo cache and try the full version once more.
+      try { localStorage.removeItem('strataManualPhotos'); } catch(e2) {}
+      try {
+        localStorage.setItem('strataReportMeta', full);
+        return; // Success after clearing photo cache — cover still persisted.
+      } catch (e3) { /* fall through to lite save below */ }
+    }
+  }
+
+  // 2. FALLBACK: full version (with cover) won't fit. Save WITHOUT the cover so at least
+  //    descriptions/severities/everything else persists. Cover remains safe in the JSON.
+  var data = buildLite();
   try {
     localStorage.setItem('strataReportMeta', data);
-  } catch (e) {
-    // Even the lite copy didn't fit — clear the photo cache and retry.
-    try { localStorage.removeItem('strataManualPhotos'); } catch(e2) {}
-    try {
-      localStorage.setItem('strataReportMeta', data);
-      console.log('[report] saved after clearing photo cache — report data is safe');
-    } catch (e3) {
-      console.warn('[report] meta save still failing after clearing photo cache', e3);
-      var now = Date.now();
-      if (typeof showToast === 'function' && (now - _lastStorageWarn) > 90000) {
-        _lastStorageWarn = now;
+    // Let the user know the cover specifically needs the JSON to persist.
+    var now = Date.now();
+    if (typeof showToast === 'function' && (now - _lastStorageWarn) > 90000) {
+      _lastStorageWarn = now;
+      showToast('\u26A0 Cover photo is too large for browser memory \u2014 it is saved in your project JSON. Use Save Project to keep it, and it will reload when you load that JSON.', 6500, true);
+    }
+  } catch (e4) {
+    try { localStorage.removeItem('strataManualPhotos'); } catch(e5) {}
+    try { localStorage.setItem('strataReportMeta', data); }
+    catch (e6) {
+      var now2 = Date.now();
+      if (typeof showToast === 'function' && (now2 - _lastStorageWarn) > 90000) {
+        _lastStorageWarn = now2;
         showToast('\u26A0 Browser storage is full. Your work is safe in this session, but please use Save Project to download a JSON file as a backup.', 6000, true);
       }
     }
@@ -5477,6 +5497,46 @@ function rbCollectCompletedRepairs() {
   });
   return out;
 }
+// Resizes an image data URL down to a report-appropriate cover size.
+// Scales to a max width (keeping aspect ratio) and re-encodes as JPEG to shrink file size.
+function rbResizeCoverImage(dataUrl, callback) {
+  var MAX_W = 1400;   // plenty for a cover banner; report displays it much smaller
+  var QUALITY = 0.82; // JPEG quality — good visual fidelity, big size savings
+  try {
+    var img = new Image();
+    img.onload = function() {
+      try {
+        var w = img.naturalWidth || img.width;
+        var h = img.naturalHeight || img.height;
+        // If it's already small enough, keep it as-is (but still re-encode to JPEG
+        // if it was a huge PNG — though most photos are already JPEG).
+        var scale = (w > MAX_W) ? (MAX_W / w) : 1;
+        var newW = Math.round(w * scale);
+        var newH = Math.round(h * scale);
+        var canvas = document.createElement('canvas');
+        canvas.width = newW; canvas.height = newH;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, newW, newH);
+        var out = canvas.toDataURL('image/jpeg', QUALITY);
+        // Safety: if for some reason the re-encoded version came out larger than the
+        // original (rare), keep whichever is smaller.
+        callback(out.length < dataUrl.length ? out : dataUrl);
+      } catch (e) {
+        console.warn('[cover] resize failed, using original', e);
+        callback(dataUrl);
+      }
+    };
+    img.onerror = function() {
+      console.warn('[cover] image load for resize failed, using original');
+      callback(dataUrl);
+    };
+    img.src = dataUrl;
+  } catch (e) {
+    console.warn('[cover] resize setup failed, using original', e);
+    callback(dataUrl);
+  }
+}
+
 function rbPickCoverPhoto() {
   var i = document.createElement('input');
   i.type = 'file'; i.accept = 'image/*,.heic,.heif';
@@ -5489,10 +5549,16 @@ function rbPickCoverPhoto() {
     convertHeicIfNeeded(file).then(function(useFile) {
       var reader = new FileReader();
       reader.onload = function(ev) {
-        REPORT_META.coverPhoto = ev.target.result;
-        saveReportMeta();
-        renderReportBuilder();
-        showToast('[OK] Cover photo added', 2000);
+        // Resize the cover photo down to a report-appropriate size before storing.
+        // Full-res drone shots (5-8MB) are overkill for a cover banner and strain
+        // browser storage; a ~1400px wide JPEG looks identical on the report but is
+        // a fraction of the size and survives page refresh comfortably.
+        rbResizeCoverImage(ev.target.result, function(resized) {
+          REPORT_META.coverPhoto = resized;
+          saveReportMeta();
+          renderReportBuilder();
+          showToast('[OK] Cover photo added', 2000);
+        });
       };
       reader.readAsDataURL(useFile);
     });
