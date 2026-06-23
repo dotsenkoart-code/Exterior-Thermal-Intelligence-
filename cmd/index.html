@@ -5057,8 +5057,12 @@ function rbTags(nodeId, node) {
   return tags;
 }
 function rbLocation(drop, floor, pos) {
-  const elev = dropAssignments[drop] || `Drop ${drop}`;
-  return `${elev} · Floor ${floor} · ${RB_POS_NAME[pos] || pos}`;
+  const hasElev = !!dropAssignments[drop];
+  const elev = hasElev ? dropAssignments[drop] : `Drop ${drop}`;
+  // Include the drop reference (e.g. "Drop F") alongside the readable location.
+  // If elev already fell back to "Drop X", don't repeat it.
+  const dropSeg = hasElev ? ` · Drop ${drop}` : '';
+  return `${elev} · Floor ${floor}${dropSeg} · ${RB_POS_NAME[pos] || pos}`;
 }
 // Per defect: one row per IR image, exposing thermal (url) + visual (dcUrl)
 // Applies the user's saved photo display order (REPORT_META.photoOrder) to an items list.
@@ -5314,7 +5318,9 @@ function rbBuildFindingPreview(c, displayNum) {
         '<div class="defect-sevbar sev-' + sev + '"></div>' +
         '<div class="defect-num">' + displayNum + '</div>' +
         '<div class="defect-titles"><h3>' + _defectTitle + '</h3><div class="loc">' + rbEsc(rbLocation(drop, floor, pos)) + '</div></div>' +
-        '<div class="defect-sevtag"><span class="sev-pill sev-' + sev + '">' + _sevLabel + '</span></div>' +
+        '<div class="defect-sevtag"><span class="sev-pill sev-' + sev + '">' + _sevLabel + '</span>' +
+        (c.isFixed ? '<span class="status-pill status-repaired">\u2713 Repaired</span>' : '<span class="status-pill status-monitor">Monitor</span>') +
+      '</div>' +
       '</div>' +
       '<div class="defect-body">' +
         (tags.length ? '<div class="defect-tags">' + tags.map(function(t){return '<span>' + rbEsc(t) + '</span>';}).join('') + '</div>' : '') +
@@ -5341,6 +5347,9 @@ function rbReportPreviewCSS() {
   '.rb-pdf-preview .defect-titles h3{margin:0;font-size:15pt;color:#1a2942;line-height:1.2;}' +
   '.rb-pdf-preview .loc{font-size:9pt;color:#6b7a8f;margin-top:2px;font-family:Arial,sans-serif;}' +
   '.rb-pdf-preview .sev-pill{padding:3px 11px;border-radius:4px;font-size:8.5pt;font-weight:bold;color:#fff;font-family:Arial,sans-serif;text-transform:uppercase;}' +
+  '.rb-pdf-preview .status-pill{padding:3px 11px;border-radius:4px;font-size:8.5pt;font-weight:bold;font-family:Arial,sans-serif;text-transform:uppercase;margin-left:6px;}' +
+  '.rb-pdf-preview .status-pill.status-repaired{background:#0a4d2a;color:#fff;}' +
+  '.rb-pdf-preview .status-pill.status-monitor{background:#fff3d6;color:#8a6d00;border:1px solid #d4a900;}' +
   '.rb-pdf-preview .defect-body{padding:14px 18px;}' +
   '.rb-pdf-preview .defect-tags{margin-bottom:10px;}' +
   '.rb-pdf-preview .defect-tags span{display:inline-block;padding:2px 9px;font-size:8pt;font-weight:bold;background:#eef2f6;color:#5a6b7f;border-radius:3px;margin-right:5px;font-family:Arial,sans-serif;}' +
@@ -5535,6 +5544,17 @@ function rbGroupCandidates(cands) {
   const sortBy = REPORT_META.sortBy || 'severity';
   if (sortBy === 'severity') {
     return [{ label: null, items: cands }];
+  }
+  if (sortBy === 'status') {
+    // Outstanding (Monitor) findings first, then Repaired — each already severity-sorted
+    // because cands arrives pre-sorted by severity from rbCandidates().
+    const outstanding = cands.filter(function(c){ return !c.isFixed; });
+    const repaired    = cands.filter(function(c){ return c.isFixed; });
+    var sections = [];
+    if (outstanding.length) sections.push({ label: 'Outstanding \u2014 Requires Attention', items: outstanding });
+    if (repaired.length)    sections.push({ label: 'Repaired During This Engagement', items: repaired });
+    // If somehow everything is in one bucket, still return both (one will be empty and skipped)
+    return sections.length ? sections : [{ label: null, items: cands }];
   }
   const groups = {};
   const order  = [];
@@ -5908,6 +5928,7 @@ function renderReportBuilder() {
         <button onclick="rbDoSort('severity')"  style="padding:4px 12px;font-size:0.72rem;font-weight:bold;border-radius:4px;cursor:pointer;background:${(REPORT_META.sortBy||'severity')==='severity'?'#1fd0a5':'transparent'};color:${(REPORT_META.sortBy||'severity')==='severity'?'#000':'#888'};border:1px solid ${(REPORT_META.sortBy||'severity')==='severity'?'#1fd0a5':'#333'};">Severity</button>
         <button onclick="rbDoSort('elevation')" style="padding:4px 12px;font-size:0.72rem;font-weight:bold;border-radius:4px;cursor:pointer;background:${(REPORT_META.sortBy||'severity')==='elevation'?'#1fd0a5':'transparent'};color:${(REPORT_META.sortBy||'severity')==='elevation'?'#000':'#888'};border:1px solid ${(REPORT_META.sortBy||'severity')==='elevation'?'#1fd0a5':'#333'};">Elevation</button>
         <button onclick="rbDoSort('type')"      style="padding:4px 12px;font-size:0.72rem;font-weight:bold;border-radius:4px;cursor:pointer;background:${(REPORT_META.sortBy||'severity')==='type'?'#1fd0a5':'transparent'};color:${(REPORT_META.sortBy||'severity')==='type'?'#000':'#888'};border:1px solid ${(REPORT_META.sortBy||'severity')==='type'?'#1fd0a5':'#333'};">Defect Type</button>
+        <button onclick="rbDoSort('status')"    style="padding:4px 12px;font-size:0.72rem;font-weight:bold;border-radius:4px;cursor:pointer;background:${(REPORT_META.sortBy||'severity')==='status'?'#1fd0a5':'transparent'};color:${(REPORT_META.sortBy||'severity')==='status'?'#000':'#888'};border:1px solid ${(REPORT_META.sortBy||'severity')==='status'?'#1fd0a5':'#333'};">Status (Outstanding / Repaired)</button>
       </div>
       </div>
       <div style="display:flex;gap:10px;flex-shrink:0;">
@@ -6515,9 +6536,9 @@ function rbBuildReportHTML() {
   let _globalIdx = 0;
   rbGroupCandidates(cands).forEach(({ label: _groupLabel, items: _groupItems }) => {
     if (_groupLabel) {
-      defectsHtml += `<div style="margin:24px 0 10px;padding:8px 12px;background:#1a1d27;border-left:4px solid #1fd0a5;border-radius:0 6px 6px 0;">
-        <span style="font-size:0.7rem;text-transform:uppercase;font-weight:bold;letter-spacing:1px;color:#1fd0a5;">${rbEsc(_groupLabel)}</span>
-        <span style="font-size:0.65rem;color:#555;margin-left:8px;">${_groupItems.length} defect${_groupItems.length!==1?'s':''}</span>
+      defectsHtml += `<div style="margin:26px 0 12px;padding:9px 14px;background:#f0f4f8;border-left:5px solid #1a2942;border-radius:0 4px 4px 0;page-break-after:avoid;">
+        <span style="font-size:11pt;text-transform:uppercase;font-weight:bold;letter-spacing:1.2px;color:#1a2942;font-family:Arial,sans-serif;">${rbEsc(_groupLabel)}</span>
+        <span style="font-size:9pt;color:#6b7a8f;margin-left:10px;font-family:Arial,sans-serif;">${_groupItems.length} finding${_groupItems.length!==1?'s':''}</span>
       </div>`;
     }
     _groupItems.forEach((c) => {
@@ -6551,7 +6572,12 @@ function rbBuildReportHTML() {
           <h3>${_defectTitle}</h3>
           <div class="loc">${rbEsc(rbLocation(drop, floor, pos))}</div>
         </div>
-        <div class="defect-sevtag"><span class="sev-pill sev-${sev}">${_sevLabel}</span></div>
+        <div class="defect-sevtag">
+          <span class="sev-pill sev-${sev}">${_sevLabel}</span>
+          ${c.isFixed
+            ? '<span class="status-pill status-repaired">\u2713 Repaired</span>'
+            : '<span class="status-pill status-monitor">Monitor</span>'}
+        </div>
       </div>
       <div class="defect-body">
         ${tags.length ? `<div class="defect-tags">${tags.map(t => `<span>${rbEsc(t)}</span>`).join('')}</div>` : ''}
@@ -6712,6 +6738,9 @@ function rbBuildReportHTML() {
   .defect-titles .loc { font-size: 9.5pt; color: var(--grey); }
   .defect-sevtag { flex-shrink: 0; display: flex; align-items: center; padding: 0 16px; }
   .sev-pill { font-size: 8pt; font-weight: 800; letter-spacing: 0.8px; padding: 4px 11px; border-radius: 3px; color: #fff; text-transform: uppercase; }
+  .status-pill { font-size: 8pt; font-weight: 800; letter-spacing: 0.6px; padding: 4px 11px; border-radius: 3px; text-transform: uppercase; margin-left: 6px; }
+  .status-pill.status-repaired { background: #0a4d2a; color: #fff; }
+  .status-pill.status-monitor { background: #fff3d6; color: #8a6d00; border: 1px solid #d4a900; }
   .sev-pill.sev-CRITICAL { background: var(--crit); }
   .sev-pill.sev-HIGH { background: var(--high); }
   .sev-pill.sev-MEDIUM { background: var(--med); color: #2a2008; }
