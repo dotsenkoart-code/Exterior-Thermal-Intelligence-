@@ -5354,7 +5354,7 @@ function rbBuildFindingPreview(c, displayNum) {
   const items = _allItems.filter(it => rbIsPhotoOn(nodeId, it.key + ':' + it.kind));
   const photoCells = items.map(it => {
     var _kindLabel = it.kind === 'thermal' ? 'Thermal (IR)' : it.kind === 'visual' ? 'Visual Spectrum' : it.kind === 'site' ? 'Site Photo' : 'Photo';
-    return '<figure class="ph"><div class="phbox"><img src="' + it.url + '" ' + (it.rot ? 'style="transform:rotate(' + it.rot + 'deg);"' : '') + '></div><figcaption>' + _kindLabel + '</figcaption></figure>';
+    return '<figure class="ph"><div class="phbox"><img src="' + it.url + '" class="' + (it.rot===90?'rot90':it.rot===270?'rot270':it.rot===180?'rot180':'') + '" ' + (it.rot ? 'style="transform:rotate(' + it.rot + 'deg);"' : '') + '></div><figcaption>' + _kindLabel + '</figcaption></figure>';
   }).join('');
   const _defectTitle = rbEsc(rbResolveTitle(nodeId, node, tags, sev));
   const _estimate = REPORT_META.estimates[nodeId] || '';
@@ -5410,7 +5410,8 @@ function rbReportPreviewCSS() {
   '.rb-pdf-preview .photos{display:flex;gap:12px;margin-top:14px;flex-wrap:wrap;}' +
   '.rb-pdf-preview .ph{flex:1;min-width:200px;margin:0;}' +
   '.rb-pdf-preview .phbox{width:100%;aspect-ratio:4/3;overflow:hidden;border-radius:5px;border:1px solid #d9dee5;background:#f0f0f0;display:flex;align-items:center;justify-content:center;}' +
-  '.rb-pdf-preview .phbox img{width:100%;height:100%;object-fit:contain;}' +
+  '.rb-pdf-preview .phbox img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;}' +
+  '.rb-pdf-preview .phbox img.rot90, .rb-pdf-preview .phbox img.rot270{max-width:75%;max-height:133%;}' +
   '.rb-pdf-preview figcaption{font-size:8.5pt;color:#6b7a8f;margin-top:5px;text-align:center;font-family:Arial,sans-serif;}' +
   '.rb-pdf-preview .nophoto{font-size:9.5pt;color:#999;font-style:italic;}' +
   '.rb-pdf-preview .sev-CRITICAL{background:#b3122b;}.rb-pdf-preview .sev-HIGH{background:#d9534f;}.rb-pdf-preview .sev-MEDIUM{background:#f1c40f;color:#000;}.rb-pdf-preview .sev-LOW{background:#28a745;}';
@@ -6686,7 +6687,7 @@ function rbBuildReportHTML() {
       var _kindLabel = it.kind === 'thermal' ? 'Thermal (IR)' : it.kind === 'visual' ? 'Visual Spectrum' : it.kind === 'site' ? 'Site Photo' : 'Photo';
       return `
       <figure class="ph">
-        <div class="phbox"><img src="${it.url}" ${it.rot ? `style="transform:rotate(${it.rot}deg);"` : ''}></div>
+        <div class="phbox"><img src="${it.url}" class="${it.rot===90?'rot90':it.rot===270?'rot270':it.rot===180?'rot180':''}" ${it.rot ? `style="transform:rotate(${it.rot}deg);"` : ''}></div>
         <figcaption>${_kindLabel}</figcaption>
       </figure>`;
     }).join('');
@@ -6889,7 +6890,10 @@ function rbBuildReportHTML() {
   .photos { display: flex; flex-wrap: wrap; gap: 12px; }
   figure.ph { margin: 0; flex: 0 0 calc(50% - 6px); }
   .phbox { width: 100%; aspect-ratio: 4/3; overflow: hidden; border-radius: 5px; background: #111c2b; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line); }
-  .phbox img { width: 100%; height: 100%; object-fit: contain; }
+  .phbox img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+  /* Rotated 90/270: the image's long side becomes vertical. Constrain by the box HEIGHT
+     so the whole rotated image stays visible (no cropping). */
+  .phbox img.rot90, .phbox img.rot270 { max-width: 75%; max-height: 133%; }
   figure.ph figcaption { font-size: 8.5pt; color: var(--grey); margin-top: 6px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
   figure.ph figcaption::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--navy); flex-shrink: 0; }
   .nophoto { font-size: 9.5pt; color: var(--grey); font-style: italic; }
@@ -7490,6 +7494,7 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
   var shapes = [];          // committed shapes
   var current = null;       // shape in progress
   var selectedShape = null; // shape selected for move/rotate
+  var _annotExportMode = false; // when true, drawShape skips the editing handles (for clean saved image)
   var dragMode = null;      // 'move' | 'rotate' | null
   var dragStart = null;     // {x,y} where drag began
   var curTool = 'circle';
@@ -7613,7 +7618,7 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
     }
     ctx.restore();
     // Selection highlight + rotation handle
-    if (s === selectedShape) {
+    if (s === selectedShape && !_annotExportMode) {
       var c = shapeCenter(s);
       var bb = shapeBBox(s);
       ctx.save();
@@ -7956,9 +7961,14 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
 
   saveBtn.onclick = function(){
     if (!_edited && !shapes.length) { showToast('Make an edit (draw, add text, or crop) first, or press Cancel.', 2800, true); return; }
-    // Bake annotations into a new image
+    // Bake annotations into a new image — WITHOUT the editing handles
+    // (dashed box, rotate dot, resize square). Those are edit-only UI and must
+    // never appear in the saved/displayed image the client sees.
+    _annotExportMode = true;
     redraw();
     var dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+    _annotExportMode = false;
+    redraw(); // restore the on-screen view (with handles) for continued editing
     // Create a new key for the annotated copy
     var annotKey = sourceKey + '_ANNOT_' + Date.now() + '_' + Math.random().toString(36).slice(2,4);
     imageBank[annotKey] = { url: dataUrl, dcUrl: null, time: entry.time || null, drop: entry.drop || 'ANNOT', _annotated: true, _sourceKey: sourceKey };
