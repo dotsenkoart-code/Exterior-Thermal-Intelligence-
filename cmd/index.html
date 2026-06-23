@@ -3447,6 +3447,7 @@ let rpActiveFilter  = 'ALL';
 let rbFindingsView = 'all'; // on-screen report findings filter: 'all' | 'fixed' | 'monitor'
 let rbFocusMode = false;    // productivity mode: show one finding at a time
 let rbFocusIndex = 0;       // which finding is currently shown in focus mode
+let rbFocusNodeId = null;   // the nodeId of the current focus finding (survives re-sorting)
 let rbReviewed = {};        // nodeId -> true when user has stepped past/marked it reviewed
 let rpGroupBy       = 'defect';
 let rpActiveElev    = '';
@@ -5223,7 +5224,7 @@ function rbBuildExecSummary(cands) {
 
 // ── event handlers (update state + persist + minimal DOM) ───────────────────
 function rbSetMeta(field, val) { REPORT_META[field] = val; saveReportMeta(); }
-function rbSetFindingsView(view) { rbFindingsView = view; if (rbFocusMode) rbFocusIndex = 0; renderReportBuilder(); }
+function rbSetFindingsView(view) { rbFindingsView = view; if (rbFocusMode) { rbFocusIndex = 0; rbFocusNodeId = null; } renderReportBuilder(); }
 // Resolves the displayed title: custom override if set, else the auto-generated clean title.
 function rbResolveTitle(nodeId, node, tags, sev) {
   if (REPORT_META.title && REPORT_META.title[nodeId] && String(REPORT_META.title[nodeId]).trim()) {
@@ -5378,11 +5379,15 @@ function rbSetVerified(nodeId, on) {
 }
 function rbToggleFocusMode() {
   rbFocusMode = !rbFocusMode;
-  if (rbFocusMode) rbFocusIndex = 0;
+  if (rbFocusMode) { rbFocusIndex = 0; rbFocusNodeId = null; }
   renderReportBuilder();
   if (rbFocusMode) showToast('Focus Mode on — reviewing one finding at a time. Use Back/Next to move.', 3000);
 }
 function rbFocusNav(dir) {
+  // Clear the nodeId lock BEFORE moving so the index change actually takes effect
+  // (otherwise the render would re-sync the index back to the current finding).
+  // The render will then re-lock onto whatever finding is at the new index.
+  rbFocusNodeId = null;
   rbFocusIndex += dir;
   renderReportBuilder();
   // Scroll to top of the findings area so the focused card is in view
@@ -6139,10 +6144,27 @@ function renderReportBuilder() {
   // FOCUS MODE: show one finding at a time with next/back navigation
   let _renderCands = _viewCands;
   if (rbFocusMode && _viewCands.length) {
+    // If we're tracking a specific finding by nodeId, find where it landed after any
+    // re-sorting (e.g. the user changed its severity) and sync the index to it. This
+    // keeps Focus Mode locked onto the SAME finding instead of jumping to whatever slid
+    // into the old index position.
+    if (rbFocusNodeId != null) {
+      var _foundAt = -1;
+      for (var _fi = 0; _fi < _viewCands.length; _fi++) {
+        if (_viewCands[_fi].nodeId === rbFocusNodeId) { _foundAt = _fi; break; }
+      }
+      if (_foundAt !== -1) {
+        rbFocusIndex = _foundAt;
+      }
+      // If not found (e.g. filtered out by the all/fixed/monitor toggle), keep the index
+      // clamped below and pick up whatever is there.
+    }
     // Clamp the index to valid range
     if (rbFocusIndex < 0) rbFocusIndex = 0;
     if (rbFocusIndex >= _viewCands.length) rbFocusIndex = _viewCands.length - 1;
     const _cur = _viewCands[rbFocusIndex];
+    // Remember which finding we're on so re-renders stay locked to it
+    rbFocusNodeId = _cur.nodeId;
     _renderCands = [_cur];
     // Navigation bar
     const _atFirst = rbFocusIndex === 0;
