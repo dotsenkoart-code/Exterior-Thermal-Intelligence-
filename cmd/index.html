@@ -470,10 +470,8 @@
 <!-- Gear popover -->
 <div id="gear-popover">
     <div style="color:#555;font-size:0.65rem;text-transform:uppercase;font-weight:bold;padding:2px 4px 6px;">FILE OPTIONS</div>
-    <button class="gear-item" onclick="closeGearMenu();document.getElementById('projectInput').click()">📦 Load Project File (.json)</button>
-    <button class="gear-item" onclick="closeGearMenu();document.getElementById('csvInput').click()">📄 Load CSV</button>
-    <button class="gear-item" onclick="closeGearMenu();document.getElementById('mediaInput').click()">🖼️ Add Individual Files</button>
-    <button class="gear-item" onclick="closeGearMenu();document.getElementById('folderInput').click()">📁 Add ZIP or Folder</button>
+    <button class="gear-item" onclick="closeGearMenu();document.getElementById('unifiedInput').click()">📂 Load Files (JSON, ZIP, CSV, photos)</button>
+    <div style="color:#444;font-size:0.58rem;padding:2px 4px 6px;">Select everything together, or add more files later — the app sorts them automatically.</div>
     <div style="border-top:1px solid #2a2d38;margin:4px 0;"></div>
     <button class="gear-item warning" onclick="closeGearMenu();editMapping()">🗺️ Edit Map</button>
     <button class="gear-item danger"  onclick="closeGearMenu();resetBoard()">🔄 Clear Data</button>
@@ -495,13 +493,14 @@
     <input type="file" id="folderInput"    webkitdirectory directory multiple style="display:none;" onchange="handleFiles(this.files,'media')">
     <input type="file" id="jsonInput"      accept=".json" style="display:none;" onchange="loadProjectFile(this)">
     <input type="file" id="projectInput"   accept=".json" style="display:none;" onchange="loadProjectFile(this)">
+    <!-- Unified loader: accepts JSON, CSV, ZIP, and images all at once. Routes everything
+         through handleFiles (which restores report data, inspection data, and photos). -->
+    <input type="file" id="unifiedInput" multiple accept=".json,.csv,.zip,image/*,.heic,.heif" style="display:none;" onchange="handleFiles(this.files)">
 
     <!-- Load buttons — shown only before project is loaded -->
-    <div id="load-btn-panel" style="display:flex;gap:15px;margin-bottom:20px;flex-shrink:0;">
-        <button class="btn btn-dark" style="flex:1;padding:20px;font-size:1.1rem;border:2px dashed #0cf;background:#161922;" onclick="document.getElementById('projectInput').click()">📦 1. LOAD PROJECT</button>
-        <button class="btn btn-dark" style="flex:1;padding:20px;font-size:1.1rem;border:2px dashed #0cf;background:#161922;" onclick="document.getElementById('csvInput').click()">📄 2. LOAD CSV</button>
-        <button class="btn btn-dark" style="flex:1;padding:20px;font-size:1.1rem;border:2px dashed #d080ff;background:#161922;" onclick="document.getElementById('mediaInput').click()">🖼️ 2. ADD INDIVIDUAL FILES</button>
-        <button class="btn btn-dark" style="flex:1;padding:20px;font-size:1.1rem;border:2px dashed #f39c12;background:#161922;" onclick="document.getElementById('folderInput').click()">📁 3. ADD ZIP OR FOLDER</button>
+    <div id="load-btn-panel" style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;flex-shrink:0;">
+        <button class="btn btn-dark" style="padding:30px;font-size:1.3rem;border:2px dashed #0cf;background:#161922;" onclick="document.getElementById('unifiedInput').click()">📂 LOAD FILES</button>
+        <div style="color:#666;font-size:0.82rem;text-align:center;">Select everything together — your project <b>JSON</b>, <b>ZIP folders</b> of photos, <b>CSV</b>, and individual <b>images</b>. You can also add more files later (e.g. load your JSON, then add a ZIP). The app sorts them automatically.</div>
     </div>
 
     <button id="btn-start-mapping" class="btn btn-green btn-block" style="display:none;padding:20px;font-size:1.2rem;flex-shrink:0;" onclick="openMappingScreen()">🗺️ MAP BUILDING ELEVATIONS</button>
@@ -1681,6 +1680,19 @@ async function handleFiles(files, forcedType=null) {
                         }
                         if (p.photoRotations) Object.assign(photoRotations, p.photoRotations);
                         restoreManualDefectPhotos();
+                        // Restore the report builder data (cover photo, descriptions, severity,
+                        // titles, tags, scope, estimates, etc.) — same as loadProjectFile.
+                        // Without this, loading a JSON via this path silently drops all report work.
+                        if (p.REPORT_META && typeof p.REPORT_META === 'object') {
+                            Object.keys(p.REPORT_META).forEach(function(k){
+                                REPORT_META[k] = p.REPORT_META[k];
+                            });
+                            ['desc','sev','excluded','estimates','photoOrder','repairDesc','verified','title','tags'].forEach(function(k){
+                                if (REPORT_META[k] == null) REPORT_META[k] = (k === 'excluded') ? [] : {};
+                            });
+                            try { saveReportMeta(); } catch(e) {}
+                            if (typeof renderReportBuilder === 'function') { try { renderReportBuilder(); } catch(e) {} }
+                        }
                         if (modalNodeId) { const _mid = modalNodeId; setTimeout(() => openModal(_mid), 150); }
                         const urlInp = document.getElementById('twin-url-input');
                         if (urlInp && projectModelUrl) urlInp.value = projectModelUrl;
