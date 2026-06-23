@@ -5408,8 +5408,8 @@ function rbReportPreviewCSS() {
   '.rb-pdf-preview .est-label{font-size:8.5pt;color:#28a745;font-weight:bold;text-transform:uppercase;font-family:Arial,sans-serif;}' +
   '.rb-pdf-preview .est-value{font-size:10pt;color:#1a2942;font-weight:bold;}' +
   '.rb-pdf-preview .photos{display:flex;gap:12px;margin-top:14px;flex-wrap:wrap;}' +
-  '.rb-pdf-preview .ph{flex:1;min-width:200px;margin:0;}' +
-  '.rb-pdf-preview .phbox{width:100%;border-radius:5px;border:1px solid #d9dee5;background:#f0f0f0;padding:6px;box-sizing:border-box;text-align:center;line-height:0;}' +
+  '.rb-pdf-preview .ph{flex:1;min-width:200px;margin:0;text-align:center;}' +
+  '.rb-pdf-preview .phbox{display:inline-block;max-width:100%;border-radius:5px;border:1px solid #d9dee5;background:#f0f0f0;padding:5px;box-sizing:border-box;line-height:0;}' +
   '.rb-pdf-preview .phbox img{max-width:100%;max-height:340px;width:auto;height:auto;display:inline-block;vertical-align:middle;border-radius:3px;}' +
   '.rb-pdf-preview .phbox img.rot90, .rb-pdf-preview .phbox img.rot270{max-width:240px;max-height:340px;}' +
   '.rb-pdf-preview figcaption{font-size:8.5pt;color:#6b7a8f;margin-top:5px;text-align:center;font-family:Arial,sans-serif;}' +
@@ -6888,8 +6888,8 @@ function rbBuildReportHTML() {
   .defect-estimate .est-label { font-size: 7.5pt; letter-spacing: 1px; text-transform: uppercase; color: var(--grey); font-weight: 700; }
   .defect-estimate .est-value { font-size: 11pt; font-weight: 700; color: var(--navy); font-family: Georgia, serif; }
   .photos { display: flex; flex-wrap: wrap; gap: 12px; }
-  figure.ph { margin: 0; flex: 0 0 calc(50% - 6px); }
-  .phbox { width: 100%; border-radius: 5px; background: #111c2b; border: 1px solid var(--line); padding: 6px; box-sizing: border-box; text-align: center; line-height: 0; }
+  figure.ph { margin: 0; flex: 0 0 calc(50% - 6px); text-align: center; }
+  .phbox { display: inline-block; max-width: 100%; border-radius: 5px; background: #111c2b; border: 1px solid var(--line); padding: 5px; box-sizing: border-box; line-height: 0; }
   /* The image is a centered inline-block; the box grows to fit it. Capped by width and a
      sensible max-height so any orientation (portrait/landscape/square) shows WHOLE and the
      box hugs it cleanly — no empty space, no overflow. */
