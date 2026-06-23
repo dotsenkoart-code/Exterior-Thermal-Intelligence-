@@ -2264,14 +2264,16 @@ function ingestPhoneePhotoToWindow(file,nodeId){
             var key=nodeId+'_PHONE_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
             imageBank[key]={url:ev.target.result,dcUrl:null,time:null,drop:nodeId.split('-')[0]};
             // Persist the bytes on the node itself (same mechanism as manual defects)
-            if(!node.embeddedPhotoData)node.embeddedPhotoData={};
-            node.embeddedPhotoData[key]=ev.target.result;
-            if(!node.photos)node.photos=[];if(node.photos.indexOf(key)===-1)node.photos.push(key);
-            // Track in manualLinks so a ZIP/CSV reload won't wipe it
-            if(!manualLinks[nodeId])manualLinks[nodeId]=[];
-            if(manualLinks[nodeId].indexOf(key)===-1)manualLinks[nodeId].push(key);
-            saveCommandState();if(typeof updatePhotoStat==='function')updatePhotoStat();
-            if(modalNodeId===nodeId)openModal(nodeId);showToast('[OK] Photo added',2000);
+            rbResizePhoto(ev.target.result, function(_resized){
+              if(!node.embeddedPhotoData)node.embeddedPhotoData={};
+              node.embeddedPhotoData[key]=_resized;
+              if(!node.photos)node.photos=[];if(node.photos.indexOf(key)===-1)node.photos.push(key);
+              // Track in manualLinks so a ZIP/CSV reload won't wipe it
+              if(!manualLinks[nodeId])manualLinks[nodeId]=[];
+              if(manualLinks[nodeId].indexOf(key)===-1)manualLinks[nodeId].push(key);
+              saveCommandState();if(typeof updatePhotoStat==='function')updatePhotoStat();
+              if(modalNodeId===nodeId)openModal(nodeId);showToast('[OK] Photo added',2000);
+            });
         };reader.readAsDataURL(useFile);
     });
 }
@@ -2312,15 +2314,18 @@ function openWindowPhotoBrowser(filesRaw,nodeId){
             if(!selected.size)return;
             Array.from(selected).forEach(function(idx){
                 var item=thumbData[idx];if(!item)return;
-                var key=nodeId+'_PHONE_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
-                imageBank[key]={url:item.dataUrl,dcUrl:null,time:null,drop:nodeId.split('-')[0]};
-                if(!node.embeddedPhotoData)node.embeddedPhotoData={};
-                node.embeddedPhotoData[key]=item.dataUrl;
-                if(!node.photos)node.photos=[];if(node.photos.indexOf(key)===-1)node.photos.push(key);
-                if(!manualLinks[nodeId])manualLinks[nodeId]=[];
-                if(manualLinks[nodeId].indexOf(key)===-1)manualLinks[nodeId].push(key);
+                rbResizePhoto(item.dataUrl, function(_resized){
+                  var key=nodeId+'_PHONE_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
+                  imageBank[key]={url:_resized,dcUrl:null,time:null,drop:nodeId.split('-')[0]};
+                  if(!node.embeddedPhotoData)node.embeddedPhotoData={};
+                  node.embeddedPhotoData[key]=_resized;
+                  if(!node.photos)node.photos=[];if(node.photos.indexOf(key)===-1)node.photos.push(key);
+                  if(!manualLinks[nodeId])manualLinks[nodeId]=[];
+                  if(manualLinks[nodeId].indexOf(key)===-1)manualLinks[nodeId].push(key);
+                  saveCommandState();
+                });
             });
-            saveCommandState();if(typeof updatePhotoStat==='function')updatePhotoStat();
+            if(typeof updatePhotoStat==='function')updatePhotoStat();
             overlay.remove();if(modalNodeId===nodeId)openModal(nodeId);
             showToast('[OK] '+selected.size+' photo'+(selected.size>1?'s':'')+' added',2500);
         };
@@ -5497,45 +5502,50 @@ function rbCollectCompletedRepairs() {
   });
   return out;
 }
-// Resizes an image data URL down to a report-appropriate cover size.
-// Scales to a max width (keeping aspect ratio) and re-encodes as JPEG to shrink file size.
-function rbResizeCoverImage(dataUrl, callback) {
-  var MAX_W = 1400;   // plenty for a cover banner; report displays it much smaller
-  var QUALITY = 0.82; // JPEG quality — good visual fidelity, big size savings
+// Resizes an image data URL down to a max width (keeping aspect ratio) and re-encodes
+// as JPEG to shrink file size. Used for ALL photo uploads so the project stays lean.
+// maxW: target max width in px. quality: JPEG quality 0-1. callback(resultDataUrl).
+function rbResizeImage(dataUrl, maxW, quality, callback) {
+  if (typeof maxW !== 'number') maxW = 2400;
+  if (typeof quality !== 'number') quality = 0.85;
   try {
+    if (!dataUrl || dataUrl.indexOf('data:image') !== 0) { callback(dataUrl); return; }
     var img = new Image();
     img.onload = function() {
       try {
         var w = img.naturalWidth || img.width;
         var h = img.naturalHeight || img.height;
-        // If it's already small enough, keep it as-is (but still re-encode to JPEG
-        // if it was a huge PNG — though most photos are already JPEG).
-        var scale = (w > MAX_W) ? (MAX_W / w) : 1;
+        var scale = (w > maxW) ? (maxW / w) : 1;
         var newW = Math.round(w * scale);
         var newH = Math.round(h * scale);
         var canvas = document.createElement('canvas');
         canvas.width = newW; canvas.height = newH;
         var ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, newW, newH);
-        var out = canvas.toDataURL('image/jpeg', QUALITY);
-        // Safety: if for some reason the re-encoded version came out larger than the
-        // original (rare), keep whichever is smaller.
+        var out = canvas.toDataURL('image/jpeg', quality);
+        // Keep whichever is smaller (re-encoding a small image can sometimes grow it).
         callback(out.length < dataUrl.length ? out : dataUrl);
       } catch (e) {
-        console.warn('[cover] resize failed, using original', e);
+        console.warn('[resize] failed, using original', e);
         callback(dataUrl);
       }
     };
     img.onerror = function() {
-      console.warn('[cover] image load for resize failed, using original');
+      console.warn('[resize] image load failed, using original');
       callback(dataUrl);
     };
     img.src = dataUrl;
   } catch (e) {
-    console.warn('[cover] resize setup failed, using original', e);
+    console.warn('[resize] setup failed, using original', e);
     callback(dataUrl);
   }
 }
+// Cover photo: smaller (banner only)
+function rbResizeCoverImage(dataUrl, callback) { rbResizeImage(dataUrl, 1400, 0.82, callback); }
+// Inspection photos: larger, to preserve defect detail when zooming.
+var RB_PHOTO_MAX_W = 2400;
+var RB_PHOTO_QUALITY = 0.85;
+function rbResizePhoto(dataUrl, callback) { rbResizeImage(dataUrl, RB_PHOTO_MAX_W, RB_PHOTO_QUALITY, callback); }
 
 function rbPickCoverPhoto() {
   var i = document.createElement('input');
@@ -8141,13 +8151,15 @@ function mdIngestPhoto(file,nodeId){
   convertHeicIfNeeded(file).then(function(useFile){
     var reader=new FileReader();
     reader.onload=function(ev){
-      var key=nodeId+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
-      imageBank[key]={url:ev.target.result,dcUrl:null,time:null,drop:'MANUAL'};
-      if(!node.embeddedPhotoData)node.embeddedPhotoData={};
-      node.embeddedPhotoData[key]=ev.target.result;
-      if(!node.photos)node.photos=[];if(node.photos.indexOf(key)===-1)node.photos.push(key);
-      saveCommandState();if(typeof updatePhotoStat==='function')updatePhotoStat();
-      if(modalNodeId===nodeId)openModal(nodeId);showToast('[OK] Photo added',2000);
+      rbResizePhoto(ev.target.result, function(_resized){
+        var key=nodeId+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
+        imageBank[key]={url:_resized,dcUrl:null,time:null,drop:'MANUAL'};
+        if(!node.embeddedPhotoData)node.embeddedPhotoData={};
+        node.embeddedPhotoData[key]=_resized;
+        if(!node.photos)node.photos=[];if(node.photos.indexOf(key)===-1)node.photos.push(key);
+        saveCommandState();if(typeof updatePhotoStat==='function')updatePhotoStat();
+        if(modalNodeId===nodeId)openModal(nodeId);showToast('[OK] Photo added',2000);
+      });
     };reader.readAsDataURL(useFile);
   });
 }
@@ -8159,7 +8171,7 @@ function openPhotoBrowser(filesRaw,nodeId){if(!filesRaw||!filesRaw.length)return
     _openPhotoBrowserInner(files,nodeId,node);
   });
 }
-function _openPhotoBrowserInner(files,nodeId,node){var existing=document.getElementById('photo-browser-overlay');if(existing)existing.remove();var overlay=document.createElement('div');overlay.id='photo-browser-overlay';overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:8000;display:flex;flex-direction:column;';var header=document.createElement('div');header.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:#111;border-bottom:1px solid #2a2d38;flex-shrink:0;';header.innerHTML='<div style="display:flex;align-items:center;gap:12px;"><span style="font-size:0.75rem;color:#1fd0a5;font-weight:bold;text-transform:uppercase;letter-spacing:1px;">Select Photos</span><span id="pb-count" style="font-size:0.72rem;color:#888;">0 selected</span></div><div style="display:flex;gap:8px;"><button id="pb-add" style="padding:8px 20px;background:#1fd0a5;color:#000;border:none;border-radius:6px;font-size:0.78rem;font-weight:bold;cursor:pointer;">Add Selected</button><button id="pb-cancel" style="padding:8px 16px;background:#222;color:#888;border:1px solid #333;border-radius:6px;font-size:0.78rem;cursor:pointer;">Cancel</button></div>';overlay.appendChild(header);var grid=document.createElement('div');grid.style.cssText='flex:1;overflow-y:auto;padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;align-content:start;';overlay.appendChild(grid);var selected=new Set();var thumbData=[];function updateCount(){document.getElementById('pb-count').textContent=selected.size+' selected';document.getElementById('pb-add').style.opacity=selected.size>0?'1':'0.4';}function openBrowserLightbox(dataUrl,name){var lb=document.createElement('div');lb.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:9000;display:flex;flex-direction:column;align-items:center;justify-content:center;';lb.addEventListener('click',function(){lb.remove();});var img=document.createElement('img');img.src=dataUrl;img.style.cssText='max-width:90vw;max-height:85vh;object-fit:contain;border-radius:6px;';lb.appendChild(img);var cap=document.createElement('div');cap.style.cssText='margin-top:12px;font-size:0.75rem;color:rgba(255,255,255,0.5);';cap.textContent=name+' - click anywhere to close';lb.appendChild(cap);document.body.appendChild(lb);}function buildThumb(idx,dataUrl,file){var wrap=document.createElement('div');wrap.style.cssText='position:relative;border-radius:8px;overflow:hidden;cursor:pointer;border:2px solid transparent;transition:0.15s;background:#1a1d27;aspect-ratio:4/3;';var img=document.createElement('img');img.src=dataUrl;img.style.cssText='width:100%;height:100%;object-fit:cover;display:block;';wrap.appendChild(img);var lbl=document.createElement('div');lbl.style.cssText='position:absolute;bottom:0;left:0;right:0;padding:4px 6px;background:rgba(0,0,0,0.65);font-size:0.58rem;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';lbl.textContent=file.name;wrap.appendChild(lbl);var chk=document.createElement('div');chk.style.cssText='position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;border:2px solid #fff;background:transparent;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:#fff;transition:0.15s;';wrap.appendChild(chk);wrap.addEventListener('click',function(e){e.stopPropagation();if(selected.has(idx)){selected.delete(idx);wrap.style.borderColor='transparent';chk.style.background='transparent';chk.textContent='';}else{selected.add(idx);wrap.style.borderColor='#1fd0a5';chk.style.background='#1fd0a5';chk.textContent='+';}updateCount();});wrap.addEventListener('contextmenu',function(e){e.preventDefault();openBrowserLightbox(dataUrl,file.name);});var mag=document.createElement('button');mag.style.cssText='position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,0.6);border:none;color:#fff;font-size:0.65rem;cursor:pointer;';mag.textContent='Q';mag.title='Preview full size';mag.addEventListener('click',function(e){e.stopPropagation();openBrowserLightbox(dataUrl,file.name);});wrap.appendChild(mag);grid.appendChild(wrap);}var loadIdx=0;function loadNext(){if(loadIdx>=files.length)return;var idx=loadIdx++;var file=files[idx];var reader=new FileReader();reader.onload=function(ev){thumbData[idx]={file:file,dataUrl:ev.target.result};buildThumb(idx,ev.target.result,file);setTimeout(loadNext,0);};reader.readAsDataURL(file);}for(var i=0;i<Math.min(6,files.length);i++)loadNext();overlay.querySelector('#pb-cancel').addEventListener('click',function(){overlay.remove();});overlay.querySelector('#pb-add').addEventListener('click',function(){if(!selected.size)return;Array.from(selected).forEach(function(idx){var item=thumbData[idx];if(!item)return;var n=manualDefects[nodeId];if(!n)return;var key=nodeId+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);imageBank[key]={url:item.dataUrl,dcUrl:null,time:null,drop:'MANUAL'};if(!n.embeddedPhotoData)n.embeddedPhotoData={};n.embeddedPhotoData[key]=item.dataUrl;if(!n.photos)n.photos=[];if(n.photos.indexOf(key)===-1)n.photos.push(key);});saveCommandState();if(typeof updatePhotoStat==='function')updatePhotoStat();overlay.remove();if(modalNodeId===nodeId)openModal(nodeId);showToast('[OK] '+selected.size+' photo'+(selected.size>1?'s':'')+' added',2500);});document.body.appendChild(overlay);updateCount();}
+function _openPhotoBrowserInner(files,nodeId,node){var existing=document.getElementById('photo-browser-overlay');if(existing)existing.remove();var overlay=document.createElement('div');overlay.id='photo-browser-overlay';overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:8000;display:flex;flex-direction:column;';var header=document.createElement('div');header.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:#111;border-bottom:1px solid #2a2d38;flex-shrink:0;';header.innerHTML='<div style="display:flex;align-items:center;gap:12px;"><span style="font-size:0.75rem;color:#1fd0a5;font-weight:bold;text-transform:uppercase;letter-spacing:1px;">Select Photos</span><span id="pb-count" style="font-size:0.72rem;color:#888;">0 selected</span></div><div style="display:flex;gap:8px;"><button id="pb-add" style="padding:8px 20px;background:#1fd0a5;color:#000;border:none;border-radius:6px;font-size:0.78rem;font-weight:bold;cursor:pointer;">Add Selected</button><button id="pb-cancel" style="padding:8px 16px;background:#222;color:#888;border:1px solid #333;border-radius:6px;font-size:0.78rem;cursor:pointer;">Cancel</button></div>';overlay.appendChild(header);var grid=document.createElement('div');grid.style.cssText='flex:1;overflow-y:auto;padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;align-content:start;';overlay.appendChild(grid);var selected=new Set();var thumbData=[];function updateCount(){document.getElementById('pb-count').textContent=selected.size+' selected';document.getElementById('pb-add').style.opacity=selected.size>0?'1':'0.4';}function openBrowserLightbox(dataUrl,name){var lb=document.createElement('div');lb.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:9000;display:flex;flex-direction:column;align-items:center;justify-content:center;';lb.addEventListener('click',function(){lb.remove();});var img=document.createElement('img');img.src=dataUrl;img.style.cssText='max-width:90vw;max-height:85vh;object-fit:contain;border-radius:6px;';lb.appendChild(img);var cap=document.createElement('div');cap.style.cssText='margin-top:12px;font-size:0.75rem;color:rgba(255,255,255,0.5);';cap.textContent=name+' - click anywhere to close';lb.appendChild(cap);document.body.appendChild(lb);}function buildThumb(idx,dataUrl,file){var wrap=document.createElement('div');wrap.style.cssText='position:relative;border-radius:8px;overflow:hidden;cursor:pointer;border:2px solid transparent;transition:0.15s;background:#1a1d27;aspect-ratio:4/3;';var img=document.createElement('img');img.src=dataUrl;img.style.cssText='width:100%;height:100%;object-fit:cover;display:block;';wrap.appendChild(img);var lbl=document.createElement('div');lbl.style.cssText='position:absolute;bottom:0;left:0;right:0;padding:4px 6px;background:rgba(0,0,0,0.65);font-size:0.58rem;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';lbl.textContent=file.name;wrap.appendChild(lbl);var chk=document.createElement('div');chk.style.cssText='position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;border:2px solid #fff;background:transparent;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:#fff;transition:0.15s;';wrap.appendChild(chk);wrap.addEventListener('click',function(e){e.stopPropagation();if(selected.has(idx)){selected.delete(idx);wrap.style.borderColor='transparent';chk.style.background='transparent';chk.textContent='';}else{selected.add(idx);wrap.style.borderColor='#1fd0a5';chk.style.background='#1fd0a5';chk.textContent='+';}updateCount();});wrap.addEventListener('contextmenu',function(e){e.preventDefault();openBrowserLightbox(dataUrl,file.name);});var mag=document.createElement('button');mag.style.cssText='position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,0.6);border:none;color:#fff;font-size:0.65rem;cursor:pointer;';mag.textContent='Q';mag.title='Preview full size';mag.addEventListener('click',function(e){e.stopPropagation();openBrowserLightbox(dataUrl,file.name);});wrap.appendChild(mag);grid.appendChild(wrap);}var loadIdx=0;function loadNext(){if(loadIdx>=files.length)return;var idx=loadIdx++;var file=files[idx];var reader=new FileReader();reader.onload=function(ev){thumbData[idx]={file:file,dataUrl:ev.target.result};buildThumb(idx,ev.target.result,file);setTimeout(loadNext,0);};reader.readAsDataURL(file);}for(var i=0;i<Math.min(6,files.length);i++)loadNext();overlay.querySelector('#pb-cancel').addEventListener('click',function(){overlay.remove();});overlay.querySelector('#pb-add').addEventListener('click',function(){if(!selected.size)return;Array.from(selected).forEach(function(idx){var item=thumbData[idx];if(!item)return;var n=manualDefects[nodeId];if(!n)return;rbResizePhoto(item.dataUrl,function(_resized){var key=nodeId+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);imageBank[key]={url:_resized,dcUrl:null,time:null,drop:'MANUAL'};if(!n.embeddedPhotoData)n.embeddedPhotoData={};n.embeddedPhotoData[key]=_resized;if(!n.photos)n.photos=[];if(n.photos.indexOf(key)===-1)n.photos.push(key);saveCommandState();});});if(typeof updatePhotoStat==='function')updatePhotoStat();overlay.remove();if(modalNodeId===nodeId)openModal(nodeId);showToast('[OK] '+selected.size+' photo'+(selected.size>1?'s':'')+' added',2500);});document.body.appendChild(overlay);updateCount();}
 
 function openAddDefectForm(elevation,preselectedDrop){var existing=document.getElementById('md-overlay');if(existing){existing.remove();return;}var drops=Object.keys(inspectionData).filter(function(d){return dropAssignments[d]===elevation;}).sort();if(!drops.length){showToast('No drops assigned to this elevation yet.',3000,true);return;}var overlay=document.createElement('div');overlay.id='md-overlay';overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:5000;display:flex;align-items:center;justify-content:center;';overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};var dropOpts=drops.map(function(d){return '<option value="'+d+'"'+(d===preselectedDrop?' selected':'')+'>Drop '+d+'</option>';}).join('');var box=document.createElement('div');box.style.cssText='background:#1a1d27;border:1px solid #1fd0a5;border-radius:12px;padding:24px;width:min(540px,92vw);box-shadow:0 15px 35px rgba(0,0,0,0.9);';box.innerHTML='<div style="color:#1fd0a5;font-size:0.8rem;font-weight:bold;text-transform:uppercase;letter-spacing:1px;margin-bottom:16px;">Add Custom Defect — '+elevation+'</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;"><div style="grid-column:1/-1;"><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Defect Name *</label><input id="md-f-label" type="text" placeholder="e.g. Expansion Joint" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;"></div><div><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Drop *</label><select id="md-f-drop" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;">'+dropOpts+'</select></div><div><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Floor *</label><select id="md-f-floor" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;"></select></div><div style="grid-column:1/-1;"><label style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;">Location Detail</label><input id="md-f-loc" type="text" placeholder="e.g. NW corner" style="width:100%;margin-top:4px;padding:10px 12px;background:#111;border:1px solid #444;color:#fff;border-radius:6px;font-size:0.9rem;box-sizing:border-box;"></div></div><div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;"><span style="font-size:0.65rem;color:#888;text-transform:uppercase;font-weight:bold;flex-shrink:0;">Status</span><button id="md-f-flagged" style="padding:7px 16px;border-radius:5px;border:1px solid #f1c40f;background:transparent;color:#f1c40f;font-size:0.8rem;font-weight:bold;cursor:pointer;">FLAGGED</button><button id="md-f-confirmed" style="padding:7px 16px;border-radius:5px;border:1px solid #d9534f;background:#d9534f;color:#fff;font-size:0.8rem;font-weight:bold;cursor:pointer;">DEFECT</button></div><div style="display:flex;gap:10px;"><button id="md-f-add" style="flex:1;padding:11px;background:#1fd0a5;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;">ADD DEFECT</button><button id="md-f-cancel" style="padding:11px 18px;background:#222;color:#888;border:1px solid #444;border-radius:6px;cursor:pointer;">CANCEL</button></div>';overlay.appendChild(box);document.body.appendChild(overlay);var status='status-confirmed';mdPopulateFloors();document.getElementById('md-f-drop').onchange=mdPopulateFloors;document.getElementById('md-f-flagged').onclick=function(){status='status-flagged';this.style.background='#f1c40f';this.style.color='#000';document.getElementById('md-f-confirmed').style.background='transparent';document.getElementById('md-f-confirmed').style.color='#d9534f';};document.getElementById('md-f-confirmed').onclick=function(){status='status-confirmed';this.style.background='#d9534f';this.style.color='#fff';document.getElementById('md-f-flagged').style.background='transparent';document.getElementById('md-f-flagged').style.color='#f1c40f';};document.getElementById('md-f-cancel').onclick=function(){overlay.remove();};document.getElementById('md-f-add').onclick=function(){mdSaveDefect(elevation,overlay,function(){return status;});};var inp=document.getElementById('md-f-label');if(inp){inp.focus();inp.onkeypress=function(e){if(e.key==='Enter')mdSaveDefect(elevation,overlay,function(){return status;});};};}
 
