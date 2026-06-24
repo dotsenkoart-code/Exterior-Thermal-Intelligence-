@@ -3465,6 +3465,8 @@ let rbFindingsView = 'all'; // on-screen report findings filter: 'all' | 'fixed'
 let rbFilterElev = 'all';   // report tab filter: elevation name, or 'all'
 let rbFilterType = 'all';   // report tab filter: defect type, or 'all'
 let rbFilterText = '';      // report tab filter: free-text search
+let rbAnalysis = null;      // report analyzer result: {issues, count, at} | {error} | {running}
+let rbAnalyzing = false;    // true while the analyzer call is in flight
 let rbFocusMode = false;    // productivity mode: show one finding at a time
 let rbFocusIndex = 0;       // which finding is currently shown in focus mode
 let rbFocusNodeId = null;   // the nodeId of the current focus finding (survives re-sorting)
@@ -5931,6 +5933,116 @@ function rbRotatePhoto(nodeId, key, kind) {
     }
 }
 
+// Report Analyzer: AI proofread + whole-report consistency pass.
+function rbAnalysisStatusOf(c) {
+  if (typeof repairFixed !== 'undefined' && repairFixed[c.nodeId]) return 'Repaired during inspection (same-drop remediation)';
+  return 'Open - recommended for monitoring / future repair';
+}
+function rbBuildAnalysisPayload() {
+  var cands = rbCandidates().filter(function(c){ return rbIsIncluded(c.nodeId); });
+  var map = {}, blocks = [];
+  cands.forEach(function(c, i){
+    var n = i + 1;
+    var loc = c.isManual ? (c.node.label || c.node.id || ('Manual ' + c.nodeId)) : rbLocation(c.drop, c.floor, c.pos);
+    map[n] = { nodeId: c.nodeId, loc: loc };
+    var sev = rbSeverity(c.nodeId, c.node);
+    var tags = rbTags(c.nodeId, c.node).join(', ') || 'General';
+    var action = rbAnalysisStatusOf(c);
+    var d = REPORT_META.desc[c.nodeId]; d = (d != null ? String(d).trim() : '');
+    blocks.push('[' + n + '] ' + loc +
+      '\n  Severity: ' + sev + '  |  Action/Status: ' + action + '  |  Defect type: ' + tags +
+      (c.node.finds ? '\n  Field note: ' + String(c.node.finds).trim() : '') +
+      '\n  Description: ' + (d || '(NONE WRITTEN)'));
+  });
+  return { text: blocks.join('\n\n'), map: map, count: cands.length };
+}
+async function rbRunAnalysis() {
+  if (rbAnalyzing) return;
+  var payload = rbBuildAnalysisPayload();
+  if (!payload.count) { showToast('No findings to analyze yet.', 3000, true); return; }
+  rbAnalyzing = true; rbAnalysis = { running: true }; renderReportBuilder();
+  var systemPrompt = 'You are a meticulous senior building-envelope consultant proofreading a facade inspection report before it is sent to a property manager. You catch inconsistencies and errors a busy inspector would miss. You are precise, conservative, and never invent problems.';
+  var userPrompt = [
+    'Below are all findings in a facade inspection report. Each has metadata (Severity, Action/Status, Defect type, and an optional raw Field note) followed by the client-facing Description.',
+    '',
+    'Review the WHOLE report and flag issues in these categories:',
+    '- CONTRADICTION: the Description conflicts with the Action/Status, Severity, or Defect type of the finding. Examples: Action/Status says the item is open or monitor but the Description says it was repaired or replaced; Defect type is Sealant but the Description is about cracking; Severity is Low but the Description describes an urgent or critical condition.',
+    '- MISSING: the Description is empty or too thin to be client-ready.',
+    '- PROOFREAD: grammar, spelling, or clearly awkward wording in a Description.',
+    '- CONSISTENCY: terminology or style that is inconsistent across findings (for example "sealant" versus "caulking" used interchangeably, mixed verb tense or voice, inconsistent units or capitalization).',
+    '',
+    'Rules: Only flag real, specific issues. Do not restate the description. Keep each note to one concise sentence that says what is wrong and how to fix it.',
+    'Return ONLY a JSON array (no prose, no code fences). Each element must be {"finding": <number>, "type": "CONTRADICTION|MISSING|PROOFREAD|CONSISTENCY", "note": "<one sentence>"}. If a CONSISTENCY issue spans findings, reference the most relevant finding number. If there are no issues at all, return [].',
+    '',
+    'FINDINGS:',
+    payload.text
+  ].join('\n');
+  try {
+    var response = await fetch(AI_ENDPOINT, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 3000, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] })
+    });
+    var data = await response.json();
+    var txt = (data.content && data.content[0] && data.content[0].text) ? data.content[0].text.trim() : '';
+    txt = txt.replace(/^```json/i, '').replace(/^```/, '').replace(/```$/, '').trim();
+    var issues = [];
+    try { issues = JSON.parse(txt); } catch(e) {
+      var m = txt.match(/\[[\s\S]*\]/); if (m) { try { issues = JSON.parse(m[0]); } catch(e2){} }
+    }
+    if (!Array.isArray(issues)) issues = [];
+    issues = issues.map(function(it){
+      var ref = payload.map[it.finding] || {};
+      return { finding: it.finding, type: String(it.type||'').toUpperCase(), note: it.note || '', nodeId: ref.nodeId || null, loc: ref.loc || ('Finding ' + it.finding) };
+    }).filter(function(it){ return it.note; });
+    rbAnalysis = { issues: issues, count: payload.count, at: Date.now() };
+  } catch(err) {
+    rbAnalysis = { error: (err && err.message) || 'Analysis failed - check your connection.' };
+    console.error('[Report analysis]', err);
+  } finally {
+    rbAnalyzing = false; renderReportBuilder();
+  }
+}
+function rbJumpToFinding(nodeId) {
+  rbFilterElev = 'all'; rbFilterType = 'all'; rbFilterText = '';
+  rbFocusMode = false;
+  renderReportBuilder();
+  setTimeout(function(){
+    var el = document.getElementById('rb-desc-ta-' + nodeId);
+    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); try { el.focus(); } catch(e){} }
+  }, 60);
+}
+function rbAnalysisPanelHTML() {
+  var a = rbAnalysis;
+  if (!a || a.running) return '';
+  if (a.error) return '<div style="margin-top:8px;padding:11px 14px;background:#2a0f0f;border:1px solid #e0533a;border-radius:10px;color:#ff9b85;font-size:0.74rem;">' + rbEsc(a.error) + '</div>';
+  var issues = a.issues || [];
+  if (!issues.length) return '<div style="margin-top:8px;padding:12px 15px;background:#06231a;border:1px solid #1fd0a5;border-radius:10px;color:#1fd0a5;font-size:0.78rem;font-weight:bold;">\u2713 No consistency or proofreading issues found across ' + a.count + ' findings.</div>';
+  var TYPE = {
+    CONTRADICTION:{label:'Contradiction', c:'#ff6b5e', bg:'#2a1010'},
+    MISSING:{label:'Missing', c:'#f39c12', bg:'#291a06'},
+    PROOFREAD:{label:'Proofread', c:'#0cf', bg:'#06212a'},
+    CONSISTENCY:{label:'Consistency', c:'#a78bfa', bg:'#160f29'}
+  };
+  var order = { CONTRADICTION:0, MISSING:1, CONSISTENCY:2, PROOFREAD:3 };
+  var sorted = issues.slice().sort(function(x,y){
+    var ox = order[x.type]==null?9:order[x.type], oy = order[y.type]==null?9:order[y.type];
+    return ox - oy || (x.finding||0) - (y.finding||0);
+  });
+  var rows = sorted.map(function(it){
+    var t = TYPE[it.type] || { label: it.type || 'Note', c:'#888', bg:'#15171c' };
+    var jump = it.nodeId ? ('<button onclick="rbJumpToFinding(\'' + it.nodeId + '\')" style="margin-left:auto;flex:none;padding:4px 10px;border-radius:6px;border:1px solid #2a2d38;background:#0d1117;color:#0cf;font-size:0.64rem;font-weight:bold;cursor:pointer;white-space:nowrap;">Go to finding \u2192</button>') : '';
+    return '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-bottom:1px solid #1a1d24;">'
+      + '<span style="flex:none;font-size:0.56rem;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;color:' + t.c + ';background:' + t.bg + ';border:1px solid ' + t.c + ';border-radius:4px;padding:3px 7px;margin-top:1px;">' + t.label + '</span>'
+      + '<div style="min-width:0;flex:1;"><div style="font-size:0.64rem;color:#888;margin-bottom:2px;">' + rbEsc(it.loc) + '</div><div style="font-size:0.78rem;color:#dfe4ea;line-height:1.45;">' + rbEsc(it.note) + '</div></div>'
+      + jump + '</div>';
+  }).join('');
+  var when = a.at ? new Date(a.at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
+  return '<div style="margin-top:8px;background:#0d1117;border:1px solid #2a2d38;border-radius:10px;overflow:hidden;">'
+    + '<div style="padding:9px 13px;background:#12161f;border-bottom:1px solid #2a2d38;display:flex;align-items:center;justify-content:space-between;gap:8px;">'
+    + '<span style="font-size:0.76rem;color:#fff;font-weight:bold;">' + sorted.length + ' thing' + (sorted.length===1?'':'s') + ' to review</span>'
+    + '<span style="font-size:0.62rem;color:#666;">across ' + a.count + ' findings' + (when ? ' \u00b7 ' + when : '') + '</span></div>'
+    + rows + '</div>';
+}
 async function rbEnhanceDefect(nodeId, useInstruction) {
     const node = getNodeData(nodeId);
     if (!node) return;
@@ -5957,7 +6069,7 @@ async function rbEnhanceDefect(nodeId, useInstruction) {
     const finds = node.finds || node.label || '';
     const loc   = rbLocation(nodeId.split('-')[0], nodeId.split('-')[1], nodeId.split('-')[2]) || '';
 
-    const systemPrompt = `You are a senior building envelope consultant writing client-facing defect descriptions for inspection reports. Write for property managers and building owners — intelligent but not technical engineers. Be precise, professional, and action-oriented. Never use filler phrases. Keep descriptions concise (2-4 sentences).`;
+    const systemPrompt = `You are a senior building envelope consultant writing client-facing defect descriptions for inspection reports. Write for property managers and building owners — intelligent but not technical engineers. Be precise, professional, and action-oriented. Never use filler phrases. Keep descriptions concise (2-4 sentences). When the inspector's own past descriptions or style rules are provided, match their voice, structure, terminology and preferences closely \u2014 while keeping the content specific to the current finding and never copying facts from the examples.`;
 
     const userPrompt = `Improve this defect description for a facade inspection report.
 
@@ -6319,6 +6431,10 @@ function renderReportBuilder() {
       </div>
     </div>
 
+    <div style="margin:18px 4px 0;">
+      <button onclick="rbRunAnalysis()" ${rbAnalyzing?'disabled':''} style="padding:8px 15px;border-radius:8px;cursor:${rbAnalyzing?'wait':'pointer'};font-size:0.74rem;font-weight:bold;border:1px solid #1fd0a5;background:${rbAnalyzing?'#0d1117':'#06231a'};color:#1fd0a5;">${rbAnalyzing?'Analyzing the full report…':'Analyze full report — proofread & check consistency'}</button>
+      ${rbAnalysisPanelHTML()}
+    </div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin:18px 4px 10px;flex-wrap:wrap;gap:8px;">
       <div style="font-size:0.8rem;color:#0cf;text-transform:uppercase;font-weight:bold;letter-spacing:1px;">Findings</div>
       <div style="display:flex;gap:4px;background:#0d1117;border:1px solid #2a2d38;border-radius:8px;padding:3px;">
