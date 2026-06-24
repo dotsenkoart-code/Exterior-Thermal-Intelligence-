@@ -3462,9 +3462,13 @@ const DEFECT_COLORS = {
 
 let rpActiveFilter  = 'ALL';
 let rbFindingsView = 'all'; // on-screen report findings filter: 'all' | 'fixed' | 'monitor'
+let rbFilterElev = 'all';   // report tab filter: elevation name, or 'all'
+let rbFilterType = 'all';   // report tab filter: defect type, or 'all'
+let rbFilterText = '';      // report tab filter: free-text search
 let rbFocusMode = false;    // productivity mode: show one finding at a time
 let rbFocusIndex = 0;       // which finding is currently shown in focus mode
 let rbFocusNodeId = null;   // the nodeId of the current focus finding (survives re-sorting)
+let rbSkipWritten = true;   // focus mode: Back/Next skip findings that already have a description
 let rbReviewed = {};        // nodeId -> true when user has stepped past/marked it reviewed
 let rpGroupBy       = 'defect';
 let rpActiveElev    = '';
@@ -5431,18 +5435,101 @@ function rbSetVerified(nodeId, on) {
   saveReportMeta();
   renderReportBuilder();
 }
+// The exact ordered list Focus Mode navigates (mirrors the on-screen findings view filter).
+function rbViewCands() {
+  var list = rbCandidates().filter(function(c){
+    if (rbFindingsView === 'all') return true;
+    var fixed = (typeof repairFixed !== 'undefined') && !!repairFixed[c.nodeId];
+    return rbFindingsView === 'fixed' ? fixed : !fixed;
+  });
+  return rbApplyFilters(list);
+}
+// Elevation a finding belongs to (from the drop->wall assignment); 'Unassigned' if none.
+function rbElevationOf(c) {
+  return (typeof dropAssignments !== 'undefined' && dropAssignments[c.drop]) ? dropAssignments[c.drop] : 'Unassigned';
+}
+// Apply the report-tab filters (elevation + defect type + free-text search) to a candidate list.
+function rbApplyFilters(list) {
+  var elev = rbFilterElev, type = rbFilterType, txt = (rbFilterText || '').trim().toLowerCase();
+  if (elev === 'all' && type === 'all' && !txt) return list;
+  return list.filter(function(c){
+    if (elev !== 'all' && rbElevationOf(c) !== elev) return false;
+    if (type !== 'all' && rbTags(c.nodeId, c.node).indexOf(type) === -1) return false;
+    if (txt) {
+      var d = REPORT_META.desc[c.nodeId]; d = (d != null ? d : (c.node.notes || ''));
+      var hay = (rbLocation(c.drop, c.floor, c.pos) + ' ' + rbTags(c.nodeId, c.node).join(' ') + ' ' + d + ' ' + (c.node.finds || '') + ' ' + (c.node.id || c.nodeId)).toLowerCase();
+      if (hay.indexOf(txt) === -1) return false;
+    }
+    return true;
+  });
+}
+function rbFilterActive() { return rbFilterElev !== 'all' || rbFilterType !== 'all' || !!(rbFilterText && rbFilterText.trim()); }
+function rbSetFilterElev(v) { rbFilterElev = v; rbFocusIndex = 0; rbFocusNodeId = null; renderReportBuilder(); }
+function rbSetFilterType(v) { rbFilterType = v; rbFocusIndex = 0; rbFocusNodeId = null; renderReportBuilder(); }
+function rbSetFilterText(v) { rbFilterText = v; rbFocusIndex = 0; rbFocusNodeId = null; renderReportBuilder(); }
+function rbClearFilters() { rbFilterElev = 'all'; rbFilterType = 'all'; rbFilterText = ''; rbFocusIndex = 0; rbFocusNodeId = null; renderReportBuilder(); }
+// "Written" == has a non-empty report description (same rule as the written/not-written badge).
+function rbIsWritten(c) {
+  var d = REPORT_META.desc[c.nodeId];
+  return d != null && String(d).trim().length > 0;
+}
+// First index (searching from `start` in direction `dir`) whose finding still needs writing.
+// `inclusive` controls whether `start` itself is considered. Returns -1 if none.
+function rbNextUnwrittenIndex(cands, start, dir, inclusive) {
+  var i = inclusive ? start : start + dir;
+  for (; i >= 0 && i < cands.length; i += dir) {
+    if (!rbIsWritten(cands[i])) return i;
+  }
+  return -1;
+}
 function rbToggleFocusMode() {
   rbFocusMode = !rbFocusMode;
-  if (rbFocusMode) { rbFocusIndex = 0; rbFocusNodeId = null; }
+  if (rbFocusMode) {
+    rbFocusIndex = 0; rbFocusNodeId = null;
+    // Land on the first finding that still needs a description (when skipping written).
+    if (rbSkipWritten) {
+      var cands = rbViewCands();
+      var t = rbNextUnwrittenIndex(cands, 0, 1, true);
+      if (t !== -1) rbFocusIndex = t;
+    }
+  }
   renderReportBuilder();
-  if (rbFocusMode) showToast('Focus Mode on — reviewing one finding at a time. Use Back/Next to move.', 3000);
+  if (rbFocusMode) showToast(rbSkipWritten
+    ? 'Focus Mode on — jumping through findings that still need a description. Toggle "All" to review everything.'
+    : 'Focus Mode on — reviewing one finding at a time. Use Back/Next to move.', 3200);
+}
+function rbToggleSkipWritten() {
+  rbSkipWritten = !rbSkipWritten;
+  // When switching to skip-written, hop to the nearest finding that needs writing.
+  if (rbSkipWritten) {
+    var cands = rbViewCands();
+    var cur = Math.max(0, Math.min(cands.length - 1, rbFocusIndex));
+    if (cands.length && rbIsWritten(cands[cur])) {
+      var t = rbNextUnwrittenIndex(cands, cur, 1, false);
+      if (t === -1) t = rbNextUnwrittenIndex(cands, 0, 1, true); // wrap to the first one
+      if (t !== -1) { rbFocusIndex = t; rbFocusNodeId = null; }
+    }
+  }
+  renderReportBuilder();
+  showToast(rbSkipWritten
+    ? 'Skipping written findings — Back/Next jump to the next one needing a description.'
+    : 'Showing all findings — Back/Next step through every one.', 2600);
 }
 function rbFocusNav(dir) {
   // Clear the nodeId lock BEFORE moving so the index change actually takes effect
   // (otherwise the render would re-sync the index back to the current finding).
   // The render will then re-lock onto whatever finding is at the new index.
   rbFocusNodeId = null;
-  rbFocusIndex += dir;
+  var cands = rbViewCands();
+  if (!cands.length) { renderReportBuilder(); return; }
+  var anyUnwritten = cands.some(function(c){ return !rbIsWritten(c); });
+  if (rbSkipWritten && anyUnwritten) {
+    // Jump to the next finding (in this direction) that still needs a description.
+    var t = rbNextUnwrittenIndex(cands, rbFocusIndex, dir, false);
+    if (t !== -1) rbFocusIndex = t;   // else: none left this way — stay put
+  } else {
+    rbFocusIndex = Math.max(0, Math.min(cands.length - 1, rbFocusIndex + dir));
+  }
   renderReportBuilder();
   // Scroll to top of the findings area so the focused card is in view
   var el = document.getElementById('report-builder-content') || document.querySelector('#arena-report');
@@ -6017,6 +6104,53 @@ function renderReportBuilder() {
     monitor: _inclCands.filter(c => !_isFixed(c)).length
   };
 
+  // Report-tab filter options (elevation + defect type) with counts, plus a live summary.
+  const _elevCounts = {};
+  _inclCands.forEach(c => { var e = rbElevationOf(c); _elevCounts[e] = (_elevCounts[e] || 0) + 1; });
+  const _elevOptions = (typeof elevations !== 'undefined' ? elevations.slice() : []).filter(e => _elevCounts[e]);
+  if (_elevCounts['Unassigned']) _elevOptions.push('Unassigned');
+  const _typeCounts = {};
+  _inclCands.forEach(c => { rbTags(c.nodeId, c.node).forEach(t => { _typeCounts[t] = (_typeCounts[t] || 0) + 1; }); });
+  const _typeOptions = Object.keys(_typeCounts).sort();
+  const _filteredCount = rbViewCands().length;
+  const _filterSummary = [rbFilterElev !== 'all' ? rbFilterElev : null, rbFilterType !== 'all' ? rbFilterType : null, (rbFilterText && rbFilterText.trim()) ? ('“' + rbFilterText.trim() + '”') : null].filter(Boolean).join(' · ');
+
+  // Progress bar computed once so Focus Mode can show it without the rest of the chrome.
+  const _progressBar = (function(){
+      // Dual progress tracking: WRITTEN (has description) + VERIFIED (manually checked)
+      // Compute the filtered list locally (this runs before _viewCands is defined below)
+      var _progCands = rbApplyFilters(cands.filter(function(c){ return rbIsIncluded(c.nodeId); }).filter(function(c){
+        if (rbFindingsView === 'all') return true;
+        var fx = (typeof repairFixed !== 'undefined') && !!repairFixed[c.nodeId];
+        return rbFindingsView === 'fixed' ? fx : !fx;
+      }));
+      var totalCount = _progCands.length;
+      var writtenCount = _progCands.filter(function(c){
+        var d = REPORT_META.desc[c.nodeId];
+        return d != null && String(d).trim().length > 0;
+      }).length;
+      var verifiedCount = _progCands.filter(function(c){ return REPORT_META.verified && REPORT_META.verified[c.nodeId]; }).length;
+      var wPct = totalCount ? Math.round(writtenCount/totalCount*100) : 0;
+      var vPct = totalCount ? Math.round(verifiedCount/totalCount*100) : 0;
+      function bar(label, count, pct, color, leftColor){
+        return '<div style="margin-bottom:8px;">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">' +
+            '<span style="font-size:0.7rem;color:#888;">' + label + ': <strong style="color:' + color + ';">' + count + '</strong> of <strong>' + totalCount + '</strong>' +
+              (totalCount-count>0 ? ' · <span style="color:' + leftColor + ';">' + (totalCount-count) + ' left</span>' : ' · <span style="color:#28a745;">complete \u2713</span>') + '</span>' +
+            '<span style="font-size:0.66rem;color:' + color + ';font-weight:bold;">' + pct + '%</span>' +
+          '</div>' +
+          '<div style="height:6px;background:#0d1117;border-radius:3px;overflow:hidden;border:1px solid #2a2d38;">' +
+            '<div style="height:100%;width:' + pct + '%;background:' + color + ';transition:width 0.3s;"></div>' +
+          '</div>' +
+        '</div>';
+      }
+      return '<div style="margin:0 4px 14px;padding:12px 14px;background:#12161f;border:1px solid #2a2d38;border-radius:10px;">' +
+        '<div style="font-size:0.64rem;color:#666;text-transform:uppercase;letter-spacing:1px;font-weight:bold;margin-bottom:8px;">Review Progress</div>' +
+        bar('\u270E Written', writtenCount, wPct, '#1fd0a5', '#f39c12') +
+        bar('\u2713 Verified', verifiedCount, vPct, '#28a745', '#888') +
+        '<div style="font-size:0.6rem;color:#666;margin-top:2px;">Written = has a description. Verified = you\'ve double-checked it (tick the box on each finding).</div>' +
+      '</div>';
+    })();
   let html = `
   <div style="max-width:980px;margin:0 auto;width:100%;padding:4px 4px 40px;">
 
@@ -6194,41 +6328,21 @@ function renderReportBuilder() {
       </div>
       <button onclick="rbToggleFocusMode()" style="padding:6px 14px;border-radius:8px;cursor:pointer;font-size:0.72rem;font-weight:bold;border:1px solid ${rbFocusMode?'#a78bfa':'#2a2d38'};background:${rbFocusMode?'#a78bfa':'#0d1117'};color:${rbFocusMode?'#000':'#a78bfa'};">${rbFocusMode?'✓ Focus Mode On':'◉ Focus Mode'}</button>
     </div>
-    ${(function(){
-      // Dual progress tracking: WRITTEN (has description) + VERIFIED (manually checked)
-      // Compute the filtered list locally (this runs before _viewCands is defined below)
-      var _progCands = cands.filter(function(c){ return rbIsIncluded(c.nodeId); }).filter(function(c){
-        if (rbFindingsView === 'all') return true;
-        var fx = (typeof repairFixed !== 'undefined') && !!repairFixed[c.nodeId];
-        return rbFindingsView === 'fixed' ? fx : !fx;
-      });
-      var totalCount = _progCands.length;
-      var writtenCount = _progCands.filter(function(c){
-        var d = REPORT_META.desc[c.nodeId];
-        return d != null && String(d).trim().length > 0;
-      }).length;
-      var verifiedCount = _progCands.filter(function(c){ return REPORT_META.verified && REPORT_META.verified[c.nodeId]; }).length;
-      var wPct = totalCount ? Math.round(writtenCount/totalCount*100) : 0;
-      var vPct = totalCount ? Math.round(verifiedCount/totalCount*100) : 0;
-      function bar(label, count, pct, color, leftColor){
-        return '<div style="margin-bottom:8px;">' +
-          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">' +
-            '<span style="font-size:0.7rem;color:#888;">' + label + ': <strong style="color:' + color + ';">' + count + '</strong> of <strong>' + totalCount + '</strong>' +
-              (totalCount-count>0 ? ' · <span style="color:' + leftColor + ';">' + (totalCount-count) + ' left</span>' : ' · <span style="color:#28a745;">complete \u2713</span>') + '</span>' +
-            '<span style="font-size:0.66rem;color:' + color + ';font-weight:bold;">' + pct + '%</span>' +
-          '</div>' +
-          '<div style="height:6px;background:#0d1117;border-radius:3px;overflow:hidden;border:1px solid #2a2d38;">' +
-            '<div style="height:100%;width:' + pct + '%;background:' + color + ';transition:width 0.3s;"></div>' +
-          '</div>' +
-        '</div>';
-      }
-      return '<div style="margin:0 4px 14px;padding:12px 14px;background:#12161f;border:1px solid #2a2d38;border-radius:10px;">' +
-        '<div style="font-size:0.64rem;color:#666;text-transform:uppercase;letter-spacing:1px;font-weight:bold;margin-bottom:8px;">Review Progress</div>' +
-        bar('\u270E Written', writtenCount, wPct, '#1fd0a5', '#f39c12') +
-        bar('\u2713 Verified', verifiedCount, vPct, '#28a745', '#888') +
-        '<div style="font-size:0.6rem;color:#666;margin-top:2px;">Written = has a description. Verified = you\'ve double-checked it (tick the box on each finding).</div>' +
-      '</div>';
-    })()}
+    <div style="margin:0 4px 12px;padding:9px 12px;background:#0d1117;border:1px solid #2a2d38;border-radius:10px;display:flex;flex-wrap:wrap;align-items:center;gap:9px;">
+      <span style="font-size:0.6rem;color:#666;text-transform:uppercase;letter-spacing:1px;font-weight:bold;">Filter</span>
+      <select onchange="rbSetFilterElev(this.value)" style="background:#111;border:1px solid #2a2d38;color:#ddd;border-radius:6px;padding:6px 9px;font-size:0.74rem;cursor:pointer;max-width:230px;">
+        <option value="all"${rbFilterElev==='all'?' selected':''}>All elevations</option>
+        ${_elevOptions.map(e=>`<option value="${rbEsc(e)}"${rbFilterElev===e?' selected':''}>${rbEsc(e)} (${_elevCounts[e]})</option>`).join('')}
+      </select>
+      <select onchange="rbSetFilterType(this.value)" style="background:#111;border:1px solid #2a2d38;color:#ddd;border-radius:6px;padding:6px 9px;font-size:0.74rem;cursor:pointer;max-width:230px;">
+        <option value="all"${rbFilterType==='all'?' selected':''}>All defect types</option>
+        ${_typeOptions.map(t=>`<option value="${rbEsc(t)}"${rbFilterType===t?' selected':''}>${rbEsc(t)} (${_typeCounts[t]})</option>`).join('')}
+      </select>
+      <input type="text" value="${rbEsc(rbFilterText)}" onchange="rbSetFilterText(this.value)" placeholder="Search text — press Enter" style="flex:1;min-width:140px;background:#111;border:1px solid #2a2d38;color:#fff;border-radius:6px;padding:6px 10px;font-size:0.74rem;box-sizing:border-box;">
+      <span style="font-size:0.7rem;color:${rbFilterActive()?'#1fd0a5':'#666'};font-weight:bold;white-space:nowrap;">${_filteredCount} match${_filteredCount===1?'':'es'}</span>
+      ${rbFilterActive()?`<button onclick="rbClearFilters()" style="padding:5px 11px;border-radius:6px;border:1px solid #e0a106;background:transparent;color:#e0a106;font-size:0.68rem;font-weight:bold;cursor:pointer;white-space:nowrap;">✕ Clear</button>`:''}
+    </div>
+    ${_progressBar}
     <div style="font-size:0.66rem;color:#555;margin:0 4px 10px;">${rbFindingsView!=='all'?'Filtered view — the exported PDF always includes all findings.':'Showing all findings.'}</div>`;
 
   if (!cands.length) {
@@ -6239,12 +6353,8 @@ function renderReportBuilder() {
   }
 
   let _wsGroupIdx = 0;
-  // Apply the on-screen findings view filter (all / fixed / monitor)
-  const _viewCands = cands.filter(c => {
-    if (rbFindingsView === 'all') return true;
-    var fixed = (typeof repairFixed !== 'undefined') && !!repairFixed[c.nodeId];
-    return rbFindingsView === 'fixed' ? fixed : !fixed;
-  });
+  // Apply the on-screen findings view filter (all / fixed / monitor) — same list Focus Mode navigates
+  const _viewCands = rbViewCands();
 
   // FOCUS MODE: show one finding at a time with next/back navigation
   let _renderCands = _viewCands;
@@ -6271,20 +6381,36 @@ function renderReportBuilder() {
     // Remember which finding we're on so re-renders stay locked to it
     rbFocusNodeId = _cur.nodeId;
     _renderCands = [_cur];
-    // Navigation bar
-    const _atFirst = rbFocusIndex === 0;
-    const _atLast = rbFocusIndex === _viewCands.length - 1;
+    // Focus Mode: drop the builder chrome — keep only the progress bar + this finding.
+    html = `<div style="max-width:980px;margin:0 auto;width:100%;padding:4px 4px 40px;">${_progressBar}${rbFilterActive()?`<div style="margin:-4px 4px 12px;padding:7px 11px;background:#0f1a14;border:1px solid #1fd0a5;border-radius:8px;font-size:0.68rem;color:#1fd0a5;display:flex;align-items:center;justify-content:space-between;gap:8px;"><span>◆ Editing only: ${rbEsc(_filterSummary)}</span><button onclick="rbClearFilters()" style="padding:3px 9px;border-radius:5px;border:1px solid #1fd0a5;background:transparent;color:#1fd0a5;font-size:0.62rem;font-weight:bold;cursor:pointer;">Clear filter</button></div>`:''}`;
+    // Navigation bar — when "skip written" is on, Back/Next jump between findings that
+    // still need a description, and the buttons disable when none remain in that direction.
+    const _unwrittenTotal = _viewCands.filter(function(c){ return !rbIsWritten(c); }).length;
+    const _effectiveSkip = rbSkipWritten && _unwrittenTotal > 0;
+    const _hasPrev = _effectiveSkip ? (rbNextUnwrittenIndex(_viewCands, rbFocusIndex, -1, false) !== -1) : (rbFocusIndex > 0);
+    const _hasNext = _effectiveSkip ? (rbNextUnwrittenIndex(_viewCands, rbFocusIndex, 1, false) !== -1) : (rbFocusIndex < _viewCands.length - 1);
+    const _atFirst = !_hasPrev;
+    const _atLast = !_hasNext;
+    const _curWritten = rbIsWritten(_cur);
+    const _counterMain = rbSkipWritten
+      ? (_unwrittenTotal === 0 ? 'All findings written \u2713' : '\u270E ' + _unwrittenTotal + ' still need' + (_unwrittenTotal===1?'s':'') + ' a description')
+      : ('Finding ' + (rbFocusIndex+1) + ' of ' + _viewCands.length);
+    const _counterSub = rbSkipWritten
+      ? ('Finding ' + (rbFocusIndex+1) + ' of ' + _viewCands.length + (_curWritten ? ' \u00b7 already written' : '') + ' \u00b7 skipping written')
+      : 'Focus Mode \u2014 review one at a time';
     html += `
     <div style="position:sticky;top:0;z-index:20;background:#12101f;border:1px solid #a78bfa;border-radius:10px;padding:10px 14px;margin-bottom:14px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
         <button onclick="rbFocusNav(-1)" ${_atFirst?'disabled':''} style="padding:8px 16px;border-radius:7px;border:none;cursor:${_atFirst?'not-allowed':'pointer'};font-weight:bold;font-size:0.8rem;background:${_atFirst?'#1a1a22':'#a78bfa'};color:${_atFirst?'#555':'#000'};">◄ Back</button>
         <div style="text-align:center;flex:1;">
-          <div style="font-size:0.78rem;color:#a78bfa;font-weight:bold;">Finding ${rbFocusIndex+1} of ${_viewCands.length}</div>
-          <div style="font-size:0.62rem;color:#888;margin-top:1px;">Focus Mode — review one at a time</div>
+          <div style="font-size:0.78rem;color:#a78bfa;font-weight:bold;">${_counterMain}</div>
+          <div style="font-size:0.62rem;color:#888;margin-top:1px;">${_counterSub}</div>
         </div>
         <button onclick="rbFocusNav(1)" ${_atLast?'disabled':''} style="padding:8px 16px;border-radius:7px;border:none;cursor:${_atLast?'not-allowed':'pointer'};font-weight:bold;font-size:0.8rem;background:${_atLast?'#1a1a22':'#a78bfa'};color:${_atLast?'#555':'#000'};">${_atLast?'Done':'Next ►'}</button>
       </div>
-      <div style="display:flex;justify-content:center;margin-top:8px;">
+      <div style="display:flex;justify-content:center;gap:8px;margin-top:8px;">
+        <button onclick="rbToggleFocusMode()" title="Leave Focus Mode" style="padding:6px 14px;border-radius:7px;cursor:pointer;font-size:0.72rem;font-weight:bold;border:1px solid #2a2d38;background:#0d1117;color:#888;">✕ Exit Focus</button>
+        <button onclick="rbToggleSkipWritten()" title="When on, Back/Next skip findings that already have a description" style="padding:6px 14px;border-radius:7px;cursor:pointer;font-size:0.72rem;font-weight:bold;border:1px solid ${rbSkipWritten?'#a78bfa':'#2a2d38'};background:${rbSkipWritten?'#a78bfa':'#0d1117'};color:${rbSkipWritten?'#000':'#a78bfa'};">${rbSkipWritten?'●':'○'} Skip written</button>
         <button onclick="rbToggleFocusPreview()" style="padding:6px 16px;border-radius:7px;cursor:pointer;font-size:0.72rem;font-weight:bold;border:1px solid ${rbFocusPreview?'#0cf':'#2a2d38'};background:${rbFocusPreview?'#0cf':'#0d1117'};color:${rbFocusPreview?'#000':'#0cf'};">${rbFocusPreview?'✎ Back to Editing':'\uD83D\uDC41 Preview as PDF'}</button>
       </div>
     </div>`;
