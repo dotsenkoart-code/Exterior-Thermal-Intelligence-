@@ -5354,7 +5354,7 @@ function rbBuildFindingPreview(c, displayNum) {
   const items = _allItems.filter(it => rbIsPhotoOn(nodeId, it.key + ':' + it.kind));
   const photoCells = items.map(it => {
     var _kindLabel = it.kind === 'thermal' ? 'Thermal (IR)' : it.kind === 'visual' ? 'Visual Spectrum' : it.kind === 'site' ? 'Site Photo' : 'Photo';
-    return '<figure class="ph"><div class="phbox"><img src="' + it.url + '" class="' + (it.rot===90?'rot90':it.rot===270?'rot270':it.rot===180?'rot180':'') + '" ' + (it.rot ? 'style="transform:rotate(' + it.rot + 'deg);"' : '') + '></div><figcaption>' + _kindLabel + '</figcaption></figure>';
+    return '<figure class="ph"><div class="phbox ' + ((it.rot===90||it.rot===270)?'port':'land') + '"><img src="' + it.url + '" class="' + (it.rot===90?'rot90':it.rot===270?'rot270':it.rot===180?'rot180':'') + '"></div><figcaption>' + _kindLabel + '</figcaption></figure>';
   }).join('');
   const _defectTitle = rbEsc(rbResolveTitle(nodeId, node, tags, sev));
   const _estimate = REPORT_META.estimates[nodeId] || '';
@@ -5373,7 +5373,7 @@ function rbBuildFindingPreview(c, displayNum) {
         (tags.length ? '<div class="defect-tags">' + tags.map(function(t){return '<span>' + rbEsc(t) + '</span>';}).join('') + '</div>' : '') +
         '<div class="defect-desc">' + (desc ? rbEsc(desc) : '<em style="color:#999;">No description written yet.</em>') + '</div>' +
         (_estimate ? '<div class="defect-estimate"><span class="est-label">Estimated Repair</span><span class="est-value">' + rbEsc(_estimate) + '</span></div>' : '') +
-        (items.length ? '<div class="photos">' + photoCells + '</div>' : '<p class="nophoto">No photographs included for this finding.</p>') +
+        (items.length ? '<div class="photos' + (items.length<=3 ? ' ph-'+items.length : '') + '">' + photoCells + '</div>' : '<p class="nophoto">No photographs included for this finding.</p>') +
       '</div>' +
     '</section>';
   // Wrap in a white "paper" container with the report styles scoped inside
@@ -5407,11 +5407,19 @@ function rbReportPreviewCSS() {
   '.rb-pdf-preview .defect-estimate{margin-top:10px;padding:8px 12px;background:#f0f7f3;border-left:3px solid #28a745;border-radius:0 4px 4px 0;display:flex;justify-content:space-between;}' +
   '.rb-pdf-preview .est-label{font-size:8.5pt;color:#28a745;font-weight:bold;text-transform:uppercase;font-family:Arial,sans-serif;}' +
   '.rb-pdf-preview .est-value{font-size:10pt;color:#1a2942;font-weight:bold;}' +
-  '.rb-pdf-preview .photos{display:flex;gap:12px;margin-top:14px;flex-wrap:wrap;justify-content:center;align-items:flex-start;}' +
-  '.rb-pdf-preview .ph{margin:0;text-align:center;flex:0 0 calc(50% - 6px);max-width:calc(50% - 6px);box-sizing:border-box;}' +
-  '.rb-pdf-preview .phbox{display:block;text-align:center;line-height:0;}' +
-  '.rb-pdf-preview .phbox img{height:300px;width:auto;max-width:100%;display:block;margin:0 auto;border:1px solid #d9dee5;border-radius:4px;object-fit:contain;}' +
-  '.rb-pdf-preview .phbox img.rot90, .rb-pdf-preview .phbox img.rot270{height:300px;width:auto;}' +
+  '.rb-pdf-preview .photos{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px;align-items:start;}' +
+  '.rb-pdf-preview .photos.ph-1{grid-template-columns:minmax(0,62%);justify-content:center;}' +
+  '.rb-pdf-preview .photos.ph-3 .ph:nth-child(3){grid-column:1 / -1;width:calc(50% - 6px);margin-left:auto;margin-right:auto;}' +
+  '.rb-pdf-preview .ph{margin:0;text-align:center;min-width:0;box-sizing:border-box;}' +
+  '.rb-pdf-preview .phbox{position:relative;width:100%;overflow:hidden;line-height:0;border:1px solid #d9dee5;border-radius:4px;background:#fff;}' +
+  '.rb-pdf-preview .phbox.land{aspect-ratio:4 / 3;}' +
+  '.rb-pdf-preview .phbox.port{aspect-ratio:3 / 4;width:56.25%;margin-left:auto;margin-right:auto;}' +
+  '.rb-pdf-preview .phbox img{position:absolute;top:50%;left:50%;object-fit:contain;transform:translate(-50%,-50%);display:block;}' +
+  '.rb-pdf-preview .phbox.land img{width:100%;height:100%;}' +
+  '.rb-pdf-preview .phbox.land img.rot180{transform:translate(-50%,-50%) rotate(180deg);}' +
+  '.rb-pdf-preview .phbox.port img{width:133.333%;height:75%;}' +
+  '.rb-pdf-preview .phbox.port img.rot90{transform:translate(-50%,-50%) rotate(90deg);}' +
+  '.rb-pdf-preview .phbox.port img.rot270{transform:translate(-50%,-50%) rotate(270deg);}' +
   '.rb-pdf-preview figcaption{font-size:8.5pt;color:#6b7a8f;margin-top:5px;text-align:center;font-family:Arial,sans-serif;}' +
   '.rb-pdf-preview .nophoto{font-size:9.5pt;color:#999;font-style:italic;}' +
   '.rb-pdf-preview .sev-CRITICAL{background:#b3122b;}.rb-pdf-preview .sev-HIGH{background:#d9534f;}.rb-pdf-preview .sev-MEDIUM{background:#f1c40f;color:#000;}.rb-pdf-preview .sev-LOW{background:#28a745;}';
@@ -6608,7 +6616,7 @@ function rbBuildWorkCompletedSection() {
       var items = (typeof rbPhotoItems === 'function') ? rbPhotoItems(r.node) : [];
       if (items.length) {
         var shown = items.slice(0, 2).map(function(it){
-          return '<div class="wc-photo"><img src="' + it.url + '"' + (it.rot ? ' style="transform:rotate(' + it.rot + 'deg);"' : '') + '></div>';
+          return '<div class="wc-photo ' + ((it.rot===90||it.rot===270)?'port':'land') + '"><img src="' + it.url + '" class="' + (it.rot===90?'rot90':it.rot===270?'rot270':it.rot===180?'rot180':'') + '"></div>';
         }).join('');
         photosHtml = '<div class="wc-photos">' + shown + '</div>';
       }
@@ -6687,7 +6695,7 @@ function rbBuildReportHTML() {
       var _kindLabel = it.kind === 'thermal' ? 'Thermal (IR)' : it.kind === 'visual' ? 'Visual Spectrum' : it.kind === 'site' ? 'Site Photo' : 'Photo';
       return `
       <figure class="ph">
-        <div class="phbox"><img src="${it.url}" class="${it.rot===90?'rot90':it.rot===270?'rot270':it.rot===180?'rot180':''}" ${it.rot ? `style="transform:rotate(${it.rot}deg);"` : ''}></div>
+        <div class="phbox ${(it.rot===90||it.rot===270)?'port':'land'}"><img src="${it.url}" class="${it.rot===90?'rot90':it.rot===270?'rot270':it.rot===180?'rot180':''}"></div>
         <figcaption>${_kindLabel}</figcaption>
       </figure>`;
     }).join('');
@@ -6715,7 +6723,7 @@ function rbBuildReportHTML() {
         ${tags.length ? `<div class="defect-tags">${tags.map(t => `<span>${rbEsc(t)}</span>`).join('')}</div>` : ''}
         <div class="defect-desc">${rbEsc(desc)}</div>
         ${_estimate ? `<div class="defect-estimate"><span class="est-label">Estimated Repair</span><span class="est-value">${rbEsc(_estimate)}</span></div>` : ''}
-        ${items.length ? `<div class="photos">${photoCells}</div>` : '<p class="nophoto">No photographs included for this finding.</p>'}
+        ${items.length ? `<div class="photos${items.length<=3 ? ' ph-'+items.length : ''}">${photoCells}</div>` : '<p class="nophoto">No photographs included for this finding.</p>'}
       </div>
     </section>`;
   }); }); // close _grpItems + rbGroupCandidates
@@ -6887,12 +6895,27 @@ function rbBuildReportHTML() {
   .defect-estimate { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: #f3f7f4; border-left: 3px solid var(--low); border-radius: 0 5px 5px 0; margin-bottom: 14px; }
   .defect-estimate .est-label { font-size: 7.5pt; letter-spacing: 1px; text-transform: uppercase; color: var(--grey); font-weight: 700; }
   .defect-estimate .est-value { font-size: 11pt; font-weight: 700; color: var(--navy); font-family: Georgia, serif; }
-  .photos { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-items: flex-start; }
-  figure.ph { margin: 0; text-align: center; flex: 0 0 calc(50% - 6px); max-width: calc(50% - 6px); box-sizing: border-box; }
-  .phbox { display: block; text-align: center; line-height: 0; }
-  /* Max two photos per row (each cell = half width). Uniform height aligns them in a clean
-     grid; width auto preserves aspect ratio. 3+ photos wrap to new rows of two. */
-  .phbox img { height: 260px; width: auto; max-width: 100%; display: block; margin: 0 auto; border: 1px solid var(--line); border-radius: 4px; object-fit: contain; }
+  /* Two-up rows. A landscape photo fills its column (4:3). A rotated photo gets the SAME
+     HEIGHT as its landscape neighbour but a narrower 3:4 footprint, centred in its column —
+     so rows line up top AND bottom with no white gap, nothing clipped, no letterbox bars.
+     1 photo centres; 3 render 2-up with the 3rd centred below. */
+  .photos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+  .photos.ph-1 { grid-template-columns: minmax(0, 62%); justify-content: center; }
+  .photos.ph-3 figure.ph:nth-child(3) { grid-column: 1 / -1; width: calc(50% - 6px); margin-left: auto; margin-right: auto; }
+  figure.ph { margin: 0; text-align: center; min-width: 0; box-sizing: border-box; }
+  .phbox { position: relative; width: 100%; line-height: 0; border: 1px solid var(--line); border-radius: 4px; background: #fff; overflow: hidden; }
+  .phbox.land { aspect-ratio: 4 / 3; }
+  /* rotated: 3:4 footprint at 56.25% width → same height as the 4:3 neighbour, centred. */
+  .phbox.port { aspect-ratio: 3 / 4; width: 56.25%; margin-left: auto; margin-right: auto; }
+  .phbox img { position: absolute; top: 50%; left: 50%; object-fit: contain; transform: translate(-50%, -50%); display: block; }
+  /* Landscape cell: image fills it (whole image, no crop). */
+  .phbox.land img { width: 100%; height: 100%; }
+  .phbox.land img.rot180 { transform: translate(-50%, -50%) rotate(180deg); }
+  /* Portrait cell: the 4:3 image is sized to a box that, once rotated 90/270, fills the
+     3:4 cell edge-to-edge — full size, upright, entire image and all FLIR readings shown. */
+  .phbox.port img { width: 133.333%; height: 75%; }
+  .phbox.port img.rot90 { transform: translate(-50%, -50%) rotate(90deg); }
+  .phbox.port img.rot270 { transform: translate(-50%, -50%) rotate(270deg); }
   figure.ph figcaption { font-size: 8.5pt; color: var(--grey); margin-top: 6px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
   figure.ph figcaption::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--navy); flex-shrink: 0; }
   .nophoto { font-size: 9.5pt; color: var(--grey); font-style: italic; }
@@ -6959,9 +6982,16 @@ function rbBuildReportHTML() {
   .wc-loc { font-size: 9pt; color: var(--grey); margin-top: 2px; }
   .wc-cat { flex-shrink: 0; font-size: 8pt; font-weight: 700; color: var(--low); text-transform: uppercase; letter-spacing: 0.5px; }
   .wc-desc { font-size: 10pt; color: var(--slate); line-height: 1.6; margin-top: 10px; padding-left: 40px; }
-  .wc-photos { display: flex; gap: 10px; margin-top: 12px; padding-left: 40px; }
-  .wc-photo { flex: 0 0 calc(50% - 25px); aspect-ratio: 4/3; overflow: hidden; border-radius: 5px; border: 1px solid var(--line); background: #111c2b; }
-  .wc-photo img { width: 100%; height: 100%; object-fit: contain; }
+  .wc-photos { display: flex; gap: 10px; margin-top: 12px; padding-left: 40px; align-items: flex-start; }
+  .wc-photo { position: relative; flex: 0 0 calc(50% - 25px); overflow: hidden; border-radius: 5px; border: 1px solid var(--line); background: #111c2b; }
+  .wc-photo.land { aspect-ratio: 4/3; }
+  .wc-photo.port { flex: 0 0 auto; width: calc((50% - 25px) * 0.5625); aspect-ratio: 3/4; }
+  .wc-photo img { position: absolute; top: 50%; left: 50%; object-fit: contain; transform: translate(-50%, -50%); }
+  .wc-photo.land img { width: 100%; height: 100%; }
+  .wc-photo.land img.rot180 { transform: translate(-50%, -50%) rotate(180deg); }
+  .wc-photo.port img { width: 133.333%; height: 75%; }
+  .wc-photo.port img.rot90 { transform: translate(-50%, -50%) rotate(90deg); }
+  .wc-photo.port img.rot270 { transform: translate(-50%, -50%) rotate(270deg); }
 
   /* ---------- LIMITATIONS ---------- */
   .limitations p { font-size: 9pt; color: var(--grey); line-height: 1.65; margin-bottom: 10px; text-align: justify; }
