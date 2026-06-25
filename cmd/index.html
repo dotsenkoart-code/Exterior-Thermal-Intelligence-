@@ -4897,6 +4897,7 @@ let REPORT_META = {
   coverPhoto: '',           // base64 data URL for the cover hero image
   estimates: {},            // nodeId -> estimate string (only set where provided)
   photoOrder: {},           // nodeId -> ['key:kind', ...] explicit display order
+  findingOrder: {},         // nodeId -> manual sort rank WITHIN its severity tier (lower = earlier). Tiebreaker only; severity tiers + Monitor/Repaired sections always win.
   repairDesc: {},           // nodeId -> short description of completed repair work
   findingsSummary: '',      // '' = auto-generate the found/fixed/monitor summary line
   verified: {},             // nodeId -> true when user has double-checked the finding
@@ -5189,6 +5190,39 @@ function rbMovePhoto(nodeId, key, kind, dir) {
   renderReportBuilder();
 }
 
+// Move a FINDING earlier/later within its own severity run (same severity, same
+// on-screen Monitor/Repaired section). Severity tiers and the Monitor/Repaired
+// split stay locked — only same-severity siblings in the same section can swap.
+// dir: -1 = move up (earlier), +1 = move down (later).
+function rbMoveFinding(nodeId, dir) {
+  var sections = rbGroupCandidates(rbViewCands());
+  var run = null, runIdx = -1;
+  for (var s = 0; s < sections.length && !run; s++) {
+    var its = sections[s].items;
+    var pos = -1;
+    for (var i = 0; i < its.length; i++) { if (its[i].nodeId === nodeId) { pos = i; break; } }
+    if (pos === -1) continue;
+    var sv = rbSeverity(its[pos].nodeId, its[pos].node);
+    // Expand to the contiguous run of same-severity findings around this one.
+    var lo = pos, hi = pos;
+    while (lo > 0 && rbSeverity(its[lo - 1].nodeId, its[lo - 1].node) === sv) lo--;
+    while (hi < its.length - 1 && rbSeverity(its[hi + 1].nodeId, its[hi + 1].node) === sv) hi++;
+    run = its.slice(lo, hi + 1);
+    runIdx = pos - lo;
+  }
+  if (!run) return;
+  var j = runIdx + dir;
+  if (j < 0 || j >= run.length) return;            // already at the edge of its tier
+  var ids = run.map(function (c) { return c.nodeId; });
+  var t = ids[runIdx]; ids[runIdx] = ids[j]; ids[j] = t;   // swap the two siblings
+  // Write explicit ranks for the whole run so the new order sticks. Other tiers/
+  // sections are untouched; the section split keeps cross-run ranks from colliding.
+  if (!REPORT_META.findingOrder) REPORT_META.findingOrder = {};
+  ids.forEach(function (id, k) { REPORT_META.findingOrder[id] = k; });
+  saveReportMeta();
+  renderReportBuilder();
+}
+
 // Helper to fetch a node for ordering (handles manual + regular)
 function node_forOrder(nodeId) { return getNodeData(nodeId); }
 
@@ -5238,8 +5272,22 @@ function rbCandidates() {
     if (!node || !node.id) return;
     out.push({ nodeId: node.id, node, drop: 'MANUAL', floor: node.floor||0, pos: '', isManual: true, isFixed: !!repairFixed[node.id] });
   });
-  out.sort((a, b) =>
-    RB_SEV_RANK[rbSeverity(a.nodeId, a.node)] - RB_SEV_RANK[rbSeverity(b.nodeId, b.node)]);
+  // Primary sort: severity (CRITICAL→LOW). Secondary: the user's manual order
+  // within a tier (REPORT_META.findingOrder). Findings with no manual rank keep
+  // their natural drop/floor/pos order and fall AFTER any manually-ranked siblings.
+  // The Monitor/Repaired split happens later in rbGroupCandidates, so manual order
+  // can never move a finding across severity tiers or across sections.
+  out.sort(function (a, b) {
+    var sd = RB_SEV_RANK[rbSeverity(a.nodeId, a.node)] - RB_SEV_RANK[rbSeverity(b.nodeId, b.node)];
+    if (sd !== 0) return sd;
+    var fo = REPORT_META.findingOrder || {};
+    var oa = fo[a.nodeId], ob = fo[b.nodeId];
+    var da = (oa !== undefined && oa !== null), db = (ob !== undefined && ob !== null);
+    if (da && db) return oa - ob;   // both manually ranked
+    if (da) return -1;              // ranked before unranked
+    if (db) return 1;
+    return 0;                       // both unranked -> stable natural order
+  });
   return out;
 }
 
@@ -5708,7 +5756,11 @@ function rbClearCoverPhoto() {
 }
 function rbSetDesc(nodeId, val) { REPORT_META.desc[nodeId] = val; saveReportMeta(); }
 function rbSetSeverity(nodeId, val) {
-  REPORT_META.sev[nodeId] = val; saveReportMeta();
+  REPORT_META.sev[nodeId] = val;
+  // Changing the tier drops any manual rank so the finding re-places naturally in its
+  // new tier (takes effect on the next render — matches the existing in-place badge update).
+  if (REPORT_META.findingOrder) delete REPORT_META.findingOrder[nodeId];
+  saveReportMeta();
   const badge = document.getElementById('rb-sevbadge-' + nodeId);
   if (badge) { badge.style.background = RB_SEV_COLOR[val]; badge.style.color = val === 'MEDIUM' ? '#000' : '#fff'; badge.innerText = val; }
 }
@@ -6555,6 +6607,20 @@ function renderReportBuilder() {
     }
   }
 
+  // --- Reorder arrows: mark first/last of each severity run within each rendered section.
+  // A finding gets an "up" arrow unless it's first in its run, a "down" arrow unless last.
+  // Lone findings (only one of their severity in the section) get no arrows. ---
+  var _rbRunPos = {};
+  rbGroupCandidates(_renderCands).forEach(function (_sec) {
+    var _its = _sec.items;
+    for (var _i = 0; _i < _its.length; _i++) {
+      var _sv = rbSeverity(_its[_i].nodeId, _its[_i].node);
+      var _prevSame = (_i > 0) && (rbSeverity(_its[_i - 1].nodeId, _its[_i - 1].node) === _sv);
+      var _nextSame = (_i < _its.length - 1) && (rbSeverity(_its[_i + 1].nodeId, _its[_i + 1].node) === _sv);
+      _rbRunPos[_its[_i].nodeId] = { first: !_prevSame, last: !_nextSame };
+    }
+  });
+
   rbGroupCandidates(_renderCands).forEach(({ label: _wsLabel, items: _wsItems }) => {
     if (_wsLabel && !rbFocusMode) {
       html += `<div style="margin:20px 0 8px;padding:7px 12px;background:#12161f;border-left:4px solid #1fd0a5;border-radius:0 6px 6px 0;display:flex;align-items:center;gap:10px;">
@@ -6618,12 +6684,34 @@ function renderReportBuilder() {
       thumbs = '<span style="color:#555;font-size:0.78rem;padding:8px 0;">No photos linked to this window.</span>';
     }
 
+    // Up/Down reorder arrows. Shown only outside Focus Mode and only when this finding
+    // has at least one same-severity sibling in its section. The edge arrow is disabled
+    // (not hidden) so card left edges stay aligned.
+    var _rp = (!rbFocusMode && _rbRunPos[nodeId] && !(_rbRunPos[nodeId].first && _rbRunPos[nodeId].last))
+      ? _rbRunPos[nodeId] : null;
+    var _rbBtn = function (d, glyph, tip, enabled) {
+      return '<button ' + (enabled ? '' : 'disabled ') +
+        'onclick="event.stopPropagation();rbMoveFinding(\'' + nodeId + '\',' + d + ')" title="' + tip + '" ' +
+        'style="width:26px;height:21px;border-radius:5px;border:1px solid ' +
+        (enabled ? 'rgba(0,207,255,0.55)' : '#262932') + ';background:' + (enabled ? '#0d1b24' : '#15171e') +
+        ';color:' + (enabled ? '#0cf' : '#333') + ';font-size:0.66rem;line-height:1;cursor:' +
+        (enabled ? 'pointer' : 'default') + ';padding:0;display:flex;align-items:center;justify-content:center;">' +
+        glyph + '</button>';
+    };
+    var _reorderArrows = _rp
+      ? '<div title="Reorder within this severity group" style="display:flex;flex-direction:column;gap:3px;flex-shrink:0;margin-top:1px;">' +
+          _rbBtn(-1, '\u25B2', 'Move up \u2014 earlier among same-severity findings', !_rp.first) +
+          _rbBtn(1, '\u25BC', 'Move down \u2014 later among same-severity findings', !_rp.last) +
+        '</div>'
+      : '';
+
     html += `
     <div id="rb-card-${nodeId}" style="background:#1a1d27;border:1px solid #2a2d38;border-radius:12px;padding:16px;margin-bottom:12px;opacity:${included ? '1' : '0.4'};">
       <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:12px;">
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer;flex-shrink:0;margin-top:3px;">
           <input type="checkbox" ${included ? 'checked' : ''} onchange="rbToggleInclude('${nodeId}', this.checked)" style="width:18px;height:18px;cursor:pointer;accent-color:#1fd0a5;">
         </label>
+        ${_reorderArrows}
         <div style="flex:1;min-width:0;">
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
             <span style="font-size:1.1rem;font-weight:900;color:#0cf;">${rbEsc(nodeId)}</span>
