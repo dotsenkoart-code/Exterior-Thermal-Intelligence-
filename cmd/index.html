@@ -5283,6 +5283,20 @@ function rbResolveTitle(nodeId, node, tags, sev) {
   }
   return rbCleanTitle(node.label || node.finds, tags, sev);
 }
+// The real problem to show for a monitored item — NOT the raw CSV field-guess (e.g. "ALL CLEAR").
+// Uses the defect type tags (the actual classification) plus a descriptive title where one exists.
+function rbMonitorProblem(nodeId, node) {
+  var tags  = rbTags(nodeId, node);
+  var sev   = rbSeverity(nodeId, node);
+  var title = rbResolveTitle(nodeId, node, tags, sev);
+  if (tags && tags.length) {
+    var tagStr = tags.join('; ');
+    // A descriptive title (manual label or custom title) that is not just the first tag → show both.
+    if (title && tags.indexOf(title) === -1) return title + ' \u2014 ' + tagStr;
+    return tagStr;
+  }
+  return title || 'Condition flagged for monitoring';
+}
 function rbSetTitle(nodeId, val) {
   if (!REPORT_META.title) REPORT_META.title = {};
   val = (val || '').trim();
@@ -6976,7 +6990,7 @@ function rbBuildReportHTML() {
   if (monCandidates.length) {
     const monRows = monCandidates.map(({nodeId, node, drop, floor, pos}) => {
       const loc   = rbLocation(drop, floor, pos, nodeId);
-      const finds = rbEsc(node.finds || node.label || '');
+      const finds = rbEsc(rbMonitorProblem(nodeId, node));
       const notes = rbEsc(node.notes || '');
       const items = rbPhotoItems(node);
       const thumb = items.length
@@ -7449,7 +7463,7 @@ function exportClientPackage() {
     monitoring: rbMonitoringCandidates().map(({nodeId, node, drop, floor, pos}) => ({
       nodeId, drop, floor, pos,
       location: rbLocation(drop, floor, pos, nodeId),
-      finds:    node.finds || node.label || '',
+      finds:    rbMonitorProblem(nodeId, node),
       notes:    node.notes || '',
       photos:   rbPhotoItems(node).slice(0,2).map(it => ({ kind:it.kind, dataUrl:it.url }))
     })),
