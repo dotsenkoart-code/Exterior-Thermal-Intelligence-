@@ -6926,13 +6926,31 @@ function rbBuildRecommendationsSection(cands, sevCount) {
     { key:'MEDIUM', label:'Medium Priority', cls:'sev-MEDIUM', action:'We suggest planning corrective work within roughly 6–12 months as part of routine building maintenance.' },
     { key:'LOW', label:'Low Priority / Monitoring', cls:'sev-LOW', action:'We suggest monitoring these areas and re-evaluating at the next scheduled inspection.' },
   ];
+  // How many findings in each tier were addressed (repaired) during this engagement.
+  const fixedBySev = { CRITICAL:0, HIGH:0, MEDIUM:0, LOW:0 };
+  cands.forEach(function(c){
+    if (typeof repairFixed !== 'undefined' && repairFixed[c.nodeId]) {
+      const sv = rbSeverity(c.nodeId, c.node);
+      if (fixedBySev[sv] !== undefined) fixedBySev[sv]++;
+    }
+  });
   tiers.forEach(function(t){
     const n = sevCount[t.key] || 0;
     if (!n) return;
+    const f = fixedBySev[t.key] || 0;
+    let body;
+    if (f === 0) {
+      body = t.action;
+    } else if (f === n) {
+      body = `All ${n} ${n!==1?'were':'was'} addressed on site during this engagement; no further action is recommended at this time.`;
+    } else {
+      const lc = t.action.charAt(0).toLowerCase() + t.action.slice(1);
+      body = `${f} of these ${f!==1?'were':'was'} addressed on site during this engagement; for the remaining ${n-f}, ${lc}`;
+    }
     html += `
       <div class="rec-item">
         <div class="rec-badge ${t.cls}">${n}</div>
-        <div class="rec-text"><strong>${t.label} — ${n} finding${n!==1?'s':''}.</strong> ${t.action}</div>
+        <div class="rec-text"><strong>${t.label} — ${n} finding${n!==1?'s':''}.</strong> ${body}</div>
       </div>`;
   });
   html += '</div>';
