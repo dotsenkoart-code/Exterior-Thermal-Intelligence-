@@ -7184,6 +7184,21 @@ function rbBuildReportHTML() {
 
   /* ---------- SECTION HEADERS ---------- */
   .page-break { page-break-before: always; }
+
+  /* ---------- PAGE-BREAK CONTROL — keep blocks intact across pages ---------- */
+  /* Never slice a photo: a too-tall finding breaks BETWEEN photos, not through one. */
+  figure.ph, .phbox { break-inside: avoid; page-break-inside: avoid; }
+  /* Findings: stay whole if they fit; if taller than a page, break cleanly (between photos). */
+  .defect { break-inside: avoid; }
+  /* A finding's header never splits, and never strands itself at the foot of a page. */
+  .defect-head { break-inside: avoid; page-break-inside: avoid; break-after: avoid; page-break-after: avoid; }
+  /* Keep the severity legend together (no orphaned "Low" row) and the cover meta block intact. */
+  .legend-table { break-inside: avoid; page-break-inside: avoid; }
+  table.meta { break-inside: avoid; page-break-inside: avoid; }
+  /* Don't strand a section heading at the bottom of a page. */
+  .sect-head, .grp-head, .subhead { break-after: avoid; page-break-after: avoid; }
+  /* No single dangling line of prose at a page boundary. */
+  .defect-desc, .exec-body, .legend-intro { orphans: 2; widows: 2; }
   .sect-head { display: flex; align-items: baseline; gap: 12px; border-bottom: 2px solid var(--navy); padding-bottom: 9px; margin-bottom: 20px; }
   .sect-num { font-family: Georgia, serif; font-size: 11pt; color: var(--grey); font-weight: 600; }
   .sect-title { font-size: 15pt; color: var(--navy); flex: 1; }
