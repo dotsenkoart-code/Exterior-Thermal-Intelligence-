@@ -4898,6 +4898,8 @@ let REPORT_META = {
   estimates: {},            // nodeId -> estimate string (only set where provided)
   photoOrder: {},           // nodeId -> ['key:kind', ...] explicit display order
   findingOrder: {},         // nodeId -> manual sort rank WITHIN its severity tier (lower = earlier). Tiebreaker only; severity tiers + Monitor/Repaired sections always win.
+  recTier:  {},             // tier key (CRITICAL/HIGH/MEDIUM/LOW) -> edited recommendation wording ('' or absent = auto). Badges + counts stay automatic.
+  recNote:  '',             // edited closing recommendations note ('' = auto)
   repairDesc: {},           // nodeId -> short description of completed repair work
   findingsSummary: '',      // '' = auto-generate the found/fixed/monitor summary line
   verified: {},             // nodeId -> true when user has double-checked the finding
@@ -6497,6 +6499,37 @@ function renderReportBuilder() {
       </div>
     </div>
 
+    ${(function(){
+      var _incl = rbCandidates().filter(function(c){ return rbIsIncluded(c.nodeId); });
+      var _rt = rbRecTierData(_incl);
+      if (!_rt.length) return '';
+      var _bg = { 'sev-CRITICAL':'#a01b2e', 'sev-HIGH':'#c45a26', 'sev-MEDIUM':'#c7992b', 'sev-LOW':'#2e7d4f' };
+      var _rows = _rt.map(function(d){
+        var v = d.override || d.gen;
+        var head = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">'
+          + '<span style="display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:20px;padding:0 6px;border-radius:4px;background:' + _bg[d.cls] + ';color:' + (d.cls==='sev-MEDIUM'?'#2a2008':'#fff') + ';font-size:0.7rem;font-weight:800;">' + d.n + '</span>'
+          + '<span style="font-size:0.74rem;font-weight:bold;color:#cdd6e0;">' + rbEsc(d.label) + '</span>'
+          + (d.override ? '<span style="font-size:0.58rem;color:#1fd0a5;font-weight:bold;letter-spacing:0.5px;">EDITED</span><button onclick="rbSetRecTier(\'' + d.key + '\',\'\');renderReportBuilder();" style="margin-left:auto;padding:3px 9px;background:#0a1a14;color:#1fd0a5;border:1px solid #1fd0a5;border-radius:5px;font-size:0.62rem;font-weight:bold;cursor:pointer;">↻ auto</button>' : '')
+          + '</div>';
+        return '<div style="margin-bottom:12px;">' + head
+          + '<textarea oninput="rbSetRecTier(\'' + d.key + '\', this.value)" placeholder="' + rbEsc(d.gen).replace(/"/g,'&quot;') + '" style="width:100%;min-height:52px;background:#111;border:1px solid #2a2d38;color:#fff;border-radius:6px;padding:9px 11px;font-family:inherit;font-size:0.8rem;line-height:1.5;resize:vertical;box-sizing:border-box;">' + rbEsc(v) + '</textarea>'
+          + '</div>';
+      }).join('');
+      var _noteOv = !!(REPORT_META.recNote && REPORT_META.recNote.trim());
+      var _noteV = _noteOv ? REPORT_META.recNote : RB_REC_NOTE_DEFAULT;
+      var _noteHead = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">'
+        + '<span style="font-size:0.74rem;font-weight:bold;color:#cdd6e0;">Closing note</span>'
+        + (_noteOv ? '<span style="font-size:0.58rem;color:#1fd0a5;font-weight:bold;letter-spacing:0.5px;">EDITED</span><button onclick="rbSetRecNote(\'\');renderReportBuilder();" style="margin-left:auto;padding:3px 9px;background:#0a1a14;color:#1fd0a5;border:1px solid #1fd0a5;border-radius:5px;font-size:0.62rem;font-weight:bold;cursor:pointer;">↻ auto</button>' : '')
+        + '</div>';
+      return '<div style="background:#1a1d27;border:1px solid #2a2d38;border-radius:12px;padding:18px;margin:16px 0;">'
+        + '<div style="font-size:0.8rem;color:#0cf;text-transform:uppercase;font-weight:bold;letter-spacing:1px;margin-bottom:6px;">Recommendations</div>'
+        + '<div style="font-size:0.64rem;color:#666;margin-bottom:13px;line-height:1.5;">Generated from the counts below — tweak any wording you like. The colored badge and the &ldquo;&mdash; N findings&rdquo; headline stay automatic. Clear a box (or hit &#8635; auto) to return it to the generated text.</div>'
+        + _rows
+        + _noteHead
+        + '<textarea oninput="rbSetRecNote(this.value)" placeholder="' + rbEsc(RB_REC_NOTE_DEFAULT).replace(/"/g,'&quot;') + '" style="width:100%;min-height:52px;background:#111;border:1px solid #2a2d38;color:#fff;border-radius:6px;padding:9px 11px;font-family:inherit;font-size:0.8rem;line-height:1.5;resize:vertical;box-sizing:border-box;">' + rbEsc(_noteV) + '</textarea>'
+        + '</div>';
+    })()}
+
     <div style="margin:18px 4px 0;">
       <button onclick="rbRunAnalysis()" ${rbAnalyzing?'disabled':''} style="padding:8px 15px;border-radius:8px;cursor:${rbAnalyzing?'wait':'pointer'};font-size:0.74rem;font-weight:bold;border:1px solid #1fd0a5;background:${rbAnalyzing?'#0d1117':'#06231a'};color:#1fd0a5;">${rbAnalyzing?'Analyzing the full report…':'Analyze full report — proofread & check consistency'}</button>
       ${rbAnalysisPanelHTML()}
@@ -6913,44 +6946,59 @@ function rbBuildPropertySection() {
 }
 
 // Recommendations section — auto-generated from findings by severity, or manual override
+// Recommendation tiers + default guidance (shared by the printed report and the in-app editor).
+const RB_REC_TIERS = [
+  { key:'CRITICAL', label:'Critical', cls:'sev-CRITICAL', action:'We suggest engaging a qualified contractor to remediate as soon as practical, as these conditions appear to present an active hazard.' },
+  { key:'HIGH', label:'High Priority', cls:'sev-HIGH', action:'As a general guideline, we suggest addressing these within roughly 3–6 months to help prevent further deterioration.' },
+  { key:'MEDIUM', label:'Medium Priority', cls:'sev-MEDIUM', action:'We suggest planning corrective work within roughly 6–12 months as part of routine building maintenance.' },
+  { key:'LOW', label:'Low Priority / Monitoring', cls:'sev-LOW', action:'We suggest monitoring these areas and re-evaluating at the next scheduled inspection.' },
+];
+const RB_REC_NOTE_DEFAULT = 'Verticality is equipped to perform same-drop remediation of many of the conditions identified above, reducing mobilization costs and shortening repair timelines. We are pleased to provide a detailed repair proposal upon request.';
+
+// The auto-generated body sentence for a tier, given its count (n) and how many were addressed (f).
+function rbRecGenBody(t, n, f) {
+  if (f === 0) return t.action;
+  if (f === n) return `All ${n} ${n!==1?'were':'was'} addressed on site during this engagement; no further action is recommended at this time.`;
+  const lc = t.action.charAt(0).toLowerCase() + t.action.slice(1);
+  return `${f} of these ${f!==1?'were':'was'} addressed on site during this engagement; for the remaining ${n-f}, ${lc}`;
+}
+
+// Per-tier data (count, addressed count, auto body, user override) — single source of truth for
+// both the printed report and the editor. Only tiers that actually have findings are returned.
+function rbRecTierData(cands) {
+  const sevCount = { CRITICAL:0, HIGH:0, MEDIUM:0, LOW:0 };
+  const fixedBySev = { CRITICAL:0, HIGH:0, MEDIUM:0, LOW:0 };
+  cands.forEach(function(c){
+    const sv = rbSeverity(c.nodeId, c.node);
+    if (sevCount[sv] !== undefined) sevCount[sv]++;
+    if (typeof repairFixed !== 'undefined' && repairFixed[c.nodeId] && fixedBySev[sv] !== undefined) fixedBySev[sv]++;
+  });
+  const ov = REPORT_META.recTier || {};
+  return RB_REC_TIERS.map(function(t){
+    const n = sevCount[t.key] || 0, f = fixedBySev[t.key] || 0;
+    return { key:t.key, label:t.label, cls:t.cls, n:n, f:f,
+             gen: rbRecGenBody(t, n, f),
+             override: (ov[t.key] && ov[t.key].trim()) ? ov[t.key] : '' };
+  }).filter(function(d){ return d.n > 0; });
+}
+
+function rbSetRecTier(key, val) { if (!REPORT_META.recTier) REPORT_META.recTier = {}; REPORT_META.recTier[key] = val; saveReportMeta(); }
+function rbSetRecNote(val) { REPORT_META.recNote = val; saveReportMeta(); }
+
+// Recommendations section — auto-generated from findings by severity. Each tier's wording and the
+// closing note can be edited in the builder (REPORT_META.recTier / recNote); badges + counts stay automatic.
 function rbBuildRecommendationsSection(cands, sevCount) {
   const M = REPORT_META;
   if (M.recommendations && M.recommendations.trim()) {
     return `<div class="exec-body">${rbEsc(M.recommendations)}</div>`;
   }
-  // Auto-generate a prioritized recommendation list
   let html = '<div class="rec-list">';
-  const tiers = [
-    { key:'CRITICAL', label:'Critical', cls:'sev-CRITICAL', action:'We suggest engaging a qualified contractor to remediate as soon as practical, as these conditions appear to present an active hazard.' },
-    { key:'HIGH', label:'High Priority', cls:'sev-HIGH', action:'As a general guideline, we suggest addressing these within roughly 3–6 months to help prevent further deterioration.' },
-    { key:'MEDIUM', label:'Medium Priority', cls:'sev-MEDIUM', action:'We suggest planning corrective work within roughly 6–12 months as part of routine building maintenance.' },
-    { key:'LOW', label:'Low Priority / Monitoring', cls:'sev-LOW', action:'We suggest monitoring these areas and re-evaluating at the next scheduled inspection.' },
-  ];
-  // How many findings in each tier were addressed (repaired) during this engagement.
-  const fixedBySev = { CRITICAL:0, HIGH:0, MEDIUM:0, LOW:0 };
-  cands.forEach(function(c){
-    if (typeof repairFixed !== 'undefined' && repairFixed[c.nodeId]) {
-      const sv = rbSeverity(c.nodeId, c.node);
-      if (fixedBySev[sv] !== undefined) fixedBySev[sv]++;
-    }
-  });
-  tiers.forEach(function(t){
-    const n = sevCount[t.key] || 0;
-    if (!n) return;
-    const f = fixedBySev[t.key] || 0;
-    let body;
-    if (f === 0) {
-      body = t.action;
-    } else if (f === n) {
-      body = `All ${n} ${n!==1?'were':'was'} addressed on site during this engagement; no further action is recommended at this time.`;
-    } else {
-      const lc = t.action.charAt(0).toLowerCase() + t.action.slice(1);
-      body = `${f} of these ${f!==1?'were':'was'} addressed on site during this engagement; for the remaining ${n-f}, ${lc}`;
-    }
+  rbRecTierData(cands).forEach(function(d){
+    const body = d.override ? rbEsc(d.override) : d.gen;
     html += `
       <div class="rec-item">
-        <div class="rec-badge ${t.cls}">${n}</div>
-        <div class="rec-text"><strong>${t.label} — ${n} finding${n!==1?'s':''}.</strong> ${body}</div>
+        <div class="rec-badge ${d.cls}">${d.n}</div>
+        <div class="rec-text"><strong>${d.label} — ${d.n} finding${d.n!==1?'s':''}.</strong> ${body}</div>
       </div>`;
   });
   html += '</div>';
@@ -6962,7 +7010,8 @@ function rbBuildRecommendationsSection(cands, sevCount) {
     html += `<div class="rec-est-summary">Preliminary repair estimates have been provided for ${estCount} of the findings in this report, shown with each applicable finding. These are budgetary figures intended for planning purposes; a formal proposal can be prepared upon request.</div>`;
   }
 
-  html += `<div class="rec-note">Verticality is equipped to perform same-drop remediation of many of the conditions identified above, reducing mobilization costs and shortening repair timelines. We are pleased to provide a detailed repair proposal upon request.</div>`;
+  const note = (M.recNote && M.recNote.trim()) ? rbEsc(M.recNote) : RB_REC_NOTE_DEFAULT;
+  html += `<div class="rec-note">${note}</div>`;
   return html;
 }
 
