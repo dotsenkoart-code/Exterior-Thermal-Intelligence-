@@ -7143,7 +7143,8 @@ function rbBuildReportHTML() {
 
   const doc = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${building} — Facade Inspection Report</title>
 <style>
-  @page { size: letter; margin: 0; }
+  @page { size: letter; margin: 24mm 0; }
+  @page :first { margin: 0; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
     --navy: #1a2942;
@@ -7160,7 +7161,7 @@ function rbBuildReportHTML() {
     --low: #2e7d4f;
   }
   body { font-family: 'Helvetica Neue', Arial, sans-serif; color: var(--ink); background: var(--paper); -webkit-print-color-adjust: exact; print-color-adjust: exact; font-size: 11pt; line-height: 1.6; }
-  .page { padding: 22mm 20mm; position: relative; }
+  .page { padding: 0 20mm; position: relative; }
   h1,h2,h3,h4 { font-family: Georgia, 'Times New Roman', serif; font-weight: 600; color: var(--navy); }
 
   /* ---------- COVER ---------- */
