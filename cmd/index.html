@@ -1559,7 +1559,7 @@ function loadProjectFile(input) {
                     REPORT_META[k] = p.REPORT_META[k];
                 });
                 // Make sure sub-objects exist (older saves may lack newer fields)
-                ['desc','sev','excluded','estimates','photoOrder','repairDesc','verified','title','tags'].forEach(function(k){
+                ['desc','sev','excluded','estimates','photoOrder','repairDesc','repairType','verified','title','tags'].forEach(function(k){
                     if (REPORT_META[k] == null) REPORT_META[k] = (k === 'excluded') ? [] : {};
                 });
                 try { saveReportMeta(); } catch(e) {}
@@ -1687,7 +1687,7 @@ async function handleFiles(files, forcedType=null) {
                             Object.keys(p.REPORT_META).forEach(function(k){
                                 REPORT_META[k] = p.REPORT_META[k];
                             });
-                            ['desc','sev','excluded','estimates','photoOrder','repairDesc','verified','title','tags'].forEach(function(k){
+                            ['desc','sev','excluded','estimates','photoOrder','repairDesc','repairType','verified','title','tags'].forEach(function(k){
                                 if (REPORT_META[k] == null) REPORT_META[k] = (k === 'excluded') ? [] : {};
                             });
                             try { saveReportMeta(); } catch(e) {}
@@ -4900,7 +4900,8 @@ let REPORT_META = {
   findingOrder: {},         // nodeId -> manual sort rank WITHIN its severity tier (lower = earlier). Tiebreaker only; severity tiers + Monitor/Repaired sections always win.
   recTier:  {},             // tier key (CRITICAL/HIGH/MEDIUM/LOW) -> edited recommendation wording ('' or absent = auto). Badges + counts stay automatic.
   recNote:  '',             // edited closing recommendations note ('' = auto)
-  repairDesc: {},           // nodeId -> short description of completed repair work
+  repairDesc: {},           // nodeId -> repair-action paragraph (canonical from repairType, or custom text)
+  repairType: {},           // nodeId -> repair type key (see RB_REPAIR_TEMPLATES), or 'none' = no repair / monitor. Absent = nothing rendered.
   findingsSummary: '',      // '' = auto-generate the found/fixed/monitor summary line
   verified: {},             // nodeId -> true when user has double-checked the finding
   title: {},                // nodeId -> custom title override ('' or absent = auto-generate)
@@ -5442,6 +5443,7 @@ function rbBuildFindingPreview(c, displayNum) {
       '<div class="defect-body">' +
         (tags.length ? '<div class="defect-tags">' + tags.map(function(t){return '<span>' + rbEsc(t) + '</span>';}).join('') + '</div>' : '') +
         '<div class="defect-desc">' + (desc ? rbEsc(desc) : '<em style="color:#999;">No description written yet.</em>') + '</div>' +
+        rbRepairBlockHTML(nodeId) +
         (_estimate ? '<div class="defect-estimate"><span class="est-label">Estimated Repair</span><span class="est-value">' + rbEsc(_estimate) + '</span></div>' : '') +
         (items.length ? '<div class="photos' + (items.length<=3 ? ' ph-'+items.length : '') + '">' + photoCells + '</div>' : '<p class="nophoto">No photographs included for this finding.</p>') +
       '</div>' +
@@ -5477,6 +5479,11 @@ function rbReportPreviewCSS() {
   '.rb-pdf-preview .defect-estimate{margin-top:10px;padding:8px 12px;background:#f0f7f3;border-left:3px solid #28a745;border-radius:0 4px 4px 0;display:flex;justify-content:space-between;}' +
   '.rb-pdf-preview .est-label{font-size:8.5pt;color:#28a745;font-weight:bold;text-transform:uppercase;font-family:Arial,sans-serif;}' +
   '.rb-pdf-preview .est-value{font-size:10pt;color:#1a2942;font-weight:bold;}' +
+  '.rb-pdf-preview .remediation{margin-top:10px;padding:9px 12px;background:#eef4fb;border-left:3px solid #1a2942;border-radius:0 4px 4px 0;}' +
+  '.rb-pdf-preview .remediation.rem-monitor{background:#fff8e8;border-left-color:#c79100;}' +
+  '.rb-pdf-preview .rem-label{display:block;font-size:7.5pt;font-weight:bold;letter-spacing:0.6px;text-transform:uppercase;color:#1a2942;font-family:Arial,sans-serif;margin-bottom:3px;}' +
+  '.rb-pdf-preview .remediation.rem-monitor .rem-label{color:#8a6d00;}' +
+  '.rb-pdf-preview .rem-text{font-size:9.5pt;line-height:1.55;color:#2a3744;}' +
   '.rb-pdf-preview .photos{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px;align-items:start;}' +
   '.rb-pdf-preview .photos.ph-1{grid-template-columns:minmax(0,62%);justify-content:center;}' +
   '.rb-pdf-preview .photos.ph-3 .ph:nth-child(3){grid-column:1 / -1;width:calc(50% - 6px);margin-left:auto;margin-right:auto;}' +
@@ -5645,6 +5652,64 @@ function rbSetRepairDesc(nodeId, val) {
   if (val) { REPORT_META.repairDesc[nodeId] = val; }
   else { delete REPORT_META.repairDesc[nodeId]; }
   saveReportMeta();
+}
+// Canonical repair-action statements, keyed by repair type. Selecting a type auto-fills
+// the editable repairDesc text below it; the wording here is the default — edit per finding
+// in the card, or pick "Other" to write a one-off for an unusual repair.
+var RB_REPAIR_TEMPLATES = {
+  sealant:   { label: 'Sealant spot repair',            text: 'During this inspection, the deteriorated sealant was removed, the substrate was cleaned and prepared, and fresh sealant was applied as a spot repair.' },
+  backerrod: { label: 'Backer rod + sealant',           text: 'During this inspection, the joint was prepared, a backer rod was installed to the correct depth, and an appropriate sealant was applied.' },
+  perimeter: { label: 'Full-perimeter window reseal',   text: 'During this inspection, the joint substrate was prepared and fresh sealant was applied around the entire window perimeter.' },
+  masonry:   { label: 'Masonry / terracotta patch',     text: 'During this inspection, the affected area was patched as an interim measure to stabilize the condition pending permanent repair.' },
+  repoint:   { label: 'Mortar repointing',              text: 'During this inspection, the deteriorated mortar joint was cut back and repointed.' },
+  touchup:   { label: 'Precautionary sealant touch-up', text: 'As a precautionary measure, a spot sealant touch-up was applied during this inspection.' },
+  custom:    { label: 'Other (type it below)',          text: '' }
+};
+// Short hint shown under the picker so it's obvious what the choice will render.
+function rbRepairHint(t) {
+  if (!t) return 'No repair paragraph is added until you choose an option.';
+  if (t === 'none') return 'A monitoring recommendation will be added to this finding instead of a repair paragraph.';
+  if (t === 'custom') return 'Type exactly what was done in the box below; it renders as the "Remediation performed" paragraph.';
+  return 'Auto-filled below from the standard wording for this repair — edit freely; your text is what renders.';
+}
+// Sets the repair type, auto-fills the editable text from the template (without clobbering an
+// existing edit), and updates the card in place (no full re-render, so focus/scroll are kept).
+function rbSetRepairType(nodeId, val) {
+  if (!REPORT_META.repairType) REPORT_META.repairType = {};
+  if (!REPORT_META.repairDesc) REPORT_META.repairDesc = {};
+  if (!val) { delete REPORT_META.repairType[nodeId]; }
+  else { REPORT_META.repairType[nodeId] = val; }
+  var ta = document.getElementById('rb-repairdesc-ta-' + nodeId);
+  if (val && val !== 'none' && val !== 'custom') {
+    var cur = REPORT_META.repairDesc[nodeId];
+    if (!cur || !cur.trim()) {
+      REPORT_META.repairDesc[nodeId] = RB_REPAIR_TEMPLATES[val].text;
+      if (ta) ta.value = RB_REPAIR_TEMPLATES[val].text;
+    }
+  } else if (val === 'none' || !val) {
+    delete REPORT_META.repairDesc[nodeId];
+    if (ta) ta.value = '';
+  } // 'custom' keeps whatever is already typed
+  var hint = document.getElementById('rb-repair-hint-' + nodeId);
+  if (hint) hint.textContent = rbRepairHint(val);
+  saveReportMeta();
+}
+// Renders the repair / monitoring paragraph for a finding. Shared by the editor preview and the
+// final report so they never drift. Returns '' when no repair type is set (backward compatible).
+function rbRepairBlockHTML(nodeId) {
+  var t = (REPORT_META.repairType && REPORT_META.repairType[nodeId]) || '';
+  if (!t) return '';
+  if (t === 'none') {
+    return '<div class="remediation rem-monitor"><span class="rem-label">Recommendation</span>' +
+      '<span class="rem-text">No repair was performed at this location during the inspection. ' +
+      'Recommend monitoring this area and re-evaluating at the next scheduled inspection to confirm the condition has not progressed.</span></div>';
+  }
+  var txt = (REPORT_META.repairDesc && REPORT_META.repairDesc[nodeId] && REPORT_META.repairDesc[nodeId].trim())
+    ? REPORT_META.repairDesc[nodeId]
+    : (RB_REPAIR_TEMPLATES[t] ? RB_REPAIR_TEMPLATES[t].text : '');
+  if (!txt || !txt.trim()) return '';
+  return '<div class="remediation"><span class="rem-label">Remediation Performed</span>' +
+    '<span class="rem-text">' + rbEsc(txt) + '</span></div>';
 }
 // Collects all completed (fixed) repairs across windows + manual defects.
 // Returns [{nodeId, node, label, cats, location, desc}]
@@ -6017,10 +6082,20 @@ function rbBuildAnalysisPayload() {
     var tags = rbTags(c.nodeId, c.node).join(', ') || 'General';
     var action = rbAnalysisStatusOf(c);
     var d = REPORT_META.desc[c.nodeId]; d = (d != null ? String(d).trim() : '');
+    var rt = (REPORT_META.repairType && REPORT_META.repairType[c.nodeId]) || '';
+    var rtext = (REPORT_META.repairDesc && REPORT_META.repairDesc[c.nodeId]) ? String(REPORT_META.repairDesc[c.nodeId]).trim() : '';
+    var rep;
+    if (!rt) { rep = '(no repair decision recorded)'; }
+    else if (rt === 'none') { rep = 'No repair performed - monitoring recommended'; }
+    else {
+      var rlabel = (typeof RB_REPAIR_TEMPLATES !== 'undefined' && RB_REPAIR_TEMPLATES[rt] && RB_REPAIR_TEMPLATES[rt].label) ? RB_REPAIR_TEMPLATES[rt].label : (rt === 'custom' ? 'Other' : rt);
+      rep = rlabel + (rtext ? ' - ' + rtext : '');
+    }
     blocks.push('[' + n + '] ' + loc +
       '\n  Severity: ' + sev + '  |  Action/Status: ' + action + '  |  Defect type: ' + tags +
       (c.node.finds ? '\n  Field note: ' + String(c.node.finds).trim() : '') +
-      '\n  Description: ' + (d || '(NONE WRITTEN)'));
+      '\n  Description: ' + (d || '(NONE WRITTEN)') +
+      '\n  Repair recorded: ' + rep);
   });
   return { text: blocks.join('\n\n'), map: map, count: cands.length };
 }
@@ -6029,17 +6104,17 @@ async function rbRunAnalysis() {
   var payload = rbBuildAnalysisPayload();
   if (!payload.count) { showToast('No findings to analyze yet.', 3000, true); return; }
   rbAnalyzing = true; rbAnalysis = { running: true }; renderReportBuilder();
-  var systemPrompt = 'You are a meticulous senior building-envelope consultant proofreading a facade inspection report before it is sent to a property manager. You catch inconsistencies and errors a busy inspector would miss. You are precise, conservative, and never invent problems.';
+  var systemPrompt = 'You are a meticulous senior building-envelope consultant proofreading a facade inspection report before it is sent to a property manager. You catch inconsistencies and errors a busy inspector would miss, including any mismatch between the repair recorded for a finding and its status, severity, defect type, or description. You are precise, conservative, and never invent problems.';
   var userPrompt = [
-    'Below are all findings in a facade inspection report. Each has metadata (Severity, Action/Status, Defect type, and an optional raw Field note) followed by the client-facing Description.',
+    'Below are all findings in a facade inspection report. Each has metadata (Severity, Action/Status, Defect type, and an optional raw Field note), the client-facing Description, and a Repair recorded line showing what remediation was logged for that finding (or that none was set). Note that Action/Status and Repair recorded are two independent signals and should agree.',
     '',
     'Review the WHOLE report and flag issues in these categories:',
-    '- CONTRADICTION: the Description conflicts with the Action/Status, Severity, or Defect type of the finding. Examples: Action/Status says the item is open or monitor but the Description says it was repaired or replaced; Defect type is Sealant but the Description is about cracking; Severity is Low but the Description describes an urgent or critical condition.',
+    '- CONTRADICTION: the Description, Action/Status, Severity, Defect type, or Repair recorded line conflict with each other. Examples: Action/Status says the item is open or monitor but a repair is logged on the Repair recorded line (or the Description says it was repaired or replaced); Action/Status says it was repaired but the Repair recorded line says no repair was performed or none was set; the Repair recorded line describes a repair that does not match the Defect type (for example Defect type is Sealant but the repair is mortar repointing); Repair recorded says monitoring only but the Description implies the issue was already fixed; Defect type is Sealant but the Description is about cracking; Severity is Low but the Description describes an urgent or critical condition.',
     '- MISSING: the Description is empty or too thin to be client-ready.',
-    '- PROOFREAD: grammar, spelling, or clearly awkward wording in a Description.',
+    '- PROOFREAD: grammar, spelling, or clearly awkward wording in a Description, or repair/remediation wording left in the condition Description that now duplicates the Repair recorded line and should be removed from the description.',
     '- CONSISTENCY: terminology or style that is inconsistent across findings (for example "sealant" versus "caulking" used interchangeably, mixed verb tense or voice, inconsistent units or capitalization).',
     '',
-    'Rules: Only flag real, specific issues. Do not restate the description. Keep each note to one concise sentence that says what is wrong and how to fix it.',
+    'Rules: Only flag real, specific issues. Do not restate the description. Keep each note to one concise sentence that says what is wrong and how to fix it. Do not flag a finding merely because its Repair recorded line says no repair decision was set - that is a normal in-progress state; only raise a repair issue when there is an actual conflict between the repair, the status, the defect type, or the description.',
     'Return ONLY a JSON array (no prose, no code fences). Each element must be {"finding": <number>, "type": "CONTRADICTION|MISSING|PROOFREAD|CONSISTENCY", "note": "<one sentence>"}. If a CONSISTENCY issue spans findings, reference the most relevant finding number. If there are no issues at all, return [].',
     '',
     'FINDINGS:',
@@ -6148,6 +6223,7 @@ The first sentence describes the condition; the second explains the consequence 
 Rules:
 - Be precise, professional, and plain-spoken. No jargon-dumping, no filler phrases, no alarmism.
 - Keep it concise: 2 to 4 sentences.
+- Describe only the observed condition and its consequence. Do not state any repair or remediation work that was performed — that is recorded separately. If the draft you are given includes a sentence about a repair (e.g. "a spot repair was completed", "sealant was applied", "the joint was re-sealed"), drop it and keep only the condition and what it means for the building.
 - Ground the consequence in the condition actually observed, and explain the typical, expected implication of that condition (for example, a failed sealant joint admits water). Never invent specific unobserved damage, costs, measurements, or causes that were not provided.
 - When the inspector's own past descriptions or style rules are provided, match their voice, terminology, and structure closely, while keeping the content specific to the current finding and never copying facts from the examples.`;
 
@@ -6161,7 +6237,7 @@ Field observations: ${finds}
 DESCRIPTION TO IMPROVE:
 ${draft}
 ${_defInstruction ? '\nADDITIONAL INSTRUCTION (follow this carefully): ' + _defInstruction + '\n' : ''}
-Rewrite it so it first states the observed condition, then explains what that condition means for the building in plain language. Return only the improved description text — no preamble or quotation marks.`;
+Rewrite it so it first states the observed condition, then explains what that condition means for the building in plain language. Describe the condition only — do not include any repair or remediation work that was performed (that is recorded separately on this finding). Return only the improved description text — no preamble or quotation marks.`;
 
     try {
         const response = await fetch(AI_ENDPOINT, {
@@ -6686,6 +6762,13 @@ function renderReportBuilder() {
     const sevOpts = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
       .map(s => `<option value="${s}"${s === sev ? ' selected' : ''}>${s}</option>`).join('');
 
+    const _rt = (REPORT_META.repairType && REPORT_META.repairType[nodeId]) || '';
+    const _repairOpts = '<option value="">— Was a repair done here? —</option>'
+      + '<option value="none"' + (_rt === 'none' ? ' selected' : '') + '>No repair — recommend monitoring</option>'
+      + '<optgroup label="Repair performed during inspection">'
+      + Object.keys(RB_REPAIR_TEMPLATES).map(k => '<option value="' + k + '"' + (_rt === k ? ' selected' : '') + '>' + RB_REPAIR_TEMPLATES[k].label + '</option>').join('')
+      + '</optgroup>';
+
     const tagChips = tags.length
       ? tags.map(t => `<span style="display:inline-block;padding:2px 9px;font-size:0.68rem;font-weight:bold;border-radius:3px;background:#2a2d38;color:#aaa;border:1px solid #444;">${rbEsc(t)}</span>`).join(' ')
       : '<span style="color:#555;font-size:0.72rem;">no defect type tagged</span>';
@@ -6831,6 +6914,17 @@ function renderReportBuilder() {
           <button onclick="document.getElementById('rb-defect-claude-${nodeId}').style.display='none'"
             style="padding:8px 14px;background:#222;color:#888;border:1px solid #444;border-radius:4px;cursor:pointer;font-size:0.8rem;">Keep mine</button>
         </div>
+      </div>
+
+      <div style="margin-bottom:12px;background:#0d1117;border:1px solid #2a2d38;border-radius:8px;padding:11px 12px;">
+        <label style="font-size:0.68rem;color:#888;text-transform:uppercase;font-weight:bold;letter-spacing:0.5px;display:block;margin-bottom:5px;">Repair performed <span style="color:#555;font-weight:normal;text-transform:none;letter-spacing:0;">(adds a distinct paragraph; "No repair" adds a monitoring note)</span></label>
+        <select onchange="rbSetRepairType('${nodeId}', this.value)"
+          style="width:100%;padding:8px 10px;background:#111;border:1px solid #2a2d38;color:#fff;border-radius:6px;font-size:0.82rem;cursor:pointer;box-sizing:border-box;font-weight:bold;">
+          ${_repairOpts}
+        </select>
+        <textarea id="rb-repairdesc-ta-${nodeId}" oninput="rbSetRepairDesc('${nodeId}', this.value)" placeholder="What was done — auto-fills from the type above; edit freely, or write your own for 'Other'."
+          style="width:100%;min-height:54px;background:#111;border:1px solid #2a2d38;color:#fff;border-radius:6px;padding:9px 10px;margin-top:7px;font-family:inherit;font-size:0.84rem;line-height:1.45;resize:vertical;box-sizing:border-box;">${rbEsc(REPORT_META.repairDesc[nodeId] || '')}</textarea>
+        <div id="rb-repair-hint-${nodeId}" style="font-size:0.66rem;color:#666;margin-top:5px;line-height:1.4;">${rbRepairHint(_rt)}</div>
       </div>
 
       <div style="margin-bottom:12px;">
@@ -7145,6 +7239,7 @@ function rbBuildReportHTML() {
       <div class="defect-body">
         ${tags.length ? `<div class="defect-tags">${tags.map(t => `<span>${rbEsc(t)}</span>`).join('')}</div>` : ''}
         <div class="defect-desc">${rbEsc(desc)}</div>
+        ${rbRepairBlockHTML(nodeId)}
         ${_estimate ? `<div class="defect-estimate"><span class="est-label">Estimated Repair</span><span class="est-value">${rbEsc(_estimate)}</span></div>` : ''}
         ${items.length ? `<div class="photos${items.length<=3 ? ' ph-'+items.length : ''}">${photoCells}</div>` : '<p class="nophoto">No photographs included for this finding.</p>'}
       </div>
@@ -7323,6 +7418,11 @@ function rbBuildReportHTML() {
   .status-pill { font-size: 8pt; font-weight: 800; letter-spacing: 0.6px; padding: 4px 11px; border-radius: 3px; text-transform: uppercase; margin-left: 6px; }
   .status-pill.status-repaired { background: #0a4d2a; color: #fff; }
   .status-pill.status-monitor { background: #fff3d6; color: #8a6d00; border: 1px solid #d4a900; }
+  .remediation { margin-top: 10px; padding: 9px 12px; background: #eef4fb; border-left: 3px solid #1a2942; border-radius: 0 4px 4px 0; }
+  .remediation.rem-monitor { background: #fff8e8; border-left-color: #c79100; }
+  .rem-label { display: block; font-size: 7.5pt; font-weight: bold; letter-spacing: 0.6px; text-transform: uppercase; color: #1a2942; font-family: Arial, sans-serif; margin-bottom: 3px; }
+  .remediation.rem-monitor .rem-label { color: #8a6d00; }
+  .rem-text { font-size: 9.5pt; line-height: 1.55; color: #2a3744; }
   .sev-pill.sev-CRITICAL { background: var(--crit); }
   .sev-pill.sev-HIGH { background: var(--high); }
   .sev-pill.sev-MEDIUM { background: var(--med); color: #2a2008; }
