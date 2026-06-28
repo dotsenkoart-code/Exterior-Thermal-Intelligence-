@@ -6137,7 +6137,19 @@ async function rbEnhanceDefect(nodeId, useInstruction) {
     const finds = node.finds || node.label || '';
     const loc   = rbLocation(nodeId.split('-')[0], nodeId.split('-')[1], nodeId.split('-')[2]) || '';
 
-    const systemPrompt = `You are a senior building envelope consultant writing client-facing defect descriptions for inspection reports. Write for property managers and building owners — intelligent but not technical engineers. Be precise, professional, and action-oriented. Never use filler phrases. Keep descriptions concise (2-4 sentences). When the inspector's own past descriptions or style rules are provided, match their voice, structure, terminology and preferences closely \u2014 while keeping the content specific to the current finding and never copying facts from the examples.`;
+    const systemPrompt = `You are a senior building envelope consultant writing client-facing defect descriptions for facade inspection reports. Your readers are property managers and building owners — intelligent, but not engineers.
+
+Every description does two things. First, it states the specific condition observed: what is wrong, where, and what it looks like. Then it explains what that condition actually means in practical terms — the consequence for the building, in plain language, so a non-technical reader understands why it matters. Translate the defect into its real-world implication; do not just name it.
+
+Follow this target style and structure:
+"The silicone perimeter sealant at the window head had lost adhesion and pulled away from the substrate, leaving an open joint. In this state the joint no longer sheds water and provides a direct path for moisture into the wall assembly."
+The first sentence describes the condition; the second explains the consequence (water is no longer kept out of the wall). Match this approach, structure, and voice — not these specific facts.
+
+Rules:
+- Be precise, professional, and plain-spoken. No jargon-dumping, no filler phrases, no alarmism.
+- Keep it concise: 2 to 4 sentences.
+- Ground the consequence in the condition actually observed, and explain the typical, expected implication of that condition (for example, a failed sealant joint admits water). Never invent specific unobserved damage, costs, measurements, or causes that were not provided.
+- When the inspector's own past descriptions or style rules are provided, match their voice, terminology, and structure closely, while keeping the content specific to the current finding and never copying facts from the examples.`;
 
     const userPrompt = `Improve this defect description for a facade inspection report.
 
@@ -6149,7 +6161,7 @@ Field observations: ${finds}
 DESCRIPTION TO IMPROVE:
 ${draft}
 ${_defInstruction ? '\nADDITIONAL INSTRUCTION (follow this carefully): ' + _defInstruction + '\n' : ''}
-Return only the improved description text. No preamble or quotation marks.`;
+Rewrite it so it first states the observed condition, then explains what that condition means for the building in plain language. Return only the improved description text — no preamble or quotation marks.`;
 
     try {
         const response = await fetch(AI_ENDPOINT, {
