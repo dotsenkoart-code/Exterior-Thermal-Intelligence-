@@ -6460,6 +6460,11 @@ function renderReportBuilder() {
           title="Generate a static PDF for printing, signing, and archiving">
           🖨 Generate PDF
         </button>
+        <button onclick="generateReportPDF(true)"
+          style="padding:14px 22px;background:#15233a;color:#a78bfa;border:1px solid #6d4fb3;border-radius:8px;font-weight:900;font-size:0.95rem;letter-spacing:0.5px;cursor:pointer;text-transform:uppercase;white-space:nowrap;"
+          title="Beta: paginate with Paged.js for a page-numbered Table of Contents and running page footers. Compare against the standard PDF before relying on it.">
+          📑 PDF + Page #s (beta)
+        </button>
       </div>
     </div>
 
@@ -7164,7 +7169,10 @@ function rbBuildLimitations() {
     </div>`;
 }
 
-function rbBuildReportHTML() {
+function rbBuildReportHTML(opts) {
+  opts = opts || {};
+  var _paged = !!opts.paged;
+  var _tocModel = [];
   const cands = rbCandidates().filter(c => rbIsIncluded(c.nodeId));
   if (!cands.length) { showToast('No defects selected for the report.', 3500, true); return; }
 
@@ -7182,15 +7190,21 @@ function rbBuildReportHTML() {
 
   let defectsHtml = '';
   let _globalIdx = 0;
+  var _sortMode = REPORT_META.sortBy || 'status';
+  var _emitTiers = (_sortMode === 'status' || _sortMode === 'severity');
   rbGroupCandidates(cands).forEach(({ label: _groupLabel, items: _groupItems }) => {
+    var _groupSlug = _groupLabel ? ('grp-' + _groupLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')) : 'grp-all';
+    var _groupAnchor = 'rbtoc-' + _groupSlug;
+    var _lastTier = null;
     if (_groupLabel) {
+      _tocModel.push({ kind: 'group', id: _groupAnchor, label: _groupLabel, count: _groupItems.length });
       // Section intro text for the Status-sorted groups
       var _introMap = {
         'Outstanding \u2014 Requires Attention': 'The following conditions were identified during the inspection and remain unaddressed. They are presented in order of severity, beginning with the most critical. These items require the owner\'s review and authorization to proceed with remediation.',
         'Repaired During This Engagement': 'The following conditions were identified and remediated during this engagement, presented in order of severity. No further action is required for these items beyond the routine monitoring noted where applicable.'
       };
       var _introTxt = _introMap[_groupLabel] || '';
-      defectsHtml += `<div style="margin:26px 0 ${_introTxt ? '4px' : '12px'};padding:9px 14px;background:#f0f4f8;border-left:5px solid #1a2942;border-radius:0 4px 4px 0;page-break-after:avoid;">
+      defectsHtml += `<div id="${_groupAnchor}" style="margin:26px 0 ${_introTxt ? '4px' : '12px'};padding:9px 14px;background:#f0f4f8;border-left:5px solid #1a2942;border-radius:0 4px 4px 0;page-break-after:avoid;">
         <span style="font-size:11pt;text-transform:uppercase;font-weight:bold;letter-spacing:1.2px;color:#1a2942;font-family:Arial,sans-serif;">${rbEsc(_groupLabel)}</span>
         <span style="font-size:9pt;color:#6b7a8f;margin-left:10px;font-family:Arial,sans-serif;">${_groupItems.length} finding${_groupItems.length!==1?'s':''}</span>
       </div>`;
@@ -7202,6 +7216,13 @@ function rbBuildReportHTML() {
     const idx = _globalIdx++;
     const { nodeId, node, drop, floor, pos } = c;
     const sev = rbSeverity(nodeId, node);
+    var _tierAttr = '';
+    if (_emitTiers && sev !== _lastTier) {
+      _lastTier = sev;
+      var _tierId = 'rbtoc-' + _groupSlug + '-' + sev;
+      _tierAttr = ' id="' + _tierId + '"';
+      _tocModel.push({ kind: 'tier', id: _tierId, sev: sev, parent: _groupSlug });
+    }
     const desc = (M.desc[nodeId] != null ? M.desc[nodeId] : (node.notes || '')) || 'No description provided.';
     const tags = rbTags(nodeId, node);
     const _allItems = rbPhotoItems(node);
@@ -7221,7 +7242,7 @@ function rbBuildReportHTML() {
     const _estimate = REPORT_META.estimates[nodeId] || '';
     const _sevLabel = sev.charAt(0) + sev.slice(1).toLowerCase();
     defectsHtml += `
-    <section class="defect">
+    <section class="defect"${_tierAttr}>
       <div class="defect-head">
         <div class="defect-sevbar sev-${sev}"></div>
         <div class="defect-num">${idx + 1}</div>
@@ -7267,7 +7288,7 @@ function rbBuildReportHTML() {
       </div>`;
     }).join('');
     monitoringHtml = `
-    <div class="mon-wrap">
+    <div class="mon-wrap" id="rbtoc-monitoring">
       <div class="mon-card">
         <div class="mon-head">
           <div class="t">Areas for Monitoring</div>
@@ -7315,6 +7336,54 @@ function rbBuildReportHTML() {
     : _autoFindingsSummary;
   const _credLine = M.inspectorCreds ? `<div style="font-size:8.5pt;color:#6b7a8f;margin-top:3px;">${rbEsc(M.inspectorCreds)}</div>` : '';
 
+  // ── Table of Contents (data-driven, matches current report order) ─────────
+  var _sevLabelMap = { CRITICAL: 'Critical', HIGH: 'High', MEDIUM: 'Medium', LOW: 'Low' };
+  function _tocRow(level, label, anchor, extra) {
+    return '<a class="rb-toc-row lvl-' + level + '" href="#' + anchor + '">'
+      + '<span class="rb-toc-txt">' + label + (extra ? ' <span class="rb-toc-meta">' + extra + '</span>' : '') + '</span></a>';
+  }
+  var _tocRows = '';
+  _tocRows += _tocRow(1, 'Property &amp; Scope', 'rbtoc-sec-01');
+  _tocRows += _tocRow(1, 'Executive Summary', 'rbtoc-sec-02');
+  _tocRows += _tocRow(1, 'Detailed Findings', 'rbtoc-sec-03');
+  _tocModel.forEach(function (e) {
+    if (e.kind === 'group') _tocRows += _tocRow(2, rbEsc(e.label), e.id, e.count + ' finding' + (e.count !== 1 ? 's' : ''));
+    else if (e.kind === 'tier') _tocRows += _tocRow(3, (_sevLabelMap[e.sev] || e.sev), e.id);
+  });
+  if (monCandidates.length) _tocRows += _tocRow(2, 'Areas for Monitoring', 'rbtoc-monitoring', monCandidates.length + ' location' + (monCandidates.length !== 1 ? 's' : ''));
+  _tocRows += _tocRow(1, 'Recommendations', 'rbtoc-sec-04');
+  var tocHtml = `
+  <div class="page-break"></div>
+  <div class="page rb-toc-page">
+    <div class="sect-head"><span class="sect-num">&mdash;</span><span class="sect-title">Contents</span></div>
+    <nav class="rb-toc">${_tocRows}</nav>
+  </div>`;
+
+  // Paged.js: gated head injection (page numbers + running footer) — off unless opts.paged
+  var _pagedHead = _paged ? `
+  <style>
+    .rb-toc-row::after { content: target-counter(attr(href), page); }
+    @page { @bottom-center { content: counter(page) " of " counter(pages); font-family: Arial, sans-serif; font-size: 8pt; color: #6b7a8f; } }
+    @page :first { @bottom-center { content: none; } }
+  </style>
+  <script>window.PagedConfig = { auto: true, after: function(){ setTimeout(function(){ try { window.focus(); } catch(e){} window.print(); }, 350); } };<\/script>
+  <script src="https://unpkg.com/pagedjs@0.4.3/dist/paged.polyfill.js"><\/script>` : '';
+
+  // Classic print path: wait for images, then print. Suppressed in paged mode (Paged.js prints after pagination).
+  var _tailScript = _paged ? '' : `<script>
+  (function(){
+    var imgs = Array.prototype.slice.call(document.images);
+    var pending = imgs.filter(function(i){ return !i.complete; }).length;
+    function go(){ setTimeout(function(){ window.focus(); window.print(); }, 400); }
+    if (!pending) { go(); return; }
+    imgs.forEach(function(i){
+      if (i.complete) return;
+      i.addEventListener('load',  function(){ if(--pending<=0) go(); });
+      i.addEventListener('error', function(){ if(--pending<=0) go(); });
+    });
+  })();
+  <\/script>`;
+
   const doc = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${building} — Facade Inspection Report</title>
 <style>
   @page { size: letter; margin: 24mm 0; }
@@ -7339,6 +7408,20 @@ function rbBuildReportHTML() {
   h1,h2,h3,h4 { font-family: Georgia, 'Times New Roman', serif; font-weight: 600; color: var(--navy); }
 
   /* ---------- COVER ---------- */
+  /* ---------- TABLE OF CONTENTS ---------- */
+  .rb-toc-page { padding: 0 20mm; }
+  .rb-toc { margin-top: 16px; }
+  .rb-toc-row { display: flex; align-items: baseline; text-decoration: none; color: var(--ink); padding: 5px 0; border-bottom: 1px dotted #c8d2de; }
+  .rb-toc-row::after { content: ''; margin-left: auto; padding-left: 12px; font-size: 9.5pt; color: var(--slate); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .rb-toc-txt { font-size: 10.5pt; }
+  .rb-toc-meta { font-size: 8.5pt; color: var(--grey); }
+  .rb-toc-row.lvl-1 { font-weight: 700; color: var(--navy); margin-top: 11px; border-bottom-color: #aab8c8; }
+  .rb-toc-row.lvl-1 .rb-toc-txt { font-size: 11pt; font-family: Georgia, 'Times New Roman', serif; }
+  .rb-toc-row.lvl-2 { padding-left: 16px; }
+  .rb-toc-row.lvl-2 .rb-toc-txt { font-size: 10pt; }
+  .rb-toc-row.lvl-3 { padding-left: 36px; border-bottom: none; padding-top: 2px; padding-bottom: 2px; }
+  .rb-toc-row.lvl-3 .rb-toc-txt { font-size: 9.5pt; color: var(--slate); }
+
   .cover { min-height: 100vh; display: flex; flex-direction: column; padding: 0; }
   .cover-band { background: var(--navy); color: #fff; padding: 26mm 20mm 18mm; }
   .wordmark { font-family: Georgia, serif; font-size: 22pt; font-weight: 600; letter-spacing: 0.5px; color: #fff; }
@@ -7538,7 +7621,7 @@ function rbBuildReportHTML() {
   /* ---------- PRINT BUTTON ---------- */
   .printbtn { position: fixed; top: 14px; right: 14px; background: var(--navy); color: #fff; border: none; padding: 12px 18px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 10pt; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 999; }
   @media print { .printbtn { display: none; } }
-</style></head><body>
+</style>${_pagedHead}</head><body>
   <button class="printbtn" onclick="window.print()">Print / Save as PDF</button>
 
   <!-- COVER -->
@@ -7568,10 +7651,12 @@ function rbBuildReportHTML() {
     </div>
   </div>
 
+  ${tocHtml}
+
   <!-- PROPERTY & SCOPE -->
   <div class="page-break"></div>
   <div class="page">
-    <div class="sect-head"><span class="sect-num">01</span><span class="sect-title">Property &amp; Scope</span></div>
+    <div class="sect-head" id="rbtoc-sec-01"><span class="sect-num">01</span><span class="sect-title">Property &amp; Scope</span></div>
     ${_propertyHtml ? `<h4 class="subhead">Property Description</h4>${_propertyHtml}` : ''}
     <h4 class="subhead">Scope &amp; Methodology</h4>
     ${_scopeHtml}
@@ -7583,7 +7668,7 @@ function rbBuildReportHTML() {
   <!-- EXECUTIVE SUMMARY -->
   <div class="page-break"></div>
   <div class="page">
-    <div class="sect-head"><span class="sect-num">02</span><span class="sect-title">Executive Summary</span></div>
+    <div class="sect-head" id="rbtoc-sec-02"><span class="sect-num">02</span><span class="sect-title">Executive Summary</span></div>
 
     <div class="dash">
       <div class="dash-card dash-total"><div class="dash-num">${_totalFindings}</div><div class="dash-lbl">Total Findings</div></div>
@@ -7599,7 +7684,7 @@ function rbBuildReportHTML() {
   <!-- FINDINGS -->
   <div class="page-break"></div>
   <div class="page">
-    <div class="sect-head"><span class="sect-num">03</span><span class="sect-title">Detailed Findings</span></div>
+    <div class="sect-head" id="rbtoc-sec-03"><span class="sect-num">03</span><span class="sect-title">Detailed Findings</span></div>
     ${defectsHtml}
     ${monitoringHtml}
   </div>
@@ -7607,7 +7692,7 @@ function rbBuildReportHTML() {
   <!-- RECOMMENDATIONS -->
   <div class="page-break"></div>
   <div class="page">
-    <div class="sect-head"><span class="sect-num">04</span><span class="sect-title">Recommendations</span></div>
+    <div class="sect-head" id="rbtoc-sec-04"><span class="sect-num">04</span><span class="sect-title">Recommendations</span></div>
     ${_recsHtml}
 
     <h4 class="subhead" style="margin-top:30px;">Limitations of Assessment</h4>
@@ -7623,28 +7708,16 @@ function rbBuildReportHTML() {
     </div>
   </div>
 
-<script>
-  (function(){
-    var imgs = Array.prototype.slice.call(document.images);
-    var pending = imgs.filter(function(i){ return !i.complete; }).length;
-    function go(){ setTimeout(function(){ window.focus(); window.print(); }, 400); }
-    if (!pending) { go(); return; }
-    imgs.forEach(function(i){
-      if (i.complete) return;
-      i.addEventListener('load',  function(){ if(--pending<=0) go(); });
-      i.addEventListener('error', function(){ if(--pending<=0) go(); });
-    });
-  })();
-<\/script>
+${_tailScript}
 </body></html>`;
 
   return doc;
 }
 
-function generateReportPDF() {
+function generateReportPDF(paged) {
   let doc;
   try {
-    doc = rbBuildReportHTML();
+    doc = rbBuildReportHTML({ paged: !!paged });
   } catch (err) {
     console.error('[PDF] rbBuildReportHTML threw:', err);
     showToast('[!] Report build error: ' + (err && err.message ? err.message : err), 9000, true);
