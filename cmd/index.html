@@ -5917,7 +5917,7 @@ function rbConfirmReport() {
 
 
 // ── AI Executive Summary Enhancement ────────────────────────────────────────
-async function rbEnhanceWithClaude() {
+async function rbEnhanceWithClaude(useInstruction) {
   const ta = document.getElementById('rb-exec-ta') || document.getElementById('rb-exec');
   if (!ta) return;
   const draft = ta.value.trim();
@@ -6894,8 +6894,8 @@ function renderReportBuilder() {
             <div id="rb-dc-orig-${nodeId}" style="font-size:0.8rem;color:#aaa;line-height:1.5;background:#0a0a0a;padding:8px;border-radius:4px;min-height:40px;white-space:pre-wrap;"></div>
           </div>
           <div>
-            <div style="font-size:0.62rem;color:#a78bfa;text-transform:uppercase;font-weight:bold;margin-bottom:4px;">AI version</div>
-            <div id="rb-dc-ai-${nodeId}" style="font-size:0.8rem;color:#fff;line-height:1.5;background:#0a0a14;padding:8px;border-radius:4px;min-height:40px;white-space:pre-wrap;">…</div>
+            <div style="font-size:0.62rem;color:#a78bfa;text-transform:uppercase;font-weight:bold;margin-bottom:4px;">AI version <span style="color:#555;font-weight:normal;text-transform:none;letter-spacing:0;">— editable, tweak before using</span></div>
+            <div id="rb-dc-ai-${nodeId}" contenteditable="true" spellcheck="true" style="font-size:0.8rem;color:#fff;line-height:1.5;background:#0a0a14;padding:8px;border-radius:4px;min-height:40px;white-space:pre-wrap;outline:none;border:1px solid #2a2d38;cursor:text;">…</div>
           </div>
         </div>
         <div style="margin-bottom:10px;">
