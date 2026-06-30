@@ -5060,29 +5060,22 @@ function rbEsc(s) {
 
 // ── data readers (all derived from real Strata state) ───────────────────────
 function rbMonitoringCandidates() {
-  // Returns flagged nodes NOT in the repair planner — shown as "Areas for Monitoring"
-  const out = [];
-  Object.keys(inspectionData).forEach(drop => {
-    Object.keys(inspectionData[drop]).map(Number).sort((a,b) => a-b).forEach(floor => {
-      const posOrder = { L:1, C:2, R:3 };
-      Object.keys(inspectionData[drop][floor])
-        .sort((a,b) => (posOrder[a]||9)-(posOrder[b]||9))
-        .forEach(pos => {
-          const node = inspectionData[drop][floor][pos];
-          if (!node) return;
-          const nodeId = drop+'-'+floor+'-'+pos;
-          const isFlagged = node.status === 'status-flagged';
-          const inPlanner = !!repairPriorities[nodeId];
-          if (isFlagged && !inPlanner) out.push({ nodeId, node, drop, floor:+floor, pos });
-        });
+  // Areas for Monitoring = every included finding still awaiting repair — exactly the set behind
+  // the report builder's "Monitor" tab (included AND not repaired), so the two counts always agree.
+  // The previous version collected only nodes with status 'status-flagged', which silently dropped
+  // not-yet-repaired confirmed defects and manually-added findings (e.g. manual defects saved as
+  // "confirmed" rather than "flagged").
+  const posOrder = { L:1, C:2, R:3 };
+  return rbCandidates()
+    .filter(function(c){ return rbIsIncluded(c.nodeId) && !c.isFixed; })
+    .sort(function(a, b){
+      var am = !!a.isManual, bm = !!b.isManual;
+      if (am !== bm) return am ? 1 : -1;                 // grid windows first, manual defects last
+      if (am && bm) return 0;
+      if (a.drop !== b.drop) return String(a.drop).localeCompare(String(b.drop));
+      if ((a.floor||0) !== (b.floor||0)) return (a.floor||0) - (b.floor||0);
+      return (posOrder[a.pos]||9) - (posOrder[b.pos]||9);
     });
-  });
-  // Manual defects that are flagged
-  Object.values(manualDefects).forEach(node => {
-    if (node.status === 'status-flagged' && !repairPriorities[node.id])
-      out.push({ nodeId:node.id, node, drop:'MANUAL', floor:node.floor||0, pos:'', isManual:true });
-  });
-  return out;
 }
 
 function rbDefaultSeverity(nodeId, node) {
@@ -5506,6 +5499,16 @@ function rbSetVerified(nodeId, on) {
   if (on) REPORT_META.verified[nodeId] = true;
   else delete REPORT_META.verified[nodeId];
   saveReportMeta();
+  renderReportBuilder();
+}
+// Clears every "Verified" check so the user can run a fresh verification pass over all findings.
+function rbResetVerification() {
+  var n = REPORT_META.verified ? Object.keys(REPORT_META.verified).length : 0;
+  if (!n) { showToast('Nothing is marked verified yet.', 2500); return; }
+  if (!confirm('Start a new verification pass?\n\nThis clears the "Verified" check on all ' + n + ' finding' + (n !== 1 ? 's' : '') + ' so you can review everything again from scratch. Descriptions, repairs, and photos are not affected.')) return;
+  REPORT_META.verified = {};
+  saveReportMeta();
+  showToast('Verification reset \u2014 ' + n + ' cleared. Fresh pass ready.', 3500);
   renderReportBuilder();
 }
 // The exact ordered list Focus Mode navigates (mirrors the on-screen findings view filter).
@@ -6510,6 +6513,7 @@ function renderReportBuilder() {
         bar('\u270E Written', writtenCount, wPct, '#1fd0a5', '#f39c12') +
         bar('\u2713 Verified', verifiedCount, vPct, '#28a745', '#888') +
         '<div style="font-size:0.6rem;color:#666;margin-top:2px;">Written = has a description. Verified = you\'ve double-checked it (tick the box on each finding).</div>' +
+        (verifiedCount > 0 ? '<button onclick="rbResetVerification()" title="Clear all verified checkmarks and review everything again" style="margin-top:9px;padding:5px 11px;border-radius:6px;border:1px solid #444;background:#1a1a1a;color:#999;font-size:0.66rem;font-weight:bold;cursor:pointer;">\u21bb Start a new verification pass</button>' : '') +
       '</div>';
     })();
   let html = `
@@ -7416,11 +7420,11 @@ function rbBuildReportHTML(opts) {
       <div class="mon-card">
         <div class="mon-head">
           <div class="t">Areas for Monitoring</div>
-          <div class="s">${monCandidates.length} location${monCandidates.length!==1?'s':''} flagged for observation — not requiring immediate remediation at time of inspection</div>
+          <div class="s">${monCandidates.length} finding${monCandidates.length!==1?'s':''} observed during the inspection and not remediated during this engagement — carried forward for monitoring and follow-up</div>
         </div>
         ${monRows}
         <div style="padding:12px 16px;font-size:8.5pt;color:#6b7a8f;font-style:italic;border-top:1px solid #e9edf2;">
-          These areas exhibited minor anomalies at the time of inspection that do not meet the threshold for immediate remediation. A visual re-assessment is recommended at the next scheduled inspection.
+          The findings listed above were observed during this inspection and were not remediated during this engagement. Each should be monitored for change and addressed in accordance with the severity and recommended timeframe noted for it in the detailed findings above. A re-assessment of these conditions is recommended at the next scheduled inspection.
         </div>
       </div>
     </div>`;
@@ -7474,7 +7478,7 @@ function rbBuildReportHTML(opts) {
     if (e.kind === 'group') _tocRows += _tocRow(2, rbEsc(e.label), e.id, e.count + ' finding' + (e.count !== 1 ? 's' : ''));
     else if (e.kind === 'tier') _tocRows += _tocRow(3, (_sevLabelMap[e.sev] || e.sev), e.id);
   });
-  if (monCandidates.length) _tocRows += _tocRow(2, 'Areas for Monitoring', 'rbtoc-monitoring', monCandidates.length + ' location' + (monCandidates.length !== 1 ? 's' : ''));
+  if (monCandidates.length) _tocRows += _tocRow(2, 'Areas for Monitoring', 'rbtoc-monitoring', monCandidates.length + ' finding' + (monCandidates.length !== 1 ? 's' : ''));
   _tocRows += _tocRow(1, 'Recommendations', 'rbtoc-sec-04');
   var tocHtml = `
   <div class="page-break"></div>
