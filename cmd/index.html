@@ -5483,7 +5483,7 @@ function rbReportPreviewCSS() {
   '.rb-pdf-preview .remediation.rem-monitor{background:#fff8e8;border-left-color:#c79100;}' +
   '.rb-pdf-preview .rem-label{display:block;font-size:7.5pt;font-weight:bold;letter-spacing:0.6px;text-transform:uppercase;color:#1a2942;font-family:Arial,sans-serif;margin-bottom:3px;}' +
   '.rb-pdf-preview .remediation.rem-monitor .rem-label{color:#8a6d00;}' +
-  '.rb-pdf-preview .rem-text{font-size:9.5pt;line-height:1.55;color:#2a3744;}' +
+  '.rb-pdf-preview .rem-text{font-size:9.5pt;line-height:1.55;color:#2a3744;white-space:pre-line;}' +
   '.rb-pdf-preview .photos{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px;align-items:start;}' +
   '.rb-pdf-preview .photos.ph-1{grid-template-columns:minmax(0,62%);justify-content:center;}' +
   '.rb-pdf-preview .photos.ph-3 .ph:nth-child(3){grid-column:1 / -1;width:calc(50% - 6px);margin-left:auto;margin-right:auto;}' +
@@ -5658,6 +5658,7 @@ function rbSetRepairDesc(nodeId, val) {
 // in the card, or pick "Other" to write a one-off for an unusual repair.
 var RB_REPAIR_TEMPLATES = {
   sealant:   { label: 'Sealant spot repair',            text: 'During this inspection, the deteriorated sealant was removed, the substrate was cleaned and prepared, and fresh sealant was applied as a spot repair.' },
+  sealantcorr: { label: 'Sealant over corroded substrate (interim)', text: 'Deteriorated sealant was removed, and the underlying corroded substrate was mechanically prepared via wire brushing (SSPC-SP 2) to remove loose oxidation. The joint was then solvent-wiped (SSPC-SP 1) to establish a chemically clean bond line prior to the application of fresh sealant.\nNote: As this interim maintenance repair was performed without abrasive blasting or a rust-inhibiting primer, the underlying metal should be monitored during future inspection cycles for recurring corrosion.' },
   backerrod: { label: 'Backer rod + sealant',           text: 'During this inspection, the joint was prepared, a backer rod was installed to the correct depth, and an appropriate sealant was applied.' },
   perimeter: { label: 'Full-perimeter window reseal',   text: 'During this inspection, the joint substrate was prepared and fresh sealant was applied around the entire window perimeter.' },
   masonry:   { label: 'Masonry / terracotta patch',     text: 'During this inspection, the affected area was patched as an interim measure to stabilize the condition pending permanent repair.' },
@@ -5665,10 +5666,13 @@ var RB_REPAIR_TEMPLATES = {
   touchup:   { label: 'Precautionary sealant touch-up', text: 'As a precautionary measure, a spot sealant touch-up was applied during this inspection.' },
   custom:    { label: 'Other (type it below)',          text: '' }
 };
+// Canonical monitoring recommendation for "No repair — recommend monitoring". This is the exact
+// text the report renders, and it now also auto-fills the editable box so the two never differ.
+var RB_MONITOR_TEXT = 'No repair was performed at this location during the inspection. Recommend monitoring this area and re-evaluating at the next scheduled inspection to confirm the condition has not progressed.';
 // Short hint shown under the picker so it's obvious what the choice will render.
 function rbRepairHint(t) {
   if (!t) return 'No repair paragraph is added until you choose an option.';
-  if (t === 'none') return 'A monitoring recommendation will be added to this finding instead of a repair paragraph.';
+  if (t === 'none') return 'The monitoring recommendation below is exactly what appears in the report — edit it if you like.';
   if (t === 'custom') return 'Type exactly what was done in the box below; it renders as the "Remediation performed" paragraph.';
   return 'Auto-filled below from the standard wording for this repair — edit freely; your text is what renders.';
 }
@@ -5686,7 +5690,13 @@ function rbSetRepairType(nodeId, val) {
       REPORT_META.repairDesc[nodeId] = RB_REPAIR_TEMPLATES[val].text;
       if (ta) ta.value = RB_REPAIR_TEMPLATES[val].text;
     }
-  } else if (val === 'none' || !val) {
+  } else if (val === 'none') {
+    var curN = REPORT_META.repairDesc[nodeId];
+    if (!curN || !curN.trim()) {
+      REPORT_META.repairDesc[nodeId] = RB_MONITOR_TEXT;
+      if (ta) ta.value = RB_MONITOR_TEXT;
+    } else if (ta) { ta.value = curN; }
+  } else if (!val) {
     delete REPORT_META.repairDesc[nodeId];
     if (ta) ta.value = '';
   } // 'custom' keeps whatever is already typed
@@ -5700,9 +5710,10 @@ function rbRepairBlockHTML(nodeId) {
   var t = (REPORT_META.repairType && REPORT_META.repairType[nodeId]) || '';
   if (!t) return '';
   if (t === 'none') {
+    var mtxt = (REPORT_META.repairDesc && REPORT_META.repairDesc[nodeId] && REPORT_META.repairDesc[nodeId].trim())
+      ? REPORT_META.repairDesc[nodeId] : RB_MONITOR_TEXT;
     return '<div class="remediation rem-monitor"><span class="rem-label">Recommendation</span>' +
-      '<span class="rem-text">No repair was performed at this location during the inspection. ' +
-      'Recommend monitoring this area and re-evaluating at the next scheduled inspection to confirm the condition has not progressed.</span></div>';
+      '<span class="rem-text">' + rbEsc(mtxt) + '</span></div>';
   }
   var txt = (REPORT_META.repairDesc && REPORT_META.repairDesc[nodeId] && REPORT_META.repairDesc[nodeId].trim())
     ? REPORT_META.repairDesc[nodeId]
@@ -6273,6 +6284,88 @@ function rbAcceptDefectClaude(nodeId) {
     saveReportMeta();
     if (panel) panel.style.display = 'none';
     showToast('[OK] AI description applied', 2500);
+}
+
+async function rbEnhanceRepair(nodeId, useInstruction) {
+    const ta = document.getElementById('rb-repairdesc-ta-' + nodeId);
+    const panel = document.getElementById('rb-rep-claude-' + nodeId);
+    const origEl = document.getElementById('rb-rep-orig-' + nodeId);
+    const aiEl   = document.getElementById('rb-rep-ai-' + nodeId);
+    if (!ta || !panel) return;
+    const draft = ta.value.trim();
+    if (!draft) { showToast('Add some repair text first, then polish it.', 3000, true); return; }
+
+    let _repInstruction = '';
+    if (useInstruction) {
+        const _ri = document.getElementById('rb-rep-instruction-' + nodeId);
+        _repInstruction = _ri ? _ri.value.trim() : '';
+    }
+
+    panel.style.display = 'block';
+    origEl.textContent = draft;
+    aiEl.textContent = '…';
+
+    var _rt = (REPORT_META.repairType && REPORT_META.repairType[nodeId]) || '';
+    var _repairLabel = _rt === 'none' ? 'Monitoring recommendation (no repair performed)'
+        : (RB_REPAIR_TEMPLATES[_rt] ? RB_REPAIR_TEMPLATES[_rt].label : 'Repair performed');
+    const loc = rbLocation(nodeId.split('-')[0], nodeId.split('-')[1], nodeId.split('-')[2]) || '';
+
+    const systemPrompt = `You are a senior building envelope consultant documenting facade repair and remediation work for a professional inspection report read by property managers and building owners. You write precise, professional descriptions of work that was performed, in the measured, technical-but-readable voice of a building envelope professional.
+
+The text you are given describes either the remediation work that was performed at a finding, or — where no repair was done — a monitoring recommendation. Preserve which of those two it is.
+
+Rules:
+- Improve the clarity, precision, and professionalism of the wording only. Do NOT add any repair step, material, product, primer, surface preparation, or industry standard that is not already present in the text. Recording work that was not performed would falsify the report.
+- Keep it factual and specific to the work described. No filler, no marketing language, no alarmism.
+- Concise: 1 to 4 sentences. If the text contains an explicit "Note:" caveat, keep it as its own line.
+- If relevant standards (such as SSPC surface-preparation designations) are already named in the text, preserve them exactly; never invent new ones.
+- Return only the improved text — no preamble, no quotation marks.`;
+
+    const userPrompt = `Improve the wording of this repair / remediation note for a facade inspection report.
+
+Location: ${loc}
+Repair type: ${_repairLabel}
+${_repInstruction ? '\nADDITIONAL INSTRUCTION (follow this carefully): ' + _repInstruction + '\n' : ''}
+TEXT TO IMPROVE:
+${draft}
+
+Improve clarity and professionalism without adding any step, material, or standard not already stated. Return only the improved text.`;
+
+    try {
+        const response = await fetch(AI_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: 'claude-sonnet-4-6',
+                max_tokens: 500,
+                system: systemPrompt,
+                messages: [{ role: 'user', content: userPrompt }]
+            })
+        });
+        const data = await response.json();
+        const enhanced = data.content && data.content[0] && data.content[0].text
+            ? data.content[0].text.trim() : null;
+        if (!enhanced) throw new Error('No response');
+        aiEl.textContent = enhanced;
+    } catch(err) {
+        aiEl.textContent = 'Enhancement failed — check your connection.';
+        console.error('[Claude repair enhance]', err);
+    }
+}
+
+function rbAcceptRepairClaude(nodeId) {
+    const aiEl = document.getElementById('rb-rep-ai-' + nodeId);
+    const ta   = document.getElementById('rb-repairdesc-ta-' + nodeId);
+    const panel = document.getElementById('rb-rep-claude-' + nodeId);
+    if (!aiEl || !ta) return;
+    const enhanced = aiEl.textContent.trim();
+    if (!enhanced || enhanced === '…') return;
+    ta.value = enhanced;
+    if (!REPORT_META.repairDesc) REPORT_META.repairDesc = {};
+    REPORT_META.repairDesc[nodeId] = enhanced;
+    saveReportMeta();
+    if (panel) panel.style.display = 'none';
+    showToast('[OK] AI repair note applied', 2500);
 }
 
 function rbEnlargePhoto(key, kind) {
@@ -6928,8 +7021,39 @@ function renderReportBuilder() {
           ${_repairOpts}
         </select>
         <textarea id="rb-repairdesc-ta-${nodeId}" oninput="rbSetRepairDesc('${nodeId}', this.value)" placeholder="What was done — auto-fills from the type above; edit freely, or write your own for 'Other'."
-          style="width:100%;min-height:54px;background:#111;border:1px solid #2a2d38;color:#fff;border-radius:6px;padding:9px 10px;margin-top:7px;font-family:inherit;font-size:0.84rem;line-height:1.45;resize:vertical;box-sizing:border-box;">${rbEsc(REPORT_META.repairDesc[nodeId] || '')}</textarea>
+          style="width:100%;min-height:54px;background:#111;border:1px solid #2a2d38;color:#fff;border-radius:6px;padding:9px 10px;margin-top:7px;font-family:inherit;font-size:0.84rem;line-height:1.45;resize:vertical;box-sizing:border-box;">${rbEsc((REPORT_META.repairDesc[nodeId] && REPORT_META.repairDesc[nodeId].trim()) ? REPORT_META.repairDesc[nodeId] : (_rt === 'none' ? RB_MONITOR_TEXT : ''))}</textarea>
         <div id="rb-repair-hint-${nodeId}" style="font-size:0.66rem;color:#666;margin-top:5px;line-height:1.4;">${rbRepairHint(_rt)}</div>
+        <button onclick="rbEnhanceRepair('${nodeId}')"
+          style="margin-top:8px;padding:6px 12px;background:#1a0a2a;color:#a78bfa;border:1px solid #a78bfa;border-radius:6px;font-size:0.7rem;font-weight:bold;cursor:pointer;">✦ AI — polish this repair note</button>
+        <div id="rb-rep-claude-${nodeId}" style="display:none;background:#0a0a0f;border:1px solid #a78bfa;border-radius:8px;padding:12px;margin-top:10px;">
+          <div style="color:#a78bfa;font-size:0.72rem;font-weight:bold;margin-bottom:8px;">✦ AI Enhancement — choose a version:</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+            <div>
+              <div style="font-size:0.62rem;color:#555;text-transform:uppercase;font-weight:bold;margin-bottom:4px;">Your version</div>
+              <div id="rb-rep-orig-${nodeId}" style="font-size:0.8rem;color:#aaa;line-height:1.5;background:#0a0a0a;padding:8px;border-radius:4px;min-height:40px;white-space:pre-wrap;"></div>
+            </div>
+            <div>
+              <div style="font-size:0.62rem;color:#a78bfa;text-transform:uppercase;font-weight:bold;margin-bottom:4px;">AI version <span style="color:#555;font-weight:normal;text-transform:none;letter-spacing:0;">— editable, tweak before using</span></div>
+              <div id="rb-rep-ai-${nodeId}" contenteditable="true" spellcheck="true" style="font-size:0.8rem;color:#fff;line-height:1.5;background:#0a0a14;padding:8px;border-radius:4px;min-height:40px;white-space:pre-wrap;outline:none;border:1px solid #2a2d38;cursor:text;">…</div>
+            </div>
+          </div>
+          <div style="margin-bottom:10px;">
+            <label style="font-size:0.6rem;color:#a78bfa;text-transform:uppercase;font-weight:bold;letter-spacing:0.5px;display:block;margin-bottom:4px;">Refine with an instruction (optional)</label>
+            <div style="display:flex;gap:6px;">
+              <input type="text" id="rb-rep-instruction-${nodeId}" placeholder="e.g. add that a backer rod was installed; make it more technical..."
+                onkeypress="if(event.key==='Enter')rbEnhanceRepair('${nodeId}',true)"
+                style="flex:1;padding:7px 9px;background:#0a0a14;border:1px solid #a78bfa;color:#fff;border-radius:4px;font-size:0.76rem;box-sizing:border-box;">
+              <button onclick="rbEnhanceRepair('${nodeId}',true)"
+                style="flex-shrink:0;padding:7px 12px;background:#1a0a2a;color:#a78bfa;border:1px solid #a78bfa;border-radius:4px;font-weight:bold;cursor:pointer;font-size:0.76rem;white-space:nowrap;">↻ Re-enhance</button>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button onclick="rbAcceptRepairClaude('${nodeId}')"
+              style="flex:1;padding:8px;background:#a78bfa;color:#000;border:none;border-radius:4px;font-weight:bold;cursor:pointer;font-size:0.8rem;">✓ Use AI version</button>
+            <button onclick="document.getElementById('rb-rep-claude-${nodeId}').style.display='none'"
+              style="padding:8px 14px;background:#222;color:#888;border:1px solid #444;border-radius:4px;cursor:pointer;font-size:0.8rem;">Keep mine</button>
+          </div>
+        </div>
       </div>
 
       <div style="margin-bottom:12px;">
@@ -7505,7 +7629,7 @@ function rbBuildReportHTML(opts) {
   .remediation.rem-monitor { background: #fff8e8; border-left-color: #c79100; }
   .rem-label { display: block; font-size: 7.5pt; font-weight: bold; letter-spacing: 0.6px; text-transform: uppercase; color: #1a2942; font-family: Arial, sans-serif; margin-bottom: 3px; }
   .remediation.rem-monitor .rem-label { color: #8a6d00; }
-  .rem-text { font-size: 9.5pt; line-height: 1.55; color: #2a3744; }
+  .rem-text { font-size: 9.5pt; line-height: 1.55; color: #2a3744; white-space: pre-line; }
   .sev-pill.sev-CRITICAL { background: var(--crit); }
   .sev-pill.sev-HIGH { background: var(--high); }
   .sev-pill.sev-MEDIUM { background: var(--med); color: #2a2008; }
