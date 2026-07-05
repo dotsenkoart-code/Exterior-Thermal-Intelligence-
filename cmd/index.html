@@ -6902,7 +6902,7 @@ function renderReportBuilder() {
               style="position:absolute;top:4px;right:32px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,0.7);border:1px solid rgba(255,255,255,0.5);color:#fff;font-size:0.75rem;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:3;">🔍</button>
             <button onclick="event.stopPropagation();openAnnotationEditor('${it.key}', '${it.kind === 'visual' ? 'dc' : 'ir'}', '${nodeId}')" title="Crop, circle, label this photo"
               style="position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:rgba(31,208,165,0.85);border:1px solid #1fd0a5;color:#000;font-size:0.72rem;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:3;">✎</button>
-            ${(imageBank[it.key] && imageBank[it.key]._annotated) ? `<button onclick="event.stopPropagation();rbDeleteAnnotatedPhoto('${nodeId}','${it.key}')" title="Delete this highlighted copy (keeps the original)"
+            ${(String(it.key).indexOf('_ANNOT_') !== -1 || (imageBank[it.key] && imageBank[it.key]._annotated)) ? `<button onclick="event.stopPropagation();rbDeleteAnnotatedPhoto('${nodeId}','${it.key}')" title="Delete this highlighted copy (keeps the original)"
               style="position:absolute;top:4px;left:4px;width:24px;height:24px;border-radius:50%;background:rgba(200,40,40,0.92);border:1px solid #ff5b5b;color:#fff;font-size:0.72rem;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:3;">🗑</button>` : ''}
             <button onclick="rbRotatePhoto('${nodeId}','${it.key}','${it.kind}')" title="Rotate photo"
               style="position:absolute;bottom:0;left:0;right:0;padding:2px;background:rgba(241,196,15,0.85);border:none;color:#000;font-size:0.55rem;font-weight:bold;cursor:pointer;border-radius:0 0 5px 5px;">↻ ROTATE</button>
@@ -8791,7 +8791,8 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
 // no longer bloats the saved JSON. Originals and un-annotated photos are never touched here.
 function rbDeleteAnnotatedPhoto(nodeId, key) {
   var img = imageBank[key];
-  if (!img || !img._annotated) { showToast('Only highlighted copies can be deleted here.', 2600, true); return; }
+  var isAnnot = String(key).indexOf('_ANNOT_') !== -1 || (img && img._annotated);
+  if (!isAnnot) { showToast('Only highlighted copies can be deleted here.', 2600, true); return; }
   if (!confirm('Delete this highlighted copy?\n\nThe annotated image is removed from the report and from the saved file, so it no longer adds to the file size. The original photo it was made from is kept.')) return;
   var node = getNodeData(nodeId);
   if (node) {
