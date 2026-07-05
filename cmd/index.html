@@ -6902,6 +6902,8 @@ function renderReportBuilder() {
               style="position:absolute;top:4px;right:32px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,0.7);border:1px solid rgba(255,255,255,0.5);color:#fff;font-size:0.75rem;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:3;">🔍</button>
             <button onclick="event.stopPropagation();openAnnotationEditor('${it.key}', '${it.kind === 'visual' ? 'dc' : 'ir'}', '${nodeId}')" title="Crop, circle, label this photo"
               style="position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:rgba(31,208,165,0.85);border:1px solid #1fd0a5;color:#000;font-size:0.72rem;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:3;">✎</button>
+            ${(imageBank[it.key] && imageBank[it.key]._annotated) ? `<button onclick="event.stopPropagation();rbDeleteAnnotatedPhoto('${nodeId}','${it.key}')" title="Delete this highlighted copy (keeps the original)"
+              style="position:absolute;top:4px;left:4px;width:24px;height:24px;border-radius:50%;background:rgba(200,40,40,0.92);border:1px solid #ff5b5b;color:#fff;font-size:0.72rem;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:3;">🗑</button>` : ''}
             <button onclick="rbRotatePhoto('${nodeId}','${it.key}','${it.kind}')" title="Rotate photo"
               style="position:absolute;bottom:0;left:0;right:0;padding:2px;background:rgba(241,196,15,0.85);border:none;color:#000;font-size:0.55rem;font-weight:bold;cursor:pointer;border-radius:0 0 5px 5px;">↻ ROTATE</button>
             <div style="position:absolute;top:4px;left:4px;display:flex;gap:3px;">
@@ -8267,7 +8269,7 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
   var dragMode = null;      // 'move' | 'rotate' | null
   var dragStart = null;     // {x,y} where drag began
   var curTool = 'circle';
-  var curColor = '#ff2d2d';
+  var curColor = '#ffffff';
   var curWidth = 5;
   var imgScale = 1;         // displayed-size / natural-size
   var _edited = false;      // true once any crop or annotation has been applied
@@ -8350,27 +8352,37 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
       ctx.rotate(s.rot * Math.PI / 180);
       ctx.translate(-c.x, -c.y);
     }
-    ctx.strokeStyle = s.color;
-    ctx.lineWidth = s.width;
+    // Uniform report styling: every mark renders as a BOLD line with a BLACK outline
+    // underneath, so it stays crisp on light OR dark areas of any photo and looks the
+    // same across the whole report. The line color defaults to white (see curColor);
+    // if another color is picked it still gets the black outline for legibility.
+    var _oline = Math.max(2, Math.round(s.width * 0.6)); // black outline width per side
+    var _fill = s.color || '#fff';
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+    var _pass = function(strokeIt){
+      ctx.strokeStyle = '#000'; ctx.lineWidth = s.width + _oline * 2; strokeIt();
+      ctx.strokeStyle = _fill;  ctx.lineWidth = s.width;             strokeIt();
+    };
     if (s.tool === 'circle') {
-      ctx.beginPath();
       var cx = (s.x1 + s.x2)/2, cy = (s.y1 + s.y2)/2;
       var rx = Math.abs(s.x2 - s.x1)/2, ry = Math.abs(s.y2 - s.y1)/2;
-      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2);
-      ctx.stroke();
+      _pass(function(){ ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2); ctx.stroke(); });
     } else if (s.tool === 'box') {
-      ctx.strokeRect(Math.min(s.x1,s.x2), Math.min(s.y1,s.y2), Math.abs(s.x2-s.x1), Math.abs(s.y2-s.y1));
+      var bx = Math.min(s.x1,s.x2), by = Math.min(s.y1,s.y2), bw = Math.abs(s.x2-s.x1), bh = Math.abs(s.y2-s.y1);
+      _pass(function(){ ctx.strokeRect(bx, by, bw, bh); });
     } else if (s.tool === 'arrow') {
-      drawArrow(s.x1, s.y1, s.x2, s.y2, s.width, s.color);
+      drawArrow(s.x1, s.y1, s.x2, s.y2, s.width + _oline * 2, '#000');
+      drawArrow(s.x1, s.y1, s.x2, s.y2, s.width, _fill);
     } else if (s.tool === 'free') {
-      ctx.beginPath();
-      if (s.points && s.points.length) {
-        ctx.moveTo(s.points[0].x, s.points[0].y);
-        for (var i=1;i<s.points.length;i++) ctx.lineTo(s.points[i].x, s.points[i].y);
-      }
-      ctx.stroke();
+      _pass(function(){
+        ctx.beginPath();
+        if (s.points && s.points.length) {
+          ctx.moveTo(s.points[0].x, s.points[0].y);
+          for (var i=1;i<s.points.length;i++) ctx.lineTo(s.points[i].x, s.points[i].y);
+        }
+        ctx.stroke();
+      });
     } else if (s.tool === 'text') {
       var fs = s.fontSize || 28;
       ctx.font = 'bold ' + fs + 'px Arial, sans-serif';
@@ -8379,10 +8391,13 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
       var metrics = ctx.measureText(s.text || '');
       var boxW = metrics.width + padding*2;
       var boxH = fs + padding*2;
-      // Semi-opaque background for legibility on any photo
-      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      // Black plate keeps labels readable; text is outlined in black then filled (white default)
+      ctx.fillStyle = 'rgba(0,0,0,0.65)';
       ctx.fillRect(s.x1, s.y1, boxW, boxH);
-      ctx.fillStyle = s.color;
+      ctx.lineWidth = Math.max(2, fs * 0.06);
+      ctx.strokeStyle = '#000';
+      ctx.strokeText(s.text || '', s.x1 + padding, s.y1 + padding);
+      ctx.fillStyle = _fill;
       ctx.fillText(s.text || '', s.x1 + padding, s.y1 + padding);
     }
     ctx.restore();
@@ -8769,7 +8784,32 @@ function openAnnotationEditor(sourceKey, kind, nodeId) {
 
   // Defaults
   setActiveTool('circle');
-  setActiveColor('#ff2d2d');
+  setActiveColor('#ffffff');
+}
+
+// Delete an annotated copy (the "highlighted" version) — removes it from every store so it
+// no longer bloats the saved JSON. Originals and un-annotated photos are never touched here.
+function rbDeleteAnnotatedPhoto(nodeId, key) {
+  var img = imageBank[key];
+  if (!img || !img._annotated) { showToast('Only highlighted copies can be deleted here.', 2600, true); return; }
+  if (!confirm('Delete this highlighted copy?\n\nThe annotated image is removed from the report and from the saved file, so it no longer adds to the file size. The original photo it was made from is kept.')) return;
+  var node = getNodeData(nodeId);
+  if (node) {
+    if (node.photos) { var i = node.photos.indexOf(key); if (i !== -1) node.photos.splice(i, 1); }
+    if (node.embeddedPhotoData) delete node.embeddedPhotoData[key];
+  }
+  if (manualLinks[nodeId]) { var j = manualLinks[nodeId].indexOf(key); if (j !== -1) manualLinks[nodeId].splice(j, 1); }
+  if (REPORT_META.photoOff && REPORT_META.photoOff[nodeId]) {
+    REPORT_META.photoOff[nodeId] = REPORT_META.photoOff[nodeId].filter(function(sel){ return String(sel).indexOf(key) === -1; });
+  }
+  delete photoRotations[key + ':ir'];
+  delete photoRotations[key + ':dc'];
+  delete photoRotations[key];
+  delete imageBank[key];
+  if (typeof saveCommandState === 'function') saveCommandState();
+  if (typeof updatePhotoStat === 'function') updatePhotoStat();
+  if (typeof renderReportBuilder === 'function') renderReportBuilder();
+  showToast('[OK] Highlighted copy deleted — original kept', 2800);
 }
 
 function restoreManualDefectPhotos(){
