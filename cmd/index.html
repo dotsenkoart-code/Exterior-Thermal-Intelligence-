@@ -3471,6 +3471,7 @@ let rbFocusMode = false;    // productivity mode: show one finding at a time
 let rbFocusIndex = 0;       // which finding is currently shown in focus mode
 let rbFocusNodeId = null;   // the nodeId of the current focus finding (survives re-sorting)
 let rbSkipWritten = true;   // focus mode: Back/Next skip findings that already have a description
+let rbSkipVerified = false; // focus mode: Back/Next skip findings already verified (verification pass)
 let rbReviewed = {};        // nodeId -> true when user has stepped past/marked it reviewed
 let rpGroupBy       = 'defect';
 let rpActiveElev    = '';
@@ -5558,26 +5559,44 @@ function rbNextUnwrittenIndex(cands, start, dir, inclusive) {
   }
   return -1;
 }
+// "Verified" == the user has ticked the double-checked box on this finding.
+function rbIsVerifiedC(c) {
+  return !!(REPORT_META.verified && REPORT_META.verified[c.nodeId]);
+}
+// First index (from `start` in direction `dir`) whose finding still needs verifying. -1 if none.
+function rbNextUnverifiedIndex(cands, start, dir, inclusive) {
+  var i = inclusive ? start : start + dir;
+  for (; i >= 0 && i < cands.length; i += dir) {
+    if (!rbIsVerifiedC(cands[i])) return i;
+  }
+  return -1;
+}
 function rbToggleFocusMode() {
   rbFocusMode = !rbFocusMode;
   if (rbFocusMode) {
     rbFocusIndex = 0; rbFocusNodeId = null;
-    // Land on the first finding that still needs a description (when skipping written).
-    if (rbSkipWritten) {
+    // Land on the first finding that still needs attention for the active pass.
+    if (rbSkipVerified) {
+      var candsV = rbViewCands();
+      var tv = rbNextUnverifiedIndex(candsV, 0, 1, true);
+      if (tv !== -1) rbFocusIndex = tv;
+    } else if (rbSkipWritten) {
       var cands = rbViewCands();
       var t = rbNextUnwrittenIndex(cands, 0, 1, true);
       if (t !== -1) rbFocusIndex = t;
     }
   }
   renderReportBuilder();
-  if (rbFocusMode) showToast(rbSkipWritten
-    ? 'Focus Mode on — jumping through findings that still need a description. Toggle "All" to review everything.'
+  if (rbFocusMode) showToast(
+    rbSkipVerified ? 'Focus Mode on — jumping through findings that still need verifying.'
+    : rbSkipWritten ? 'Focus Mode on — jumping through findings that still need a description. Toggle "All" to review everything.'
     : 'Focus Mode on — reviewing one finding at a time. Use Back/Next to move.', 3200);
 }
 function rbToggleSkipWritten() {
   rbSkipWritten = !rbSkipWritten;
   // When switching to skip-written, hop to the nearest finding that needs writing.
   if (rbSkipWritten) {
+    rbSkipVerified = false; // the writing pass and verification pass are mutually exclusive
     var cands = rbViewCands();
     var cur = Math.max(0, Math.min(cands.length - 1, rbFocusIndex));
     if (cands.length && rbIsWritten(cands[cur])) {
@@ -5591,6 +5610,24 @@ function rbToggleSkipWritten() {
     ? 'Skipping written findings — Back/Next jump to the next one needing a description.'
     : 'Showing all findings — Back/Next step through every one.', 2600);
 }
+function rbToggleSkipVerified() {
+  rbSkipVerified = !rbSkipVerified;
+  // When switching to skip-verified, hop to the nearest finding that still needs verifying.
+  if (rbSkipVerified) {
+    rbSkipWritten = false; // mutually exclusive with the writing pass
+    var cands = rbViewCands();
+    var cur = Math.max(0, Math.min(cands.length - 1, rbFocusIndex));
+    if (cands.length && rbIsVerifiedC(cands[cur])) {
+      var t = rbNextUnverifiedIndex(cands, cur, 1, false);
+      if (t === -1) t = rbNextUnverifiedIndex(cands, 0, 1, true); // wrap to the first one
+      if (t !== -1) { rbFocusIndex = t; rbFocusNodeId = null; }
+    }
+  }
+  renderReportBuilder();
+  showToast(rbSkipVerified
+    ? 'Skipping verified findings — Back/Next jump to the next one still needing a verify-check.'
+    : 'Showing all findings — Back/Next step through every one.', 2600);
+}
 function rbFocusNav(dir) {
   // Clear the nodeId lock BEFORE moving so the index change actually takes effect
   // (otherwise the render would re-sync the index back to the current finding).
@@ -5599,7 +5636,12 @@ function rbFocusNav(dir) {
   var cands = rbViewCands();
   if (!cands.length) { renderReportBuilder(); return; }
   var anyUnwritten = cands.some(function(c){ return !rbIsWritten(c); });
-  if (rbSkipWritten && anyUnwritten) {
+  var anyUnverified = cands.some(function(c){ return !rbIsVerifiedC(c); });
+  if (rbSkipVerified && anyUnverified) {
+    // Verification pass: jump to the next finding (this direction) that still needs verifying.
+    var tv = rbNextUnverifiedIndex(cands, rbFocusIndex, dir, false);
+    if (tv !== -1) rbFocusIndex = tv;   // else: none left this way — stay put
+  } else if (rbSkipWritten && anyUnwritten) {
     // Jump to the next finding (in this direction) that still needs a description.
     var t = rbNextUnwrittenIndex(cands, rbFocusIndex, dir, false);
     if (t !== -1) rbFocusIndex = t;   // else: none left this way — stay put
@@ -6791,16 +6833,27 @@ function renderReportBuilder() {
     // Navigation bar — when "skip written" is on, Back/Next jump between findings that
     // still need a description, and the buttons disable when none remain in that direction.
     const _unwrittenTotal = _viewCands.filter(function(c){ return !rbIsWritten(c); }).length;
-    const _effectiveSkip = rbSkipWritten && _unwrittenTotal > 0;
-    const _hasPrev = _effectiveSkip ? (rbNextUnwrittenIndex(_viewCands, rbFocusIndex, -1, false) !== -1) : (rbFocusIndex > 0);
-    const _hasNext = _effectiveSkip ? (rbNextUnwrittenIndex(_viewCands, rbFocusIndex, 1, false) !== -1) : (rbFocusIndex < _viewCands.length - 1);
+    const _unverifiedTotal = _viewCands.filter(function(c){ return !rbIsVerifiedC(c); }).length;
+    const _skipVerActive = rbSkipVerified && _unverifiedTotal > 0;
+    const _skipWriActive = rbSkipWritten && _unwrittenTotal > 0;
+    const _hasPrev = _skipVerActive ? (rbNextUnverifiedIndex(_viewCands, rbFocusIndex, -1, false) !== -1)
+                   : _skipWriActive ? (rbNextUnwrittenIndex(_viewCands, rbFocusIndex, -1, false) !== -1)
+                   : (rbFocusIndex > 0);
+    const _hasNext = _skipVerActive ? (rbNextUnverifiedIndex(_viewCands, rbFocusIndex, 1, false) !== -1)
+                   : _skipWriActive ? (rbNextUnwrittenIndex(_viewCands, rbFocusIndex, 1, false) !== -1)
+                   : (rbFocusIndex < _viewCands.length - 1);
     const _atFirst = !_hasPrev;
     const _atLast = !_hasNext;
     const _curWritten = rbIsWritten(_cur);
-    const _counterMain = rbSkipWritten
+    const _curVerified = rbIsVerifiedC(_cur);
+    const _counterMain = rbSkipVerified
+      ? (_unverifiedTotal === 0 ? 'All findings verified \u2713' : '\u2713 ' + _unverifiedTotal + ' still need' + (_unverifiedTotal===1?'s':'') + ' verifying')
+      : rbSkipWritten
       ? (_unwrittenTotal === 0 ? 'All findings written \u2713' : '\u270E ' + _unwrittenTotal + ' still need' + (_unwrittenTotal===1?'s':'') + ' a description')
       : ('Finding ' + (rbFocusIndex+1) + ' of ' + _viewCands.length);
-    const _counterSub = rbSkipWritten
+    const _counterSub = rbSkipVerified
+      ? ('Finding ' + (rbFocusIndex+1) + ' of ' + _viewCands.length + (_curVerified ? ' \u00b7 already verified' : '') + ' \u00b7 skipping verified')
+      : rbSkipWritten
       ? ('Finding ' + (rbFocusIndex+1) + ' of ' + _viewCands.length + (_curWritten ? ' \u00b7 already written' : '') + ' \u00b7 skipping written')
       : 'Focus Mode \u2014 review one at a time';
     html += `
@@ -6816,6 +6869,7 @@ function renderReportBuilder() {
       <div style="display:flex;justify-content:center;gap:8px;margin-top:8px;">
         <button onclick="rbToggleFocusMode()" title="Leave Focus Mode" style="padding:6px 14px;border-radius:7px;cursor:pointer;font-size:0.72rem;font-weight:bold;border:1px solid #2a2d38;background:#0d1117;color:#888;">✕ Exit Focus</button>
         <button onclick="rbToggleSkipWritten()" title="When on, Back/Next skip findings that already have a description" style="padding:6px 14px;border-radius:7px;cursor:pointer;font-size:0.72rem;font-weight:bold;border:1px solid ${rbSkipWritten?'#a78bfa':'#2a2d38'};background:${rbSkipWritten?'#a78bfa':'#0d1117'};color:${rbSkipWritten?'#000':'#a78bfa'};">${rbSkipWritten?'●':'○'} Skip written</button>
+        <button onclick="rbToggleSkipVerified()" title="When on, Back/Next skip findings you've already verified — a clean pass through everything still needing a verify-check" style="padding:6px 14px;border-radius:7px;cursor:pointer;font-size:0.72rem;font-weight:bold;border:1px solid ${rbSkipVerified?'#28a745':'#2a2d38'};background:${rbSkipVerified?'#28a745':'#0d1117'};color:${rbSkipVerified?'#000':'#28a745'};">${rbSkipVerified?'●':'○'} Skip verified</button>
         <button onclick="rbToggleFocusPreview()" style="padding:6px 16px;border-radius:7px;cursor:pointer;font-size:0.72rem;font-weight:bold;border:1px solid ${rbFocusPreview?'#0cf':'#2a2d38'};background:${rbFocusPreview?'#0cf':'#0d1117'};color:${rbFocusPreview?'#000':'#0cf'};">${rbFocusPreview?'✎ Back to Editing':'\uD83D\uDC41 Preview as PDF'}</button>
       </div>
     </div>`;
