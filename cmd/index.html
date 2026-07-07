@@ -7432,7 +7432,7 @@ function rbBuildWorkCompletedSection() {
     var photosHtml = '';
     // Include up to 2 photos if available for this node
     if (r.node) {
-      var items = (typeof rbPhotoItems === 'function') ? rbPhotoItems(r.node) : [];
+      var items = (typeof rbPhotoItems === 'function') ? rbApplyPhotoOrder(r.nodeId, rbPhotoItems(r.node)) : [];
       if (items.length) {
         var shown = items.slice(0, 2).map(function(it){
           return '<div class="wc-photo ' + ((it.rot===90||it.rot===270)?'port':'land') + '"><img src="' + it.url + '" class="' + (it.rot===90?'rot90':it.rot===270?'rot270':it.rot===180?'rot180':'') + '"></div>';
@@ -7463,6 +7463,7 @@ function rbBuildLimitations() {
     <div class="limitations">
       <p>This report reflects the condition of the building façade as observed at the time of inspection and is based on visual and infrared thermographic assessment from rope-access drops and, where applicable, aerial imagery. Conditions concealed behind finishes, within wall assemblies, or otherwise not visually accessible at the time of inspection are excluded from this assessment.</p>
       <p>Infrared thermography indicates apparent thermal anomalies that are commonly associated with subsurface moisture, air leakage, or material discontinuity; thermographic findings are indicative and may warrant confirmatory testing. Severity classifications and suggested timeframes provided in this report are observational recommendations intended to assist with maintenance planning; they do not constitute engineering determinations or code-compliance findings. This report does not constitute a structural engineering certification and should not be relied upon as such. It is prepared exclusively for the named client and for the building identified herein.</p>
+      <p>The inspection was non-destructive; no exploratory openings, material sampling, or laboratory testing were performed. Thermographic results reflect environmental conditions at the time of the survey, and building conditions may change after the inspection date — no representation is made regarding future performance. Services were performed in a manner consistent with the degree of care and skill ordinarily exercised by professionals providing similar services under similar conditions in the same locality; no other warranty, express or implied, is made. No third party may rely on this report without the prior written consent of Verticality Inc.</p>
     </div>`;
 }
 
@@ -7522,7 +7523,7 @@ function rbBuildReportHTML(opts) {
     }
     const desc = (M.desc[nodeId] != null ? M.desc[nodeId] : (node.notes || '')) || 'No description provided.';
     const tags = rbTags(nodeId, node);
-    const _allItems = rbPhotoItems(node);
+    const _allItems = rbApplyPhotoOrder(nodeId, rbPhotoItems(node));
     const items = _allItems.filter(it => rbIsPhotoOn(nodeId, it.key + ':' + it.kind));
     const unselectedPhotoCount = _allItems.length - items.length;
 
@@ -7572,7 +7573,7 @@ function rbBuildReportHTML(opts) {
       const loc   = rbLocation(drop, floor, pos, nodeId);
       const finds = rbEsc(rbMonitorProblem(nodeId, node));
       const notes = rbEsc(node.notes || '');
-      const items = rbPhotoItems(node);
+      const items = rbApplyPhotoOrder(nodeId, rbPhotoItems(node));
       const thumb = items.length
         ? `<img src="${items[0].url}" style="width:52px;height:52px;object-fit:cover;border-radius:4px;margin-left:12px;flex-shrink:0;border:1px solid #d8dee6;${items[0].rot ? 'transform:rotate(' + items[0].rot + 'deg);' : ''}">`
         : '';
@@ -8078,7 +8079,7 @@ function exportClientPackage() {
     const tag3d = saved3DTags[nodeId] || null;
 
     // Only include photos the user selected (teal-outlined in the workspace)
-    const allPhotos = rbPhotoItems(node);
+    const allPhotos = rbApplyPhotoOrder(nodeId, rbPhotoItems(node));
     const selectedPhotos = allPhotos.filter(it => rbIsPhotoOn(nodeId, it.key + ':' + it.kind));
     const unselectedCount = allPhotos.length - selectedPhotos.length;
     const photos = selectedPhotos.map(it => ({ kind: it.kind, key: it.key, dataUrl: it.url, rot: it.rot || 0 }));
@@ -8118,7 +8119,7 @@ function exportClientPackage() {
       location: rbLocation(drop, floor, pos, nodeId),
       finds:    rbMonitorProblem(nodeId, node),
       notes:    node.notes || '',
-      photos:   rbPhotoItems(node).slice(0,2).map(it => ({ kind:it.kind, dataUrl:it.url }))
+      photos:   rbApplyPhotoOrder(nodeId, rbPhotoItems(node)).slice(0,2).map(it => ({ kind:it.kind, dataUrl:it.url }))
     })),
     elevations:      elevations    || [],
     dropAssignments: dropAssignments || {},
