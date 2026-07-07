@@ -3082,13 +3082,13 @@ function addToRepairPlanner(nodeId) {
         <div style="display:flex;gap:6px;margin-bottom:12px;">
             <button onclick="rpPickPri(this,'HIGH')" data-pri="HIGH"
                 style="flex:1;padding:7px;font-size:0.8rem;font-weight:bold;border-radius:4px;border:1px solid #d9534f;background:transparent;color:#d9534f;cursor:pointer;">
-                ? HIGH</button>
+                HIGH</button>
             <button onclick="rpPickPri(this,'MED')" data-pri="MED"
                 style="flex:1;padding:7px;font-size:0.8rem;font-weight:bold;border-radius:4px;border:1px solid #f1c40f;background:transparent;color:#f1c40f;cursor:pointer;">
-                ? MED</button>
+                MED</button>
             <button onclick="rpPickPri(this,'LOW')" data-pri="LOW"
                 style="flex:1;padding:7px;font-size:0.8rem;font-weight:bold;border-radius:4px;border:1px solid #28a745;background:transparent;color:#28a745;cursor:pointer;">
-                ? LOW</button>
+                LOW</button>
         </div>
         <button onclick="rpConfirmAdd('${nodeId}')"
             style="width:100%;padding:10px;background:#f39c12;color:#000;border:none;border-radius:6px;font-weight:bold;font-size:0.9rem;cursor:pointer;">
@@ -6086,6 +6086,84 @@ function rbAcceptClaude() {
   showToast('[OK] AI version applied — review and confirm when ready', 3500);
 }
 
+// ── AI Findings-Summary Enhancement (the opening line of the Executive Summary) ──
+async function rbEnhanceFindingsSummary(useInstruction) {
+  const ta = document.getElementById('rb-findings-summary-ta');
+  if (!ta) return;
+  const draft = ta.value.trim();
+  if (!draft) { showToast('The findings summary is empty — nothing to enhance.', 3200, true); return; }
+
+  let _instruction = '';
+  if (useInstruction) {
+    const _el = document.getElementById('rb-fsum-instruction');
+    _instruction = _el ? _el.value.trim() : '';
+  }
+
+  const btn    = document.getElementById('btn-fsum-enhance');
+  const panel  = document.getElementById('rb-fsum-panel');
+  const status = document.getElementById('rb-fsum-status');
+  const origEl = document.getElementById('rb-fsum-orig');
+  const aiEl   = document.getElementById('rb-fsum-ai');
+  if (btn) { btn.textContent = '✦ Enhancing…'; btn.style.opacity = '0.6'; btn.disabled = true; }
+  if (panel) panel.style.display = 'block';
+  if (origEl) origEl.textContent = draft;
+  if (aiEl) aiEl.textContent = '…';
+  if (status) status.textContent = 'Calling AI…';
+
+  const cands = rbCandidates();
+  const found = cands.length;
+  const repaired = cands.filter(function(c){ return c.isFixed; }).length;
+  const monitor = found - repaired;
+  const critical = cands.filter(function(c){ return rbSeverity(c.nodeId, c.node) === 'CRITICAL'; }).length;
+  const high = cands.filter(function(c){ return rbSeverity(c.nodeId, c.node) === 'HIGH'; }).length;
+  const medium = cands.filter(function(c){ return rbSeverity(c.nodeId, c.node) === 'MEDIUM'; }).length;
+  const low = cands.filter(function(c){ return rbSeverity(c.nodeId, c.node) === 'LOW'; }).length;
+
+  const systemPrompt = `You are a senior building envelope consultant writing the opening findings-summary line of a facade inspection report for property managers and building owners — intelligent readers who are not engineers. This is a short, factual overview that opens the Executive Summary: how many conditions were found, how many were repaired on site, and how many remain for monitoring or follow-up. Keep it tight and professional — 1 to 3 sentences. Do not invent counts, severities, causes, or specifics that are not provided, and never contradict the numbers given. No filler, no alarmism, no quotation marks.`;
+
+  const userPrompt = [
+    'Improve the wording of this findings-summary line for a facade inspection report. Keep it factual and concise, and keep every count accurate to the figures below.',
+    '',
+    'Findings on record: ' + found + ' total \u2014 ' + repaired + ' repaired during the inspection, ' + monitor + ' remaining for monitoring/follow-up.',
+    'Severity mix: ' + critical + ' critical, ' + high + ' high, ' + medium + ' medium, ' + low + ' low.',
+    '',
+    'TEXT TO IMPROVE:',
+    draft,
+    (_instruction ? '\nADDITIONAL INSTRUCTION (follow this carefully): ' + _instruction + '\n' : ''),
+    'Return only the improved findings-summary text. No preamble, no quotation marks.'
+  ].join('\n');
+
+  try {
+    const response = await fetch(AI_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 500, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] })
+    });
+    const data = await response.json();
+    const enhanced = data.content && data.content[0] && data.content[0].text ? data.content[0].text.trim() : null;
+    if (!enhanced) throw new Error('No response from AI');
+    if (aiEl) aiEl.textContent = enhanced;
+    if (status) status.textContent = 'Ready — choose a version below';
+  } catch(err) {
+    if (aiEl) aiEl.textContent = 'Enhancement failed. Check your connection and try again.';
+    if (status) status.textContent = 'Error: ' + (err.message || 'unknown');
+    console.error('[Claude findings-summary enhance]', err);
+  } finally {
+    if (btn) { btn.textContent = '✦ Enhance with AI'; btn.style.opacity = '1'; btn.disabled = false; }
+  }
+}
+
+function rbAcceptFindingsSummaryClaude() {
+  const enhanced = document.getElementById('rb-fsum-ai')?.textContent?.trim();
+  if (!enhanced || enhanced === '…') return;
+  const ta = document.getElementById('rb-findings-summary-ta');
+  if (ta) { ta.value = enhanced; }
+  rbSetMeta('findingsSummary', enhanced);
+  const panel = document.getElementById('rb-fsum-panel');
+  if (panel) panel.style.display = 'none';
+  showToast('[OK] AI findings summary applied', 3000);
+}
+
 
 function rbApplyTemplate(nodeId, selectEl) {
   const val = selectEl.value;
@@ -6690,11 +6768,38 @@ function renderReportBuilder() {
             '</div>' +
           '</div>' +
           '<textarea id="rb-findings-summary-ta" oninput="rbSetMeta(\'findingsSummary\', this.value)" placeholder="' + auto.replace(/"/g,'&quot;') + '" ' +
-            'style="width:100%;min-height:70px;background:#111;border:1px solid #2a2d38;color:#fff;border-radius:6px;padding:11px;font-family:inherit;font-size:0.86rem;line-height:1.5;resize:vertical;box-sizing:border-box;">' + rbEsc(REPORT_META.findingsSummary || '') + '</textarea>' +
-          '<div style="display:flex;align-items:center;gap:8px;margin-top:6px;">' +
+            'style="width:100%;min-height:70px;background:#111;border:1px solid #2a2d38;color:#fff;border-radius:6px;padding:11px;font-family:inherit;font-size:0.86rem;line-height:1.5;resize:vertical;box-sizing:border-box;">' + rbEsc(REPORT_META.findingsSummary || auto) + '</textarea>' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap;">' +
+            '<button onclick="rbEnhanceFindingsSummary()" id="btn-fsum-enhance" style="padding:5px 11px;background:#1a0a2a;color:#a78bfa;border:1px solid #a78bfa;border-radius:5px;font-size:0.68rem;font-weight:bold;cursor:pointer;">✦ Enhance with AI</button>' +
             '<button onclick="rbSetMeta(\'findingsSummary\',\'\');renderReportBuilder();" style="padding:5px 10px;background:#0a1a14;color:#1fd0a5;border:1px solid #1fd0a5;border-radius:5px;font-size:0.68rem;font-weight:bold;cursor:pointer;">↻ Use auto-generated</button>' +
-            '<span style="font-size:0.64rem;color:#666;">Leave blank to auto-generate from the counts above. This appears at the top of the Executive Summary.</span>' +
-          '</div>';
+            '<span style="font-size:0.64rem;color:#666;">Edit freely, or enhance with AI. "Use auto-generated" resets to the counts above. This appears at the top of the Executive Summary.</span>' +
+          '</div>' +
+          `<div id="rb-fsum-panel" style="display:none;margin-top:12px;">
+            <div style="color:#a78bfa;font-size:0.72rem;font-weight:bold;margin-bottom:6px;">✦ AI Enhancement — <span id="rb-fsum-status" style="color:#888;font-weight:normal;">Ready</span></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+              <div>
+                <div style="font-size:0.62rem;color:#555;text-transform:uppercase;font-weight:bold;margin-bottom:4px;">Your version</div>
+                <div id="rb-fsum-orig" style="font-size:0.82rem;color:#aaa;line-height:1.55;background:#0a0a0a;padding:10px;border-radius:6px;min-height:50px;white-space:pre-wrap;"></div>
+              </div>
+              <div>
+                <div style="font-size:0.62rem;color:#a78bfa;text-transform:uppercase;font-weight:bold;margin-bottom:4px;">AI version <span style="color:#555;font-weight:normal;text-transform:none;letter-spacing:0;">— editable</span></div>
+                <div id="rb-fsum-ai" contenteditable="true" spellcheck="true" style="font-size:0.82rem;color:#fff;line-height:1.55;background:#0a0a14;padding:10px;border-radius:6px;min-height:50px;white-space:pre-wrap;outline:none;border:1px solid #2a2d38;cursor:text;">…</div>
+              </div>
+            </div>
+            <div style="margin-bottom:10px;">
+              <label style="font-size:0.62rem;color:#a78bfa;text-transform:uppercase;font-weight:bold;letter-spacing:0.5px;display:block;margin-bottom:4px;">Refine with an instruction (optional)</label>
+              <div style="display:flex;gap:8px;">
+                <input type="text" id="rb-fsum-instruction" placeholder="e.g. lead with the critical items; keep it to two sentences..."
+                  onkeypress="if(event.key==='Enter')rbEnhanceFindingsSummary(true)"
+                  style="flex:1;padding:8px 10px;background:#0a0a14;border:1px solid #a78bfa;color:#fff;border-radius:6px;font-size:0.8rem;box-sizing:border-box;">
+                <button onclick="rbEnhanceFindingsSummary(true)" style="flex-shrink:0;padding:8px 14px;background:#1a0a2a;color:#a78bfa;border:1px solid #a78bfa;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.8rem;white-space:nowrap;">↻ Re-enhance</button>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button onclick="rbAcceptFindingsSummaryClaude()" style="flex:1;padding:9px;background:#a78bfa;color:#000;border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:0.82rem;">✓ Use AI version</button>
+              <button onclick="document.getElementById('rb-fsum-panel').style.display='none'" style="padding:9px 16px;background:#222;color:#888;border:1px solid #444;border-radius:6px;cursor:pointer;font-size:0.82rem;">Keep mine</button>
+            </div>
+          </div>`;
       })()}
     </div>
 
