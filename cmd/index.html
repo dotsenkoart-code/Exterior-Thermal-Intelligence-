@@ -5731,7 +5731,15 @@ function rbSetRepairType(nodeId, val) {
   var ta = document.getElementById('rb-repairdesc-ta-' + nodeId);
   if (val && val !== 'none' && val !== 'custom') {
     var cur = REPORT_META.repairDesc[nodeId];
-    if (!cur || !cur.trim()) {
+    // Replace the text when it's empty OR still equals some library template / the monitor text
+    // (i.e. an unedited auto-fill from a previous selection) — so switching templates actually
+    // shows the new one. Genuinely hand-edited text is left untouched.
+    var curTrim = cur ? String(cur).trim() : '';
+    var isUnedited = !curTrim || (curTrim === RB_MONITOR_TEXT.trim()) ||
+      Object.keys(RB_REPAIR_TEMPLATES).some(function(k){
+        return RB_REPAIR_TEMPLATES[k].text && RB_REPAIR_TEMPLATES[k].text.trim() === curTrim;
+      });
+    if (isUnedited) {
       REPORT_META.repairDesc[nodeId] = RB_REPAIR_TEMPLATES[val].text;
       if (ta) ta.value = RB_REPAIR_TEMPLATES[val].text;
     }
@@ -6277,6 +6285,7 @@ Follow this target style and structure:
 The first sentence describes the condition; the second explains the consequence (water is no longer kept out of the wall). Match this approach, structure, and voice — not these specific facts.
 
 Rules:
+- The description you are given is the authoritative account of what was observed at this finding. Improve its wording — never contradict, reverse, or second-guess its meaning. If it describes a defect or condition, never rewrite it as clear, defect-free, satisfactory, or requiring no action.
 - Be precise, professional, and plain-spoken. No jargon-dumping, no filler phrases, no alarmism.
 - Keep it concise: 2 to 4 sentences.
 - Describe only the observed condition and its consequence. Do not state any repair or remediation work that was performed — that is recorded separately. If the draft you are given includes a sentence about a repair (e.g. "a spot repair was completed", "sealant was applied", "the joint was re-sealed"), drop it and keep only the condition and what it means for the building.
@@ -6288,7 +6297,6 @@ Rules:
 Location: ${loc}
 Severity: ${sev}
 Defect type: ${tags.join(', ') || 'General'}
-Field observations: ${finds}
 
 DESCRIPTION TO IMPROVE:
 ${draft}
@@ -7081,7 +7089,7 @@ function renderReportBuilder() {
           ${_repairOpts}
         </select>
         <textarea id="rb-repairdesc-ta-${nodeId}" oninput="rbSetRepairDesc('${nodeId}', this.value)" placeholder="What was done — auto-fills from the type above; edit freely, or write your own for 'Other'."
-          style="width:100%;min-height:54px;background:#111;border:1px solid #2a2d38;color:#fff;border-radius:6px;padding:9px 10px;margin-top:7px;font-family:inherit;font-size:0.84rem;line-height:1.45;resize:vertical;box-sizing:border-box;">${rbEsc((REPORT_META.repairDesc[nodeId] && REPORT_META.repairDesc[nodeId].trim()) ? REPORT_META.repairDesc[nodeId] : (_rt === 'none' ? RB_MONITOR_TEXT : ''))}</textarea>
+          style="width:100%;min-height:54px;background:#111;border:1px solid #2a2d38;color:#fff;border-radius:6px;padding:9px 10px;margin-top:7px;font-family:inherit;font-size:0.84rem;line-height:1.45;resize:vertical;box-sizing:border-box;">${rbEsc((REPORT_META.repairDesc[nodeId] && REPORT_META.repairDesc[nodeId].trim()) ? REPORT_META.repairDesc[nodeId] : (_rt === 'none' ? RB_MONITOR_TEXT : (_rt && _rt !== 'custom' && RB_REPAIR_TEMPLATES[_rt] ? RB_REPAIR_TEMPLATES[_rt].text : '')))}</textarea>
         <div id="rb-repair-hint-${nodeId}" style="font-size:0.66rem;color:#666;margin-top:5px;line-height:1.4;">${rbRepairHint(_rt)}</div>
         <button onclick="rbEnhanceRepair('${nodeId}')"
           style="margin-top:8px;padding:6px 12px;background:#1a0a2a;color:#a78bfa;border:1px solid #a78bfa;border-radius:6px;font-size:0.7rem;font-weight:bold;cursor:pointer;">✦ AI — polish this repair note</button>
